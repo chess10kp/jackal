@@ -193,6 +193,16 @@ glob PROVIDER_ROUTES: dict[str, dict[str, any]] = {
         "key_env": "DEEPSEEK_API_KEY",
         "models": ["deepseek-chat", "deepseek-reasoner"],
     },
+    "zai": {
+        "description": "Z.ai GLM models (OpenAI-compatible)",
+        "base_url": "https://api.z.ai/api/paas/v4",
+        "base_url_env": "",
+        "key_env": "ZAI_API_KEY",
+        # Fallback hints; GET /models is not officially documented but
+        # works (auth-gated), so a live catalog replaces these when a
+        # ZAI_API_KEY is present.
+        "models": ["glm-4.6", "glm-4.5", "glm-4.5-air"],
+    },
     "openai_compat": {
         "description": "Any OpenAI-compatible chat-completions endpoint",
         "base_url": "https://api.openai.com/v1",
@@ -215,6 +225,7 @@ glob PROVIDER_ROUTES: dict[str, dict[str, any]] = {
 Dispatch:
   "openrouter/<model>"          -> "openrouter"
   "deepseek/<model>"            -> "deepseek"
+  "zai/<model>"                 -> "zai"
   "mock" | "mockllm" | "mock/*" -> "mock"
   "ext/<extension>/<model>"     -> "ext" (resolved via plugin bridge)
   anything else                 -> "openai_compat"
@@ -222,6 +233,7 @@ Dispatch:
 def provider_for(model: str) -> str {
     if model.startswith("openrouter/") { return "openrouter"; }
     if model.startswith("deepseek/") { return "deepseek"; }
+    if model.startswith("zai/") { return "zai"; }
     if model == "mock" or model == "mockllm" or model.startswith("mock/") {
         return "mock";
     }

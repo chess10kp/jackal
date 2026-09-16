@@ -302,6 +302,11 @@ test "make_transport binds explicit model and thinking per provider" {
     assert ds.model == "deepseek-chat";
     assert ds.thinking == "low";
 
+    z = make_transport("zai/glm-4.6", thinking="high");
+    assert z.base_url == "https://api.z.ai/api/paas/v4";
+    assert z.model == "glm-4.6";
+    assert z.thinking == "high";
+
     plain = make_transport("gpt-4o-mini", thinking="minimal");
     assert plain.model == "gpt-4o-mini";
     assert plain.thinking == "minimal";
