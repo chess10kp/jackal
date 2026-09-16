@@ -3,7 +3,7 @@ import os;
 import from tui.state { LiveShell }
 import from tui.core { _push_turn, _meter }
 import from tui.picker_base { _open_picker, _close_picker }
-import from agent.llm { PROVIDER_ROUTES, credential_error }
+import from agent.llm { PROVIDER_ROUTES, credential_error, catalog_models, routed_model_id }
 import from agent.session {
     model_preferences, get_model, set_model, get_history, restore_history, provider_for,
 }
@@ -42,19 +42,13 @@ def _model_picker_entries() -> dict {
         }
         rows.append(header + " ──");
         ids.append("__header__");
-        for m in (meta.get("models", []) or []) {
+        # Live catalog first (fx parity): fresh/last-good fetch of the
+        # route's /models endpoint, falling back to the static hints.
+        models = catalog_models(str(prov));
+        for m in models {
             mname = str(m);
-            # Advertise the ROUTED id: provider routing dispatches on the
-            # provider prefix, so bare catalog names like "deepseek-chat"
-            # misroute to openai_compat (wrong endpoint and credential
-            # check). Bare ids that already route here (mock, gpt-4o under
-            # openai_compat) stay bare. Display labels stay bare either way.
-            full = mname;
-            if provider_for(mname) != str(prov) {
-                full = str(prov) + "/" + mname;
-            }
             rows.append("  " + mname);
-            ids.append(full);
+            ids.append(routed_model_id(str(prov), mname));
         }
         last = str(prefs.get(str(prov), "") or "");
         if last {

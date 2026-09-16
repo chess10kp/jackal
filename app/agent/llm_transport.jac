@@ -230,6 +230,20 @@ def provider_for(model: str) -> str {
 }
 
 
+"""The id the MODEL picker must advertise for `name` under `provider`.
+
+Routing dispatches on the provider prefix, so bare catalog names like
+"deepseek-chat" misroute to openai_compat (wrong endpoint and credential
+check). Ids that already route to their advertising provider (mock,
+openrouter's nested vendor/model ids) pass through untouched."""
+def routed_model_id(provider: str, name: str) -> str {
+    if provider_for(name) == provider {
+        return name;
+    }
+    return provider + "/" + name;
+}
+
+
 """fx-style actionable credential check. Returns "" when the model is
 usable; otherwise ONE sentence naming the exact fix. Reads only os.environ
 and never raises.

@@ -315,6 +315,16 @@ test "make_transport binds explicit model and thinking per provider" {
 }
 
 
+test "routed_model_id prefixes bare ids and passes routed ids through" {
+    assert routed_model_id("deepseek", "deepseek-chat") == "deepseek/deepseek-chat";
+    assert routed_model_id("openrouter", "anthropic/claude-sonnet-5")
+        == "openrouter/anthropic/claude-sonnet-5";
+    # Already routes to its advertising provider: stays bare.
+    assert routed_model_id("openai_compat", "gpt-4o") == "gpt-4o";
+    assert routed_model_id("mock", "mock") == "mock";
+}
+
+
 test "unknown tool yields error result without crashing" {
     messages = [{"role": "user", "content": "go"}];
     spec = ScriptedTransport();

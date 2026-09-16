@@ -11,8 +11,14 @@ import from .llm_transport {
     PROVIDER_ROUTES,
     provider_for,
     credential_error,
+    routed_model_id,
     make_transport,
     make_ext_transport,
+}
+import from .model_catalog {
+    catalog_models,
+    warm_model_catalog,
+    refresh_model_catalog,
 }
 import from .llm_loop {
     ToolSpec,

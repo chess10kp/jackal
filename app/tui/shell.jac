@@ -10,6 +10,7 @@ import from tui.overlay { _render }
 import from tui.runtime { _apply_resize }
 import from tui.input { _tick_app, _handle_host_events }
 import from agent.session { session_boot, get_model, set_mode, get_mode }
+import from agent.llm { warm_model_catalog }
 import from ui.runtime { create_session, dispose_session }
 import from ui.screen { build_main_shell, install_shell_contracts }
 import from ui.transcript { bind_transcript, set_follow_tail }
@@ -75,6 +76,12 @@ def run_tui() {
     } except Exception {
     }
     _hydrate_auth_environment();
+    # fx-style catalog preload: /models endpoints refresh in background
+    # flows so the picker serves live lists without blocking first paint.
+    try {
+        warm_model_catalog();
+    } except Exception {
+    }
     app = create_live_shell();
     app.cmd_q = queue.Queue();
     app.term.start();
