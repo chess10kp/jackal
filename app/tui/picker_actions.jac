@@ -44,8 +44,17 @@ def _model_picker_entries() -> dict {
         ids.append("__header__");
         for m in (meta.get("models", []) or []) {
             mname = str(m);
+            # Advertise the ROUTED id: provider routing dispatches on the
+            # provider prefix, so bare catalog names like "deepseek-chat"
+            # misroute to openai_compat (wrong endpoint and credential
+            # check). Bare ids that already route here (mock, gpt-4o under
+            # openai_compat) stay bare. Display labels stay bare either way.
+            full = mname;
+            if provider_for(mname) != str(prov) {
+                full = str(prov) + "/" + mname;
+            }
             rows.append("  " + mname);
-            ids.append(mname);
+            ids.append(full);
         }
         last = str(prefs.get(str(prov), "") or "");
         if last {
