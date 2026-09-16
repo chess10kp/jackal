@@ -346,6 +346,25 @@ def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
 }
 
 
+"""Resolve a tab/enter press against the popup: returns (chosen, submit).
+Enter on a candidate identical to the current draft (a fully-typed command
+name) returns submit=True — "completing" /model to /model is a visual no-op
+that used to swallow the keypress and force a second Enter. Pure so the
+decision stays testable headless (LiveShell needs a TTY)."""
+def _slash_popup_pick(matches: list[list[str]], draft: str, sel: int) -> tuple[str, bool] {
+    count = len(matches);
+    idx = int(sel);
+    if idx >= count {
+        idx = count - 1;
+    }
+    if idx < 0 {
+        idx = 0;
+    }
+    chosen = str(matches[idx][0]);
+    return (chosen, chosen == draft.strip());
+}
+
+
 """>-cursor rows for the popup (selected entry marked, description
 truncated to the terminal width). Selection clamps into range so stale
 indices from earlier filters never crash the paint."""

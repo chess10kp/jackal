@@ -3,7 +3,7 @@ import os;
 import queue;
 import from tui.state { LiveShell }
 import from tui.core { _push_turn, _scroll_transcript }
-import from tui.overlay { _slash_popup_state }
+import from tui.overlay { _slash_popup_state, _slash_popup_pick }
 import from tui.picker_base { _close_picker, _multi_filtered }
 import from tui.picker_actions { _complete_api_key_login, _start_login_provider, _cancel_login }
 import from tui.context {
@@ -340,22 +340,24 @@ def _handle_key(app: LiveShell, key: str) {
             return;
         }
         if key == "tab" or key == "enter" {
-            idx = int(app.slash_sel);
-            if idx >= count {
-                idx = count - 1;
+            (chosen, submit) = _slash_popup_pick(
+                popup, app.shell.prompt.draft, int(app.slash_sel),
+            );
+            # Enter on a fully-typed command name falls through to the
+            # submit branch below: completing /model to /model is a visual
+            # no-op that swallowed the keypress (the picker opened only on
+            # a second Enter). Tab, and Enter that extends the draft,
+            # still complete + dismiss.
+            if not (key == "enter" and submit) {
+                app.shell.prompt.draft = chosen;
+                app.shell.prompt.caret = len(chosen);
+                app.shell.prompt.history_index = -1;
+                # Dismiss at the completed draft: enter must submit on the next
+                # press, not re-complete.
+                app.slash_dismissed = chosen;
+                app.dirty = True;
+                return;
             }
-            if idx < 0 {
-                idx = 0;
-            }
-            chosen = str(popup[idx][0]);
-            app.shell.prompt.draft = chosen;
-            app.shell.prompt.caret = len(chosen);
-            app.shell.prompt.history_index = -1;
-            # Dismiss at the completed draft: enter must submit on the next
-            # press, not re-complete.
-            app.slash_dismissed = chosen;
-            app.dirty = True;
-            return;
         }
         if key == "escape" {
             # First esc closes the popup without touching the draft; the
