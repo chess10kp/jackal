@@ -20,10 +20,9 @@ import from tui.runtime {
 }
 import from agent.session {
     cancel_active_turn, list_extension_shortcuts, run_extension_shortcut,
-    set_mode, set_model,
+    set_mode,
 }
 import from agent.modes { cycle_mode, is_read_only_mode }
-import from agent.llm { credential_error }
 import from agent.tasks { load_tasks, format_tasks_list }
 import from ui.screen {
     shell_insert_text, shell_submit, shell_cancel,
@@ -63,12 +62,7 @@ def _handle_picker_key(app: LiveShell, key: str) {
             if title == "LOGIN" {
                 _complete_api_key_login(app, str(p.get("providerId", "")), draft.strip());
             } else {
-                name = draft.strip();
                 _close_picker(app);
-                if name {
-                    _push_turn(app, "tool", "model -> " + set_model(name));
-                    app.dirty = True;
-                }
             }
         } elif key == "backspace" or key == "\x7f" {
             if draft {
@@ -148,7 +142,7 @@ def _handle_picker_key(app: LiveShell, key: str) {
         }
         if chosen_id == "__header__" {
             # Header/divider/summary rows are separators, not choices
-            # (provider headers in MODEL, board furniture in TASKS).
+            # (board furniture in TASKS).
             app.dirty = True;
             return;
         }
@@ -167,18 +161,7 @@ def _handle_picker_key(app: LiveShell, key: str) {
             return;
         }
         _close_picker(app);
-        if title == "MODEL" {
-            mname = chosen_id or chosen;
-            cerr = credential_error(mname);
-            if cerr {
-                # Missing credentials: surface which env var to set instead of
-                # switching (same tool-row path as /command results).
-                _push_turn(app, "tool", cerr);
-            } else {
-                _push_turn(app, "tool", "model -> " + mname);
-                set_model(mname);
-            }
-        } elif title == "RESUME SESSION" {
+        if title == "RESUME SESSION" {
             reply = _resume_session(app, chosen_id);
             if reply {
                 _push_turn(app, "tool", reply);
@@ -362,7 +345,10 @@ def _handle_key(app: LiveShell, key: str) {
         if key == "escape" {
             # First esc closes the popup without touching the draft; the
             # second one (popup now hidden) keeps the existing behavior.
-            app.slash_dismissed = app.shell.prompt.draft.strip();
+            # Store the RAW draft: comparing stripped values used to merge
+            # "/model" with "/model " and keep the model window shut after
+            # the arg space.
+            app.slash_dismissed = app.shell.prompt.draft;
             app.dirty = True;
             return;
         }
@@ -421,6 +407,9 @@ def _handle_key(app: LiveShell, key: str) {
             return;
         }
         shell_submit(app.session, app.shell);
+        # The draft is gone; a stale dismissal must not suppress the popup
+        # when the user later types the same command again (e.g. /model).
+        app.slash_dismissed = "";
         if text.startswith("/") {
             reply = _run_slash(app, text);
             if reply {

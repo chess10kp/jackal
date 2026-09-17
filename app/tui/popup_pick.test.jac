@@ -1,9 +1,12 @@
 """Regression tests for the slash-popup tab/enter decision.
 
-The tested function is a VERBATIM replica of tui.overlay._slash_popup_pick
-(keep in sync) — the real TUI modules cannot host test annexes yet (see
-tui/popup_pick.jac). The wiring being guarded: tui/input.jac's popup branch
-must SUBMIT when Enter lands on a candidate identical to the draft.
+The tested functions are VERBATIM replicas of tui.overlay._slash_popup_pick
+and tui.overlay._popup_suppressed (keep in sync) — the real TUI modules
+cannot host test annexes yet (see tui/popup_pick.jac). The wiring being
+guarded: tui/input.jac's popup branch must SUBMIT when Enter lands on a
+candidate identical to the draft, and the dismissal gate must compare RAW
+drafts so completing /model doesn't suppress the "/model " argument
+completion window.
 Completing /model to /model used to be a visual no-op that swallowed the
 keypress, so `/model` + Enter appeared dead and the MODEL picker only
 opened on a second Enter.
@@ -62,4 +65,28 @@ test "exact match among several candidates still submits" {
     (chosen, submit) = _slash_popup_pick(matches, "/checkpoint", 0);
     assert chosen == "/checkpoint";
     assert submit;
+}
+
+
+"""Verbatim replica of tui.overlay._popup_suppressed."""
+def _popup_suppressed(raw: str, dismissed: str) -> bool {
+    return raw == dismissed;
+}
+
+
+test "completed /model must not suppress the argument window" {
+    # THE regression: tab-completing /model stores dismissed="/model";
+    # typing the argument space produces draft "/model ". The old
+    # stripped comparison merged the two and the model completion window
+    # never opened after "/model<space>".
+    assert _popup_suppressed("/model", "/model");
+    assert not _popup_suppressed("/model ", "/model");
+}
+
+
+test "esc hides the exact draft and typing reopens" {
+    # esc stores the raw draft (trailing space included); any further
+    # typing — including a filter char — must reopen the popup.
+    assert _popup_suppressed("/model ", "/model ");
+    assert not _popup_suppressed("/model c", "/model ");
 }

@@ -3,9 +3,9 @@ import os;
 import from tui.state { LiveShell }
 import from tui.core { _push_turn, _meter }
 import from tui.picker_base { _open_picker, _close_picker }
-import from agent.llm { PROVIDER_ROUTES, credential_error, catalog_models, routed_model_id }
+import from agent.llm { PROVIDER_ROUTES, provider_for }
 import from agent.session {
-    model_preferences, get_model, set_model, get_history, restore_history, provider_for,
+    get_history, restore_history, get_model,
 }
 import from agent.auth {
     load_auth_file, save_auth_file, resolve_auth_path, credential_set,
@@ -22,43 +22,6 @@ import from agent.checkpoints {
 import from agent.skills { load_jackal_skills }
 import from ui.screen { shell_open_approval }
 import from tui.context { _skills_picker_entries }
-
-def _model_picker_entries() -> dict {
-    rows: list[str] = [];
-    ids: list[str] = [];
-    prefs: dict = {};
-    try {
-        prefs = dict(model_preferences());
-    } except Exception {
-        prefs = {};
-    }
-    for prov in PROVIDER_ROUTES {
-        route = PROVIDER_ROUTES[prov];
-        meta: any = route if isinstance(route, dict) else {};
-        desc = str(meta.get("description", "") or "");
-        header = "── " + str(prov);
-        if desc {
-            header += " — " + desc;
-        }
-        rows.append(header + " ──");
-        ids.append("__header__");
-        # Live catalog first (fx parity): fresh/last-good fetch of the
-        # route's /models endpoint, falling back to the static hints.
-        models = catalog_models(str(prov));
-        for m in models {
-            mname = str(m);
-            rows.append("  " + mname);
-            ids.append(routed_model_id(str(prov), mname));
-        }
-        last = str(prefs.get(str(prov), "") or "");
-        if last {
-            rows.append("  " + last + "  · last");
-            ids.append(last);
-        }
-    }
-    return {"rows": rows, "ids": ids};
-}
-
 
 """Provider rows for /login. Native routes use API-key auth today; routes
 that advertise an OAuth authType are retained so their explicit network seam
@@ -226,38 +189,6 @@ def _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
     _push_turn(app, "tool", "logged in to " + provider_id + "; credentials saved to " + path);
     app.status_hint = "login complete · enter · ↑↓ history · esc quit";
     app.dirty = True;
-}
-"""Model picker: provider-grouped rows from PROVIDER_ROUTES (headers,
-advertised models, per-provider "· last" entries), the active model
-injected when missing, plus a free-text fallback row; cursor starts on
-the active model."""
-def _open_model_picker(app: LiveShell) -> str {
-    entries = _model_picker_entries();
-    choices: list[str] = list(entries["rows"]);
-    pick_ids: list[str] = list(entries["ids"]);
-    active_model = get_model();
-    if active_model not in pick_ids {
-        choices.insert(0, active_model + "  · current");
-        pick_ids.insert(0, active_model);
-    }
-    sel = 0;
-    i = 0;
-    for c in pick_ids {
-        if c == active_model {
-            sel = i;
-            break;
-        }
-        i += 1;
-    }
-    opened = _open_picker(app, "MODEL", choices, pick_ids, extra_last_input=True);
-    if not opened {
-        return "picker unavailable (overlay busy)";
-    }
-    p: any = app.picker;
-    if p is not None {
-        p["selected"] = sel;
-    }
-    return "";
 }
 """Open /login's provider picker. An optional provider argument skips the
 picker while retaining the same state machine and input overlay."""

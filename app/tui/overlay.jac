@@ -15,7 +15,8 @@ import from ui.renderer {
 }
 import from ui.width { display_width, truncate_text }
 import from tui.picker_base { _multi_filtered }
-import from agent.session { list_commands }
+import from agent.session { list_commands, get_model, model_preferences }
+import from agent.llm { PROVIDER_ROUTES, catalog_models, routed_model_id, provider_for }
 """Unified-diff preview lines for a pending write_file/edit_file approval.
 Capped at 20 diff lines with a trailing truncation marker; returns [] when
 no old/new text pair can be assembled (missing args, unreadable baseline)."""
@@ -323,19 +324,114 @@ def _slash_candidates(draft: str) -> list[list[str]] {
 }
 
 
+"""Model candidates for the `/model <prefix>` completion window.
+
+Pool is the same live catalog the old picker used (catalog_models per
+provider, routed_model_id, per-provider last-used from model_preferences,
+plus the active model). Filtering is case-insensitive substring on the
+typed prefix, capped at 8 so the popup stays compact. Each entry is
+["/model <id>", provider_description] — the prompt handler replaces the
+whole draft with the chosen label. Pure over the catalog."""
+def _model_completion_candidates(prefix: str) -> list[list[str]] {
+    p = prefix.strip().lower();
+    pool: list[str] = [];
+    seen: dict[str, bool] = {};
+    prefs: dict = {};
+    try {
+        prefs = dict(model_preferences());
+    } except Exception {
+        prefs = {};
+    }
+    for prov in PROVIDER_ROUTES {
+        models = catalog_models(str(prov));
+        for m in models {
+            mid = routed_model_id(str(prov), str(m));
+            if mid not in seen {
+                seen[mid] = True;
+                pool.append(mid);
+            }
+        }
+        last = str(prefs.get(str(prov), "") or "");
+        if last and last not in seen {
+            seen[last] = True;
+            pool.append(last);
+        }
+    }
+    active = get_model();
+    if active and active not in seen {
+        pool.insert(0, active);
+        seen[active] = True;
+    }
+    filtered: list[str] = [];
+    if not p {
+        filtered = pool[:8];
+    } else {
+        for mid in pool {
+            if p in mid.lower() {
+                filtered.append(mid);
+                if len(filtered) >= 8 {
+                    break;
+                }
+            }
+        }
+    }
+    out: list[list[str]] = [];
+    for mid in filtered {
+        prov = provider_for(mid);
+        desc = "";
+        route: any = PROVIDER_ROUTES.get(prov);
+        if isinstance(route, dict) {
+            desc = str(route.get("description", "") or "");
+        }
+        out.append(["/model " + mid, desc]);
+    }
+    return out;
+}
+
+
+"""Dismissal gate for the slash/model popup. The dismissed value is the
+RAW draft captured at esc/tab/enter time, and the popup stays hidden only
+while the draft is unchanged. This used to compare the STRIPPED draft,
+which merges "/model" with "/model ": after tab-completing /model (or
+dismissing with esc), typing the argument space never reopened the
+window. Pure so the rule stays testable headless."""
+def _popup_suppressed(raw: str, dismissed: str) -> bool {
+    return raw == dismissed;
+}
+
+
 """Popup visibility + candidates in one shot: hidden while any modal,
-picker or approval owns the screen, when the draft is not a bare "/word",
-or when the user dismissed this exact draft with esc. Returns the match
-list or None."""
+picker or approval owns the screen. Serves two contexts on the same
+popup:
+  1) `/model` or `/model <prefix>` — model ids (same completion window,
+     no separate picker)
+  2) bare "/word" — slash-command candidates
+When the user dismissed this exact draft with esc the popup stays hidden
+(see _popup_suppressed). Returns the match list or None."""
 def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
     if app.picker is not None or app.ui_modal is not None or app.shell.approval is not None {
         return None;
     }
-    text = app.shell.prompt.draft.strip();
-    if not text.startswith("/") or " " in text {
+    raw = app.shell.prompt.draft;
+    stripped = raw.strip();
+    if _popup_suppressed(raw, app.slash_dismissed) {
         return None;
     }
-    if text == app.slash_dismissed {
+    # Model argument completion: "/model" or "/model <prefix>" — same window
+    trimmed_start = raw.lstrip();
+    if trimmed_start.startswith("/model") {
+        rest = trimmed_start[len("/model"):];
+        if rest == "" or (rest and rest[0] == " ") {
+            pref = rest.strip();
+            cands = _model_completion_candidates(pref);
+            if cands {
+                return cands;
+            }
+            return None;
+        }
+    }
+    text = stripped;
+    if not text.startswith("/") or " " in text {
         return None;
     }
     matches = _slash_candidates(text);

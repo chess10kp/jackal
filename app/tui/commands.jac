@@ -5,7 +5,7 @@ import queue;
 import from tui.state { LiveShell }
 import from tui.core { _push_turn }
 import from tui.picker_actions {
-    _open_login_picker, _open_model_picker, _open_resume_picker,
+    _open_login_picker, _open_resume_picker,
     _open_tasks_picker, _open_checkpoints_picker, _create_checkpoint_now,
     _open_skills_picker,
 }
@@ -15,7 +15,7 @@ import from tui.runtime { _begin_assistant_reply }
 import from agent.session {
     clear_history, get_history, restore_history, list_commands,
     run_command, list_extension_shortcuts, run_extension_shortcut, plugins,
-    new_session_id, set_model, cancel_active_turn,
+    new_session_id, set_model, get_model, cancel_active_turn,
 }
 import from agent.sessions {
     list_sessions, get_session_record, export_session, save_session,
@@ -149,8 +149,8 @@ def _run_slash(app: LiveShell, line: str) -> str {
     if line == "/model" or line.startswith("/model ") {
         name = line[len("/model"):].strip();
         if not name {
-            # No argument: interactive picker (curated list + free-text row).
-            return _open_model_picker(app);
+            cur = get_model();
+            return "current model: " + cur + " — type '/model ' then \u2191\u2193 to pick (tab completes, enter sets)";
         }
         return "model -> " + set_model(name);
     }
