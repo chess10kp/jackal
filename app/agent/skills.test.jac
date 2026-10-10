@@ -336,7 +336,7 @@ test "explicit skill_paths resolve relative, home, and error cases" {
 
         # Single .md file loads directly; duplicate paths dedup by realpath.
         solo = load_jackal_skills(cwd=proj, include_defaults=False,
-                                  skill_paths=["standalone.md", single_md]);
+                                  skill_paths=["standalone.md", str(single_md)]);
         assert _names(solo) == ["standalone"];
 
         # Errors become diagnostics: missing path and non-markdown file.

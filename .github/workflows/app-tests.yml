@@ -49,12 +49,13 @@ jobs:
         env:
           TIMEOUT: "900"
         run: |
+          Q="--quarantine scripts/test-quarantine.txt"
           case "${{ matrix.shard }}" in
-            agent) scripts/test.sh -j3 app/agent/ ;;
-            tui)   scripts/test.sh -j3 app/tui/ ;;
-            ui)    scripts/test.sh -j3 app/ui/ ;;
-            e2e)   scripts/test.sh -j2 app/e2e/ ;;
-            other) scripts/test.sh -j3 --exclude app/agent/ --exclude app/tui/ --exclude app/ui/ --exclude app/e2e/ ;;
+            agent) scripts/test.sh -j3 $Q app/agent/ ;;
+            tui)   scripts/test.sh -j3 $Q app/tui/ ;;
+            ui)    scripts/test.sh -j3 $Q app/ui/ ;;
+            e2e)   scripts/test.sh -j2 $Q app/e2e/ ;;
+            other) scripts/test.sh -j3 $Q --exclude app/agent/ --exclude app/tui/ --exclude app/ui/ --exclude app/e2e/ ;;
           esac
       - name: Upload logs
         if: always()

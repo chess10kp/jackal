@@ -46,8 +46,13 @@ test "lifecycle events round-trip through the real node host" {
     phase = ensure_node_host(bridge3);
     assert phase == "ready";
     assert bridge3.host_kind == "node";
+    # Runs from the repo root (scripts/test.sh, CI) or from app/.
+    app_root: str = os.getcwd();
+    if not os.path.isdir(os.path.join(app_root, "plugin_host")) {
+        app_root = os.path.join(app_root, "app");
+    }
     fixture = os.path.join(
-        os.getcwd(), "plugin_host", "fixtures", "pi_lifecycle_probe.mjs"
+        app_root, "plugin_host", "fixtures", "pi_lifecycle_probe.mjs"
     );
     names = load_extension_path(bridge3, reg, "pi.probe", fixture);
     assert len(names) == 0;

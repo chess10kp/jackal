@@ -128,12 +128,6 @@ def _apply_extension_traffic(bridge: PluginBridge | None, on_event: any) {
 }
 
 
-"""Best-effort auto-compaction of session history when the context threshold
-is crossed (checked after the user message lands — matches src ordering).
-
-Fires Pi's session_before_compact / session_after_compact hooks; a blocking
-verdict ({block: true}) from any before-listener skips compaction this turn.
-Never raises — compaction failure must not break the turn."""
 """Index where the kept tail starts: `len(msgs) - keep_tail`, moved earlier
 so the tail never opens with a tool result orphaned from the assistant
 message carrying its tool_calls, and never earlier than `floor`."""
@@ -219,6 +213,9 @@ def compact_history(bridge: PluginBridge | None = None, force: bool = False) -> 
 }
 
 
+"""Best-effort auto-compaction when the context threshold is crossed (checked
+after the user message lands). Never raises — compaction failure must not
+break the turn."""
 def _maybe_auto_compact(bridge: PluginBridge | None) {
     try {
         compact_history(bridge, False);

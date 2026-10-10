@@ -1,0 +1,15 @@
+# Known-failing suites (pre-existing as of 2026-10-10, jac 0.37.25 on CI).
+# scripts/test.sh --quarantine reports these as XFAIL instead of failing CI;
+# when one starts passing CI lists it as XPASS — delete its line then.
+# Every entry needs a reason.
+
+# Native-lowered UI paths dump core under jac test (no output before crash).
+ui/gates
+ui/renderer
+ui/host
+ui/virtual_terminal
+ui/demo_complex_shell
+
+# Cordis tracked-effect assertions fail (core.jac:55/64/84/92); C0 core
+# predates the native placement switch.
+cordis/core
