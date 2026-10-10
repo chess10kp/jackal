@@ -112,11 +112,15 @@ Legacy vars (`JACKAL_HEAP_MB`, `JACKAL_TUI_OUT`, `JACKAL_SKIP_TUI_COMPILE`) belo
 
 ## Tests
 
+See [`docs/TESTING.md`](docs/TESTING.md). Tests run on GitHub Actions — the dev box is compute-constrained, so push and read CI (`gh run download <id>` for `.testlogs/`) instead of running suites locally.
+
 | Suite | Location | Run |
 |-------|----------|-----|
-| Native jac tests | `app/**/*.test.jac` (~55 files; counts approximate) | `jac test app/<file>.test.jac` (per-file) |
+| Unit (jac) | `app/**/*.test.jac` | `scripts/test.sh [-j3] [path-substring]` |
+| E2E (mock provider, real processes, PTY TUI) | `app/e2e/` | `scripts/test.sh app/e2e/` |
 | js2jac converter | `tui/js2jac/` bridge loop | see `tui/js2jac/SYNC.md` |
-| Vendored compiler | `vendor/jac/jac/tests/` | inside vendor tree |
+
+Offline model for any manual or scripted run: `JACKAL_MODEL=mock` with `JACKAL_MOCK_SCRIPT` / `JACKAL_MOCK_LOG` (see TESTING.md). Known failures live in `scripts/test-quarantine.txt` (with reasons).
 
 Note: a repo-root `jac build` sweeps everything, including legacy `templates/*.cl.jac` (which fail by design — the `.cl.jac` marker was retired) and skill asset samples. Judge build health on the `app/` tree: `cd app && jac build`.
 
