@@ -3,8 +3,8 @@
 import time;
 
 
-def _req(method: str = "select", parent: str = "corr-1", **extra: any) -> dict {
-    req: dict = {
+def _req(method: str = "select", parent: str = "corr-1", **extra: any) -> dict[str, any] {
+    req: dict[str, any] = {
         "method": method,
         "parent_corr": parent,
         "parent_kind": "cmd_invoke",

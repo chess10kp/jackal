@@ -45,10 +45,10 @@ import from sys {
 }
 
 
-def _build_expression(terms: list, const: float) -> Expression {
+def _build_expression(terms: list[list[any]], const: float) -> Expression {
     acc: Expression = Expression(constant=const);
     for pair in terms {
-        plist: list = pair as list;
+        plist: list[any] = pair as list;
         vid: int = int(plist[0] as int);
         coef: float = plist[1] as float;
         acc = add_expressions(
@@ -60,7 +60,7 @@ def _build_expression(terms: list, const: float) -> Expression {
 }
 
 
-def _run_batch(batch: dict) -> dict {
+def _run_batch(batch: dict[str, any]) -> dict[str, any] {
     version = batch.get("schema_version");
     if version != 1 {
         return {
@@ -81,7 +81,7 @@ def _run_batch(batch: dict) -> dict {
     };
     ops_raw = batch.get("ops", []) as list;
     for op_any in ops_raw {
-        op: dict = op_any as dict;
+        op: dict[str, any] = op_any as dict;
         expr = _build_expression(op["terms"] as list, op["const"] as float);
         c = Constraint(
             expression=expr,

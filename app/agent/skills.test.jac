@@ -64,22 +64,22 @@ def _write_skill(dir_path: str, name: str, description: str,
 }
 
 
-def _names(result: dict) -> list[str] {
+def _names(result: dict[str, any]) -> list[str] {
     out: list[str] = [];
-    items: list = result["skills"];
+    items: list[dict[str, any]] = result["skills"];
     for item in items {
-        rec: dict = item;
+        rec: dict[str, any] = item;
         out.append(str(rec["name"]));
     }
     return out;
 }
 
 
-def _diag_types(result: dict, kind: str) -> list[dict] {
-    found: list[dict] = [];
-    diags: list = result["diagnostics"];
+def _diag_types(result: dict[str, any], kind: str) -> list[dict[str, any]] {
+    found: list[dict[str, any]] = [];
+    diags: list[dict[str, any]] = result["diagnostics"];
     for d in diags {
-        diag: dict = d;
+        diag: dict[str, any] = d;
         if str(diag["type"]) == kind {
             found.append(diag);
         }
@@ -106,9 +106,9 @@ test "discovery walk claims SKILL.md branches and skips hidden vendor dirs" {
         assert sorted(_names(result)) == ["alpha", "beta"];
         assert len(_diag_types(result, "collision")) == 0;
 
-        items: list = result["skills"];
+        items: list[dict[str, any]] = result["skills"];
         for item in items {
-            s: dict = item;
+            s: dict[str, any] = item;
             assert _base_name(str(s["filePath"])) == "SKILL.md";
             assert str(s["baseDir"]) == _dir_name(str(s["filePath"]));
             assert str(s["source"]) == "project";
@@ -125,8 +125,8 @@ test "discovery walk claims SKILL.md branches and skips hidden vendor dirs" {
         );
         loose = load_skills_from_dir(plain_root, "builtin");
         assert sorted(_names(loose)) == ["loose-note", "nested-skill"];
-        loose_items: list = loose["skills"];
-        first: dict = loose_items[0];
+        loose_items: list[dict[str, any]] = loose["skills"];
+        first: dict[str, any] = loose_items[0];
         assert str(first["source"]) == "builtin";
 
         # Missing directory yields an empty result, not an error.
@@ -153,7 +153,7 @@ test "frontmatter parser handles scalars, quoting, lists, and absence" {
         "Body line one.\n\nBody line two.\n"
     );
     parsed = parse_frontmatter(doc);
-    fm: dict = parsed[0];
+    fm: dict[str, any] = parsed[0];
     body: str = parsed[1];
     assert str(fm.get("name")) == "demo-skill";
     assert str(fm.get("quoted")) == "hello world";
@@ -175,7 +175,7 @@ test "frontmatter parser handles scalars, quoting, lists, and absence" {
 
     # CRLF normalization.
     parsed4 = parse_frontmatter("---\r\nname: crlf\r\ndescription: d\r\n---\r\n\r\nB\r\n");
-    fm4: dict = parsed4[0];
+    fm4: dict[str, any] = parsed4[0];
     assert str(fm4.get("name")) == "crlf";
     assert parsed4[1] == "B";
 
@@ -222,7 +222,7 @@ test "malformed SKILL.md files produce warnings without crashing" {
         warnings = _diag_types(result, "warning");
         messages: list[str] = [];
         for w in warnings {
-            wd: dict = w;
+            wd: dict[str, any] = w;
             messages.append(str(wd["message"]));
         }
         assert any("description is required" in m for m in messages);
@@ -230,7 +230,7 @@ test "malformed SKILL.md files produce warnings without crashing" {
         assert any("exceeds 64 characters" in m for m in messages);
         assert "goodone" in names;
         for w in warnings {
-            wd2: dict = w;
+            wd2: dict[str, any] = w;
             wp: any = wd2["path"];
             assert str(wp).endswith(".md");
         }
@@ -238,7 +238,7 @@ test "malformed SKILL.md files produce warnings without crashing" {
         # The same tree through load_jackal_skills stays crash-free.
         merged = load_jackal_skills(cwd=tmp, package_root=tmp,
                                     agent_dir=os.path.join(tmp, "home"));
-        merged_skills: list = merged["skills"];
+        merged_skills: list[dict[str, any]] = merged["skills"];
         assert isinstance(merged_skills, list);
     } finally {
         _cleanup(tmp);
@@ -271,27 +271,27 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
         # Sorted by name across all roots.
         assert _names(result) == ["alpha", "beta", "dupe", "gamma", "zeta"];
 
-        by_name: dict = {};
-        items: list = result["skills"];
+        by_name: dict[str, dict[str, any]] = {};
+        items: list[dict[str, any]] = result["skills"];
         for item in items {
-            s: dict = item;
+            s: dict[str, any] = item;
             by_name[str(s["name"])] = s;
         }
-        winner_zeta: dict = by_name["zeta"];
+        winner_zeta: dict[str, any] = by_name["zeta"];
         assert str(winner_zeta["source"]) == "builtin";
-        winner_beta: dict = by_name["beta"];
+        winner_beta: dict[str, any] = by_name["beta"];
         assert str(winner_beta["source"]) == "user";
-        winner_gamma: dict = by_name["gamma"];
+        winner_gamma: dict[str, any] = by_name["gamma"];
         assert str(winner_gamma["source"]) == "project";
         # Later root (user) overrides builtin on name collision...
-        winner_dupe: dict = by_name["dupe"];
+        winner_dupe: dict[str, any] = by_name["dupe"];
         assert str(winner_dupe["source"]) == "user";
         assert str(winner_dupe["description"]) == "User dupe wins.";
         assert winner_dupe["disableModelInvocation"] is True;
         # ...and records a collision diagnostic pointing both ways.
         collisions = _diag_types(result, "collision");
         assert len(collisions) == 1;
-        col0: dict = collisions[0];
+        col0: dict[str, any] = collisions[0];
         col: any = col0["collision"];
         assert str(col["name"]) == "dupe";
         assert str(col["winnerPath"]) == dupe_user;
@@ -330,8 +330,8 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         # Relative directory resolves against cwd.
         rel = load_jackal_skills(cwd=proj, include_defaults=False, skill_paths=["local"]);
         assert _names(rel) == ["local-one"];
-        rel_items: list = rel["skills"];
-        rel0: dict = rel_items[0];
+        rel_items: list[dict[str, any]] = rel["skills"];
+        rel0: dict[str, any] = rel_items[0];
         assert str(rel0["filePath"]) == target;
 
         # Single .md file loads directly; duplicate paths dedup by realpath.
@@ -344,9 +344,9 @@ test "explicit skill_paths resolve relative, home, and error cases" {
                                   skill_paths=["missing-dir", "notmd.txt"]);
         assert errs["skills"] == [];
         msgs: list[str] = [];
-        err_diags: list = errs["diagnostics"];
+        err_diags: list[dict[str, any]] = errs["diagnostics"];
         for d in err_diags {
-            ed: dict = d;
+            ed: dict[str, any] = d;
             msgs.append(str(ed["message"]));
         }
         assert any("does not exist" in m for m in msgs);
@@ -358,8 +358,8 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         tagged = load_jackal_skills(cwd=proj, package_root=proj, agent_dir=home,
                                     include_defaults=False,
                                     skill_paths=[os.path.join(home, "skills", "homed")]);
-        tagged_items: list = tagged["skills"];
-        tag0: dict = tagged_items[0];
+        tagged_items: list[dict[str, any]] = tagged["skills"];
+        tag0: dict[str, any] = tagged_items[0];
         assert str(tag0["source"]) == "user";
 
         # Tilde expansion maps into the fake home via HOME env override.
@@ -385,7 +385,7 @@ test "explicit skill_paths resolve relative, home, and error cases" {
 test "format_skills_for_prompt escapes xml and honors the disable flag" {
     tmp = _make_tmp();
     try {
-        visible: dict = {
+        visible: dict[str, any] = {
             "name": "escaper",
             "description": "Handles a<b & c>d \"quotes\" and 'apos'.",
             "filePath": os.path.join(tmp, "escaper", "SKILL.md"),
@@ -393,7 +393,7 @@ test "format_skills_for_prompt escapes xml and honors the disable flag" {
             "source": "builtin",
             "disableModelInvocation": False,
         };
-        hidden: dict = {
+        hidden: dict[str, any] = {
             "name": "hidden-one",
             "description": "Never shown.",
             "filePath": os.path.join(tmp, "hidden-one", "SKILL.md"),
@@ -428,7 +428,7 @@ test "expand_skill_command inlines the referenced skill body" {
     try {
         dir_path = os.path.join(tmp, "demo");
         path = _write_skill(dir_path, "demo", "Demo skill.", body="Step 1. Step 2.");
-        skill: dict = {
+        skill: dict[str, any] = {
             "name": "demo",
             "description": "Demo skill.",
             "filePath": path,
@@ -450,7 +450,7 @@ test "expand_skill_command inlines the referenced skill body" {
         # the original text straight through.
         assert expand_skill_command("/skill:nope hi", [skill]) == "/skill:nope hi";
         assert expand_skill_command("just chat", [skill]) == "just chat";
-        broken: dict = dict(skill);
+        broken: dict[str, any] = dict(skill);
         broken["filePath"] = os.path.join(tmp, "gone", "SKILL.md");
         assert expand_skill_command("/skill:demo x", [broken]) == "/skill:demo x";
     } finally {
@@ -481,7 +481,7 @@ test "skill_read_allowlist yields absolute files and rooted base dirs" {
     try {
         p1 = _write_skill(os.path.join(tmp, "one"), "one", "One.");
         p2 = _write_skill(os.path.join(tmp, "two"), "two", "Two.");
-        skills: list = [
+        skills: list[dict[str, any]] = [
             {"name": "one", "description": "One.", "filePath": p1,
              "baseDir": _dir_name(p1), "source": "builtin",
              "disableModelInvocation": False},
@@ -490,8 +490,8 @@ test "skill_read_allowlist yields absolute files and rooted base dirs" {
              "disableModelInvocation": True},
         ];
         allow = skill_read_allowlist(skills);
-        files: list = allow["files"];
-        roots: list = allow["roots"];
+        files: list[str] = allow["files"];
+        roots: list[str] = allow["roots"];
         assert files == [p1, p2];
         assert roots == [_dir_name(p1) + os.sep, _dir_name(p2) + os.sep];
     } finally {
@@ -527,12 +527,12 @@ test "real jackal catalog under pi/skills parses read-only" {
             cwd=tmp, package_root=repo,
             agent_dir=os.path.join(tmp, "home"),
         );
-        items: list = result["skills"];
+        items: list[dict[str, any]] = result["skills"];
         # The repo ships ~26 built-in skills; be robust to small drift.
         assert len(items) >= 20;
         prev = "";
         for item in items {
-            s: dict = item;
+            s: dict[str, any] = item;
             name = str(s["name"]);
             desc = str(s["description"]);
             assert name != "";

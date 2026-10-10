@@ -82,7 +82,7 @@ def list_chain_files(dir_path: str) -> list[str] {
 
 Returns {"agent": ..., "task": ...} plus "output"/"reads"/"model" keys
 only when present in the config block before the first blank line."""
-def parse_step_body(agent: str, section_body: str) -> dict {
+def parse_step_body(agent: str, section_body: str) -> dict[str, any] {
     lines = section_body.split("\n");
     blank_index = -1;
     idx = 0;
@@ -101,7 +101,7 @@ def parse_step_body(agent: str, section_body: str) -> dict {
         task = "\n".join(lines[blank_index + 1:]).strip();
     }
 
-    step: dict = {"agent": agent, "task": task};
+    step: dict[str, any] = {"agent": agent, "task": task};
     for line in config_lines {
         found = re.match(r"^([\w-]+):\s*(.*)$", line);
         if not found {
@@ -139,7 +139,7 @@ def parse_step_body(agent: str, section_body: str) -> dict {
 
 Raises ValueError when frontmatter lacks name/description or no `##`
 step sections exist."""
-def parse_chain_markdown(content: str, source: str, file_path: str) -> dict {
+def parse_chain_markdown(content: str, source: str, file_path: str) -> dict[str, any] {
     (fm, body) = parse_frontmatter(content);
     raw_name = frontmatter_string(fm.get("name"));
     name = (raw_name or "").strip();
@@ -153,7 +153,7 @@ def parse_chain_markdown(content: str, source: str, file_path: str) -> dict {
     }
 
     # Find all ## heading sections, line by line (see docstring note).
-    steps: list[dict] = [];
+    steps: list[dict[str, any]] = [];
     current_agent = "";
     section_lines: list[str] = [];
     for line in body.split("\n") {
@@ -192,8 +192,8 @@ def parse_chain_markdown(content: str, source: str, file_path: str) -> dict {
 
 
 """Load all valid chain definitions from *dir_path* (invalid skipped)."""
-def load_chains_from_dir(dir_path: str, source: str) -> list[dict] {
-    chains: list[dict] = [];
+def load_chains_from_dir(dir_path: str, source: str) -> list[dict[str, any]] {
+    chains: list[dict[str, any]] = [];
     for file_path in list_chain_files(dir_path) {
         try {
             fh = open(file_path, encoding="utf-8");
@@ -212,7 +212,7 @@ def load_chains_from_dir(dir_path: str, source: str) -> list[dict] {
 
 
 """Discovery roots: {"packageDir": <root>/chains, "projectDir": <cwd>/chains}."""
-def discover_chain_dirs(cwd: str, agent_dir: str = "") -> dict {
+def discover_chain_dirs(cwd: str, agent_dir: str = "") -> dict[str, str] {
     base_root = agent_dir if agent_dir else resolve_jackal_root();
     return {
         "packageDir": os.path.join(base_root, "chains"),
@@ -222,9 +222,9 @@ def discover_chain_dirs(cwd: str, agent_dir: str = "") -> dict {
 
 
 """Merged chain map keyed by name (project overrides package)."""
-def load_chains(cwd: str, agent_dir: str = "") -> dict {
+def load_chains(cwd: str, agent_dir: str = "") -> dict[str, dict[str, any]] {
     dirs = discover_chain_dirs(cwd, agent_dir);
-    merged: dict = {};
+    merged: dict[str, dict[str, any]] = {};
     for chain in load_chains_from_dir(str(dirs["packageDir"]), "package") {
         merged[str(chain["name"])] = chain;
     }
@@ -235,20 +235,20 @@ def load_chains(cwd: str, agent_dir: str = "") -> dict {
 }
 
 
-def _chain_sort_key(chain: dict) -> str {
+def _chain_sort_key(chain: dict[str, any]) -> str {
     return str(chain.get("name", ""));
 }
 
 
 """Name-sorted list of merged chain definitions."""
-def list_chains(cwd: str, agent_dir: str = "") -> list[dict] {
-    chains: list[dict] = list(load_chains(cwd, agent_dir).values());
+def list_chains(cwd: str, agent_dir: str = "") -> list[dict[str, any]] {
+    chains: list[dict[str, any]] = list(load_chains(cwd, agent_dir).values());
     return sorted(chains, key=_chain_sort_key);
 }
 
 
 """Look up one merged chain by name; None when unknown."""
-def get_chain(cwd: str, name: str, agent_dir: str = "") -> dict | None {
+def get_chain(cwd: str, name: str, agent_dir: str = "") -> dict[str, any] | None {
     return load_chains(cwd, agent_dir).get(name.strip());
 }
 
@@ -267,7 +267,7 @@ def format_chain_catalog(cwd: str, agent_dir: str = "") -> str {
         agents_seq: list[str] = [];
         steps: any = chain["steps"];
         for step in steps {
-            step_dict: dict = step;
+            step_dict: dict[str, any] = step;
             agents_seq.append(str(step_dict.get("agent", "")));
         }
         lines.append(

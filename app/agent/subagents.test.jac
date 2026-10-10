@@ -58,10 +58,10 @@ def _write_agent(dir_path: str, fname: str, fm: str, body: str) -> str {
 }
 
 
-def _agent_names(agents: list) -> list[str] {
+def _agent_names(agents: list[dict[str, any]]) -> list[str] {
     out: list[str] = [];
     for a in agents {
-        rec: dict = a;
+        rec: dict[str, any] = a;
         out.append(str(rec["name"]));
     }
     return out;
@@ -83,12 +83,12 @@ test "discovery finds agents in nested dirs but skips chain files and non-md" {
         assert sorted(_agent_names(found)) == ["scout", "worker"];
         paths: list[str] = [];
         for a in found {
-            rec: dict = a;
+            rec: dict[str, any] = a;
             paths.append(str(rec["filePath"]));
         }
         assert sorted(paths) == sorted([scout, worker]);
         for a in found {
-            rec2: dict = a;
+            rec2: dict[str, any] = a;
             assert str(rec2["source"]) == "package";
         }
 
@@ -166,7 +166,7 @@ test "invalid or unreadable agent files are tolerated without raising" {
         good = _write_agent(tmp, "good.md", "name: good\ndescription: fine", "ok");
         loaded = load_agents_from_dir(tmp, "project");
         assert _agent_names(loaded) == ["good"];
-        first: dict = loaded[0];
+        first: dict[str, any] = loaded[0];
         assert str(first["filePath"]) == good;
     } finally {
         _cleanup(tmp);
@@ -185,16 +185,16 @@ test "merge puts project overrides above package by name" {
 
         merged = load_subagents(os.path.join(tmp, "proj"), os.path.join(tmp, "pkg"));
         assert sorted([str(k) for k in merged.keys()]) == ["planner", "scout"];
-        winner: dict = merged["scout"];
+        winner: dict[str, any] = merged["scout"];
         assert str(winner["description"]) == "project scout";
         assert str(winner["source"]) == "project";
-        loser: dict = merged["planner"];
+        loser: dict[str, any] = merged["planner"];
         assert str(loser["source"]) == "package";
 
         listed = list_subagents(os.path.join(tmp, "proj"), os.path.join(tmp, "pkg"));
         assert _agent_names(listed) == ["planner", "scout"];  # sorted by name
 
-        picked: dict | None = get_subagent(os.path.join(tmp, "proj"), " scout ", os.path.join(tmp, "pkg"));
+        picked: dict[str, any] | None = get_subagent(os.path.join(tmp, "proj"), " scout ", os.path.join(tmp, "pkg"));
         assert picked is not None;
         assert str(picked["description"]) == "project scout";
         assert get_subagent(os.path.join(tmp, "proj"), "ghost", os.path.join(tmp, "pkg")) is None;
@@ -353,7 +353,7 @@ test "real repo builtin catalog smoke-parses read-only" {
         names = sorted([str(k) for k in merged.keys()]);
         assert names == ["architect", "implementer", "scout"];
 
-        scout_rec: dict = merged["scout"];
+        scout_rec: dict[str, any] = merged["scout"];
         assert str(scout_rec["source"]) == "package";
         assert "recon" in str(scout_rec["description"]).lower();
         scout_tools: any = scout_rec["tools"];
@@ -361,7 +361,7 @@ test "real repo builtin catalog smoke-parses read-only" {
         assert str(scout_rec["systemPrompt"]).startswith("You are a Jac/Jaseci specialist scout.");
         assert str(scout_rec["model"]) != "";
 
-        arch_rec: dict = merged["architect"];
+        arch_rec: dict[str, any] = merged["architect"];
         arch_tools: any = arch_rec["tools"];
         assert isinstance(arch_tools, list);
         normalized = normalize_allowed_tool_names([str(t) for t in arch_tools]);

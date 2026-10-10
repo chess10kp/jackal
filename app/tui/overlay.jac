@@ -141,7 +141,7 @@ def _ui_modal_lines(app: LiveShell) -> list[str] {
     }
     body.append("");
     if method == "select" {
-        options: list = list(m.get("options", []));
+        options: list[any] = list(m.get("options", []));
         sel = int(m.get("selected", 0));
         i = 0;
         for opt in options[:8] {
@@ -192,10 +192,10 @@ def _picker_lines(app: LiveShell) -> list[str] {
         # Multi-select (EXPLORER): optional type-to-filter row, [x]/[ ]
         # toggle boxes, and a sliding 8-row window over the FILTERED rows so
         # the cursor stays visible in long file lists.
-        vis: tuple[list, list] = _multi_filtered(p);
-        vis_options: list = vis[0];
-        vis_ids: list = vis[1];
-        toggled: list = list(p.get("toggled", []));
+        vis: tuple[list[str], list[str]] = _multi_filtered(p);
+        vis_options: list[str] = vis[0];
+        vis_ids: list[str] = vis[1];
+        toggled: list[str] = list(p.get("toggled", []));
         filt: str = str(p.get("filter", ""));
         if filt {
             body.append("/ " + filt + "▌");
@@ -222,7 +222,7 @@ def _picker_lines(app: LiveShell) -> list[str] {
             body.append("… " + str(more) + " more");
         }
     } else {
-        options2: list = list(p.get("options", []));
+        options2: list[any] = list(p.get("options", []));
         sel = int(p.get("selected", 0));
         i = 0;
         for opt in options2[:8] {
@@ -307,7 +307,7 @@ def _slash_candidates(draft: str) -> list[list[str]] {
             if full in descs {
                 continue;  # built-in shadows same-named extension command
             }
-            meta: dict = cmds[cname] if isinstance(cmds[cname], dict) else {};
+            meta: dict[str, any] = cmds[cname] if isinstance(cmds[cname], dict) else {};
             descs[full] = str(meta.get("description", "") or "");
         }
     }
@@ -336,7 +336,7 @@ def _model_completion_candidates(prefix: str) -> list[list[str]] {
     p = prefix.strip().lower();
     pool: list[str] = [];
     seen: dict[str, bool] = {};
-    prefs: dict = {};
+    prefs: dict[str, any] = {};
     try {
         prefs = dict(model_preferences());
     } except Exception {

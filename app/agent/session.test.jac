@@ -185,12 +185,12 @@ test "turn_start and turn_end hooks fire around a turn" {
     }
     seen: list[str] = [];
 
-    def _on_start(data: dict, ctx: any) -> str {
+    def _on_start(data: dict[str, any], ctx: any) -> str {
         seen.append("start:" + str(data.get("message", "")));
         return "";
     }
 
-    def _on_end(data: dict, ctx: any) -> str {
+    def _on_end(data: dict[str, any], ctx: any) -> str {
         seen.append("end:" + str(round(float(data.get("secs", 0.0)), 1)));
         return "";
     }
@@ -220,12 +220,12 @@ test "relay_tool_hooks fires pi-named tool events and delegates" {
     seen: list[str] = [];
     inner_seen: list[str] = [];
 
-    def _on_start(data: dict, ctx: any) -> str {
+    def _on_start(data: dict[str, any], ctx: any) -> str {
         seen.append("start:" + str(data.get("tool", "")));
         return "";
     }
 
-    def _on_end(data: dict, ctx: any) -> str {
+    def _on_end(data: dict[str, any], ctx: any) -> str {
         seen.append("end:" + str(data.get("tool", "")));
         return "";
     }
@@ -233,7 +233,7 @@ test "relay_tool_hooks fires pi-named tool events and delegates" {
     register_fake_listener(b, "tool_execution_start", _on_start);
     register_fake_listener(b, "tool_execution_end", _on_end);
 
-    def _inner(kind: str, data: dict) {
+    def _inner(kind: str, data: dict[str, any]) {
         inner_seen.append(kind);
     }
 
@@ -264,7 +264,7 @@ test "session_dispose fires session_shutdown before teardown" {
     }
     seen: list[str] = [];
 
-    def _bye(data: dict, ctx: any) -> str {
+    def _bye(data: dict[str, any], ctx: any) -> str {
         seen.append("bye");
         return "";
     }
@@ -286,7 +286,7 @@ test "extension traffic joins history and emits entry events" {
 
     seen: list[str] = [];
 
-    def _collect(kind: str, data: dict) {
+    def _collect(kind: str, data: dict[str, any]) {
         seen.append(kind);
     }
 
@@ -318,7 +318,7 @@ test "run_turn short-circuits on handled input verdict" {
         ensure_host(b);
     }
 
-    def _handle_ping(data: dict, ctx: any) -> dict | None {
+    def _handle_ping(data: dict[str, any], ctx: any) -> dict[str, any] | None {
         if data.get("text") == "!ping" {
             return {"action": "handled"};
         }
@@ -327,9 +327,9 @@ test "run_turn short-circuits on handled input verdict" {
 
     register_fake_listener(b as PluginBridge, "input", _handle_ping);
     n_before = len(history);
-    sink: list = [];
+    sink: list[str] = [];
 
-    def _collect(kind: str, data: dict) {
+    def _collect(kind: str, data: dict[str, any]) {
         sink.append(kind);
     }
 
@@ -357,7 +357,7 @@ test "agent_start_gate collects systemPrompt without touching history" {
         ensure_host(b);
     }
 
-    def _sys(data: dict, ctx: any) -> dict {
+    def _sys(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"systemPrompt": "OVERRIDE"};
     }
 

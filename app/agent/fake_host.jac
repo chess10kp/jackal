@@ -33,15 +33,15 @@ obj FakePluginHost {
     has handlers: dict[str, any] = {},
         command_handlers: dict[str, any] = {},
         shortcut_handlers: dict[str, any] = {},
-        listeners: dict[str, list] = {},
-        md_transformers: list = [],
-        pending_messages: list = [],
-        pending_entries: list = [],
+        listeners: dict[str, list[any]] = {},
+        md_transformers: list[dict[str, any]] = [],
+        pending_messages: list[dict[str, any]] = [],
+        pending_entries: list[dict[str, any]] = [],
         active_tools: any = None,
         session_name: str = "",
-        providers: dict = {},
-        message_renderers: dict = {},
-        entry_renderers: dict = {},
+        providers: dict[str, any] = {},
+        message_renderers: dict[str, any] = {},
+        entry_renderers: dict[str, any] = {},
         extension_tools: dict[str, list[str]] = {},
         cancelled: set[str] = set(),
         node_version: str = "fake",
@@ -72,7 +72,7 @@ def apply_hello(bridge: any, hello: Envelope) {
     payload = hello.payload if hello.payload is not None else {};
     bridge.hello_payload = dict(payload);
     raw_caps: any = payload.get("caps", []);
-    caps: list = [];
+    caps: list[str] = [];
     if isinstance(raw_caps, list) {
         caps = [str(c) for c in raw_caps];
     }
@@ -204,7 +204,7 @@ def register_fake_transformer(
 
 
 """Register a provider on the FAKE host (unit-test parity for registerProvider)."""
-def register_fake_provider(bridge: any, cfg: dict, extension_id: str = "fake.provider") {
+def register_fake_provider(bridge: any, cfg: dict[str, any], extension_id: str = "fake.provider") {
     ensure_host(bridge);
     name = str(cfg.get("name", ""));
     if not name {
@@ -247,7 +247,7 @@ def fake_push_message(bridge: any, role: str, content: str) {
 }
 
 
-def fake_push_entry(bridge: any, type: str, data: dict) {
+def fake_push_entry(bridge: any, type: str, data: dict[str, any]) {
     ensure_host(bridge);
     h = bridge.host;
     if h is not None {
@@ -256,7 +256,7 @@ def fake_push_entry(bridge: any, type: str, data: dict) {
 }
 
 
-def set_fake_active_tools(bridge: any, names: list | None) {
+def set_fake_active_tools(bridge: any, names: list[str] | None) {
     ensure_host(bridge);
     h = bridge.host;
     if h is not None {
@@ -274,13 +274,13 @@ def fake_session_name(bridge: any) -> str {
 and display-method ui_events (parity with the JS makeUi surface)."""
 obj FakeUi {
     has notifications: list[str],
-        ui_events: list;
+        ui_events: list[dict[str, any]];
 
     def notify(message: str, level: str = "info") {
         self.notifications.append(str(message));
     }
 
-    def _record(method: str, args: list) {
+    def _record(method: str, args: list[str]) {
         self.ui_events.append({"method": method, "args": args});
     }
 
@@ -300,7 +300,7 @@ obj FakeUi {
         self._record("setTitle", [text]);
     }
 
-    def select(_title: str, _options: list) -> any {
+    def select(_title: str, _options: list[str]) -> any {
         return None;
     }
 

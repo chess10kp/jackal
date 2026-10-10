@@ -61,12 +61,12 @@ def _write_text(path: str, text: str) {
 }
 
 
-def _api_cred(key: str) -> dict {
+def _api_cred(key: str) -> dict[str, any] {
     return {"type": "api_key", "key": key};
 }
 
 
-def _oauth_cred(access: str, refresh: str, expires: int) -> dict {
+def _oauth_cred(access: str, refresh: str, expires: int) -> dict[str, any] {
     return {"type": "oauth", "access": access, "refresh": refresh,
             "expires": expires};
 }
@@ -229,7 +229,7 @@ test "credential set/remove are immutable snapshots and persist to disk" {
 
 
 test "validate_credential rejects junk but preserves unknown extra keys" {
-    tmp_data_list: list = [
+    tmp_data_list: list[any] = [
         None, 42, "str", [], {}, {"type": "mystery"},
         {"type": "api_key"}, {"type": "api_key", "key": ""},
         {"type": "oauth", "access": "a"},
@@ -354,7 +354,7 @@ test "redaction never leaks secrets in any display form" {
 # ============================== flow machine ==============================
 
 
-def _provider(pid: str, auth_type: str, configured: bool = False) -> dict {
+def _provider(pid: str, auth_type: str, configured: bool = False) -> dict[str, any] {
     return {"id": pid, "displayName": pid.title(), "authType": auth_type,
             "configured": configured, "modelCount": 2};
 }

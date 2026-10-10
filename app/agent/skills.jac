@@ -60,8 +60,8 @@ def _escape_xml(s: str) -> str {
 
 
 """Render the <available_skills> system-prompt block ('' when all hidden)."""
-def format_skills_for_prompt(skills: list) -> str {
-    visible: list = [];
+def format_skills_for_prompt(skills: list[dict[str, any]]) -> str {
+    visible: list[dict[str, any]] = [];
     for s in skills {
         if not s.get("disableModelInvocation", False) {
             visible.append(s);
@@ -94,7 +94,7 @@ def format_skills_for_prompt(skills: list) -> str {
 
 
 """Append the skills catalog to a system prompt (unchanged when empty)."""
-def append_skills_to_prompt(system_prompt: str, skills: list) -> str {
+def append_skills_to_prompt(system_prompt: str, skills: list[dict[str, any]]) -> str {
     catalog = format_skills_for_prompt(skills);
     if catalog {
         return system_prompt + catalog;
@@ -110,7 +110,7 @@ def append_skills_to_prompt(system_prompt: str, skills: list) -> str {
 
 Unchanged text when the input is not a /skill: command, the name is
 unknown, or the backing file became unreadable."""
-def expand_skill_command(text: str, skills: list) -> str {
+def expand_skill_command(text: str, skills: list[dict[str, any]]) -> str {
     if not text.startswith("/skill:") {
         return text;
     }
@@ -123,7 +123,7 @@ def expand_skill_command(text: str, skills: list) -> str {
         args = "";
     }
 
-    found: dict | None = None;
+    found: dict[str, any] | None = None;
     for s in skills {
         if str(s.get("name", "")) == skill_name {
             found = s;
@@ -185,7 +185,7 @@ def load_skill_by_dir(dir_name: str, package_root: str = "") -> str {
 
 
 """Read-permission seeds for loaded skills: exact files plus rooted dirs."""
-def skill_read_allowlist(skills: list) -> dict {
+def skill_read_allowlist(skills: list[dict[str, any]]) -> dict[str, list[str]] {
     files: list[str] = [];
     roots: list[str] = [];
     for s in skills {

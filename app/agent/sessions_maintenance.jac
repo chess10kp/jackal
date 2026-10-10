@@ -60,7 +60,7 @@ def prune_sessions(cwd: str, max_count: int = 0, retention_days: int = 0) -> int
     }
     now = time.time();
     max_age_secs = retention_days * 24 * 60 * 60 if retention_days > 0 else 0;
-    kept: list = [];
+    kept: list[dict[str, any]] = [];
     pruned = 0;
     idx = 0;
     for item in entries {
@@ -106,7 +106,7 @@ Writes to `path` (parent dirs created). Tool messages render as fenced
 blocks under their preceding call. True on success; False for unknown ids,
 unwritable targets, or corrupt transcripts."""
 def export_session(cwd: str, session_id: str, path: str) -> bool {
-    rec: dict | None = get_session_record(cwd, session_id);
+    rec: dict[str, any] | None = get_session_record(cwd, session_id);
     if rec is None {
         return False;
     }

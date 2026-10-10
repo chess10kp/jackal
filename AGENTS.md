@@ -29,7 +29,7 @@ cd app && jac build            # native compile check over app/
 jac test app/<file>.test.jac   # per-file jac tests
 ```
 
-**Launcher status:** `./jackal.sh` boots the native TUI (`app/tui/shell.jac`); headless passthroughs are `--repl` (line REPL) and `--json` (JSONL protocol).
+**Running:** no launcher script — from `app/`: `jac run tui/shell.jac` boots the native TUI (needs a TTY); headless: `jac run main.jac` (line REPL) or `jac run main.jac -- --json` (JSONL protocol). Set `JACKAL_AGENT_DIR=<repo>/pi` and `JACKAL_ROOT=<repo>` so auth/catalogs resolve.
 
 **Requirements:** Python env with `jac` CLI (vendored compiler under `vendor/jac/`, wrapper in `scripts/setup-vendor-jac.sh`); a TTY for the TUI; provider API keys via env or auth.json (see below).
 
@@ -177,3 +177,17 @@ Pruned as stale (legacy-runtime-bound, moot after deletion): `@jac/pi` hook nami
   edits with `cd vendor/jac/jac && zig build -Dskip-precompile
   -Dpayload-progress`; the full precompile needs >9 GB RSS and OOM-kills on
   a 14 GB box. First use compiles the compiler on demand (one slow run).
+
+## LLVM slice — reuse the shared copy, never fetch a private one
+
+`jac/.llvm-build` in this workspace is a symlink to the single canonical slice at
+`~/repos/jaseci/jac/.llvm-build` (pinned LLVM 22.1.8, see `jac/bootstrap/pins.json`).
+
+- Plain `zig build` resolves the slice through the link; `zig build fetch-llvm`
+  is a no-op once the marker lib exists. NEVER delete the symlink or fetch a
+  private copy — each private `.llvm-build` costs ~3.4G of disk.
+- If a build complains the LLVM slice is missing, refresh the canonical copy
+  once: `cd ~/repos/jaseci/jac && zig build fetch-llvm` (range-fetch, ~84 MB).
+- All local trees pin the same slice (`LLVM-22.1.8-*`). If you bump llvm pins
+  in this tree, mirror them in `~/repos/jaseci/jac` so the shared copy is
+  refreshed, or pass `-Dllvm-dir` to the build explicitly.

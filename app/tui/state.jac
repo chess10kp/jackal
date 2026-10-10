@@ -86,8 +86,8 @@ obj LiveShell {
         picker: any = None,
         mode: str = "normal",
         cmd_q: any = None,
-        auth_flow: dict = {},
-        auth_data: dict = {},
+        auth_flow: dict[str, any] = {},
+        auth_data: dict[str, any] = {},
         slash_sel: int = 0,
         slash_dismissed: str = "";
 }

@@ -9,8 +9,8 @@ plugin_host/fixtures/pi_lifecycle_probe.mjs, and the name-pinned helpers.
 
 test "fire_user_bash reaches fake-host listeners" {
     bridge = create_bridge("s-ub-fake");
-    seen: dict = {};
-    def grab(data: dict, ctx: any) -> str {
+    seen: dict[str, str] = {};
+    def grab(data: dict[str, any], ctx: any) -> str {
         seen["command"] = str(data.get("command", ""));
         return "bash-seen";
     }
@@ -26,8 +26,8 @@ test "fire_user_bash reaches fake-host listeners" {
 
 test "fire_project_trust reaches fake-host listeners" {
     bridge = create_bridge("s-pt-fake");
-    seen2: dict = {};
-    def grab2(data: dict, ctx: any) -> str {
+    seen2: dict[str, str] = {};
+    def grab2(data: dict[str, any], ctx: any) -> str {
         seen2["path"] = str(data.get("path", ""));
         return "trust-seen";
     }

@@ -26,9 +26,13 @@ RUN npm install -g "@earendil-works/pi-coding-agent@${PI_VERSION}"
 COPY . /opt/jackal
 WORKDIR /opt/jackal
 # Production deps only (matches how the image runs); avoids `npm ci` lockfile strictness for devDependencies.
-RUN npm install --omit=dev \
-	&& chmod +x /opt/jackal/jackal.sh
+RUN npm install --omit=dev
+
+ENV JACKAL_AGENT_DIR=/opt/jackal/pi \
+	JACKAL_ROOT=/opt/jackal
 
 WORKDIR /workspace
-ENTRYPOINT ["/opt/jackal/jackal.sh"]
+# Native TUI entry (needs a TTY: docker run -t). Headless alternative:
+#   jac run /opt/jackal/app/main.jac -- --json
+ENTRYPOINT ["jac", "run", "/opt/jackal/app/tui/shell.jac"]
 CMD []

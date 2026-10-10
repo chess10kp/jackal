@@ -26,14 +26,14 @@ import from tui.context { _skills_picker_entries }
 """Provider rows for /login. Native routes use API-key auth today; routes
 that advertise an OAuth authType are retained so their explicit network seam
 can report a useful error instead of pretending to log in."""
-def _login_provider_entries() -> dict {
+def _login_provider_entries() -> dict[str, any] {
     stored = load_auth_file(resolve_auth_path());
     rows: list[str] = [];
     ids: list[str] = [];
     for prov in PROVIDER_ROUTES {
         provider_id = str(prov);
         route: any = PROVIDER_ROUTES[prov];
-        meta: dict = route if isinstance(route, dict) else {};
+        meta: dict[str, any] = route if isinstance(route, dict) else {};
         key_env = str(meta.get("key_env", "") or "");
         auth_type = str(meta.get("authType", "api_key" if key_env else "env"));
         if auth_type == "env" {
@@ -67,7 +67,7 @@ def _hydrate_auth_environment() {
     for prov in PROVIDER_ROUTES {
         provider_id = str(prov);
         route: any = PROVIDER_ROUTES[prov];
-        meta: dict = route if isinstance(route, dict) else {};
+        meta: dict[str, any] = route if isinstance(route, dict) else {};
         key_env = str(meta.get("key_env", "") or "");
         if not key_env or os.environ.get(key_env, "") {
             continue;
@@ -108,8 +108,8 @@ def _cancel_login(app: LiveShell) {
 
 def _start_login_provider(app: LiveShell, provider_id: str) {
     entries = _login_provider_entries();
-    stored: dict = entries.get("stored", {});
-    found: dict | None = None;
+    stored: dict[str, any] = entries.get("stored", {});
+    found: dict[str, any] | None = None;
     for item in PROVIDER_ROUTES {
         if str(item) == provider_id {
             route: any = PROVIDER_ROUTES[item];
@@ -274,7 +274,7 @@ board from format_tasks_list (counts header, divider rule, one row per
 task). Row ids: "__header__" for non-selectable lines, the task index as
 a string otherwise. Pure over cwd — replicated in tui/overlays.test.jac
 (tui/shell.jac cannot be imported headless; keep in sync with the replica)."""
-def _task_picker_entries(cwd: str) -> dict {
+def _task_picker_entries(cwd: str) -> dict[str, any] {
     tasks = load_tasks(cwd);
     if not tasks {
         return {"rows": ["No tasks yet."], "ids": ["__header__"]};
@@ -306,7 +306,7 @@ def _task_picker_entries(cwd: str) -> dict {
 """CHECKPOINTS picker rows via list_checkpoints (newest first), one
 format_checkpoint_overlay_row line per checkpoint; ids are names. Pure
 over cwd — replicated in tui/overlays.test.jac (keep in sync)."""
-def _checkpoint_picker_entries(cwd: str) -> dict {
+def _checkpoint_picker_entries(cwd: str) -> dict[str, any] {
     items = list_checkpoints(cwd);
     rows: list[str] = [];
     ids: list[str] = [];
@@ -319,15 +319,15 @@ def _checkpoint_picker_entries(cwd: str) -> dict {
 """Open the SKILLS catalog overlay; enter inserts `/skill:name ` into the
 draft (submitting it inlines the skill body via expand_skill_command)."""
 def _open_skills_picker(app: LiveShell) -> str {
-    skills: list = [];
+    skills: list[dict[str, any]] = [];
     try {
-        catalog: dict = load_jackal_skills();
+        catalog: dict[str, any] = load_jackal_skills();
         skills = list(catalog.get("skills", []));
     } except Exception as e {
         return "ERROR: failed to load skills: " + str(e)[:80];
     }
     entries = _skills_picker_entries(skills);
-    ids: list = list(entries["ids"]);
+    ids: list[str] = list(entries["ids"]);
     selectable = False;
     for rid in ids {
         if str(rid) != "__header__" {

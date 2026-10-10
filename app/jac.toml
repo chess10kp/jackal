@@ -2,7 +2,7 @@
 name = "jackal"
 version = "0.1.0"
 description = "Jackal - all-Jac na-codespace coding agent harness"
-entry-point = "main.jac"
+entry-point = "main"
 
 # Model config for the ambient `llm` builtin. api_key here is a fallback;
 # provider env vars (e.g. OPENROUTER_API_KEY) take precedence.
@@ -12,8 +12,8 @@ api_key = ""
 
 # Pure compute: pin native (dogfooding target). Inference keeps core/edit
 # server while its importer tools.jac is server-anchored, so pin explicitly.
-[build]
-default_codespace = "native"
+[placement]
+default = "native"
 
 [placement.pins]
 # Current frontier: 12 explicit server pins remain (was 15; terminal/vt went
@@ -168,5 +168,5 @@ default_codespace = "native"
 #     see agent.tool_spec above).
 "agent.extensions" = "server"
 
-[dependencies]
+[dependencies.pypi]
 httpx = "~=0.28"

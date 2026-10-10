@@ -2,7 +2,7 @@
 name = "jackal-shell"
 version = "0.1.0"
 description = "Jackal agent harness"
-entry-point = "app/main.jac"
+entry-point = "app.main"
 
-[dependencies]
+[dependencies.pypi]
 httpx = "latest"

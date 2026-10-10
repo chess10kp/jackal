@@ -104,8 +104,8 @@ def _parse_scalar(value: str) -> any {
 Mirrors orchestration/_frontmatter_toolchain.parse_frontmatter: CRLF
 normalized, missing terminator keeps the whole text as body, dash-block
 lists collect under the preceding bare key."""
-def parse_frontmatter(content: str) -> tuple[dict, str] {
-    fm: dict = {};
+def parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
+    fm: dict[str, any] = {};
     normalized = content.replace("\r\n", "\n");
     if not normalized.startswith("---") {
         return (fm, normalized);
@@ -227,7 +227,7 @@ def _load_ignore_rules(root_dir: str, subdir: str) -> list[str] {
 
 
 """Minimal gitignore-style match; True when *path* should be ignored."""
-def _match_ignore_pattern(path: str, rules: list) -> bool {
+def _match_ignore_pattern(path: str, rules: list[str]) -> bool {
     result = False;
     for rule in rules {
         rule_str = str(rule);
@@ -295,7 +295,7 @@ def _validate_description(description: str | None) -> list[str] {
 # =========================== single skill load ===========================
 
 
-def _warning(message: str, path: str) -> dict {
+def _warning(message: str, path: str) -> dict[str, any] {
     return {"type": "warning", "message": message, "path": path, "collision": None};
 }
 
@@ -304,9 +304,9 @@ def _warning(message: str, path: str) -> dict {
 
 Missing descriptions exclude the skill (after recording the warning);
 bad names warn but keep the skill, mirroring the legacy loader."""
-def _load_skill_from_file(file_path: str, source: str) -> tuple[dict | None, list] {
-    diagnostics: list = [];
-    result: dict | None = None;
+def _load_skill_from_file(file_path: str, source: str) -> tuple[dict[str, any] | None, list[dict[str, any]]] {
+    diagnostics: list[dict[str, any]] = [];
+    result: dict[str, any] | None = None;
     try {
         fh = open(file_path, encoding="utf-8");
         try {

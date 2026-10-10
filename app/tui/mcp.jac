@@ -9,7 +9,7 @@ import from agent.session { plugins }
 agent.session's _mcp_server_specs shape ({name: argv}). Inlined because
 underscore-prefixed imports from agent.session did not bind at runtime
 (NameError swallowed by callers); keep in sync with session.jac."""
-def _local_mcp_server_specs(cfg: dict) -> dict[str, list[str]] {
+def _local_mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
     out: dict[str, list[str]] = {};
     raw: any = cfg.get("mcp") if isinstance(cfg, dict) else None;
     if not isinstance(raw, dict) {
@@ -48,10 +48,10 @@ agent.session plugins.mcp_clients only after a successful spawn+handshake,
 so a configured-but-absent client is reported "not connected", and a
 present-but-uninitialized one as "spawn failed". Pure over (cwd, clients)
 — replicated in tui/overlays.test.jac (keep in sync)."""
-def _mcp_status_entries(cwd: str, clients: dict) -> dict {
+def _mcp_status_entries(cwd: str, clients: dict[str, any]) -> dict[str, list[str]] {
     specs: dict[str, list[str]] = {};
     try {
-        cfg: dict = load_project_config(cwd);
+        cfg: dict[str, any] = load_project_config(cwd);
         parsed: dict[str, list[str]] = _local_mcp_server_specs(cfg);
         specs = parsed;
     } except Exception {
@@ -92,7 +92,7 @@ def _mcp_status_entries(cwd: str, clients: dict) -> dict {
 """Open the read-only MCP status overlay; every row is furniture, so enter
 is a no-op and esc dismisses."""
 def _open_mcp_picker(app: LiveShell) -> str {
-    clients_arg: dict = {};
+    clients_arg: dict[str, any] = {};
     raw_clients: any = plugins.mcp_clients;
     if isinstance(raw_clients, dict) {
         clients_arg = raw_clients;

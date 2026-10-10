@@ -42,7 +42,7 @@ import json;
 import re;
 import from .compaction { load_project_config }
 
-glob SUBAGENT_TOOL_ALIASES: dict = {
+glob SUBAGENT_TOOL_ALIASES: dict[str, str] = {
         "read_file": "read",
         "write_file": "write",
         "edit_file": "edit",
@@ -101,8 +101,8 @@ def _parse_scalar(value: str) -> any {
 Mirrors orchestration/_frontmatter_toolchain.parse_frontmatter: CRLF
 normalized, missing terminator keeps the whole text as body, dash-block
 lists collect under the preceding bare key."""
-def parse_frontmatter(content: str) -> tuple[dict, str] {
-    fm: dict = {};
+def parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
+    fm: dict[str, any] = {};
     normalized = content.replace("\r\n", "\n");
     if not normalized.startswith("---") {
         return (fm, normalized);
@@ -259,7 +259,7 @@ def _list_files(directory: str, accept: any) -> list[str] {
 """Load one agent markdown file into a SubagentDefinition-style dict.
 
 Returns None when unreadable or missing name/description frontmatter."""
-def load_agent_file(file_path: str, source: str) -> dict | None {
+def load_agent_file(file_path: str, source: str) -> dict[str, any] | None {
     try {
         fh = open(file_path, encoding="utf-8");
         try {
@@ -295,8 +295,8 @@ def load_agent_file(file_path: str, source: str) -> dict | None {
 
 
 """Load all valid agent definitions found under *directory*."""
-def load_agents_from_dir(directory: str, source: str) -> list[dict] {
-    agents: list[dict] = [];
+def load_agents_from_dir(directory: str, source: str) -> list[dict[str, any]] {
+    agents: list[dict[str, any]] = [];
     for fp in _list_files(directory, _is_agent_md) {
         agent = load_agent_file(fp, source);
         if agent is not None {
@@ -312,7 +312,7 @@ def load_agents_from_dir(directory: str, source: str) -> list[dict] {
 
 """Discovery roots: {"packageDir": <root>/.pi/agents,
 "projectDir": <cwd>/subagents}."""
-def discover_subagent_dirs(cwd: str, agent_dir: str = "") -> dict {
+def discover_subagent_dirs(cwd: str, agent_dir: str = "") -> dict[str, str] {
     base_root = resolve_jackal_root(agent_dir);
     return {
         "packageDir": os.path.join(base_root, ".pi", "agents"),
@@ -322,9 +322,9 @@ def discover_subagent_dirs(cwd: str, agent_dir: str = "") -> dict {
 
 
 """Merged subagent map keyed by name (project overrides package)."""
-def load_subagents(cwd: str, agent_dir: str = "") -> dict {
+def load_subagents(cwd: str, agent_dir: str = "") -> dict[str, dict[str, any]] {
     dirs = discover_subagent_dirs(cwd, agent_dir);
-    merged: dict = {};
+    merged: dict[str, dict[str, any]] = {};
     for agent in load_agents_from_dir(str(dirs["packageDir"]), "package") {
         merged[str(agent["name"])] = agent;
     }
@@ -335,20 +335,20 @@ def load_subagents(cwd: str, agent_dir: str = "") -> dict {
 }
 
 
-def _agent_sort_key(agent: dict) -> str {
+def _agent_sort_key(agent: dict[str, any]) -> str {
     return str(agent.get("name", ""));
 }
 
 
 """Name-sorted list of merged subagent definitions."""
-def list_subagents(cwd: str, agent_dir: str = "") -> list[dict] {
-    agents: list[dict] = list(load_subagents(cwd, agent_dir).values());
+def list_subagents(cwd: str, agent_dir: str = "") -> list[dict[str, any]] {
+    agents: list[dict[str, any]] = list(load_subagents(cwd, agent_dir).values());
     return sorted(agents, key=_agent_sort_key);
 }
 
 
 """Look up one merged subagent by name; None when unknown."""
-def get_subagent(cwd: str, name: str, agent_dir: str = "") -> dict | None {
+def get_subagent(cwd: str, name: str, agent_dir: str = "") -> dict[str, any] | None {
     return load_subagents(cwd, agent_dir).get(name.strip());
 }
 
@@ -357,7 +357,7 @@ def get_subagent(cwd: str, name: str, agent_dir: str = "") -> dict | None {
 
 
 """settings.json overrides: {"<agent>": "<model>"}; {} when absent/broken."""
-def load_settings_model_overrides(agent_dir: str = "") -> dict {
+def load_settings_model_overrides(agent_dir: str = "") -> dict[str, str] {
     settings_path = os.path.join(resolve_jackal_root(agent_dir), "settings.json");
     if not os.path.isfile(settings_path) {
         return {};
@@ -384,7 +384,7 @@ def load_settings_model_overrides(agent_dir: str = "") -> dict {
     if not isinstance(overrides, dict) {
         return {};
     }
-    out: dict = {};
+    out: dict[str, str] = {};
     for agent_name in overrides {
         value: any = overrides[agent_name];
         if isinstance(value, dict) and isinstance(value.get("model"), str) {
@@ -397,13 +397,13 @@ def load_settings_model_overrides(agent_dir: str = "") -> dict {
 
 """`.jackal` project-config overrides: {"__default__": ...} seed plus
 per-agent models from string values or {"model": ...} dicts."""
-def load_project_model_overrides(cwd: str) -> dict {
+def load_project_model_overrides(cwd: str) -> dict[str, str] {
     cfg = load_project_config(cwd);
     sub: any = cfg.get("subagents");
     if not isinstance(sub, dict) {
         return {};
     }
-    out: dict = {};
+    out: dict[str, str] = {};
     default_model: any = sub.get("model");
     if isinstance(default_model, str) and default_model.strip() {
         out["__default__"] = default_model.strip();
@@ -429,11 +429,11 @@ def load_project_model_overrides(cwd: str) -> dict {
 """Normalize an allowed-tool list into a set (aliases + mcp: prefix).
 
 None means "all allowed" (empty or missing input)."""
-def normalize_allowed_tool_names(tools: list | None) -> set | None {
+def normalize_allowed_tool_names(tools: list[str] | None) -> set[str] | None {
     if not tools {
         return None;
     }
-    allowed: set = set();
+    allowed: set[str] = set();
     for raw in tools {
         name = str(raw).strip();
         if not name {
@@ -455,8 +455,8 @@ def normalize_allowed_tool_names(tools: list | None) -> set | None {
 Always drops EXCLUDED_SUBAGENT_TOOLS, intersects allowed_names when given,
 re-pins bash when it was allowed but filtered away, and falls back to all
 non-excluded tools when nothing survives."""
-def filter_tools_for_subagent(all_tool_names: list, allowed_names: set | None) -> list[str] {
-    excluded: set = set(EXCLUDED_SUBAGENT_TOOLS);
+def filter_tools_for_subagent(all_tool_names: list[str], allowed_names: set[str] | None) -> list[str] {
+    excluded: set[str] = set(EXCLUDED_SUBAGENT_TOOLS);
     filtered: list[str] = [];
     for t in all_tool_names {
         name = str(t);

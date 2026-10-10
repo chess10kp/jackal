@@ -32,7 +32,7 @@ obj ExtensionDecl {
         path: str = "",
         runtime: str = "node",
         activation: str = "sidecar",
-        requires: list = [];
+        requires: list[str] = [];
 }
 
 
@@ -50,8 +50,8 @@ obj ExtensionStatus {
 
 
 """Parse one extension dict into ExtensionDecl (missing fields → defaults)."""
-def decl_from_dict(raw: dict) -> ExtensionDecl {
-    req: list = [];
+def decl_from_dict(raw: dict[str, any]) -> ExtensionDecl {
+    req: list[str] = [];
     raw_req: any = raw.get("requires", []);
     if isinstance(raw_req, list) {
         req = [str(x) for x in raw_req];
@@ -77,7 +77,7 @@ def decl_from_dict(raw: dict) -> ExtensionDecl {
 
 """Normalize a JSON document into a list of ExtensionDecl."""
 def decls_from_json(data: any) -> list[ExtensionDecl] {
-    rows: list = [];
+    rows: list[any] = [];
     if isinstance(data, list) {
         rows = data;
     } elif isinstance(data, dict) {

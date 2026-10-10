@@ -308,7 +308,7 @@ test "tool_cancel aborts slow Pi tool" {
     load_extension_path(bridge, reg, "pi.slow", slow);
     # Fire invoke on a worker thread; cancel shortly after.
     import threading;
-    box: dict = {"result": ""};
+    box: dict[str, str] = {"result": ""};
 
     def _run {
         box["result"] = invoke(
@@ -386,17 +386,17 @@ test "fake host hook fire runs listeners serially and isolates errors" {
     bridge = create_bridge("s-hook");
     order: list[str] = [];
 
-    def _h1(event_data: dict, ctx: any) -> str {
+    def _h1(event_data: dict[str, any], ctx: any) -> str {
         order.append("h1");
         return "one:" + str(event_data.get("message", ""));
     }
 
-    def _boom(event_data: dict, ctx: any) -> str {
+    def _boom(event_data: dict[str, any], ctx: any) -> str {
         order.append("boom");
         raise ValueError("listener failed");
     }
 
-    def _h3(event_data: dict, ctx: any) -> str {
+    def _h3(event_data: dict[str, any], ctx: any) -> str {
         order.append("h3");
         return "three";
     }
@@ -572,7 +572,7 @@ test "fake host drains messages entries and ui events" {
     assert traffic["messages"] == [{"role": "assistant", "content": "pushed note"}];
     assert len(traffic["entries"]) == 3;
     # Entries include the ui_event normalized from the command's UI calls.
-    entries: list[dict] = list(traffic["entries"]);
+    entries: list[dict[str, any]] = list(traffic["entries"]);
     kinds: list[str] = [];
     for ent in entries {
         kinds.append(str(ent.get("type", "")));
@@ -625,12 +625,12 @@ test "fire_hook_data fake path captures verdicts and chains mutations" {
     bridge = create_bridge("s-b2-data");
     ensure_host(bridge);
 
-    def _mutator(data: dict, ctx: any) -> str {
+    def _mutator(data: dict[str, any], ctx: any) -> str {
         data["input"]["text"] = data["input"]["text"].upper();
         return "";
     }
 
-    def _verdict(data: dict, ctx: any) -> dict {
+    def _verdict(data: dict[str, any], ctx: any) -> dict[str, any] {
         # Sees the mutation made by _mutator (in-place chaining).
         assert data["input"]["text"] == "HI";
         return {"block": True, "reason": "nope"};
@@ -656,7 +656,7 @@ test "tool_call_gate aggregates blocks and mutated args" {
     bridge = create_bridge("s-b2-gate");
     ensure_host(bridge);
 
-    def _gate(data: dict, ctx: any) -> any {
+    def _gate(data: dict[str, any], ctx: any) -> any {
         if str(data["input"].get("command", "")).find("rm") >= 0 {
             return {"block": True, "reason": "danger", "terminate": True};
         }
@@ -688,7 +688,7 @@ test "input_gate handles and transforms" {
     bridge = create_bridge("s-b2-input");
     ensure_host(bridge);
 
-    def _input(data: dict, ctx: any) -> any {
+    def _input(data: dict[str, any], ctx: any) -> any {
         t = str(data.get("text", ""));
         if t == "!gate" {
             return {"action": "handled"};
@@ -715,7 +715,7 @@ test "input transforms chain across handlers on the fake host" {
     bridge = create_bridge("s-b2-chain");
     ensure_host(bridge);
 
-    def _first(data: dict, ctx: any) -> dict | None {
+    def _first(data: dict[str, any], ctx: any) -> dict[str, any] | None {
         t = str(data.get("text", ""));
         if t.startswith("?up ") {
             return {"action": "transform", "text": t[4:].upper()};
@@ -723,7 +723,7 @@ test "input transforms chain across handlers on the fake host" {
         return None;
     }
 
-    def _second(data: dict, ctx: any) -> dict | None {
+    def _second(data: dict[str, any], ctx: any) -> dict[str, any] | None {
         # Sees the REWRITTEN text from _first (chaining parity pin).
         t = str(data.get("text", ""));
         if t and t == t.upper() and any(c.isupper() for c in t) {
@@ -745,12 +745,12 @@ test "context_gate applies in-place edits and replacements non-destructively" {
     bridge = create_bridge("s-b2-ctx");
     ensure_host(bridge);
 
-    def _ctx_edit(data: dict, ctx: any) -> any {
+    def _ctx_edit(data: dict[str, any], ctx: any) -> any {
         data["messages"].append({"role": "user", "content": "[inject]"});
         return None;
     }
 
-    def _ctx_replace(data: dict, ctx: any) -> dict {
+    def _ctx_replace(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"messages": [{"role": "user", "content": "replaced"}]};
     }
 
@@ -778,7 +778,7 @@ test "agent_start_gate collects systemPrompt and message" {
     bridge = create_bridge("s-b2-agent");
     ensure_host(bridge);
 
-    def _sys(data: dict, ctx: any) -> dict {
+    def _sys(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"systemPrompt": data["prompt"] + "+sys", "message": {"content": "extra ctx"}};
     }
 
@@ -864,12 +864,12 @@ test "prepare_provider_request applies edits and replacements" {
     bridge = create_bridge("s-p10-prep");
     ensure_host(bridge);
 
-    def _mutator(data: dict, ctx: any) -> any {
+    def _mutator(data: dict[str, any], ctx: any) -> any {
         data["body"]["injected"] = True;
         return None;
     }
 
-    def _replacer(data: dict, ctx: any) -> dict {
+    def _replacer(data: dict[str, any], ctx: any) -> dict[str, str] {
         return {"url": "https://proxy.example/v1/chat/completions"};
     }
 
@@ -995,14 +995,14 @@ test "tool_result_gate chains patches and echoes latest content" {
     bridge = create_bridge("s-tres");
     ensure_host(bridge);
 
-    def _first(data: dict, ctx: any) -> dict | None {
+    def _first(data: dict[str, any], ctx: any) -> dict[str, any] | None {
         if data.get("toolName") == "bash" {
             return {"content": str(data.get("content", "")) + "\n[redacted]"};
         }
         return None;
     }
 
-    def _second(data: dict, ctx: any) -> dict {
+    def _second(data: dict[str, any], ctx: any) -> dict[str, any] {
         # Sees the first patch applied (middleware chaining pin).
         assert str(data.get("content", "")).endswith("[redacted]");
         return {"isError": True};
@@ -1212,7 +1212,7 @@ test "node host sends builtins on ext_load and getAllTools sees them" {
     ctx_report = invoke(reg, "probe_ctx", {}, bridge);
     assert ctx_report.startswith("{");
     import json;
-    data: dict = json.loads(ctx_report);
+    data: dict[str, any] = json.loads(ctx_report);
     assert data["has_cwd"] is True;
     assert data["ui_kind"] == "object";
     assert data["notify_kind"] == "function";
@@ -1250,11 +1250,11 @@ test "tool execute ui ctx: notify rides tool_result notifications, setStatus rid
     assert res == "ui exercised";
 
     # setStatus is a display method -> normalized ui_event entry.
-    traffic: dict = drain_extension_traffic(bridge);
+    traffic: dict[str, any] = drain_extension_traffic(bridge);
     methods: list[str] = [];
-    entries: list = traffic["entries"];
+    entries: list[dict[str, any]] = traffic["entries"];
     for ent in entries {
-        row: dict = ent;
+        row: dict[str, any] = ent;
         if str(row.get("type", "")) == "ui_event" {
             methods.append(str(row.get("method", "")));
         }

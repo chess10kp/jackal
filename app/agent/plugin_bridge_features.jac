@@ -54,7 +54,7 @@ def transform_markdown(
     }
     for t in h.md_transformers {
         try {
-            out: any = t["fn"](md, mctx);
+            out: dict[str, any] = t["fn"](md, mctx);
             if isinstance(out, str) {
                 md = out;
             }

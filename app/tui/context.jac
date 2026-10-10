@@ -22,7 +22,7 @@ def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
     if depth > _EXPLORER_MAX_DEPTH or len(out) >= _EXPLORER_MAX_FILES {
         return;
     }
-    rules: list = [];
+    rules: list[str] = [];
     try {
         rules = _load_ignore_rules(base_root, dir_path);
     } except Exception {
@@ -68,7 +68,7 @@ def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
 }
 
 
-def _explorer_file_entries(cwd: str) -> dict {
+def _explorer_file_entries(cwd: str) -> dict[str, list[str]] {
     out: list[str] = [];
     _explorer_walk(cwd, cwd, 1, out);
     return {"rows": list(out), "ids": list(out)};
@@ -79,7 +79,7 @@ def _explorer_file_entries(cwd: str) -> dict {
 "name — description" row per skill (model-hidden skills tagged "· hidden");
 ids are skill names so enter can insert /skill:name. Pure over its input
 — replicated in tui/overlays.test.jac."""
-def _skills_picker_entries(skills: list) -> dict {
+def _skills_picker_entries(skills: list[dict[str, any]]) -> dict[str, list[str]] {
     if not skills {
         return {"rows": ["no skills found"], "ids": ["__header__"]};
     }
@@ -104,7 +104,7 @@ trailing space so typing continues cleanly. Paths containing whitespace
 use the quoted `@"a b.txt"` form, which the TUI-side pre-pass expands
 (see _take_quoted_mentions); bare paths stay unquoted for readability.
 Empty picks -> ""."""
-def _format_mentions(paths: list) -> str {
+def _format_mentions(paths: list[str]) -> str {
     parts: list[str] = [];
     seen: set[str] = set();
     for p in paths {
@@ -140,13 +140,13 @@ Ownership note: this pre-pass exists because the shared parser
 (agent.context_input._FILE_MENTION_PATTERN) tokenizes on whitespace; the
 quoting-aware regex belongs there once that file is editable by this
 task's scope."""
-def _take_quoted_mentions(text: str) -> tuple[str, list[dict]] {
-    mentions: list[dict] = [];
+def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
+    mentions: list[dict[str, any]] = [];
     spans: list[tuple[int, int]] = [];
     for m in re.finditer(_QUOTED_MENTION_PATTERN, text) {
         inner: str = str(m.group(1));
         path_part: str = inner;
-        rng: dict | None = None;
+        rng: dict[str, any] | None = None;
         outer_start: any = m.group(2);
         outer_end: any = m.group(3);
         if outer_start {
@@ -154,7 +154,7 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict]] {
             outer_range: str = str(outer_start) + (
                 "-" + str(outer_end) if outer_end else ""
             );
-            parsed_outer: dict | None = parse_line_range(outer_range);
+            parsed_outer: dict[str, any] | None = parse_line_range(outer_range);
             if parsed_outer is not None {
                 rng = parsed_outer;
             }
@@ -164,7 +164,7 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict]] {
             cm = re.search(r":(\d+)(?:-(\d+))?$", inner);
             if cm is not None {
                 inner_range: str = inner[cm.start() + 1:];
-                parsed_inner: dict | None = parse_line_range(inner_range);
+                parsed_inner: dict[str, any] | None = parse_line_range(inner_range);
                 if parsed_inner is not None {
                     path_part = inner[:cm.start()];
                     rng = parsed_inner;
@@ -207,9 +207,9 @@ remaining text goes through the normal expansion (plain @mentions and
 "Attached context:" header — merged into the existing section when the
 base expansion already produced one."""
 def _expand_quoted_context(cwd: str, text: str) -> str {
-    lifted: tuple[str, list[dict]] = _take_quoted_mentions(text);
+    lifted: tuple[str, list[dict[str, any]]] = _take_quoted_mentions(text);
     cleaned: str = lifted[0];
-    quotes: list[dict] = lifted[1];
+    quotes: list[dict[str, any]] = lifted[1];
     if not quotes {
         return expand_context_input(cwd, text);
     }

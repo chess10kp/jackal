@@ -129,7 +129,7 @@ def _run_slash(app: LiveShell, line: str) -> str {
         }
         lines: list[str] = ["extension shortcuts:"];
         for key in scs {
-            meta: dict = scs[key] if isinstance(scs[key], dict) else {};
+            meta: dict[str, any] = scs[key] if isinstance(scs[key], dict) else {};
             lines.append("  " + str(key) + " — " + str(meta.get("description", "") or "") + " (" + str(meta.get("extension_id", "") or "") + ")");
         }
         return "\n".join(lines);
@@ -141,7 +141,7 @@ def _run_slash(app: LiveShell, line: str) -> str {
         }
         lines: list[str] = ["extension commands:"];
         for cname in cmds {
-            meta: dict = cmds[cname] if isinstance(cmds[cname], dict) else {};
+            meta: dict[str, any] = cmds[cname] if isinstance(cmds[cname], dict) else {};
             lines.append("  /" + str(cname) + " — " + str(meta.get("description", "") or ""));
         }
         return "\n".join(lines);
@@ -181,7 +181,7 @@ def _run_slash(app: LiveShell, line: str) -> str {
         # Inline skill expansion: the transcript keeps the typed command;
         # the model receives the <skill> block with args appended.
         try {
-            catalog: dict = load_jackal_skills();
+            catalog: dict[str, any] = load_jackal_skills();
         } except Exception as e {
             return "ERROR: failed to load skills: " + str(e);
         }
@@ -216,11 +216,11 @@ def _run_slash(app: LiveShell, line: str) -> str {
 
 """Open the foreground extension-UI modal (one at a time; approval owns the
 overlay node while it is up, so UI requests queue behind it)."""
-def _ui_open_modal(app: LiveShell, rec: dict) -> bool {
+def _ui_open_modal(app: LiveShell, rec: dict[str, any]) -> bool {
     if app.ui_modal is not None or app.shell.approval is not None {
         return False;
     }
-    m: dict = dict(rec);
+    m: dict[str, any] = dict(rec);
     m["selected"] = 0;
     m["draft"] = "";
     m["prev_hint"] = app.status_hint;
@@ -304,7 +304,7 @@ def _handle_ui_modal_key(app: LiveShell, key: str) {
         return;
     }
     if method == "select" {
-        options: list = list(m.get("options", []));
+        options: list[any] = list(m.get("options", []));
         sel = int(m.get("selected", 0));
         moved = False;
         if (key == "up" or key == "k") and len(options) > 0 {

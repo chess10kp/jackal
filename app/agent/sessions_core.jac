@@ -172,22 +172,22 @@ def _is_index_entry(item: any) -> bool {
 }
 
 
-def _entry_sort_key(rec: dict) -> str {
+def _entry_sort_key(rec: dict[str, any]) -> str {
     return str(rec.get("updatedAt", ""));
 }
 
 
 """Order entries newest-updated first (stable on ties)."""
-def _newest_first(entries: list) -> list {
+def _newest_first(entries: list[dict[str, any]]) -> list[dict[str, any]] {
     return sorted(entries, key=_entry_sort_key, reverse=True);
 }
 
 
 """Validated index entries whose transcript still exists; second value is
 False when index.json was missing or corrupt."""
-def _read_index(cwd: str) -> tuple[list, bool] {
+def _read_index(cwd: str) -> tuple[list[dict[str, any]], bool] {
     raw = _read_json(_index_path(cwd));
-    valid: list = [];
+    valid: list[dict[str, any]] = [];
     if not isinstance(raw, list) {
         return (valid, False);
     }
@@ -211,7 +211,7 @@ def _read_index(cwd: str) -> tuple[list, bool] {
 }
 
 
-def _write_index(cwd: str, entries: list) -> bool {
+def _write_index(cwd: str, entries: list[dict[str, any]]) -> bool {
     sdir = _sessions_dir(cwd);
     try {
         os.makedirs(sdir, exist_ok=True);
@@ -223,9 +223,9 @@ def _write_index(cwd: str, entries: list) -> bool {
 
 
 """Replace or append one entry in the index, preserving the others."""
-def _upsert_index_entry(cwd: str, rec: dict) -> bool {
+def _upsert_index_entry(cwd: str, rec: dict[str, any]) -> bool {
     (entries, _ok) = _read_index(cwd);
-    kept: list = [];
+    kept: list[dict[str, any]] = [];
     for existing in entries {
         if str(existing["id"]) != str(rec["id"]) {
             kept.append(existing);
@@ -247,8 +247,8 @@ def _upsert_index_entry(cwd: str, rec: dict) -> bool {
 Returns legacy-shaped index entries; used to merge into listings and to
 rebuild a missing or corrupt index.
 """
-def _scan_directory(cwd: str) -> list {
-    found: list = [];
+def _scan_directory(cwd: str) -> list[dict[str, any]] {
+    found: list[dict[str, any]] = [];
     sdir = _sessions_dir(cwd);
     if not os.path.isdir(sdir) {
         return found;
@@ -294,9 +294,9 @@ stored verbatim under `messages`. Returns metadata:
 new name is given).
 """
 def save_session(
-    cwd: str, history: list, name: str = "", session_id: str = "",
+    cwd: str, history: list[dict[str, any]], name: str = "", session_id: str = "",
     model: str = "",
-) -> dict {
+) -> dict[str, any] {
     sid = session_id if session_id else new_session_id();
     if not is_valid_session_id(sid) {
         raise ValueError("invalid session id: " + str(sid));
@@ -378,7 +378,7 @@ def save_session(
 
 """Full transcript record for one session, or None when unknown/corrupt.
 Used by restore flows that need model + metadata, not just messages."""
-def get_session_record(cwd: str, session_id: str) -> dict | None {
+def get_session_record(cwd: str, session_id: str) -> dict[str, any] | None {
     if not is_valid_session_id(session_id) {
         return None;
     }
@@ -392,7 +392,7 @@ def get_session_record(cwd: str, session_id: str) -> dict | None {
 
 """Messages for one session; [] when the id is unknown or the transcript
 is missing/corrupt."""
-def load_session(cwd: str, session_id: str) -> list {
+def load_session(cwd: str, session_id: str) -> list[dict[str, any]] {
     if not is_valid_session_id(session_id) {
         return [];
     }
@@ -414,13 +414,13 @@ Merges index.json entries with a directory scan so sessions missing from a
 missing/stale/corrupt index still appear; a missing or corrupt index is
 rebuilt from disk when anything is found.
 """
-def list_sessions(cwd: str) -> list {
+def list_sessions(cwd: str) -> list[dict[str, any]] {
     sdir = _sessions_dir(cwd);
     if not os.path.isdir(sdir) {
         return [];
     }
     (indexed, index_ok) = _read_index(cwd);
-    merged: list = [];
+    merged: list[dict[str, any]] = [];
     seen: set[str] = set();
     for item in indexed {
         merged.append(item);
@@ -502,7 +502,7 @@ def delete_session(cwd: str, session_id: str) -> bool {
         }
     }
     (entries, _ok) = _read_index(cwd);
-    remaining: list = [];
+    remaining: list[dict[str, any]] = [];
     removed_entry = False;
     for item in entries {
         if str(item["id"]) == session_id {

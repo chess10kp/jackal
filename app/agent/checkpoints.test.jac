@@ -92,8 +92,8 @@ def _init_git_repo(tmp: str) -> str {
 }
 
 
-def _msgs(*texts: str) -> list {
-    out: list = [];
+def _msgs(*texts: str) -> list[dict[str, str]] {
+    out: list[dict[str, str]] = [];
     for t in texts {
         out.append({"role": "user", "content": t});
         out.append({"role": "assistant", "content": "ok"});
@@ -179,7 +179,7 @@ test "create auto-generates timestamped names and rejects duplicates" {
 
 
 test "validate_checkpoint_name covers every rejection branch" {
-    cases: list = [
+    cases: list[tuple[str, str]] = [
         ("", "empty"),
         ("   ", "empty"),
         ("x" * 101, "100 characters"),

@@ -8,7 +8,7 @@ import from .auth_display { validate_provider_entry, validate_model_entry }
 
 
 """Initial flow state: the idle step."""
-def initial_auth_flow_state() -> dict {
+def initial_auth_flow_state() -> dict[str, any] {
     return {"step": {"kind": "idle"}};
 }
 
@@ -16,7 +16,7 @@ def initial_auth_flow_state() -> dict {
 """Steps that block on user input (prompt/manual_code/select/api_key_input).
 The UI layer attaches promise resolvers to these; cancel mid-flow means
 abandoning such a step and returning to idle."""
-def step_is_pending(state: dict) -> bool {
+def step_is_pending(state: dict[str, any]) -> bool {
     kind = state.get("step", {}).get("kind", "");
     return kind in ["prompt", "manual_code", "select", "api_key_input"];
 }
@@ -27,13 +27,13 @@ open_provider_picker, open_model_picker, set_logging_in, set_browser_auth,
 set_prompt, set_manual_code, set_select, set_api_key_input, set_logged_in,
 set_error, set_idle, update_query, update_provider_filter, cancel, reset.
 Unknown actions return an unchanged copy. Never mutates current_state."""
-def transition_auth_flow(current_state: dict, action: str, payload: dict | None = None) -> dict {
+def transition_auth_flow(current_state: dict[str, any], action: str, payload: dict[str, any] | None = None) -> dict[str, any] {
     p = payload if payload is not None else {};
     step = current_state.get("step", {});
 
     if action == "open_provider_picker" {
-        incoming: list = p.get("providers", []);
-        valid: list = [];
+        incoming: list[dict[str, any]] = p.get("providers", []);
+        valid: list[dict[str, any]] = [];
         for item in incoming {
             v = validate_provider_entry(item);
             if v is not None {
@@ -44,8 +44,8 @@ def transition_auth_flow(current_state: dict, action: str, payload: dict | None 
     }
 
     if action == "open_model_picker" {
-        incoming: list = p.get("models", []);
-        valid: list = [];
+        incoming: list[dict[str, any]] = p.get("models", []);
+        valid: list[dict[str, any]] = [];
         for item in incoming {
             v = validate_model_entry(item);
             if v is not None {
@@ -63,7 +63,7 @@ def transition_auth_flow(current_state: dict, action: str, payload: dict | None 
     }
 
     if action == "set_browser_auth" {
-        result_step: dict = {
+        result_step: dict[str, str] = {
             "kind": "browser_auth",
             "providerId": p.get("providerId", ""),
             "url": p.get("url", ""),
@@ -105,7 +105,7 @@ def transition_auth_flow(current_state: dict, action: str, payload: dict | None 
     }
 
     if action == "set_error" {
-        result_step: dict = {"kind": "error", "message": p.get("message", "")};
+        result_step: dict[str, str] = {"kind": "error", "message": p.get("message", "")};
         if p.get("providerId") {
             result_step["providerId"] = p["providerId"];
         }

@@ -33,7 +33,7 @@ obj KeyProbeShell {
         status_hint: str = "",
         ui_modal: any = None,
         approval: any = None,
-        tool_replies: list = [];
+        tool_replies: list[str] = [];
 }
 
 
@@ -62,7 +62,7 @@ def probe_handle_key(app: KeyProbeShell, key: str) {
     }
     scs = list_extension_shortcuts();
     if key in scs {
-        meta: dict = scs[key];
+        meta: dict[str, any] = scs[key];
         desc = str(meta.get("description", "") or "");
         app.status_hint = "shortcut " + key + (" — " + desc if desc else "");
         reply = run_extension_shortcut(key);
@@ -88,8 +88,8 @@ def probe_handle_key(app: KeyProbeShell, key: str) {
 registered for each (key, handler_result) pair. Returns (app, bridge, fired)
 where `fired` records invoked keys. Caller MUST reset plugins.bridge and
 dispose the bridge in a finally block."""
-def make_key_probe(bindings: list[tuple]) -> tuple {
-    fired: list = [];
+def make_key_probe(bindings: list[tuple[str, str]]) -> tuple[KeyProbeShell, any, list[str]] {
+    fired: list[str] = [];
 
     def _make_handler(result: str) -> any {
         def _handler(ctx: any) -> any {

@@ -100,7 +100,7 @@ def resolve_auth_path(agent_dir: str = "") -> str {
 
 """Load and parse auth.json. Missing file, corrupt JSON, or a non-object
 root all yield {} (legacy behaviour: auth failures never crash boot)."""
-def load_auth_file(path: str) -> dict {
+def load_auth_file(path: str) -> dict[str, any] {
     if not os.path.isfile(path) {
         return {};
     }
@@ -124,7 +124,7 @@ def load_auth_file(path: str) -> dict {
 
 """Save auth data as pretty JSON (indent=2 + trailing newline), creating
 parent dirs 0700 and chmod-ing the file 0600. True on success."""
-def save_auth_file(path: str, data: dict) -> bool {
+def save_auth_file(path: str, data: dict[str, any]) -> bool {
     parent = _path_dirname(_path_abspath(path));
     try {
         if not os.path.isdir(parent) {
@@ -148,7 +148,7 @@ def save_auth_file(path: str, data: dict) -> bool {
 Returns a fresh dict on success, None when the record cannot be an auth
 credential (wrong container, unknown/missing type, missing required OAuth
 fields). Mirrors the ApiKeyCredential | OAuthCredential union."""
-def validate_credential(cred: any) -> dict | None {
+def validate_credential(cred: any) -> dict[str, any] | None {
     if not isinstance(cred, dict) {
         return None;
     }
@@ -158,7 +158,7 @@ def validate_credential(cred: any) -> dict | None {
         if not isinstance(key, str) or not key {
             return None;
         }
-        out: dict = {"type": "api_key", "key": key};
+        out: dict[str, any] = {"type": "api_key", "key": key};
     } elif ctype == "oauth" {
         for field in OAUTH_REQUIRED_KEYS {
             if not isinstance(cred.get(field), str) or not cred[field] {
@@ -186,7 +186,7 @@ def validate_credential(cred: any) -> dict | None {
 
 """Stored credential for one provider, validated; None when absent or
 malformed (malformed entries are skipped rather than trusted)."""
-def credential_get(data: dict, provider: str) -> dict | None {
+def credential_get(data: dict[str, any], provider: str) -> dict[str, any] | None {
     if provider not in data {
         return None;
     }
@@ -196,7 +196,7 @@ def credential_get(data: dict, provider: str) -> dict | None {
 
 """Return a NEW data dict with `provider` bound to `cred`; the input dict
 is never mutated (store snapshots stay immutable like the TS spreads)."""
-def credential_set(data: dict, provider: str, cred: dict) -> dict {
+def credential_set(data: dict[str, any], provider: str, cred: dict[str, any]) -> dict[str, any] {
     nxt = dict(data);
     nxt[provider] = cred;
     return nxt;
@@ -204,8 +204,8 @@ def credential_set(data: dict, provider: str, cred: dict) -> dict {
 
 
 """Return a NEW data dict without `provider` (no-op when absent)."""
-def credential_remove(data: dict, provider: str) -> dict {
-    nxt: dict = {};
+def credential_remove(data: dict[str, any], provider: str) -> dict[str, any] {
+    nxt: dict[str, any] = {};
     for (k, v) in data.items() {
         if k != provider {
             nxt[k] = v;
@@ -216,7 +216,7 @@ def credential_remove(data: dict, provider: str) -> dict {
 
 
 """True when a well-formed credential exists for the provider."""
-def has_credential(data: dict, provider: str) -> bool {
+def has_credential(data: dict[str, any], provider: str) -> bool {
     return credential_get(data, provider) is not None;
 }
 
@@ -262,7 +262,7 @@ api_key -> the key. oauth -> the access token ONLY while unexpired; an
 expired token returns None because refresh requires the network seam
 (oauth_refresh_credentials) which the runtime loop must fill. Anything
 else -> None."""
-def stored_api_key(data: dict, provider: str, at_ms: int = -1) -> str | None {
+def stored_api_key(data: dict[str, any], provider: str, at_ms: int = -1) -> str | None {
     cred = credential_get(data, provider);
     if cred is None or is_expired(cred, at_ms) {
         return None;
@@ -278,10 +278,10 @@ def stored_api_key(data: dict, provider: str, at_ms: int = -1) -> str | None {
 win, then stored credentials, then a caller-supplied env key."""
 def get_auth_status(
     provider: str,
-    stored_providers: dict,
-    runtime_keys: list | None = None,
+    stored_providers: dict[str, any],
+    runtime_keys: list[str] | None = None,
     env_api_key: str = "",
-) -> dict {
+) -> dict[str, any] {
     runtimes = runtime_keys if runtime_keys is not None else [];
     if provider in runtimes {
         return {"configured": True, "source": "stored", "label": "runtime override"};

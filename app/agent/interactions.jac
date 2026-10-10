@@ -21,7 +21,7 @@ obj UiInteraction {
         method: str = "",
         title: str = "",
         message: str = "",
-        options: list = [],
+        options: list[str] = [],
         placeholder: str = "",
         created: float = 0.0,
         timeout_ms: float = 30000.0,
@@ -29,7 +29,7 @@ obj UiInteraction {
 }
 
 
-glob UI_METHODS: list = ["select", "confirm", "input"];
+glob UI_METHODS: list[str] = ["select", "confirm", "input"];
 
 
 def new_ui_queue() -> UiInteractionQueue {
@@ -39,15 +39,15 @@ def new_ui_queue() -> UiInteractionQueue {
 
 obj UiInteractionQueue {
     has lock: any = None,
-        records: list = [],
-        by_corr: dict = {},
+        records: list[UiInteraction] = [],
+        by_corr: dict[str, UiInteraction] = {},
         next_id: int = 1;
 
     """Validate + enqueue one request. Returns (ok, corr-or-error).
 
     corr comes from the request when supplied (the Node host owns child-id
     generation so ui_response/ui_cancel correlate); falls back to ui-N."""
-    def enqueue(req: dict) -> list {
+    def enqueue(req: dict[str, any]) -> list[any] {
         method = str(req.get("method", ""));
         if method not in UI_METHODS {
             return [False, f"unsupported ui method {method}"];
@@ -94,7 +94,7 @@ obj UiInteractionQueue {
 
     """Peek the oldest live record WITHOUT detaching it — the TUI polls
 every tick and answers later via take(). Expired ones reap into element 2."""
-    def poll(now: float) -> list {
+    def poll(now: float) -> list[any] {
         live: UiInteraction | None = None;
         expired: list[UiInteraction] = [];
         if self.lock is None {
@@ -139,7 +139,7 @@ every tick and answers later via take(). Expired ones reap into element 2."""
     }
 
     """Cancel every open child of one parent; returns the cancelled records."""
-    def cancel_by_parent(parent_corr: str) -> list {
+    def cancel_by_parent(parent_corr: str) -> list[UiInteraction] {
         cancelled: list[UiInteraction] = [];
         if self.lock is None {
             return cancelled;

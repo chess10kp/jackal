@@ -44,7 +44,7 @@ def _model_completion_candidates(prefix: str) -> list[list[str]] {
     seen: dict[str, bool] = {};
     for prov in PROVIDER_ROUTES {
         route: any = PROVIDER_ROUTES[prov];
-        meta: dict = route if isinstance(route, dict) else {};
+        meta: dict[str, any] = route if isinstance(route, dict) else {};
         for m in (meta.get("models", []) or []) {
             mid = routed_model_id(str(prov), str(m));
             if mid not in seen {
@@ -83,7 +83,7 @@ def _model_completion_candidates(prefix: str) -> list[list[str]] {
 test "every advertised id routes to its advertising provider" {
     for prov in PROVIDER_ROUTES {
         route: any = PROVIDER_ROUTES[prov];
-        meta: dict = route if isinstance(route, dict) else {};
+        meta: dict[str, any] = route if isinstance(route, dict) else {};
         for m in (meta.get("models", []) or []) {
             mname = str(m);
             expected = routed_model_id(str(prov), mname);

@@ -75,8 +75,8 @@ def _handle_picker_key(app: LiveShell, key: str) {
         }
         return;
     }
-    options: list = list(p.get("options", []));
-    ids: list = list(p.get("ids", []));
+    options: list[str] = list(p.get("options", []));
+    ids: list[str] = list(p.get("ids", []));
     is_multi: bool = bool(p.get("multi", False));
     if is_multi {
         # Type-to-filter: every printable char except space (toggle) narrows
@@ -97,7 +97,7 @@ def _handle_picker_key(app: LiveShell, key: str) {
             app.dirty = True;
             return;
         }
-        vis: tuple[list, list] = _multi_filtered(p);
+        vis: tuple[list[str], list[str]] = _multi_filtered(p);
         options = vis[0];
         ids = vis[1];
     }
@@ -108,7 +108,7 @@ def _handle_picker_key(app: LiveShell, key: str) {
         idx = min(sel, len(options) - 1);
         rid = str(ids[idx]) if idx < len(ids) else "";
         if rid and rid != "__header__" {
-            toggled: list = list(p.get("toggled", []));
+            toggled: list[str] = list(p.get("toggled", []));
             if rid in toggled {
                 toggled.remove(rid);
             } else {
@@ -149,7 +149,7 @@ def _handle_picker_key(app: LiveShell, key: str) {
         if bool(p.get("multi", False)) {
             # Multi-select confirm: insert every toggled path as @mentions;
             # with nothing toggled, fall back to the cursor row.
-            picks: list = list(p.get("toggled", []));
+            picks: list[str] = list(p.get("toggled", []));
             if not picks {
                 picks = [chosen_id];
             }
@@ -280,7 +280,7 @@ def _handle_key(app: LiveShell, key: str) {
     # global-binding semantics. ctrl+c / modals / approvals keep precedence.
     scs = list_extension_shortcuts();
     if key in scs {
-        meta: dict = scs[key];
+        meta: dict[str, any] = scs[key];
         desc = str(meta.get("description", "") or "");
         app.status_hint = "shortcut " + key + (" — " + desc if desc else "");
         reply = run_extension_shortcut(key);

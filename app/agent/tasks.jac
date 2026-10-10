@@ -66,7 +66,7 @@ def _is_task(value: any) -> bool {
 
 """All valid tasks from tasks.json; [] when missing, corrupt, or not a
 list (invalid entries are filtered out rather than failing the load)."""
-def load_tasks(cwd: str) -> list {
+def load_tasks(cwd: str) -> list[dict[str, any]] {
     fh = None;
     try {
         fh = open(tasks_path(cwd), "r");
@@ -81,7 +81,7 @@ def load_tasks(cwd: str) -> list {
     if not isinstance(parsed, list) {
         return [];
     }
-    valid: list = [];
+    valid: list[dict[str, any]] = [];
     for item in parsed {
         if _is_task(item) {
             valid.append(item);
@@ -93,7 +93,7 @@ def load_tasks(cwd: str) -> list {
 
 """Persist the full task array (indent=2 + trailing newline), creating
 the .jackal directory when needed."""
-def save_tasks(cwd: str, tasks: list) -> bool {
+def save_tasks(cwd: str, tasks: list[dict[str, any]]) -> bool {
     try {
         os.makedirs(os.path.join(cwd, ".jackal"), exist_ok=True);
     } except OSError {
@@ -123,11 +123,11 @@ def clear_tasks(cwd: str) -> bool {
 
 """Append a new pending task; title is stripped, a blank description
 becomes null. Returns the created task dict."""
-def add_task(cwd: str, title: str, description: str = "") -> dict {
+def add_task(cwd: str, title: str, description: str = "") -> dict[str, any] {
     tasks = load_tasks(cwd);
     now = _now_iso();
     trimmed_desc = (description or "").strip();
-    task: dict = {
+    task: dict[str, any] = {
         "id": generate_task_id(),
         "title": title.strip(),
         "description": trimmed_desc if trimmed_desc else None,
@@ -142,7 +142,7 @@ def add_task(cwd: str, title: str, description: str = "") -> dict {
 
 
 """Remove the task at `index`; None when out of range."""
-def remove_task_by_index(cwd: str, index: int) -> dict | None {
+def remove_task_by_index(cwd: str, index: int) -> dict[str, any] | None {
     tasks = load_tasks(cwd);
     if index < 0 or index >= len(tasks) {
         return None;
@@ -154,7 +154,7 @@ def remove_task_by_index(cwd: str, index: int) -> dict | None {
 
 
 """Remove the first task whose id matches; None when unknown."""
-def remove_task_by_id(cwd: str, task_id: str) -> dict | None {
+def remove_task_by_id(cwd: str, task_id: str) -> dict[str, any] | None {
     tasks = load_tasks(cwd);
     idx: int = -1;
     pos: int = 0;
@@ -180,7 +180,7 @@ Unknown ids are skipped silently. A matched task gets updatedAt refreshed;
 a status change also rewrites completedAt (now for "completed", else null).
 Returns the full post-update task list.
 """
-def update_tasks(cwd: str, updates: list) -> list {
+def update_tasks(cwd: str, updates: list[dict[str, any]]) -> list[dict[str, any]] {
     tasks = load_tasks(cwd);
     now = _now_iso();
     for update in updates {
@@ -199,7 +199,7 @@ def update_tasks(cwd: str, updates: list) -> list {
         if idx < 0 {
             continue;
         }
-        task: dict = dict(tasks[idx]);
+        task: dict[str, any] = dict(tasks[idx]);
         if "status" in update {
             task["status"] = update["status"];
             if update["status"] == "completed" {
@@ -223,7 +223,7 @@ def update_tasks(cwd: str, updates: list) -> list {
 
 
 """Counts keyed by legacy snake_case status names."""
-def task_counts(tasks: list) -> dict {
+def task_counts(tasks: list[dict[str, any]]) -> dict[str, int] {
     pending: int = 0;
     in_progress: int = 0;
     completed: int = 0;
@@ -242,7 +242,7 @@ def task_counts(tasks: list) -> dict {
 
 
 """One rendered row: status icon, [id], title, optional em-dash blurb."""
-def format_task_line(task: dict) -> str {
+def format_task_line(task: dict[str, any]) -> str {
     icon: str = "○";
     status = str(task.get("status", ""));
     if status == "completed" {
@@ -261,7 +261,7 @@ def format_task_line(task: dict) -> str {
 
 """Rendered board: counts header, divider, numbered rows (or a hint when
 the list is empty)."""
-def format_tasks_list(tasks: list, title: str = "Tasks") -> str {
+def format_tasks_list(tasks: list[dict[str, any]], title: str = "Tasks") -> str {
     if not tasks {
         return _NO_TASKS_LINE;
     }

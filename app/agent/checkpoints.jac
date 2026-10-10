@@ -70,7 +70,7 @@ def _checkpoint_path(cwd: str, name: str) -> str {
 }
 
 
-def validate_checkpoint_name(name: str) -> dict {
+def validate_checkpoint_name(name: str) -> dict[str, any] {
     if not name or not name.strip() {
         return {"valid": False, "error": "Checkpoint name cannot be empty"};
     }
@@ -98,7 +98,7 @@ def _generate_checkpoint_name() -> str {
 }
 
 
-def _generate_description(messages: list) -> str {
+def _generate_description(messages: list[dict[str, any]]) -> str {
     for msg in messages {
         if not isinstance(msg, dict) {
             continue;
@@ -247,9 +247,9 @@ Returns the metadata dict that was persisted to metadata.json.
 Raises ValueError for invalid names (including generated ones failing
 validation) and for duplicate checkpoint names."""
 def create_checkpoint(
-    cwd: str, messages: list, provider: str, model: str,
+    cwd: str, messages: list[dict[str, any]], provider: str, model: str,
     name: str = "", modified_files: list[str] | None = None,
-) -> dict {
+) -> dict[str, any] {
     os.makedirs(checkpoints_dir(cwd), exist_ok=True);
 
     trimmed = name.strip() if isinstance(name, str) else "";
@@ -311,7 +311,7 @@ def create_checkpoint(
 Snapshot files missing from disk are skipped silently. Raises ValueError
 when the checkpoint does not exist, and lets OSError/ValueError from the
 underlying JSON reads propagate (corrupt stores surface here)."""
-def load_checkpoint(cwd: str, name: str) -> dict {
+def load_checkpoint(cwd: str, name: str) -> dict[str, any] {
     dir_path = _checkpoint_path(cwd, name);
     if not os.path.exists(dir_path) {
         raise ValueError("Checkpoint '" + name + "' does not exist");
@@ -320,7 +320,7 @@ def load_checkpoint(cwd: str, name: str) -> dict {
     metadata = _load_json_file(os.path.join(dir_path, _METADATA_NAME));
     conversation = _load_json_file(os.path.join(dir_path, _CONVERSATION_NAME));
 
-    file_snapshots: dict = {};
+    file_snapshots: dict[str, str] = {};
     files_dir = os.path.join(dir_path, "files");
     if os.path.exists(files_dir) {
         changed = metadata.get("filesChanged") if isinstance(metadata, dict) else None;
@@ -345,7 +345,7 @@ def load_checkpoint(cwd: str, name: str) -> dict {
 }
 
 
-def _timestamp_key(item: dict) -> str {
+def _timestamp_key(item: dict[str, any]) -> str {
     return str(item["metadata"].get("timestamp", ""));
 }
 
@@ -353,13 +353,13 @@ def _timestamp_key(item: dict) -> str {
 """All checkpoints for a project, newest-timestamped first. Entries are
 {name, metadata, sizeBytes}; directories without readable metadata.json
 are skipped."""
-def list_checkpoints(cwd: str) -> list {
+def list_checkpoints(cwd: str) -> list[dict[str, any]] {
     cp_dir = checkpoints_dir(cwd);
     try {
         os.makedirs(cp_dir, exist_ok=True);
     } except OSError {}
 
-    items: list = [];
+    items: list[dict[str, any]] = [];
     try {
         entries = os.listdir(cp_dir);
     } except OSError {
@@ -428,7 +428,7 @@ def _plural(n: int, unit: str) -> str {
 }
 
 
-def _changed_count(m: dict) -> int {
+def _changed_count(m: dict[str, any]) -> int {
     changed = m.get("filesChanged");
     if isinstance(changed, list) {
         return len(changed);
@@ -471,7 +471,7 @@ def _size_label(size_bytes: any) -> str {
 
 
 """One overlay line: <name> — <N> msgs, <N> files — <when> (<size>)."""
-def format_checkpoint_overlay_row(item: dict) -> str {
+def format_checkpoint_overlay_row(item: dict[str, any]) -> str {
     m = item["metadata"];
     when = format_relative_time(str(m["timestamp"]));
     size_kb = _size_label(item.get("sizeBytes"));
@@ -483,13 +483,13 @@ def format_checkpoint_overlay_row(item: dict) -> str {
 }
 
 
-def format_checkpoint_list(items: list[dict]) -> str {
+def format_checkpoint_list(items: list[dict[str, any]]) -> str {
     if not items {
         return "No checkpoints. Use /checkpoint create [name].";
     }
     lines: list[str] = [];
     for item in items {
-        m: dict = item["metadata"];
+        m: dict[str, any] = item["metadata"];
         when = datetime.datetime.fromisoformat(str(m["timestamp"])).strftime("%Y-%m-%d %H:%M");
         size_kb = _size_label(item.get("sizeBytes"));
         lines.append(

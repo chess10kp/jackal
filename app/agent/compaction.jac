@@ -42,7 +42,7 @@ glob CHARS_PER_TOKEN: int = 4,
 
 
 """Defaults mirror AutoCompactConfig in src/session/auto-compact.ts."""
-glob DEFAULT_AUTO_COMPACT: dict = {
+glob DEFAULT_AUTO_COMPACT: dict[str, any] = {
     "enabled": True,
     "thresholdPercent": 80,
     "keepTail": 12,
@@ -59,7 +59,7 @@ def estimate_tokens(text: str) -> int {
 }
 
 
-def _message_to_text(message: dict) -> str {
+def _message_to_text(message: dict[str, any]) -> str {
     content: any = message.get("content");
     if isinstance(content, str) {
         return content;
@@ -88,7 +88,7 @@ def _message_to_text(message: dict) -> str {
 }
 
 
-def estimate_messages_tokens(messages: list) -> int {
+def estimate_messages_tokens(messages: list[dict[str, any]]) -> int {
     total = 0;
     for msg in messages {
         if isinstance(msg, dict) {
@@ -100,7 +100,7 @@ def estimate_messages_tokens(messages: list) -> int {
 }
 
 
-def compute_context_usage(messages: list, context_max_override: any = None) -> dict {
+def compute_context_usage(messages: list[dict[str, any]], context_max_override: any = None) -> dict[str, int] {
     used = estimate_messages_tokens(messages);
     max_tokens: int = DEFAULT_CONTEXT_MAX;
     if isinstance(context_max_override, int) and context_max_override > 0 {
@@ -113,7 +113,7 @@ def compute_context_usage(messages: list, context_max_override: any = None) -> d
 
 """Walk up from cwd for a `.jackal` JSON config file (mirrors
 lib/jac/config/_project_config_toolchain.py find/load)."""
-def load_project_config(cwd: str) -> dict {
+def load_project_config(cwd: str) -> dict[str, any] {
     cur = _path_abspath(cwd);
     while True {
         cand = os.path.join(cur, ".jackal");
@@ -138,7 +138,7 @@ def load_project_config(cwd: str) -> dict {
 }
 
 
-def resolve_auto_compact_config(raw: dict | None = None, compact_strategy: str = "") -> dict {
+def resolve_auto_compact_config(raw: dict[str, any] | None = None, compact_strategy: str = "") -> dict[str, any] {
     cfg: any = None;
     if raw is not None {
         cfg = raw.get("autoCompact");
@@ -166,7 +166,7 @@ def resolve_auto_compact_config(raw: dict | None = None, compact_strategy: str =
 }
 
 
-def should_auto_compact(usage: dict, config: dict) -> bool {
+def should_auto_compact(usage: dict[str, int], config: dict[str, any]) -> bool {
     if not config.get("enabled", True) {
         return False;
     }
@@ -207,7 +207,7 @@ def _extract_content_text(content: any) -> str {
 }
 
 
-def build_mechanical_summary(messages: list) -> str {
+def build_mechanical_summary(messages: list[dict[str, any]]) -> str {
     lines: list[str] = [
         "<context-summary>",
         "Earlier conversation context (auto-compacted for space):",
@@ -233,7 +233,7 @@ def build_mechanical_summary(messages: list) -> str {
 }
 
 
-def build_llm_summary_prompt(messages: list) -> str {
+def build_llm_summary_prompt(messages: list[dict[str, any]]) -> str {
     previews: list[str] = [];
     for msg in messages {
         role: str = "unknown";
@@ -284,7 +284,7 @@ Returns the wrapped summary or None when messages are empty, no API key
 is configured, or the provider call fails (mechanical fallback then
 applies at the call site — matches src semantics)."""
 def summarize_for_compaction(
-    messages: list, model_name: str, thinking: str = ""
+    messages: list[dict[str, any]], model_name: str, thinking: str = ""
 ) -> str | None {
     if not messages or not model_name {
         return None;

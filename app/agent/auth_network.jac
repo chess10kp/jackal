@@ -17,7 +17,7 @@ Would POST the refresh grant to the provider's token endpoint. Returns
 {"ok": False, "error": "network_not_supported", "provider": <id>,
 "detail": "..."}; the runtime loop fills this by performing the refresh
 and handing back a validated credential dict to store."""
-def oauth_refresh_credentials(provider_id: str, credentials: dict) -> dict {
+def oauth_refresh_credentials(provider_id: str, credentials: dict[str, any]) -> dict[str, any] {
     return {
         "ok": False,
         "error": "network_not_supported",
@@ -37,7 +37,7 @@ Would open the authorize URL (and possibly a local callback server).
 Returns {"ok": False, "error": "network_not_supported", "provider": <id>,
 "detail": "..."}; the runtime loop drives the browser dance and hands back
 credentials to store."""
-def oauth_start_login(provider_id: str) -> dict {
+def oauth_start_login(provider_id: str) -> dict[str, any] {
     return {
         "ok": False,
         "error": "network_not_supported",

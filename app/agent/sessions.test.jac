@@ -28,8 +28,8 @@ def _cleanup(tmp: str) {
 }
 
 
-def _hist(*exchanges: str) -> list {
-    out: list = [{"role": "system", "content": "sys prompt"}];
+def _hist(*exchanges: str) -> list[dict[str, any]] {
+    out: list[dict[str, any]] = [{"role": "system", "content": "sys prompt"}];
     for text in exchanges {
         out.append({"role": "user", "content": text});
         out.append({"role": "assistant", "content": "reply: " + text});
@@ -447,7 +447,7 @@ def _backdate_transcript(tmp: str, session_id: str, updated_iso: str) {
     idx: any = _read_raw(ipath);
     pos = 0;
     while pos < len(idx) {
-        ent: dict = idx[pos];
+        ent: dict[str, any] = idx[pos];
         if str(ent.get("id")) == session_id {
             ent["updatedAt"] = updated_iso;
         }
@@ -478,7 +478,7 @@ test "prune_sessions is disabled when both limits are zero" {
 test "prune_sessions keeps newest N and rewrites the index" {
     tmp = _make_tmp();
     try {
-        ids: list = [];
+        ids: list[str] = [];
         for text in ["one", "two", "three"] {
             meta = save_session(tmp, _hist(text));
             ids.append(str(meta["id"]));

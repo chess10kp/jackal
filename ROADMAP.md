@@ -139,7 +139,7 @@ The TUI targets the native codespace end to end; terminal support comes from `na
 - [~] Packaging, install, upgrade, and recovery story for the native path is not settled
 - [~] Session-data migration policy vs legacy runtime data is explicit backup/incompatibility work, not an implicit conversion
 - [~] MCP integration breadth (status surfacing in the TUI, failure degradation UX) unverified
-- [x] Headless native term/JSONL launch through `jackal.sh`; broader CLI parity remains pending
+- [x] Headless native term/JSONL launch (`jac run main.jac` / `main.jac -- --json`); broader CLI parity remains pending
 ### Current native frontier
 
 `app/jac.toml` currently contains 12 server pins; N6 requires reducing that count to

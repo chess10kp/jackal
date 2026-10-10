@@ -23,11 +23,11 @@ def redact_secret(secret: any, visible: int = 4) -> str {
 """Deep-copy a credential with every secret-bearing field redacted.
 Unknown extra keys whose values are strings are masked too -- an unknown
 key may be a token (e.g. account_id, project_id wrappers)."""
-def redact_credential(cred: any) -> dict | None {
+def redact_credential(cred: any) -> dict[str, any] | None {
     if not isinstance(cred, dict) {
         return None;
     }
-    out: dict = {};
+    out: dict[str, any] = {};
     for (k, v) in cred.items() {
         if k == "type" {
             out[k] = v;
@@ -45,7 +45,7 @@ def redact_credential(cred: any) -> dict | None {
 
 
 """Validate/normalise a provider picker entry; None on failure."""
-def validate_provider_entry(item: any) -> dict | None {
+def validate_provider_entry(item: any) -> dict[str, any] | None {
     if not isinstance(item, dict) {
         return None;
     }
@@ -89,7 +89,7 @@ def needs_oauth(auth_type: any) -> bool {
 
 
 """Validate/normalise a model picker entry; None on failure."""
-def validate_model_entry(item: any) -> dict | None {
+def validate_model_entry(item: any) -> dict[str, any] | None {
     if not isinstance(item, dict) {
         return None;
     }
@@ -110,12 +110,12 @@ def validate_model_entry(item: any) -> dict | None {
 
 
 """Case-insensitive substring filter over provider id/displayName."""
-def filter_providers_by_query(providers: list, query: str) -> list {
+def filter_providers_by_query(providers: list[dict[str, any]], query: str) -> list[dict[str, any]] {
     if not query {
         return list(providers);
     }
     q = query.lower();
-    found: list = [];
+    found: list[dict[str, any]] = [];
     for p in providers {
         if q in str(p.get("id", "")).lower() or q in str(p.get("displayName", "")).lower() {
             found.append(p);
@@ -127,7 +127,7 @@ def filter_providers_by_query(providers: list, query: str) -> list {
 
 """Filter models by optional exact provider and case-insensitive query
 matched against modelId/displayName/provider."""
-def filter_models_by_query(models: list, query: str, provider_filter: str = "") -> list {
+def filter_models_by_query(models: list[dict[str, any]], query: str, provider_filter: str = "") -> list[dict[str, any]] {
     result = models;
     if provider_filter {
         result = [m for m in result if m.get("provider") == provider_filter];
@@ -146,7 +146,7 @@ def filter_models_by_query(models: list, query: str, provider_filter: str = "") 
 
 
 """Human-readable picker row, e.g. "[✓] Anthropic (OAuth, 12 models)"."""
-def format_provider_label(item: dict) -> str {
+def format_provider_label(item: dict[str, any]) -> str {
     name = item.get("displayName", item.get("id", "unknown"));
     auth_type = item.get("authType", "");
     configured = "✓" if item.get("configured") else " ";
@@ -158,7 +158,7 @@ def format_provider_label(item: dict) -> str {
 
 
 """Human-readable model row, e.g. "Claude Sonnet (anthropic/claude-5)"."""
-def format_model_label(item: dict) -> str {
+def format_model_label(item: dict[str, any]) -> str {
     display = item.get("displayName", item.get("modelId", "unknown"));
     provider = item.get("provider", "");
     model_id = item.get("modelId", "");

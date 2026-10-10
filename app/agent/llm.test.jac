@@ -11,7 +11,7 @@ Test-only transports and helpers live here, not in llm.jac.
 obj RetryTransport {
     has calls: int = 0;
 
-    def stream(messages: list, tool_defs: list) -> Generator[dict, None, None] {
+    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
         self.calls += 1;
         if self.calls == 1 {
             yield {"error": "HTTP 503: temporarily unavailable"};
@@ -23,7 +23,7 @@ obj RetryTransport {
 
 
 obj TwoCallTransport {
-    def stream(messages: list, tool_defs: list) -> Generator[dict, None, None] {
+    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
         saw = False;
         for m in messages {
             msg: any = m;
@@ -59,7 +59,7 @@ obj ScriptedTransport {
         tool_args: str = "{\"text\": \"hi\"}",
         final_text: str = "done";
 
-    def stream(messages: list, tool_defs: list) -> Generator[dict, None, None] {
+    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
         saw_tool_result = False;
         for m in messages {
             msg: any = m;
@@ -87,11 +87,11 @@ def _tool_echo(args: dict[str, any]) -> str {
     return _echo(str(args.get("text", "")));
 }
 
-def _noop_event(kind: str, data: dict) {
+def _noop_event(kind: str, data: dict[str, any]) {
     _events.append([kind, dict(data)]);
 }
 
-glob _events: list = [];
+glob _events: list[any] = [];
 
 
 test "react loop runs a tool then finishes" {
@@ -135,7 +135,7 @@ test "react loop retries transient transport errors" {
 obj CancelMidStreamTransport {
     has flag: any = None;
 
-    def stream(messages: list, tool_defs: list) -> Generator[dict, None, None] {
+    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
         yield {"content": "partial"};
         if self.flag is not None {
             self.flag.cancelled = True;
@@ -173,7 +173,7 @@ test "cancel before tool calls fills cancelled tool results" {
 
     # Cooperative semantics: the in-flight call finishes; the NEXT pending
     # call is skipped and filled with a terminal cancelled result.
-    def _cancelling_event(kind: str, data: dict) {
+    def _cancelling_event(kind: str, data: dict[str, any]) {
         _events.append([kind, dict(data)]);
         if kind == "tool_result" {
             cancel.cancelled = True;
@@ -192,12 +192,12 @@ test "cancel before tool calls fills cancelled tool results" {
 }
 
 
-def _deny_all(name: str, args: dict) -> any {
+def _deny_all(name: str, args: dict[str, any]) -> any {
     return "denied by test policy";
 }
 
 
-def _allow_all(name: str, args: dict) -> any {
+def _allow_all(name: str, args: dict[str, any]) -> any {
     return True;
 }
 
@@ -393,7 +393,7 @@ test "react loop honors tool_call block verdicts from a plugin bridge" {
     }
     import from .registry { create_registry }
 
-    def _block_no_terminate(data: dict, ctx: any) -> dict {
+    def _block_no_terminate(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"block": True, "reason": "policy"};
     }
 
@@ -425,7 +425,7 @@ test "react loop stops early on terminating block verdict" {
     }
     import from .registry { create_registry }
 
-    def _terminate_block(data: dict, ctx: any) -> dict {
+    def _terminate_block(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"block": True, "reason": "dangerous command", "terminate": True};
     }
 
@@ -487,7 +487,7 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
     }
     import from .registry { create_registry, ToolRegistry }
 
-    def _rewrite(data: dict, ctx: any) -> dict | None {
+    def _rewrite(data: dict[str, any], ctx: any) -> dict[str, any] | None {
         # Sees the latest content; appends a marker (middleware chain).
         if data.get("toolName") == "echo" {
             return {"content": str(data.get("content", "")) + "+REWRITTEN"};
@@ -495,7 +495,7 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
         return None;
     }
 
-    def _confirm_latest(data: dict, ctx: any) -> dict | None {
+    def _confirm_latest(data: dict[str, any], ctx: any) -> dict[str, any] | None {
         # Second handler must see the first handler's patch applied.
         assert str(data.get("content", "")).endswith("+REWRITTEN");
         return None;
@@ -544,7 +544,7 @@ test "react loop skips tool execution when cancelled during the gate" {
     # TurnCancel is module-level in this file.
     cancel = TurnCancel();
 
-    def _slow_gate(data: dict, ctx: any) -> any {
+    def _slow_gate(data: dict[str, any], ctx: any) -> any {
         # User hits esc while the gate dialog is open.
         cancel.cancelled = True;
         return None;
@@ -623,8 +623,8 @@ test "_notify_response fires after_provider_response with status and headers" {
     }
 
     bridge = create_bridge("apr-notify");
-    seen: list = [];
-    def _capture(data: dict, ctx: any) -> str {
+    seen: list[dict[str, any]] = [];
+    def _capture(data: dict[str, any], ctx: any) -> str {
         seen.append(dict(data));
         return "ok";
     }
@@ -652,8 +652,8 @@ test "_open_stream fires hook before the first delta from a live SSE server" {
     import from .fake_host { register_fake_listener }
     import from .plugin_bridge { create_bridge, dispose_bridge }
 
-    order: list = [];
-    def _mark(data: dict, ctx: any) -> str {
+    order: list[str] = [];
+    def _mark(data: dict[str, any], ctx: any) -> str {
         order.append("hook:" + str(data.get("status")));
         return "";
     }
@@ -667,7 +667,7 @@ test "_open_stream fires hook before the first delta from a live SSE server" {
             model="test-model",
             hook_bridge=bridge,
         );
-        chunks: list = [];
+        chunks: list[str] = [];
         for chunk in t.stream([{"role": "user", "content": "hi"}], []) {
             if "content" in chunk {
                 order.append("chunk");
@@ -688,8 +688,8 @@ test "_open_stream fires the hook even when the provider answers non-200" {
     import from .fake_host { register_fake_listener }
     import from .plugin_bridge { create_bridge, dispose_bridge }
 
-    statuses: list = [];
-    def _cap(data: dict, ctx: any) -> str {
+    statuses: list[int] = [];
+    def _cap(data: dict[str, any], ctx: any) -> str {
         statuses.append(int(data.get("status", 0)));
         return "";
     }
@@ -703,7 +703,7 @@ test "_open_stream fires the hook even when the provider answers non-200" {
             model="test-model",
             hook_bridge=bridge,
         );
-        out: list = [];
+        out: list[dict[str, any]] = [];
         for chunk in t.stream([], []) {
             out.append(dict(chunk));
         }
@@ -770,8 +770,8 @@ test "after_provider_response refires per retry attempt through react_loop" {
     import from .fake_host { register_fake_listener }
     import from .plugin_bridge { create_bridge, dispose_bridge }
 
-    statuses: list = [];
-    def _cap(data: dict, ctx: any) -> str {
+    statuses: list[int] = [];
+    def _cap(data: dict[str, any], ctx: any) -> str {
         statuses.append(int(data.get("status", 0)));
         return "";
     }
@@ -791,7 +791,7 @@ test "after_provider_response refires per retry attempt through react_loop" {
         # Pi onResponse parity: one hook fire PER PROVIDER ATTEMPT — the
         # 503 attempt and the successful retry each reported.
         assert statuses == [503, 200];
-        retries: list = [];
+        retries: list[any] = [];
         for e in _events {
             if str(e[0]) == "retry" {
                 retries.append(e);

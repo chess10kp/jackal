@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Jac migration CI check — toolchain + npm agent loop (parallel to ./jackal.sh --check).
+# Jac migration CI check — toolchain + npm agent loop.
 # Requires: jac on PATH, node, npm ci (node_modules with pi-agent-core).
 set -euo pipefail
 

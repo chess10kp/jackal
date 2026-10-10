@@ -187,7 +187,7 @@ def _skills_picker_entries(skills: list[dict[str, any]]) -> dict[str, list[str]]
 }
 
 
-def _format_mentions(paths: list) -> str {
+def _format_mentions(paths: list[str]) -> str {
     parts: list[str] = [];
     seen: set[str] = set();
     for p in paths {
@@ -236,15 +236,15 @@ def _mode_badge(mode: str) -> str {
 }
 
 
-def _multi_filtered(p: dict) -> tuple[list, list] {
-    options: list = list(p.get("options", []));
-    ids: list = list(p.get("ids", []));
+def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
+    options: list[str] = list(p.get("options", []));
+    ids: list[str] = list(p.get("ids", []));
     filt: str = str(p.get("filter", "")).strip().lower();
     if not filt {
         return (options, ids);
     }
-    vis_options: list = [];
-    vis_ids: list = [];
+    vis_options: list[str] = [];
+    vis_ids: list[str] = [];
     for i in range(len(options)) {
         if filt in str(options[i]).lower() {
             vis_options.append(options[i]);
@@ -255,13 +255,13 @@ def _multi_filtered(p: dict) -> tuple[list, list] {
 }
 
 
-def _take_quoted_mentions(text: str) -> tuple[str, list[dict]] {
-    mentions: list[dict] = [];
+def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
+    mentions: list[dict[str, any]] = [];
     spans: list[tuple[int, int]] = [];
     for m in re.finditer(_QUOTED_MENTION_PATTERN, text) {
         inner: str = str(m.group(1));
         path_part: str = inner;
-        rng: dict | None = None;
+        rng: dict[str, int] | None = None;
         outer_start: any = m.group(2);
         outer_end: any = m.group(3);
         if outer_start {
@@ -269,7 +269,7 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict]] {
             outer_range: str = str(outer_start) + (
                 "-" + str(outer_end) if outer_end else ""
             );
-            parsed_outer: dict | None = parse_line_range(outer_range);
+            parsed_outer: dict[str, int] | None = parse_line_range(outer_range);
             if parsed_outer is not None {
                 rng = parsed_outer;
             }
@@ -279,7 +279,7 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict]] {
             cm = re.search(r":(\d+)(?:-(\d+))?$", inner);
             if cm is not None {
                 inner_range: str = inner[cm.start() + 1:];
-                parsed_inner: dict | None = parse_line_range(inner_range);
+                parsed_inner: dict[str, int] | None = parse_line_range(inner_range);
                 if parsed_inner is not None {
                     path_part = inner[:cm.start()];
                     rng = parsed_inner;
@@ -313,9 +313,9 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict]] {
 
 
 def _expand_quoted_context(cwd: str, text: str) -> str {
-    lifted: tuple[str, list[dict]] = _take_quoted_mentions(text);
+    lifted: tuple[str, list[dict[str, any]]] = _take_quoted_mentions(text);
     cleaned: str = lifted[0];
-    quotes: list[dict] = lifted[1];
+    quotes: list[dict[str, any]] = lifted[1];
     if not quotes {
         return expand_context_input(cwd, text);
     }
@@ -347,7 +347,7 @@ def _expand_quoted_context(cwd: str, text: str) -> str {
 }
 
 
-def _local_mcp_server_specs(cfg: dict) -> dict[str, list[str]] {
+def _local_mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
     out: dict[str, list[str]] = {};
     raw: any = cfg.get("mcp") if isinstance(cfg, dict) else None;
     if not isinstance(raw, dict) {
@@ -379,10 +379,10 @@ def _local_mcp_server_specs(cfg: dict) -> dict[str, list[str]] {
 }
 
 
-def _mcp_status_entries(cwd: str, clients: dict) -> dict[str, list[str]] {
+def _mcp_status_entries(cwd: str, clients: dict[str, any]) -> dict[str, list[str]] {
     specs: dict[str, list[str]] = {};
     try {
-        cfg: dict = load_project_config(cwd);
+        cfg: dict[str, any] = load_project_config(cwd);
         parsed: dict[str, list[str]] = _local_mcp_server_specs(cfg);
         specs = parsed;
     } except Exception {
@@ -641,63 +641,63 @@ test "mode badge is empty for normal and loud for read-only modes" {
 }
 
 test "multi filter narrows rows case-insensitively with aligned ids" {
-    p: dict = {
+    p: dict[str, any] = {
         "options": ["src/main.py", "README.md", "src/SUB/Deep.txt"],
         "ids": ["src/main.py", "README.md", "src/SUB/Deep.txt"],
         "filter": "",
     };
-    full: tuple[list, list] = _multi_filtered(p);
+    full: tuple[list[str], list[str]] = _multi_filtered(p);
     assert len(full[0]) == 3;
 
     p["filter"] = "PY";
-    got: tuple[list, list] = _multi_filtered(p);
+    got: tuple[list[str], list[str]] = _multi_filtered(p);
     assert got[0] == ["src/main.py"];
     assert got[1] == ["src/main.py"];
 
     # Substring anywhere in the path, not just the basename.
     p["filter"] = "deep";
-    got2: tuple[list, list] = _multi_filtered(p);
+    got2: tuple[list[str], list[str]] = _multi_filtered(p);
     assert got2[0] == ["src/SUB/Deep.txt"];
 
     p["filter"] = "zzz";
-    got3: tuple[list, list] = _multi_filtered(p);
+    got3: tuple[list[str], list[str]] = _multi_filtered(p);
     assert got3[0] == [];
     assert got3[1] == [];
 }
 
 test "quoted mentions extract paths with spaces and line ranges" {
     # Plain quoted path.
-    r1: tuple[str, list[dict]] = _take_quoted_mentions('see @"my file.md" now');
+    r1: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('see @"my file.md" now');
     assert len(r1[1]) == 1;
     assert r1[1][0]["path"] == "my file.md";
     assert r1[1][0]["line_range"] is None;
     assert r1[0] == "see  now";
 
     # Range inside the quotes.
-    r2: tuple[str, list[dict]] = _take_quoted_mentions('@"notes big.txt:10-20"');
+    r2: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('@"notes big.txt:10-20"');
     assert len(r2[1]) == 1;
     assert r2[1][0]["path"] == "notes big.txt";
     assert r2[1][0]["line_range"] == {"start": 10, "end": 20};
 
     # Range after the closing quote works too.
-    r2b: tuple[str, list[dict]] = _take_quoted_mentions('see @"other file.md":3');
+    r2b: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('see @"other file.md":3');
     assert len(r2b[1]) == 1;
     assert r2b[1][0]["path"] == "other file.md";
     assert r2b[1][0]["line_range"] == {"start": 3};
     assert r2b[0] == "see ";
 
     # Malformed range inside the quotes stays part of the path.
-    r3: tuple[str, list[dict]] = _take_quoted_mentions('@"weird:name.txt:abc"');
+    r3: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('@"weird:name.txt:abc"');
     assert len(r3[1]) == 1;
     assert r3[1][0]["path"] == "weird:name.txt:abc";
 
     # Invalid (traversal) paths are left untouched in the text.
-    r4: tuple[str, list[dict]] = _take_quoted_mentions('@"../escape.md"');
+    r4: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('@"../escape.md"');
     assert r4[1] == [];
     assert r4[0] == '@"../escape.md"';
 
     # No quoted mentions -> verbatim passthrough.
-    r5: tuple[str, list[dict]] = _take_quoted_mentions("plain @a.py text");
+    r5: tuple[str, list[dict[str, any]]] = _take_quoted_mentions("plain @a.py text");
     assert r5[0] == "plain @a.py text";
     assert r5[1] == [];
 }

@@ -48,10 +48,10 @@ def _write_text(path: str, text: str) {
 }
 
 
-def _chain_names(chains: list) -> list[str] {
+def _chain_names(chains: list[dict[str, any]]) -> list[str] {
     out: list[str] = [];
     for c in chains {
-        rec: dict = c;
+        rec: dict[str, any] = c;
         out.append(str(rec["name"]));
     }
     return out;
@@ -139,20 +139,20 @@ test "parse_chain_markdown extracts frontmatter and ordered steps" {
         assert str(chain["source"]) == "package";
         assert str(chain["filePath"]) == path;
 
-        steps: list = chain["steps"];
+        steps: list[dict[str, any]] = chain["steps"];
         assert len(steps) == 3;
-        s0: dict = steps[0];
+        s0: dict[str, any] = steps[0];
         assert str(s0["agent"]) == "scout";
         assert str(s0["output"]) == "context.md";
         assert str(s0["task"]).startswith("Investigate the project");
-        s1: dict = steps[1];
+        s1: dict[str, any] = steps[1];
         # Agent names are trimmed; keys are case-insensitive (MODEL works).
         assert str(s1["agent"]) == "Planner";
         assert str(s1["model"]) == "reasoner-model";
         reads1: any = s1["reads"];
         assert isinstance(reads1, list);
         assert [str(r) for r in reads1] == ["context.md"];
-        s2: dict = steps[2];
+        s2: dict[str, any] = steps[2];
         assert str(s2["agent"]) == "worker";
         assert "{previous}" in str(s2["task"]);
         # Steps without config lines carry no optional keys.
@@ -216,7 +216,7 @@ test "load_chains_from_dir skips invalid chain files silently" {
 
         loaded = load_chains_from_dir(tmp, "project");
         assert _chain_names(loaded) == ["good"];
-        first: dict = loaded[0];
+        first: dict[str, any] = loaded[0];
         assert str(first["filePath"]) == good_path;
         assert str(first["source"]) == "project";
     } finally {
@@ -239,16 +239,16 @@ test "load_chains merges package and project with project winning" {
 
         merged = load_chains(cwd, pkg);
         assert sorted([str(k) for k in merged.keys()]) == ["alpha", "beta"];
-        alpha: dict = merged["alpha"];
+        alpha: dict[str, any] = merged["alpha"];
         assert str(alpha["description"]) == "project alpha";
         assert str(alpha["source"]) == "project";
-        beta: dict = merged["beta"];
+        beta: dict[str, any] = merged["beta"];
         assert str(beta["source"]) == "package";
 
         listed = list_chains(cwd, pkg);
         assert _chain_names(listed) == ["alpha", "beta"];  # sorted
 
-        picked: dict | None = get_chain(cwd, " beta ", pkg);
+        picked: dict[str, any] | None = get_chain(cwd, " beta ", pkg);
         assert picked is not None;
         assert str(picked["description"]) == "pkg beta";
         assert get_chain(cwd, "ghost", pkg) is None;
@@ -307,19 +307,19 @@ test "real repo chains smoke-parse read-only" {
         merged = load_chains(scratch, repo_pi);
         assert sorted([str(k) for k in merged.keys()]) == ["pipeline", "scout-and-design"];
 
-        pipe: dict | None = get_chain(scratch, "pipeline", repo_pi);
+        pipe: dict[str, any] | None = get_chain(scratch, "pipeline", repo_pi);
         assert pipe is not None;
         assert str(pipe["source"]) == "package";
-        steps: list = pipe["steps"];
+        steps: list[dict[str, any]] = pipe["steps"];
         agents_seq: list[str] = [];
         for s in steps {
-            rec: dict = s;
+            rec: dict[str, any] = s;
             agents_seq.append(str(rec["agent"]));
         }
         assert agents_seq == ["scout", "planner", "worker"];
-        first: dict = steps[0];
+        first: dict[str, any] = steps[0];
         assert str(first.get("output", "")) == "context.md";
-        second: dict = steps[1];
+        second: dict[str, any] = steps[1];
         assert str(second.get("model", "")) != "";
 
         text = format_chain_catalog(scratch, repo_pi);

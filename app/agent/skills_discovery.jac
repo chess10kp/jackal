@@ -35,17 +35,17 @@ def _load_skills_from_dir(
     dir_path: str,
     source: str,
     include_root_files: bool = True,
-    ignore_rules: list | None = None,
+    ignore_rules: list[str] | None = None,
     root_dir: str = "",
-) -> dict {
-    skills: list = [];
-    diagnostics: list = [];
-    empty: dict = {"skills": skills, "diagnostics": diagnostics};
+) -> dict[str, list[dict[str, any]]] {
+    skills: list[dict[str, any]] = [];
+    diagnostics: list[dict[str, any]] = [];
+    empty: dict[str, list[dict[str, any]]] = {"skills": skills, "diagnostics": diagnostics};
     if not os.path.isdir(dir_path) {
         return empty;
     }
     base = root_dir if root_dir else dir_path;
-    rules: list = list(ignore_rules) if ignore_rules else [];
+    rules: list[str] = list(ignore_rules) if ignore_rules else [];
     rules.extend(_load_ignore_rules(base, dir_path));
 
     try {
@@ -87,8 +87,8 @@ def _load_skills_from_dir(
                 continue;
             }
             sub = _load_skills_from_dir(full, source, False, rules, base);
-            sub_skills: list = sub["skills"];
-            sub_diags: list = sub["diagnostics"];
+            sub_skills: list[dict[str, any]] = sub["skills"];
+            sub_diags: list[dict[str, any]] = sub["diagnostics"];
             skills.extend(sub_skills);
             diagnostics.extend(sub_diags);
         } elif include_root_files and name.endswith(".md") and os.path.isfile(full) {
@@ -108,7 +108,7 @@ def _load_skills_from_dir(
 
 
 """Public single-directory load."""
-def load_skills_from_dir(dir_path: str, source: str) -> dict {
+def load_skills_from_dir(dir_path: str, source: str) -> dict[str, list[dict[str, any]]] {
     return _load_skills_from_dir(dir_path, source, True);
 }
 
@@ -183,18 +183,18 @@ def _get_source(rp: str, user_dir: str, proj_dir: str) -> str {
 
 
 """Merge one load result: realpath dedup, later-root-wins collisions."""
-def _add_loaded(result: dict, skill_map: dict, real_paths: set,
-                all_diags: list, collision_diags: list) {
-    res_diags: list = result["diagnostics"];
+def _add_loaded(result: dict[str, list[dict[str, any]]], skill_map: dict[str, dict[str, any]], real_paths: set[str],
+                all_diags: list[dict[str, any]], collision_diags: list[dict[str, any]]) {
+    res_diags: list[dict[str, any]] = result["diagnostics"];
     all_diags.extend(res_diags);
-    res_skills: list = result["skills"];
+    res_skills: list[dict[str, any]] = result["skills"];
     for skill in res_skills {
         rp = _canonical(str(skill["filePath"]));
         if rp in real_paths {
             continue;
         }
         real_paths.add(rp);
-        existing: dict | None = skill_map.get(str(skill["name"]));
+        existing: dict[str, any] | None = skill_map.get(str(skill["name"]));
         if existing is not None {
             collision_diags.append({
                 "type": "collision",
@@ -225,7 +225,7 @@ def _resolve_package_root() -> str {
 }
 
 
-def _skill_sort_key(skill: dict) -> str {
+def _skill_sort_key(skill: dict[str, any]) -> str {
     return str(skill.get("name", ""));
 }
 
@@ -242,18 +242,18 @@ def load_jackal_skills(
     cwd: str = "",
     package_root: str = "",
     agent_dir: str = "",
-    skill_paths: list | None = None,
+    skill_paths: list[str] | None = None,
     include_defaults: bool = True,
-) -> dict {
+) -> dict[str, list[dict[str, any]]] {
     base_cwd = cwd if cwd else os.getcwd();
     pkg_root = package_root if package_root else _resolve_package_root();
     home_dir = agent_dir if agent_dir else os.path.join(_user_home(), ".jackal");
-    paths: list = skill_paths if skill_paths is not None else [];
+    paths: list[str] = skill_paths if skill_paths is not None else [];
 
-    skill_map: dict = {};
-    real_paths: set = set();
-    all_diags: list = [];
-    collision_diags: list = [];
+    skill_map: dict[str, dict[str, any]] = {};
+    real_paths: set[str] = set();
+    all_diags: list[dict[str, any]] = [];
+    collision_diags: list[dict[str, any]] = [];
 
     user_skills_dir = os.path.join(home_dir, "skills");
     project_skills_dir = _find_project_skills_dir(base_cwd);

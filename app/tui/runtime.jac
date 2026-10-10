@@ -58,7 +58,7 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
     app.stream_msg_id = _push_turn(app, "assistant", "▍");
     app.status_hint = "streaming · esc abort";
 
-    def collector(kind: str, data: dict) {
+    def collector(kind: str, data: dict[str, any]) {
         try {
             q.put((str(kind), dict(data)));
         } except Exception {
@@ -68,7 +68,7 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
     # Tool approver: auto-allow per the ACTIVE dev mode (Shift+Tab cycle);
     # destructive ones raise the modal and block the WORKER thread on an
     # Event until the UI resolves it.
-    def approve(name: str, args: dict) -> any {
+    def approve(name: str, args: dict[str, any]) -> any {
         cmd = "";
         if isinstance(args, dict) {
             cmd = str(args.get("cmd", ""));

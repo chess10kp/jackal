@@ -85,7 +85,7 @@ test "save writes tasks.json as an indent=2 array with camelCase keys" {
 
         raw = _read_raw(path);
         assert isinstance(raw, list) and len(raw) == 1;
-        ent: dict = raw[0];
+        ent: dict[str, any] = raw[0];
         assert set(ent.keys()) == {"id", "title", "description", "status", "createdAt", "updatedAt"};
         assert ent["id"] == task["id"];
         assert ent["title"] == "ship the port";
@@ -223,7 +223,7 @@ test "update_tasks sets completedAt on completed and clears it otherwise" {
         b = add_task(tmp, "second");
 
         updated = update_tasks(tmp, [{"id": a["id"], "status": "in_progress"}]);
-        ta: dict = {};
+        ta: dict[str, any] = {};
         for t in updated {
             if str(t["id"]) == a["id"] {
                 ta = t;
@@ -325,13 +325,13 @@ test "task_counts buckets by status and ignores foreign statuses" {
 test "format_task_line picks icons per status and renders optional blurb" {
     tmp = _make_tmp();
     try {
-        plain: dict = {"id": "aaaa1111", "title": "plain", "description": None,
+        plain: dict[str, any] = {"id": "aaaa1111", "title": "plain", "description": None,
                        "status": "pending", "createdAt": "t", "updatedAt": "t"};
-        running: dict = dict(plain);
+        running: dict[str, any] = dict(plain);
         running["status"] = "in_progress";
-        done: dict = dict(plain);
+        done: dict[str, any] = dict(plain);
         done["status"] = "completed";
-        with_desc: dict = dict(plain);
+        with_desc: dict[str, any] = dict(plain);
         with_desc["description"] = "the details";
 
         line = format_task_line(with_desc);
@@ -341,7 +341,7 @@ test "format_task_line picks icons per status and renders optional blurb" {
         assert format_task_line(plain) == "○ [aaaa1111] plain";
 
         # Legacy files may omit description entirely; must not crash.
-        bare: dict = {"id": "bbbb2222", "title": "bare", "status": "pending"};
+        bare: dict[str, str] = {"id": "bbbb2222", "title": "bare", "status": "pending"};
         assert format_task_line(bare) == "○ [bbbb2222] bare";
     } finally {
         _cleanup(tmp);

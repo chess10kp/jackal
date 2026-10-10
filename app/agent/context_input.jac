@@ -74,7 +74,7 @@ def is_valid_file_path(file_path: str) -> bool {
 
 """{"start"} or {"start", "end"} for a `10` / `10-20` string; None when
 malformed, zero, negative, or reversed."""
-def parse_line_range(range_str: str) -> dict | None {
+def parse_line_range(range_str: str) -> dict[str, any] | None {
     if not range_str {
         return None;
     }
@@ -110,8 +110,8 @@ Each mention is {raw_text, file_path, start_index, end_index, line_range}
 where line_range is None or {start, end?}. Invalid paths are skipped; a
 syntactically present but rejected range leaves line_range None (whole
 file)."""
-def parse_file_mentions(input_text: str) -> list {
-    mentions: list = [];
+def parse_file_mentions(input_text: str) -> list[dict[str, any]] {
+    mentions: list[dict[str, any]] = [];
     for m in re.finditer(_FILE_MENTION_PATTERN, input_text) {
         file_path = str(m.group(1));
         if not is_valid_file_path(file_path) {
@@ -119,7 +119,7 @@ def parse_file_mentions(input_text: str) -> list {
         }
         line_start = m.group(2);
         line_end = m.group(3);
-        mention: dict = {
+        mention: dict[str, any] = {
             "raw_text": m.group(0),
             "file_path": file_path,
             "start_index": m.start(),
@@ -144,7 +144,7 @@ def parse_file_mentions(input_text: str) -> list {
 A trailing `:<digits>[-<digits>]` is consumed as the range; anything else
 (non-digit suffix, malformed or reversed range, no colon) returns the raw
 token as the path unchanged."""
-def parse_mention_token(raw: str) -> dict {
+def parse_mention_token(raw: str) -> dict[str, any] {
     colon = raw.rfind(":");
     if colon <= 0 {
         return {"path": raw};
@@ -171,7 +171,7 @@ def parse_mention_token(raw: str) -> dict {
 Returns {mention, start, end, rangeSuffix} or None when the cursor is not
 inside a mention. Scanning stops at whitespace backwards and at
 whitespace or `@` forwards."""
-def get_current_file_mention(input_text: str, cursor_position: int = -1) -> dict | None {
+def get_current_file_mention(input_text: str, cursor_position: int = -1) -> dict[str, any] | None {
     pos = cursor_position if cursor_position >= 0 else len(input_text);
 
     start = -1;
@@ -296,7 +296,7 @@ def _run_inline_command(cwd: str, command: str) -> str {
     } except OSError as exc {
         return "Command failed: " + str(exc);
     }
-    parts: list = [];
+    parts: list[str] = [];
     if proc.stdout {
         parts.append("stdout:\n" + proc.stdout);
     }
@@ -342,7 +342,7 @@ def expand_context_input(cwd: str, text: str) -> str {
         return text;
     }
 
-    blocks: list = [];
+    blocks: list[str] = [];
     seen: set[str] = set();
     total_chars = 0;
     for mention in mentions {

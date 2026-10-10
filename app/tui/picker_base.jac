@@ -65,15 +65,15 @@ the full lists. Both paint (_picker_lines) and key handling
 (_handle_picker_key) go through this helper so the cursor index always
 refers to the same visible rows. Pure over its input — replicated in
 tui/overlays.test.jac (keep in sync)."""
-def _multi_filtered(p: dict) -> tuple[list, list] {
-    options: list = list(p.get("options", []));
-    ids: list = list(p.get("ids", []));
+def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
+    options: list[str] = list(p.get("options", []));
+    ids: list[str] = list(p.get("ids", []));
     filt: str = str(p.get("filter", "")).strip().lower();
     if not filt {
         return (options, ids);
     }
-    vis_options: list = [];
-    vis_ids: list = [];
+    vis_options: list[str] = [];
+    vis_ids: list[str] = [];
     for i in range(len(options)) {
         if filt in str(options[i]).lower() {
             vis_options.append(options[i]);
