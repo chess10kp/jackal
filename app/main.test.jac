@@ -180,3 +180,10 @@ test "mode command shows and sets the dev mode" {
     assert "invalid mode" in handle_command("/mode turbo");
     handle_command("/mode normal");
 }
+
+
+test "logout and compact commands answer without a live turn" {
+    assert handle_command("/logout") == "usage: /logout PROVIDER";
+    assert handle_command("/logout not-a-provider").startswith("unknown provider");
+    assert handle_command("/compact").startswith("nothing compacted");
+}

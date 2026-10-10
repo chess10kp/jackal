@@ -2,7 +2,7 @@
 import os;
 import threading;
 import queue;
-import from tui.state { LiveShell }
+import from tui.state { LiveShell, SLASH_BUILTINS }
 import from tui.core { _push_turn }
 import from tui.picker_actions {
     _open_login_picker, _open_resume_picker,
@@ -16,7 +16,11 @@ import from agent.session {
     clear_history, get_history, restore_history, list_commands,
     run_command, list_extension_shortcuts, run_extension_shortcut, plugins,
     new_session_id, set_model, get_model, cancel_active_turn,
+    compact_now, set_mode, set_current_session_id,
 }
+import from agent.modes { DEV_MODES }
+import from agent.compaction { compute_context_usage }
+import from agent.auth_env { logout_provider, stored_providers }
 import from agent.sessions {
     list_sessions, get_session_record, export_session, save_session,
     is_valid_session_id,
@@ -61,12 +65,65 @@ def _run_slash(app: LiveShell, line: str) -> str {
         app.running = False;
         return "";
     }
-    if line == "/clear" {
+    if line == "/help" {
+        lines: list[str] = ["commands:"];
+        for name in sorted(SLASH_BUILTINS.keys()) {
+            lines.append("  /" + name + " — " + SLASH_BUILTINS[name]);
+        }
+        lines.append("  /skill:NAME — run a skill");
+        lines.append("extension commands: /commands · shift+tab cycles mode");
+        return "\n".join(lines);
+    }
+    if line in ("/clear", "/new") {
+        if app.phase == "streaming" {
+            return "a turn is running — /abort first";
+        }
         clear_history();
+        # Fresh id: the next save must not overwrite the previous transcript.
+        set_current_session_id("");
         app.messages = [];
         app.rev = 0;
         apply_transcript_revision(app.proj, 0, app.messages);
-        return "history cleared";
+        return "new session" if line == "/new" else "history cleared";
+    }
+    if line == "/compact" {
+        if app.phase == "streaming" {
+            return "a turn is running — /abort first";
+        }
+        return compact_now();
+    }
+    if line == "/context" {
+        env_max: str = os.environ.get("JACKAL_CONTEXT_MAX", "");
+        usage = compute_context_usage(get_history(), int(env_max) if env_max.isdigit() else None);
+        return (
+            "context: ~" + str(usage.get("used", 0)) + " / "
+            + str(usage.get("max", 0)) + " tokens ("
+            + str(usage.get("percent", 0)) + "%) · "
+            + str(len(get_history())) + " messages · /compact to shrink"
+        );
+    }
+    if line == "/mode" or line.startswith("/mode ") {
+        want = line[len("/mode"):].strip();
+        if not want {
+            return "mode: " + app.mode + " (" + " | ".join(DEV_MODES) + "; shift+tab cycles)";
+        }
+        if want not in DEV_MODES {
+            return "invalid mode: " + want + " (" + " | ".join(DEV_MODES) + ")";
+        }
+        app.mode = set_mode(want);
+        app.dirty = True;
+        return "mode -> " + app.mode;
+    }
+    if line == "/logout" or line.startswith("/logout ") {
+        prov = line[len("/logout"):].strip();
+        if not prov {
+            have = stored_providers();
+            if not have {
+                return "no stored credentials";
+            }
+            return "usage: /logout PROVIDER (stored: " + ", ".join(have) + ")";
+        }
+        return logout_provider(prov);
     }
     if line == "/abort" {
         return "turn aborted" if cancel_active_turn() else "no active turn";

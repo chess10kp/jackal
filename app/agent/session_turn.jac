@@ -134,13 +134,29 @@ is crossed (checked after the user message lands — matches src ordering).
 Fires Pi's session_before_compact / session_after_compact hooks; a blocking
 verdict ({block: true}) from any before-listener skips compaction this turn.
 Never raises — compaction failure must not break the turn."""
-def _maybe_auto_compact(bridge: PluginBridge | None) {
-    try {
-        cwd = plugins.cwd if plugins.cwd else os.getcwd();
-        raw_cfg = load_project_config(cwd);
-        cfg = resolve_auto_compact_config(
-            raw_cfg, str(raw_cfg.get("compactStrategy", ""))
-        );
+"""Index where the kept tail starts: `len(msgs) - keep_tail`, moved earlier
+so the tail never opens with a tool result orphaned from the assistant
+message carrying its tool_calls, and never earlier than `floor`."""
+def compaction_cut(msgs: list[dict[str, any]], keep_tail: int, floor: int = 0) -> int {
+    cut: int = max(floor, len(msgs) - keep_tail);
+    while cut > floor and str(msgs[cut].get("role", "")) == "tool" {
+        cut -= 1;
+    }
+    return cut;
+}
+
+
+"""Compact the live history: leading system prompt kept, everything before
+the tail summarized (LLM when strategy="llm" and a key is available, else
+mechanical). Returns {"ok", "before", "after", "strategy"} or {"ok": False,
+"reason"}. `force` skips the threshold gate (manual /compact)."""
+def compact_history(bridge: PluginBridge | None = None, force: bool = False) -> dict[str, any] {
+    cwd = plugins.cwd if plugins.cwd else os.getcwd();
+    raw_cfg = load_project_config(cwd);
+    cfg = resolve_auto_compact_config(
+        raw_cfg, str(raw_cfg.get("compactStrategy", ""))
+    );
+    if not force {
         ctx_override: any = None;
         env_max: str = os.environ.get("JACKAL_CONTEXT_MAX", "");
         if env_max.isdigit() {
@@ -148,60 +164,83 @@ def _maybe_auto_compact(bridge: PluginBridge | None) {
         }
         usage = compute_context_usage(history, ctx_override);
         if not should_auto_compact(usage, cfg) {
-            return;
+            return {"ok": False, "reason": "below threshold"};
         }
-        keep_tail: any = cfg.get("keepTail", 12);
-        kt = int(keep_tail);
-        if len(history) <= kt {
-            return;
-        }
-        blocked = False;
-        if bridge is not None {
-            results = fire_hook(bridge as PluginBridge, "session_before_compact", {
-                "messages_count": len(history),
-                "percent": usage.get("percent"),
-            });
-            for r in results {
-                v: any = r.get("verdict") if isinstance(r, dict) else None;
-                if isinstance(v, dict) and v.get("block") {
-                    blocked = True;
-                    break;
-                }
+    }
+    kt: int = int(cfg.get("keepTail", 12));
+    if force { kt = min(kt, 4); }
+    floor: int = 1 if history and str(history[0].get("role", "")) == "system" else 0;
+    cut: int = compaction_cut(history, kt, floor);
+    if cut <= floor {
+        return {"ok": False, "reason": "nothing to compact"};
+    }
+    if bridge is not None {
+        results = fire_hook(bridge as PluginBridge, "session_before_compact", {
+            "messages_count": len(history),
+            "manual": force,
+        });
+        for r in results {
+            v: any = r.get("verdict") if isinstance(r, dict) else None;
+            if isinstance(v, dict) and v.get("block") {
+                return {"ok": False, "reason": "blocked by extension"};
             }
         }
-        if blocked {
-            return;
+    }
+    count_before = len(history);
+    dropped = history[floor:cut];
+    summary_text = build_mechanical_summary(dropped);
+    strategy = "mechanical";
+    if str(cfg.get("strategy", "mechanical")) == "llm" {
+        llm_text = summarize_for_compaction(dropped, get_model_state(), get_thinking_level_state());
+        if llm_text is not None {
+            summary_text = llm_text;
+            strategy = "llm";
         }
-        count_before = len(history);
-        dropped = history[:count_before - kt];
-        kept = history[count_before - kt:];
-        summary_text = build_mechanical_summary(dropped);
-        strategy = "mechanical";
-        if str(cfg.get("strategy", "mechanical")) == "llm" {
-            llm_text = summarize_for_compaction(dropped, get_model_state(), get_thinking_level_state());
-            if llm_text is not None {
-                summary_text = llm_text;
-                strategy = "llm";
-            }
-        }
-        compacted: list[dict[str, any]] = [{"role": "user", "content": summary_text}];
-        for m in kept {
-            compacted.append(m);
-        }
-        # Clear + refill (glob reassignment is a trap per SessionPlugins note).
-        history.clear();
-        for m in compacted {
-            history.append(m);
-        }
-        if bridge is not None {
-            fire_hook(bridge as PluginBridge, "session_after_compact", {
-                "before": count_before,
-                "after": len(history),
-                "strategy": strategy,
-            });
-        }
+    }
+    compacted: list[dict[str, any]] = [];
+    if floor == 1 { compacted.append(history[0]); }
+    compacted.append({"role": "user", "content": summary_text});
+    for m in history[cut:] {
+        compacted.append(m);
+    }
+    # Clear + refill (glob reassignment is a trap per SessionPlugins note).
+    history.clear();
+    for m in compacted {
+        history.append(m);
+    }
+    if bridge is not None {
+        fire_hook(bridge as PluginBridge, "session_after_compact", {
+            "before": count_before,
+            "after": len(history),
+            "strategy": strategy,
+        });
+    }
+    return {"ok": True, "before": count_before, "after": len(history), "strategy": strategy};
+}
+
+
+def _maybe_auto_compact(bridge: PluginBridge | None) {
+    try {
+        compact_history(bridge, False);
     } except Exception {
     }
+}
+
+
+"""Manual compaction (/compact): status line for the UI."""
+def compact_now() -> str {
+    try {
+        res = compact_history(plugins.bridge, True);
+    } except Exception as e {
+        return "ERROR: compaction failed: " + str(e);
+    }
+    if not res.get("ok") {
+        return "nothing compacted (" + str(res.get("reason", "")) + ")";
+    }
+    return (
+        "compacted " + str(res["before"]) + " -> " + str(res["after"])
+        + " messages (" + str(res["strategy"]) + ")"
+    );
 }
 
 

@@ -15,6 +15,7 @@ import os;
 import json;
 import agent.session as _session;
 import from agent.session { clear_history }
+import from agent.auth_env { hydrate_auth_environment, logout_provider }
 import from agent.cli { parse_cli, combine_prompt, CLI_USAGE, CLI_VERSION }
 import from agent.modes { requires_approval, is_read_only_mode, read_only_mode_block_reason }
 import from agent.sessions {
@@ -44,6 +45,8 @@ def print_help {
         "  /sessions      list saved sessions\n"
         "  /resume [ID]   load a session transcript (default: latest)\n"
         "  /export [PATH] write the current transcript as markdown\n"
+        "  /logout PROV   remove a stored provider credential\n"
+        "  /compact       summarize older history to free context\n"
         "  /mode [NAME]   show or set dev mode (normal|auto-accept|yolo|plan|ask)\n"
         "  /commands      list extension commands\n"
         "  /exit          quit"
@@ -55,7 +58,13 @@ def print_help {
 def handle_command(line: str) -> str | None {
     if line in ("/exit", "/quit") { return None; }
     if line == "/help" { print_help(); return ""; }
-    if line == "/clear" { _session.clear_history(); return "history cleared"; }
+    if line in ("/clear", "/new") {
+        _session.clear_history();
+        # Fresh id: the next save must not overwrite the previous transcript.
+        _session.set_current_session_id("");
+        return "history cleared";
+    }
+    if line == "/compact" { return _session.compact_now(); }
     if line == "/abort" {
         return "turn aborted" if _session.cancel_active_turn() else "no active turn";
     }
@@ -121,6 +130,11 @@ def handle_command(line: str) -> str | None {
             }
         }
         return "\n".join(lines);
+    }
+    if line.startswith("/logout") {
+        prov = line[len("/logout"):].strip();
+        if not prov { return "usage: /logout PROVIDER"; }
+        return logout_provider(prov);
     }
     if line == "/mode" { return "mode: " + _session.get_mode(); }
     if line.startswith("/mode ") {
@@ -345,6 +359,7 @@ with entry:__main__ {
             sys.exit(2);
         }
     }
+    hydrate_auth_environment();
     _session.session_boot();
     opt_err: str = apply_cli_options(opts);
     if opt_err {

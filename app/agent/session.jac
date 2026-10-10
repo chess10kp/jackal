@@ -74,6 +74,7 @@ import from .session_turn {
     relay_tool_hooks,
     run_turn,
     _apply_extension_traffic,
+    compact_now,
 }
 import from .session_commands {
     get_history,

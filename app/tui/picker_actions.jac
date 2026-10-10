@@ -12,6 +12,7 @@ import from agent.auth {
     stored_api_key, get_auth_status, transition_auth_flow,
     initial_auth_flow_state, format_provider_label, oauth_start_login,
 }
+import from agent.auth_env { hydrate_auth_environment, note_hydrated }
 import from agent.tasks { load_tasks, format_tasks_list, task_counts }
 import from agent.sessions { list_sessions }
 import from ui.transcript { apply_transcript_revision }
@@ -58,25 +59,9 @@ def _login_provider_entries() -> dict[str, any] {
 }
 
 
-"""Apply a stored native API key only when the process does not already
-have an explicit environment override. This keeps provider routing intact
-across launches without changing persisted credentials or leaking them into
-the transcript."""
+"""Apply stored API keys to the environment (see agent.auth_env)."""
 def _hydrate_auth_environment() {
-    stored = load_auth_file(resolve_auth_path());
-    for prov in PROVIDER_ROUTES {
-        provider_id = str(prov);
-        route: any = PROVIDER_ROUTES[prov];
-        meta: dict[str, any] = route if isinstance(route, dict) else {};
-        key_env = str(meta.get("key_env", "") or "");
-        if not key_env or os.environ.get(key_env, "") {
-            continue;
-        }
-        key = stored_api_key(stored, provider_id);
-        if key {
-            os.environ[key_env] = key;
-        }
-    }
+    hydrate_auth_environment();
 }
 
 
@@ -177,6 +162,7 @@ def _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
     key_env = str(route.get("key_env", "") or "") if isinstance(route, dict) else "";
     if key_env {
         os.environ[key_env] = key;
+        note_hydrated(key_env);
     }
     app.auth_flow = transition_auth_flow(
         app.auth_flow,
