@@ -8,7 +8,6 @@ test "tui boots, streams a reply, and quits cleanly on esc" {
     try {
         sb.script([{"text": "hello from the tui mock"}]);
         tui = spawn_tui(sb);
-        assert "ready" in tui.screen_text(), tui.screen_text();
         tui.type_text("hi there");
         tui.wait_for("hi there", 10.0);
         tui.press("enter");

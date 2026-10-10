@@ -252,9 +252,13 @@ def mcp_restart(server_name: str) -> str {
         }
         plugins.mcp_tools = max(0, plugins.mcp_tools - removed);
     }
-    # Status keeps its own copy; the flow gets a fresh, unaliased list.
-    _mcp_set_status(server_name, "connecting", cmd=[str(c) for c in cmd]);
-    flow _attach_one_mcp_server(server_name, [str(c) for c in cmd]);
+    # Same shape as _attach_mcp_servers: a typed spec map whose loop values
+    # are sendable into the flow.
+    specs: dict[str, list[str]] = {server_name: [str(c) for c in cmd]};
+    for (name, argv) in specs.items() {
+        _mcp_set_status(name, "connecting", cmd=list(argv));
+        flow _attach_one_mcp_server(name, argv);
+    }
     return "restarting mcp server " + server_name;
 }
 

@@ -367,8 +367,9 @@ def spawn_tui(
     );
     sess.reader = threading.Thread(target=sess._read_loop, daemon=True);
     sess.reader.start();
-    # First frame: the shell's status hint is always painted.
-    sess.wait_for("enter", boot_timeout_s);
+    # First frame: the status line's ready phase. (Compiler diagnostics may
+    # be printed before the TUI takes over the screen on a cold cache.)
+    sess.wait_for("\u25cf ready", boot_timeout_s);
     return sess;
 }
 
