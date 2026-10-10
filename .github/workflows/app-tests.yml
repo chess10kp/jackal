@@ -1,0 +1,64 @@
+name: App tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: app-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAC_VERSION: "0.37.25"
+  JAC_SHA256: "a7d29cc7b35cc25b8697510e7d31fcb3403a11451d5693f57e0918a7420cf2c2"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-jac
+        with:
+          version: ${{ env.JAC_VERSION }}
+          sha256: ${{ env.JAC_SHA256 }}
+      - name: jac check app/
+        working-directory: app
+        run: jac check .
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [agent, tui, ui, other]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: ./.github/actions/setup-jac
+        with:
+          version: ${{ env.JAC_VERSION }}
+          sha256: ${{ env.JAC_SHA256 }}
+      - name: Run suites (${{ matrix.shard }})
+        env:
+          TIMEOUT: "900"
+        run: |
+          case "${{ matrix.shard }}" in
+            agent) scripts/test.sh -j3 app/agent/ ;;
+            tui)   scripts/test.sh -j3 app/tui/ ;;
+            ui)    scripts/test.sh -j3 app/ui/ ;;
+            other) scripts/test.sh -j3 --exclude app/agent/ --exclude app/tui/ --exclude app/ui/ ;;
+          esac
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testlogs-${{ matrix.shard }}
+          path: .testlogs/
+          retention-days: 7

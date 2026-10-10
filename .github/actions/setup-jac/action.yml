@@ -1,0 +1,34 @@
+name: Setup jac
+description: Install a pinned jac release binary and the app's pypi deps
+inputs:
+  version:
+    required: true
+  sha256:
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Cache jac binary
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/jac-bin
+        key: jac-${{ inputs.version }}-linux-x86_64
+    - name: Download jac
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p ~/.local/jac-bin
+        curl -fsSL -o ~/.local/jac-bin/jac \
+          "https://github.com/jaseci-labs/jac/releases/download/v${{ inputs.version }}/jac-${{ inputs.version }}-linux-x86_64"
+        echo "${{ inputs.sha256 }}  $HOME/.local/jac-bin/jac" | sha256sum -c -
+        chmod +x ~/.local/jac-bin/jac
+    - shell: bash
+      run: |
+        echo "$HOME/.local/jac-bin" >> "$GITHUB_PATH"
+        echo "JACKAL_ROOT=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+        echo "JACKAL_AGENT_DIR=$GITHUB_WORKSPACE/pi" >> "$GITHUB_ENV"
+    - name: Install app deps
+      shell: bash
+      working-directory: app
+      run: jac --version && jac install
