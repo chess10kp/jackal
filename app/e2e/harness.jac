@@ -371,3 +371,16 @@ def spawn_tui(
     sess.wait_for("enter", boot_timeout_s);
     return sess;
 }
+
+
+"""Absolute path of an e2e fixture file."""
+def fixture_path(name: str) -> str {
+    return os.path.join(app_dir(), "e2e", "fixtures", name);
+}
+
+
+"""Write the project config as .jackal/config.json (directory form, so
+sessions and tasks can live alongside it) — e.g. MCP servers."""
+def write_project_config(sb: Sandbox, cfg: dict[str, any]) {
+    sb.write(".jackal/config.json", json.dumps(cfg));
+}

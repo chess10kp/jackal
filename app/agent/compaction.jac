@@ -117,6 +117,11 @@ def load_project_config(cwd: str) -> dict[str, any] {
     cur = _path_abspath(cwd);
     while True {
         cand = os.path.join(cur, ".jackal");
+        # `.jackal` is a JSON file, or a directory (sessions/tasks live there)
+        # holding the config as .jackal/config.json.
+        if os.path.isdir(cand) {
+            cand = os.path.join(cand, "config.json");
+        }
         if os.path.isfile(cand) {
             try {
                 with open(cand, "r", encoding="utf-8") as fh {

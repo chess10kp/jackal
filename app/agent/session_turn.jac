@@ -5,7 +5,7 @@ import os;
 import time;
 
 import from .session_state { history, show_stats, plugins, _t0, _n_tools, reset_turn_stats, bump_tool_count, get_model_state, get_thinking_level_state, get_mode_state }
-import from .session_config { set_model, set_thinking_level, _apply_pending_model_requests }
+import from .session_config { set_model, set_thinking_level, _apply_pending_model_requests, wait_mcp_ready }
 import from .llm {
     react_loop,
     make_transport,
@@ -276,6 +276,9 @@ def run_turn(
         session_boot(plugins.session_id, plugins.cwd if plugins.cwd else os.getcwd(), []);
     }
     st = wait_extensions_ready();
+    # MCP servers attach in background flows; give them a bounded window so
+    # the first request includes their tools (no-op once all have settled).
+    wait_mcp_ready();
     # Extensions may have called pi.setModel/setThinkingLevel during load.
     _apply_pending_model_requests();
     if on_event is not None and st.total > 0 {

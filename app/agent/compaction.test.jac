@@ -4,6 +4,9 @@ Same-stem annex of compaction.jac (merged automatically): local names are
 used directly, no import from .compaction.
 """
 
+import tempfile;
+import shutil;
+
 
 test "config defaults and override resolution" {
     # Defaults with no .jackal keys.
@@ -110,4 +113,20 @@ test "llm summary prompt previews truncate at 200 and wrap summary guards empty"
     assert wrap_compaction_summary("  ") == "";
     w = wrap_compaction_summary("brief facts");
     assert w.startswith("<conversation-summary>\nbrief facts\n</conversation-summary>");
+}
+
+
+test "project config also loads from .jackal/config.json" {
+    tmp_dir = tempfile.mkdtemp(prefix="jackal-cfg-");
+    try {
+        os.makedirs(os.path.join(tmp_dir, ".jackal", "sessions"));
+        fh = open(os.path.join(tmp_dir, ".jackal", "config.json"), "w");
+        fh.write('{"compactStrategy": "llm"}');
+        fh.close();
+        sub = os.path.join(tmp_dir, "pkg");
+        os.makedirs(sub);
+        assert load_project_config(sub).get("compactStrategy") == "llm";
+    } finally {
+        shutil.rmtree(tmp_dir, ignore_errors=True);
+    }
 }

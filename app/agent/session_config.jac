@@ -2,6 +2,7 @@
 
 import os;
 import json;
+import time;
 
 import from .llm { provider_for, credential_error }
 import from .modes { DEV_MODES }
@@ -255,6 +256,33 @@ def mcp_restart(server_name: str) -> str {
     _mcp_set_status(server_name, "connecting", cmd=[str(c) for c in cmd]);
     flow _attach_one_mcp_server(server_name, [str(c) for c in cmd]);
     return "restarting mcp server " + server_name;
+}
+
+
+"""Block (bounded) until no MCP server is still connecting, so the first
+model request sees every tool that is going to attach. Budget comes from
+JACKAL_MCP_WAIT_S (default 10s). Returns True when nothing is pending."""
+def wait_mcp_ready(timeout_s: float = -1.0) -> bool {
+    budget: float = timeout_s;
+    if budget < 0.0 {
+        raw: str = os.environ.get("JACKAL_MCP_WAIT_S", "");
+        try {
+            budget = float(raw) if raw else 10.0;
+        } except ValueError {
+            budget = 10.0;
+        }
+    }
+    deadline: float = time.time() + budget;
+    while True {
+        pending: bool = False;
+        for st in list(plugins.mcp_status.values()) {
+            if str(st.get("state", "")) == "connecting" { pending = True; break; }
+        }
+        if not pending { return True; }
+        if time.time() >= deadline { return False; }
+        time.sleep(0.05);
+    }
+    return False;
 }
 
 
