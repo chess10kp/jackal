@@ -16,7 +16,7 @@ import json;
 import agent.session as _session;
 import from agent.session { clear_history }
 import from agent.auth_env { hydrate_auth_environment, logout_provider }
-import from agent.cli { parse_cli, combine_prompt, CLI_USAGE, CLI_VERSION }
+import from agent.cli { parse_cli, user_argv, combine_prompt, CLI_USAGE, CLI_VERSION }
 import from agent.modes { requires_approval, is_read_only_mode, read_only_mode_block_reason }
 import from agent.sessions {
     list_sessions,
@@ -348,7 +348,7 @@ with entry:__main__ {
     # Pi lifecycle: boot loads .jackal/extensions.json and warms the Node
     # sidecar without blocking the first frame; run_turn awaits extension
     # readiness before the first model request.
-    opts: dict[str, any] = parse_cli(sys.argv[1:]);
+    opts: dict[str, any] = parse_cli(user_argv(list(sys.argv)));
     if opts["help"] { print(CLI_USAGE); sys.exit(0); }
     if opts["version"] { print("jackal " + CLI_VERSION); sys.exit(0); }
     if opts["error"] {

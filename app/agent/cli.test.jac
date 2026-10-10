@@ -56,3 +56,10 @@ test "combine_prompt appends piped stdin" {
     assert combine_prompt("", "only stdin\n") == "only stdin";
     assert combine_prompt("only arg", "  ") == "only arg";
 }
+
+
+test "user_argv strips the jac run prefix and separator" {
+    assert user_argv(["main.jac", "-p", "hi"]) == ["-p", "hi"];
+    assert user_argv(["jac", "run", "/x/app/main.jac", "--", "--json"]) == ["--json"];
+    assert user_argv(["prog"]) == [];
+}

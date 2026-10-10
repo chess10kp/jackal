@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [agent, tui, ui, other]
+        shard: [agent, tui, ui, e2e, other]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,7 +53,8 @@ jobs:
             agent) scripts/test.sh -j3 app/agent/ ;;
             tui)   scripts/test.sh -j3 app/tui/ ;;
             ui)    scripts/test.sh -j3 app/ui/ ;;
-            other) scripts/test.sh -j3 --exclude app/agent/ --exclude app/tui/ --exclude app/ui/ ;;
+            e2e)   scripts/test.sh -j2 app/e2e/ ;;
+            other) scripts/test.sh -j3 --exclude app/agent/ --exclude app/tui/ --exclude app/ui/ --exclude app/e2e/ ;;
           esac
       - name: Upload logs
         if: always()
@@ -61,4 +62,5 @@ jobs:
         with:
           name: testlogs-${{ matrix.shard }}
           path: .testlogs/
+          include-hidden-files: true
           retention-days: 7

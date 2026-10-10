@@ -42,6 +42,25 @@ glob _VALUE_FLAGS: dict[str, str] = {
 };
 
 
+"""User arguments from a raw sys.argv under `jac run main.jac -- ARGS`:
+everything after the entry script, minus one leading "--" separator."""
+def user_argv(raw: list[str]) -> list[str] {
+    start: int = 1;
+    for i in range(len(raw)) {
+        a: str = raw[i];
+        if a.endswith("main.jac") or a.endswith("main.py") or a == "main" {
+            start = i + 1;
+            break;
+        }
+    }
+    out: list[str] = list(raw[start:]);
+    if out and out[0] == "--" {
+        out = out[1:];
+    }
+    return out;
+}
+
+
 """Default option set: every key parse_cli may fill."""
 def default_cli_options() -> dict[str, any] {
     return {

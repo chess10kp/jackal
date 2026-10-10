@@ -163,6 +163,111 @@ obj Transport {
 }
 
 
+"""Scripted, offline transport behind the `mock` route (models `mock`,
+`mockllm`, `mock/*`) — the backbone of the e2e test harness.
+
+JACKAL_MOCK_SCRIPT names a JSON file holding a list of responses; each model
+call consumes the next one (cursor per script path, per process):
+  {"text": "..."}                                   plain answer
+  {"text": "...", "tool_calls": [{"name": "read_file", "args": {...}}]}
+  {"error": "HTTP 500: boom"}                       stream error event
+Without a script (or once it is exhausted) the reply echoes the last user
+message as "mock: <text>". JACKAL_MOCK_LOG, when set, receives one JSON line
+per call ({"call", "messages", "last", "tools"}) so tests can assert exactly
+what the model was sent."""
+glob _mock_cursor: dict[str, int] = {};
+
+def _mock_last_user(messages: list[dict[str, any]]) -> str {
+    for i in range(len(messages) - 1, -1, -1) {
+        m: dict[str, any] = messages[i];
+        if str(m.get("role", "")) == "user" {
+            return str(m.get("content", ""));
+        }
+    }
+    return "";
+}
+
+def _mock_next_response(script_path: str) -> dict[str, any] | None {
+    if not script_path {
+        return None;
+    }
+    try {
+        fh: any = open(script_path, "r", encoding="utf-8");
+        steps: any = json.loads(fh.read());
+        fh.close();
+    } except Exception as e {
+        return {"error": "mock script unreadable: " + str(e)};
+    }
+    if not isinstance(steps, list) {
+        return {"error": "mock script must be a JSON list"};
+    }
+    idx: int = _mock_cursor.get(script_path, 0);
+    _mock_cursor[script_path] = idx + 1;
+    if idx >= len(steps) or not isinstance(steps[idx], dict) {
+        return None;
+    }
+    return steps[idx];
+}
+
+obj MockTransport (Transport) {
+    override def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+        script_path: str = os.environ.get("JACKAL_MOCK_SCRIPT", "");
+        step: dict[str, any] | None = _mock_next_response(script_path);
+        log_path: str = os.environ.get("JACKAL_MOCK_LOG", "");
+        if log_path {
+            tool_names: list[str] = [];
+            for d in tool_defs {
+                fn: any = d.get("function", {}) if isinstance(d, dict) else {};
+                tool_names.append(str(fn.get("name", "")) if isinstance(fn, dict) else "");
+            }
+            last: dict[str, any] = messages[-1] if messages else {};
+            entry: dict[str, any] = {
+                "call": _mock_cursor.get(script_path, 0),
+                "messages": len(messages),
+                "last": {"role": str(last.get("role", "")), "content": str(last.get("content", ""))},
+                "tools": tool_names,
+            };
+            try {
+                lf: any = open(log_path, "a", encoding="utf-8");
+                lf.write(json.dumps(entry) + "\n");
+                lf.close();
+            } except Exception {
+            }
+        }
+        if step is None {
+            step = {"text": "mock: " + _mock_last_user(messages)};
+        }
+        if "error" in step {
+            yield {"error": str(step["error"])};
+            return;
+        }
+        text: str = str(step.get("text", "") or "");
+        # Two pieces so frontends exercise incremental streaming.
+        half: int = len(text) // 2;
+        if text[:half] { yield {"content": text[:half]}; }
+        if text[half:] { yield {"content": text[half:]}; }
+        raw_calls: any = step.get("tool_calls", []);
+        if isinstance(raw_calls, list) and raw_calls {
+            calls: list[dict[str, any]] = [];
+            n: int = 0;
+            for rc in raw_calls {
+                if not isinstance(rc, dict) { continue; }
+                n += 1;
+                calls.append({
+                    "id": "mock_call_" + str(n),
+                    "type": "function",
+                    "function": {
+                        "name": str(rc.get("name", "")),
+                        "arguments": json.dumps(rc.get("args", {})),
+                    },
+                });
+            }
+            yield {"tool_calls": calls};
+        }
+    }
+}
+
+
 """fx-style provider-first routing (see ~/notes/fx-model-routing.md).
 
 One table owns every provider fact — endpoint, credential env var, catalog —
@@ -306,6 +411,9 @@ def make_transport(model: str = "", thinking: str = "", hook_bridge: any = None)
     api_key = os.environ.get(key_env, "") if key_env else "";
     base_url_env = str(route.get("base_url_env", ""));
     base_url = os.environ.get(base_url_env, str(route["base_url"])) if base_url_env else str(route["base_url"]);
+    if provider == "mock" {
+        return MockTransport(base_url=base_url, model=stripped, thinking=thinking);
+    }
     return Transport(
         base_url=base_url,
         api_key=api_key,
