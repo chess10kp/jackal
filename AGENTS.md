@@ -9,7 +9,7 @@ Jac-native terminal coding agent.
 ## Rules for agents working in this repo
 
 1. **Commit** after each feature or bugfix (unless the user says otherwise).
-2. **Do not modify** `jac-client`. **Exception — vendored compiler:** `vendor/jac/` (subtree of jaseci-labs/jac, see [`docs/VENDOR-JAC.md`](docs/VENDOR-JAC.md)) is ours to fix: native-path fixes land there first so product work never waits on upstream PR latency. Keep vendor changes upstream-able and sync them back.
+2. **Do not modify** `jac-client`. There is no vendored compiler: jac is the jacup-managed release (0.37.25). Compiler bugs go upstream to jaseci-labs/jac (see Human handoff).
 3. **Native lowering discipline:** write Jac that lowers natively — annotate types (including kwargs and intermediates) so modules lower without implicit server fallback; keep `jac build` green on `app/`; change `[placement.pins]` in `app/jac.toml` only via deliberate commits with a stated reason.
 4. **Do not extend legacy code.** `src/`, `templates/`, `tui/*.tsx`, `lib/jac/`, and the TS test suites are frozen pending deletion. No new features, no fixes unless a deletion commit depends on it.
 5. **Framework/plugin gaps** → stop, document symptom + owning repo + minimal recommended fix for the **human** (see [Human handoff](#human-handoff)).
@@ -31,7 +31,7 @@ jac test app/<file>.test.jac   # per-file jac tests
 
 **Running:** no launcher script — from `app/`: `jac run tui/shell.jac` boots the native TUI (needs a TTY); headless: `jac run main.jac` (line REPL) or `jac run main.jac -- --json` (JSONL protocol). Set `JACKAL_AGENT_DIR=<repo>/pi` and `JACKAL_ROOT=<repo>` so auth/catalogs resolve.
 
-**Requirements:** Python env with `jac` CLI (vendored compiler under `vendor/jac/`, wrapper in `scripts/setup-vendor-jac.sh`); a TTY for the TUI; provider API keys via env or auth.json (see below).
+**Requirements:** `jac` 0.37.25 via jacup (`jacup install 0.37.25`; CI pins the same release binary); a TTY for the TUI; provider API keys via env or auth.json (see below).
 
 ---
 
@@ -132,7 +132,7 @@ Only entries still true after the native-first pivot:
 
 | Symptom / need | Owner | Notes |
 |----------------|-------|-------|
-| Native lowering failures in `app/` | jaclang (via `vendor/jac/`) | Fix lands in vendor first, syncs back upstream |
+| Native lowering failures in `app/` | jaclang (jaseci-labs/jac) | Work around in `app/` (annotate types), report upstream |
 | `js2jac` converter gaps | jac_llm_data fork | Sync contract in `tui/js2jac/SYNC.md` |
 
 Pruned as stale (legacy-runtime-bound, moot after deletion): `@jac/pi` hook naming, facade copy workarounds, formal `--adapter` flag.
@@ -173,14 +173,7 @@ Pruned as stale (legacy-runtime-bound, moot after deletion): `@jac/pi` hook nami
 - `agent-session`-style dependencies flow through `agent/session.jac`; leaf-module changes propagate upward.
 - After editing a `.jac` module, check it compiles/lowers before running the dependent test file.
 - The TUI paint/layout logic lives in `app/ui/demo_live_shell.jac` (upstream of `tui/shell.jac`); change paint behavior there, not in the shell driver.
-- Toolchain: use the installed release jac at `~/.local/share/jac/bin/jac`
-  (symlinked `~/.local/bin/jac`) — a self-contained 0.36.1 payload built from
-  `vendor/jac` — NOT `/usr/bin/jac` (stale 0.30.9; phantom `own` errors,
-  incompatible `.jac` cache) and not the `-Ddev` launcher in
-  `vendor/jac/jac/zig-out/bin` (slow, source-linked). Rebuild after vendor
-  edits with `cd vendor/jac/jac && zig build -Dskip-precompile
-  -Dpayload-progress`; the full precompile needs >9 GB RSS and OOM-kills on
-  a 14 GB box. First use compiles the compiler on demand (one slow run).
+- Toolchain: jacup-managed jac 0.37.25 (`~/.local/share/jacup/bin/jac`); NOT `/usr/bin/jac` (stale 0.30.9). The old `vendor/jac` subtree was removed.
 
 ## LLVM slice — reuse the shared copy, never fetch a private one
 

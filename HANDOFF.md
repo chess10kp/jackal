@@ -45,8 +45,7 @@ tool. Do NOT delete other sessions' dirs under `/tmp/claude-1000/`. Deleting
 
 ### Toolchain
 - `jac` on PATH = jacup-managed **0.37.25** (`~/.local/share/jacup/bin/jac`).
-  The `vendor/jac` subtree is gone (see §7). AGENTS.md still mentions
-  `~/.local/share/jac/bin/jac` 0.36.1; that section is stale.
+  The `vendor/jac` subtree is gone for good (user-confirmed).
 - jac 0.37 config shape: `[placement] default = "native"`,
   `[placement.pins]`, `[dependencies.pypi]`, `entry-point = "main"`.
 - Python deps: `app/jac.toml` **and** root `jac.toml` both list
@@ -483,14 +482,7 @@ symbols are in scope; annotate locals whose type the checker cannot infer.
 
 ## 7. Open items to raise with the user (don't decide alone)
 
-1. **vendor/ deletion got committed by mistake.** Commit `c5d67da15`
-   ("ci: keep main-branch app-test runs…") used `git commit -a` and swept in
-   the user's uncommitted deletion of `vendor/jac/` (~4,900 files). The user's
-   working tree already had it deleted (they moved to jacup 0.37.25), so the
-   on-disk state matches their intent, but the history message is misleading.
-   Ask: keep it, or restore `vendor/` (`git checkout c5d67da15~1 -- vendor`
-   then commit)? AGENTS.md still documents `vendor/jac` as the vendored
-   compiler; update AGENTS.md once the user decides.
+1. ~~vendor/ deletion~~ — resolved: the user confirmed `vendor/` is not needed; the deletion in `c5d67da15` stays. AGENTS.md updated.
 2. Normal-mode auto-approval of read-only tools (A4) is a behavior change;
    mention it in the summary.
 3. OAuth scope (C8).
