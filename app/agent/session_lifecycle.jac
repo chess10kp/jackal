@@ -6,6 +6,7 @@ import time;
 import from .session_state { plugins }
 import from .session_config { set_mode, _attach_mcp_servers, _load_model_prefs }
 import from .compaction { load_project_config }
+import from .agent_tools { register_agent_tools }
 import from .tools { default_registry }
 import from .registry { get_tool }
 import from .plugin_bridge {
@@ -161,6 +162,7 @@ def session_boot(
     }
     plugins.decls = parsed;
     plugins.reg = default_registry();
+    register_agent_tools(plugins.reg);
     # user_bash hook: tools.jac cannot import the bridge (import cycle), so
     # boot wraps the registered run_command handler; fire_user_bash never
     # raises and tolerates bridge=None.
