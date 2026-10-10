@@ -13,6 +13,9 @@ import json;
 import shutil;
 import tempfile;
 import subprocess;
+import time;
+import threading;
+import from e2e.screen { Screen }
 
 glob E2E_TIMEOUT_S: int = 300;
 
@@ -193,4 +196,180 @@ def jsonl(kind: str, text: str = "", extra: dict[str, any] | None = None) -> str
         for (k, v) in extra.items() { req[k] = v; }
     }
     return json.dumps(req) + "\n";
+}
+
+
+# ============================ PTY / TUI driver ============================
+
+"""Named keys for TuiSession.press."""
+glob KEYS: dict[str, str] = {
+    "enter": "\r", "esc": "\x1b", "tab": "\t", "backspace": "\x7f",
+    "up": "\x1b[A", "down": "\x1b[B", "right": "\x1b[C", "left": "\x1b[D",
+    "shift+tab": "\x1b[Z", "ctrl+c": "\x03", "ctrl+d": "\x04",
+};
+
+
+"""A live `jac run tui/shell.jac` under a pseudo-terminal, with its output
+replayed into a Screen. Drive it with type_text/press, assert with
+wait_for/screen_text, and always close()."""
+obj TuiSession {
+    has proc: any = None,
+        master_fd: int = -1,
+        screen: Screen = Screen(),
+        raw: list[str] = [],
+        lock: any = None,
+        reader: any = None,
+        alive: bool = True;
+
+    def _read_loop() {
+        import os;
+        import codecs;
+        dec: any = codecs.getincrementaldecoder("utf-8")("replace");
+        while self.alive {
+            try {
+                chunk: bytes = os.read(self.master_fd, 65536);
+            } except OSError {
+                break;
+            }
+            if not chunk { break; }
+            text: str = dec.decode(chunk);
+            self.lock.acquire();
+            try {
+                self.raw.append(text);
+                self.screen.feed(text);
+            } finally {
+                self.lock.release();
+            }
+        }
+        self.alive = False;
+    }
+
+    def send(data: str) {
+        import os;
+        os.write(self.master_fd, data.encode("utf-8"));
+    }
+
+    """Type text one character at a time (like a user), then settle briefly."""
+    def type_text(text: str, delay_s: float = 0.005) {
+        for ch in text {
+            self.send(ch);
+            time.sleep(delay_s);
+        }
+    }
+
+    def press(key: str) {
+        self.send(KEYS.get(key, key));
+    }
+
+    def screen_text() -> str {
+        self.lock.acquire();
+        try {
+            return self.screen.text();
+        } finally {
+            self.lock.release();
+        }
+    }
+
+    def raw_output() -> str {
+        self.lock.acquire();
+        try {
+            return "".join(self.raw);
+        } finally {
+            self.lock.release();
+        }
+    }
+
+    """Poll until `needle` is on screen; raises AssertionError with the
+    screen dump on timeout."""
+    def wait_for(needle: str, timeout_s: float = 60.0) -> str {
+        deadline: float = time.time() + timeout_s;
+        while time.time() < deadline {
+            txt: str = self.screen_text();
+            if needle in txt { return txt; }
+            if not self.alive and self.proc.poll() is not None { break; }
+            time.sleep(0.05);
+        }
+        raise AssertionError(
+            "timed out waiting for " + repr(needle) + "\n--- screen ---\n"
+            + self.screen_text() + "\n--- exit: " + str(self.proc.poll())
+        );
+    }
+
+    """Wait for the process to exit; returns its code (or None on timeout)."""
+    def wait_exit(timeout_s: float = 30.0) -> int | None {
+        try {
+            return int(self.proc.wait(timeout=timeout_s));
+        } except subprocess.TimeoutExpired {
+            return None;
+        }
+    }
+
+    def close() {
+        import os;
+        import signal;
+        if self.proc is not None and self.proc.poll() is None {
+            try {
+                os.killpg(self.proc.pid, signal.SIGTERM);
+            } except Exception {
+            }
+            try {
+                self.proc.wait(timeout=10);
+            } except Exception {
+                try { os.killpg(self.proc.pid, signal.SIGKILL); } except Exception { }
+            }
+        }
+        self.alive = False;
+        try {
+            os.close(self.master_fd);
+        } except OSError {
+        }
+    }
+}
+
+
+"""Launch the native TUI in `sb.project` under a cols x rows PTY with the
+mock model. Waits until the first frame is painted."""
+def spawn_tui(
+    sb: Sandbox,
+    cols: int = 100,
+    rows: int = 30,
+    env_extra: dict[str, str] | None = None,
+    boot_timeout_s: float = 240.0,
+) -> TuiSession {
+    import pty;
+    import fcntl;
+    import termios;
+    import struct;
+    (master_fd, slave_fd) = pty.openpty();
+    fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0));
+    env: dict[str, str] = dict(os.environ);
+    for k in ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ZAI_API_KEY", "JACKAL_MODE"] {
+        env.pop(k, None);
+    }
+    env["JACKAL_MODEL"] = "mock";
+    env["JACKAL_MOCK_SCRIPT"] = sb.script_path;
+    env["JACKAL_MOCK_LOG"] = sb.log_path;
+    env["JACKAL_AGENT_DIR"] = sb.agent_dir;
+    env["HOME"] = sb.root;
+    env["TERM"] = "xterm-256color";
+    env["COLUMNS"] = str(cols);
+    env["LINES"] = str(rows);
+    if env_extra is not None {
+        for (k, v) in env_extra.items() { env[k] = v; }
+    }
+    cmd: list[str] = [jac_bin(), "run", os.path.join(app_dir(), "tui", "shell.jac")];
+    proc: any = subprocess.Popen(
+        cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+        cwd=sb.project, env=env, start_new_session=True, close_fds=True,
+    );
+    os.close(slave_fd);
+    sess = TuiSession(
+        proc=proc, master_fd=master_fd, screen=Screen(columns=cols, rows=rows),
+        raw=[], lock=threading.Lock(), alive=True,
+    );
+    sess.reader = threading.Thread(target=sess._read_loop, daemon=True);
+    sess.reader.start();
+    # First frame: the shell's status hint is always painted.
+    sess.wait_for("enter", boot_timeout_s);
+    return sess;
 }
