@@ -1,11 +1,10 @@
 """E2E: the native TUI driven through a real pseudo-terminal."""
 
-import from e2e.harness { make_sandbox, spawn_tui }
 
 
 test "tui boots, streams a reply, and quits cleanly on esc" {
     sb = make_sandbox();
-    tui = None;
+    tui: TuiSession | None = None;
     try {
         sb.script([{"text": "hello from the tui mock"}]);
         tui = spawn_tui(sb);
@@ -31,7 +30,7 @@ test "tui boots, streams a reply, and quits cleanly on esc" {
 
 test "tui approval modal accepts with y" {
     sb = make_sandbox();
-    tui = None;
+    tui: TuiSession | None = None;
     try {
         sb.script([
             {"text": "", "tool_calls": [{"name": "write_file", "args": {"path": "t.txt", "content": "tui"}}]},
@@ -53,7 +52,7 @@ test "tui approval modal accepts with y" {
 
 test "tui approval modal rejects with n" {
     sb = make_sandbox();
-    tui = None;
+    tui: TuiSession | None = None;
     try {
         sb.script([
             {"text": "", "tool_calls": [{"name": "write_file", "args": {"path": "no.txt", "content": "x"}}]},
@@ -76,7 +75,7 @@ test "tui approval modal rejects with n" {
 
 test "tui slash commands and mode cycling" {
     sb = make_sandbox();
-    tui = None;
+    tui: TuiSession | None = None;
     try {
         tui = spawn_tui(sb);
         tui.type_text("/help");

@@ -65,8 +65,9 @@ def handle_command(line: str) -> str | None {
         return "history cleared";
     }
     if line == "/mcp" {
-        rows = _session.mcp_status_lines();
-        return "mcp servers:\n" + "\n".join(rows) if rows else "no mcp servers configured";
+        mcp_rows: list[str] = _session.mcp_status_lines();
+        if not mcp_rows { return "no mcp servers configured"; }
+        return "mcp servers:\n" + "\n".join(mcp_rows);
     }
     if line.startswith("/mcp restart ") {
         return _session.mcp_restart(line[len("/mcp restart "):].strip());

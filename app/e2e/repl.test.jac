@@ -1,6 +1,5 @@
 """E2E: the line REPL frontend driven over piped stdin."""
 
-import from e2e.harness { make_sandbox, run_jackal, jsonl }
 
 
 test "repl runs a turn and slash commands then exits" {

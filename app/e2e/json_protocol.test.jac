@@ -1,6 +1,5 @@
 """E2E: the --json JSONL protocol used by UI clients."""
 
-import from e2e.harness { make_sandbox, run_jackal, jsonl }
 
 
 test "jsonl session lifecycle and a turn" {
@@ -13,8 +12,11 @@ test "jsonl session lifecycle and a turn" {
         assert types[0] == "session_ready", r.describe();
         assert "chunk" in types and "turn_end" in types, r.describe();
         assert types[-1] == "session_end", r.describe();
-        msgs = [e for e in r.events() if e.get("type") == "message"];
-        assert msgs and msgs[0]["content"] == "pong", r.describe();
+        contents: list[str] = [];
+        for e in r.events() {
+            if e.get("type") == "message" { contents.append(str(e.get("content"))); }
+        }
+        assert contents == ["pong"], r.describe();
     } finally {
         sb.cleanup();
     }
@@ -51,9 +53,14 @@ test "jsonl rejects malformed requests without dying" {
     try {
         r = run_jackal(sb, ["--json"], stdin_text="not json\n" + jsonl("command", "/mode") + jsonl("command", "/exit"));
         assert r.code == 0, r.describe();
-        evs = r.events();
-        assert any([e.get("type") == "error" and "bad json" in str(e.get("message")) for e in evs]), r.describe();
-        assert any([e.get("type") == "info" and "mode: normal" in str(e.get("text")) for e in evs]), r.describe();
+        saw_bad: bool = False;
+        saw_mode: bool = False;
+        for e in r.events() {
+            if e.get("type") == "error" and "bad json" in str(e.get("message")) { saw_bad = True; }
+            if e.get("type") == "info" and "mode: normal" in str(e.get("text")) { saw_mode = True; }
+        }
+        assert saw_bad, r.describe();
+        assert saw_mode, r.describe();
     } finally {
         sb.cleanup();
     }

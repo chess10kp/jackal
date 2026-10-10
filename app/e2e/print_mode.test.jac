@@ -1,6 +1,5 @@
 """E2E: one-shot print mode (`jackal -p`) against the scripted mock model."""
 
-import from e2e.harness { make_sandbox, run_jackal, jsonl }
 
 import json;
 
