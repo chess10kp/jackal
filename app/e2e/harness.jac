@@ -14,6 +14,7 @@ import shutil;
 import tempfile;
 import subprocess;
 import time;
+import signal;
 import threading;
 import from e2e.screen { Screen }
 
@@ -52,7 +53,7 @@ def jac_bin() -> str {
 """Isolated sandbox: a project dir (seeded with `files`, path -> text) and a
 private agent dir. Call cleanup() when done."""
 obj Sandbox {
-    has root: str = "",
+    has base_dir: str = "",
         project: str = "",
         agent_dir: str = "",
         script_path: str = "",
@@ -99,19 +100,19 @@ obj Sandbox {
     }
 
     def cleanup() {
-        shutil.rmtree(self.root, ignore_errors=True);
+        shutil.rmtree(self.base_dir, ignore_errors=True);
     }
 }
 
 
 def make_sandbox(files: dict[str, str] | None = None) -> Sandbox {
-    root: str = tempfile.mkdtemp(prefix="jackal-e2e-");
+    base: str = tempfile.mkdtemp(prefix="jackal-e2e-");
     sb = Sandbox(
-        root=root,
-        project=os.path.join(root, "project"),
-        agent_dir=os.path.join(root, "agent"),
-        script_path=os.path.join(root, "script.json"),
-        log_path=os.path.join(root, "calls.jsonl"),
+        base_dir=base,
+        project=os.path.join(base, "project"),
+        agent_dir=os.path.join(base, "agent"),
+        script_path=os.path.join(base, "script.json"),
+        log_path=os.path.join(base, "calls.jsonl"),
     );
     os.makedirs(sb.project);
     os.makedirs(sb.agent_dir);
@@ -171,7 +172,7 @@ def run_jackal(
     env["JACKAL_MOCK_SCRIPT"] = sb.script_path;
     env["JACKAL_MOCK_LOG"] = sb.log_path;
     env["JACKAL_AGENT_DIR"] = sb.agent_dir;
-    env["HOME"] = sb.root;
+    env["HOME"] = sb.base_dir;
     env["NO_COLOR"] = "1";
     if env_extra is not None {
         for (k, v) in env_extra.items() { env[k] = v; }
@@ -305,8 +306,6 @@ obj TuiSession {
     }
 
     def close() {
-        import os;
-        import signal;
         if self.proc is not None and self.proc.poll() is None {
             try {
                 os.killpg(self.proc.pid, signal.SIGTERM);
@@ -350,7 +349,7 @@ def spawn_tui(
     env["JACKAL_MOCK_SCRIPT"] = sb.script_path;
     env["JACKAL_MOCK_LOG"] = sb.log_path;
     env["JACKAL_AGENT_DIR"] = sb.agent_dir;
-    env["HOME"] = sb.root;
+    env["HOME"] = sb.base_dir;
     env["TERM"] = "xterm-256color";
     env["COLUMNS"] = str(cols);
     env["LINES"] = str(rows);

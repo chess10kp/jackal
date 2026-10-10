@@ -221,7 +221,7 @@ obj MockTransport (Transport) {
                 tool_names.append(str(fn.get("name", "")) if isinstance(fn, dict) else "");
             }
             last: dict[str, any] = messages[-1] if messages else {};
-            entry: dict[str, any] = {
+            log_entry: dict[str, any] = {
                 "call": _mock_cursor.get(script_path, 0),
                 "messages": len(messages),
                 "last": {"role": str(last.get("role", "")), "content": str(last.get("content", ""))},
@@ -229,7 +229,7 @@ obj MockTransport (Transport) {
             };
             try {
                 lf: any = open(log_path, "a", encoding="utf-8");
-                lf.write(json.dumps(entry) + "\n");
+                lf.write(json.dumps(log_entry) + "\n");
                 lf.close();
             } except Exception {
             }

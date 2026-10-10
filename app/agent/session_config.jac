@@ -251,8 +251,9 @@ def mcp_restart(server_name: str) -> str {
         }
         plugins.mcp_tools = max(0, plugins.mcp_tools - removed);
     }
-    _mcp_set_status(server_name, "connecting", cmd=cmd);
-    flow _attach_one_mcp_server(server_name, cmd);
+    argv: list[str] = [str(c) for c in cmd];
+    _mcp_set_status(server_name, "connecting", cmd=argv);
+    flow _attach_one_mcp_server(server_name, argv);
     return "restarting mcp server " + server_name;
 }
 
