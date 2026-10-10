@@ -152,3 +152,31 @@ test "handle_command sessions resume export round-trip" {
         assert not c.endswith("=False"), "failed check: " + c;
     }
 }
+
+
+test "headless approver follows the dev-mode policy" {
+    _session.set_mode("normal");
+    deny = make_approver(None);
+    verdict = deny("write_file", {"path": "x"});
+    assert isinstance(verdict, str) and "--mode" in verdict;
+    asked: list[str] = [];
+    def yes(name: str, args: dict[str, any]) -> bool {
+        asked.append(name);
+        return True;
+    }
+    assert make_approver(yes)("write_file", {"path": "x"}) is True;
+    assert asked == ["write_file"];
+    _session.set_mode("yolo");
+    assert deny("write_file", {"path": "x"}) is True;
+    _session.set_mode("plan");
+    assert isinstance(deny("write_file", {"path": "x"}), str);
+    _session.set_mode("normal");
+}
+
+
+test "mode command shows and sets the dev mode" {
+    assert handle_command("/mode yolo") == "mode -> yolo";
+    assert handle_command("/mode") == "mode: yolo";
+    assert "invalid mode" in handle_command("/mode turbo");
+    handle_command("/mode normal");
+}

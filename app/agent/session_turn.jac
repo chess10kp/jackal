@@ -233,6 +233,7 @@ def run_turn(
     message: str,
     on_event: any = render_event,
     approve: any = None,
+    max_iters: int = 30,
 ) -> str {
     # Auto-boot with no decls if never booted (native-only path).
     if plugins.reg is None {
@@ -338,7 +339,8 @@ def run_turn(
         reg = plugins.reg if plugins.reg is not None else default_registry();
         answer = react_loop(
             history, [], transport, relay_tool_hooks(bridge, on_event),
-            reg=reg, bridge=bridge, cancel=turn_cancel, approve=approve,
+            max_iters=max_iters, reg=reg, bridge=bridge, cancel=turn_cancel,
+            approve=approve,
         );
     } finally {
         plugins.active_cancel = None;

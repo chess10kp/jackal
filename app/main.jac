@@ -1,9 +1,13 @@
 """Jackal - all-Jac coding agent harness.
 
-Two frontends, one session:
+Three frontends, one session:
   term:  line REPL (default)
   json:  `--json` — JSONL protocol on stdio for UI clients (one JSON object
          per line; see json_event in agent/session.jac for the event set)
+  print: `-p PROMPT` — one-shot run; answer on stdout (or a JSON result with
+         --output-format json|stream-json), exit code 1 on failure
+
+Flags are parsed by agent/cli.jac (`--help` for the list).
 """
 
 import sys;
@@ -11,6 +15,8 @@ import os;
 import json;
 import agent.session as _session;
 import from agent.session { clear_history }
+import from agent.cli { parse_cli, combine_prompt, CLI_USAGE, CLI_VERSION }
+import from agent.modes { requires_approval, is_read_only_mode, read_only_mode_block_reason }
 import from agent.sessions {
     list_sessions,
     latest_session_id,
@@ -38,7 +44,7 @@ def print_help {
         "  /sessions      list saved sessions\n"
         "  /resume [ID]   load a session transcript (default: latest)\n"
         "  /export [PATH] write the current transcript as markdown\n"
-        "  /stats         toggle turn stats line (term mode)\n"
+        "  /mode [NAME]   show or set dev mode (normal|auto-accept|yolo|plan|ask)\n"
         "  /commands      list extension commands\n"
         "  /exit          quit"
     );
@@ -66,26 +72,7 @@ def handle_command(line: str) -> str | None {
         return "\n".join(lines);
     }
     if line.startswith("/resume") {
-        arg = line[len("/resume"):].strip();
-        sid: str = arg;
-        if not sid {
-            got = latest_session_id(os.getcwd());
-            if got is None { return "no saved sessions to resume"; }
-            sid = got;
-        }
-        rec: dict[str, any] | None = get_session_record(os.getcwd(), sid);
-        if rec is None { return "unknown session: " + sid; }
-        msgs: any = rec.get("messages", []);
-        if not isinstance(msgs, list) or not msgs {
-            return "session has no transcript: " + sid;
-        }
-        _session.restore_history(msgs as list);
-        rec_model: any = rec.get("model");
-        reply: str = "resumed " + sid + " (" + str(len(msgs)) + " messages)";
-        if isinstance(rec_model, str) and rec_model and rec_model != _session.get_model() {
-            reply += "\nmodel -> " + _session.restore_model(rec_model);
-        }
-        return reply;
+        return resume_session(line[len("/resume"):].strip());
     }
     if line.startswith("/export") {
         arg = line[len("/export"):].strip();
@@ -135,6 +122,15 @@ def handle_command(line: str) -> str | None {
         }
         return "\n".join(lines);
     }
+    if line == "/mode" { return "mode: " + _session.get_mode(); }
+    if line.startswith("/mode ") {
+        want = line[len("/mode "):].strip();
+        try {
+            return "mode -> " + _session.set_mode(want);
+        } except ValueError as e {
+            return str(e);
+        }
+    }
     if line.startswith("/model ") {
         name = line[len("/model "):].strip();
         if name { return "model -> " + _session.set_model(name); }
@@ -155,16 +151,230 @@ def handle_command(line: str) -> str | None {
 }
 
 
+"""Load a saved session (latest when `sid` is empty) into the live history
+and keep persisting under the same id. Returns a status line; failures start
+with "unknown"/"no"/"session"."""
+def resume_session(sid: str) -> str {
+    if not sid {
+        got = latest_session_id(os.getcwd());
+        if got is None { return "no saved sessions to resume"; }
+        sid = got;
+    }
+    rec: dict[str, any] | None = get_session_record(os.getcwd(), sid);
+    if rec is None { return "unknown session: " + sid; }
+    msgs: any = rec.get("messages", []);
+    if not isinstance(msgs, list) or not msgs {
+        return "session has no transcript: " + sid;
+    }
+    _session.restore_history(msgs as list);
+    _session.set_current_session_id(sid);
+    rec_model: any = rec.get("model");
+    reply: str = "resumed " + sid + " (" + str(len(msgs)) + " messages)";
+    if isinstance(rec_model, str) and rec_model and rec_model != _session.get_model() {
+        reply += "\nmodel -> " + _session.restore_model(rec_model);
+    }
+    return reply;
+}
+
+
+"""Mode-policy tool approver for headless frontends. `ask(name, args)`
+answers "confirm" verdicts; ask=None (non-interactive) denies them with a
+hint, so `-p` never runs a confirm-gated tool silently."""
+def make_approver(ask: any) -> any {
+    def approve(name: str, args: dict[str, any]) -> any {
+        cmd: str = "";
+        if isinstance(args, dict) { cmd = str(args.get("cmd", "")); }
+        mode: str = _session.get_mode();
+        policy: str = requires_approval(mode, name, cmd);
+        if policy == "auto" { return True; }
+        if policy == "blocked" {
+            if is_read_only_mode(mode) {
+                return read_only_mode_block_reason(name, mode);
+            }
+            return "blocked in " + mode + " mode";
+        }
+        if ask is None {
+            return (
+                "tool \"" + name + "\" needs approval in " + mode
+                + " mode; rerun with --mode auto-accept or --mode yolo"
+            );
+        }
+        if ask(name, args) { return True; }
+        return "denied by user";
+    }
+    return approve;
+}
+
+
+def _args_preview(args: dict[str, any]) -> str {
+    try {
+        return json.dumps(args)[:400];
+    } except Exception {
+        return str(args)[:400];
+    }
+}
+
+
+"""Line-REPL approval prompt on the controlling terminal."""
+def term_ask(name: str, args: dict[str, any]) -> bool {
+    print("\n  ? " + name + " " + _args_preview(args));
+    try {
+        got = input("  approve? [y/N] ").strip().lower();
+    } except EOFError {
+        return False;
+    } except KeyboardInterrupt {
+        return False;
+    }
+    return got in ("y", "yes");
+}
+
+
+"""JSONL approval round-trip: emit approval_request, then read stdin until an
+{"type": "approval", "approved": bool} line arrives (EOF denies). Other
+requests are rejected while the turn is blocked on the decision."""
+def json_ask(name: str, args: dict[str, any]) -> bool {
+    _session.json_event("approval_request", {"tool": name, "args": args});
+    while True {
+        raw = sys.stdin.readline();
+        if not raw { return False; }
+        text_in: str = str(raw).strip();
+        if not text_in { continue; }
+        try {
+            req: any = json.loads(text_in);
+        } except ValueError {
+            _session.json_event("error", {"message": "bad json: " + text_in[:80]});
+            continue;
+        }
+        if isinstance(req, dict) and str(req.get("type", "")) == "approval" {
+            return bool(req.get("approved", False));
+        }
+        _session.json_event("error", {"message": "awaiting approval decision"});
+    }
+    return False;
+}
+
+
+"""Apply --model/--thinking/--mode/--continue/--resume after boot. Returns
+an error message, or "" on success."""
+def apply_cli_options(opts: dict[str, any]) -> str {
+    if opts["continue"] or opts["resume"] {
+        got = resume_session(str(opts["resume"]));
+        if not got.startswith("resumed") { return got; }
+    }
+    model_name: str = str(opts["model"]);
+    if model_name {
+        result = _session.set_model(model_name);
+        if result != model_name { return result; }
+    }
+    if opts["thinking"] { _session.set_thinking_level(str(opts["thinking"])); }
+    if opts["mode"] { _session.set_mode(str(opts["mode"])); }
+    return "";
+}
+
+
+"""One-shot run (-p): execute `prompt`, write the answer per output_format,
+return the process exit code (0 ok, 1 error)."""
+def run_print(prompt: str, opts: dict[str, any]) -> int {
+    fmt: str = str(opts["output_format"]);
+    errors: list[str] = [];
+    stats: dict[str, any] = {"tools": 0, "secs": 0.0};
+
+    def on_event(kind: str, data: dict[str, any]) {
+        if kind == "error" { errors.append(str(data.get("message", ""))); }
+        if kind == "tool_call" { stats["tools"] = int(stats["tools"]) + 1; }
+        if kind == "turn_end" { stats["secs"] = data.get("secs", 0.0); }
+        if fmt == "stream-json" {
+            _session.json_event(kind, data);
+        } elif kind == "error" {
+            sys.stderr.write("[error] " + str(data.get("message", "")) + "\n");
+            sys.stderr.flush();
+        }
+    }
+    max_turns: int = int(opts["max_turns"]) if opts["max_turns"] else 30;
+    answer: str = "";
+    try {
+        answer = _session.run_turn(
+            prompt, on_event, approve=make_approver(None), max_iters=max_turns,
+        );
+    } except KeyboardInterrupt {
+        errors.append("interrupted");
+    } except Exception as e {
+        errors.append(str(e));
+        sys.stderr.write("[error] " + str(e) + "\n");
+    }
+    is_error: bool = not answer and len(errors) > 0;
+    if fmt == "text" {
+        if answer {
+            sys.stdout.write(answer + ("" if answer.endswith("\n") else "\n"));
+            sys.stdout.flush();
+        }
+    } else {
+        _session.json_event("result", {
+            "result": answer,
+            "is_error": is_error,
+            "errors": errors,
+            "session_id": str(_session.plugins.session_id),
+            "model": _session.get_model(),
+            "num_tools": stats["tools"],
+            "duration_s": stats["secs"],
+        });
+    }
+    return 1 if is_error else 0;
+}
+
+
 with entry:__main__ {
     # Pi lifecycle: boot loads .jackal/extensions.json and warms the Node
     # sidecar without blocking the first frame; run_turn awaits extension
     # readiness before the first model request.
+    opts: dict[str, any] = parse_cli(sys.argv[1:]);
+    if opts["help"] { print(CLI_USAGE); sys.exit(0); }
+    if opts["version"] { print("jackal " + CLI_VERSION); sys.exit(0); }
+    if opts["error"] {
+        sys.stderr.write("jackal: " + str(opts["error"]) + "\n" + CLI_USAGE + "\n");
+        sys.exit(2);
+    }
+    print_mode: bool = bool(opts["print"]);
+    prompt: str = str(opts["prompt"]);
+    if print_mode {
+        piped: str = "";
+        if not sys.stdin.isatty() { piped = sys.stdin.read(); }
+        prompt = combine_prompt(prompt, piped);
+        if not prompt {
+            sys.stderr.write("jackal: -p needs a prompt (argument or stdin)\n");
+            sys.exit(2);
+        }
+    }
     _session.session_boot();
-    json_mode = "--json" in sys.argv;
+    opt_err: str = apply_cli_options(opts);
+    if opt_err {
+        sys.stderr.write("jackal: " + opt_err + "\n");
+        _session.session_dispose();
+        sys.exit(1);
+    }
+    if print_mode {
+        code: int = 1;
+        try {
+            code = run_print(prompt, opts);
+        } finally {
+            _session.session_dispose();
+        }
+        sys.exit(code);
+    }
+    json_mode: bool = bool(opts["json"]);
+    approver: any = make_approver(json_ask if json_mode else term_ask);
     if json_mode {
         _session.json_event("session_ready", {"model": _session.get_model(), "cwd": os.getcwd()});
     } else {
         print_banner();
+        if prompt {
+            print("\n> " + prompt);
+            try {
+                _session.run_turn(prompt, approve=approver);
+            } except KeyboardInterrupt {
+                print("\n[interrupted]");
+            }
+        }
     }
     ended = False;
     try {
@@ -210,9 +420,9 @@ with entry:__main__ {
             }
             try {
                 if json_mode {
-                    _session.run_turn(text, _session.json_event);
+                    _session.run_turn(text, _session.json_event, approve=approver);
                 } else {
-                    _session.run_turn(text);
+                    _session.run_turn(text, approve=approver);
                 }
             } except KeyboardInterrupt {
                 if json_mode { _session.json_event("error", {"message": "interrupted"}); }
