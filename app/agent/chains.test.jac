@@ -301,7 +301,11 @@ test "format_chain_catalog renders arrow step summaries" {
 
 
 test "real repo chains smoke-parse read-only" {
-    repo_pi = "/home/jac/repos/jackal/pi";
+    # Local-only catalog: pi/.pi is gitignored, so CI checkouts lack it.
+    repo_pi = os.path.join(os.environ.get("JACKAL_ROOT", os.getcwd()), "pi");
+    if not os.path.isdir(os.path.join(repo_pi, ".pi")) {
+        return;
+    }
     scratch = _make_tmp();
     try {
         merged = load_chains(scratch, repo_pi);

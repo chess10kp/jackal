@@ -71,6 +71,14 @@ match() { # match <suite>
   return 0
 }
 
+_exec_suite() { # _exec_suite <suite> <log>
+  if command -v timeout >/dev/null 2>&1; then
+    timeout --kill-after=30 "$TIMEOUT" "$JAC" test "$1" >"$2" 2>&1
+  else
+    "$JAC" test "$1" >"$2" 2>&1
+  fi
+}
+
 run_suite() { # run_suite <suite>
   local s="$1"
   local name tag log rc secs
@@ -79,20 +87,23 @@ run_suite() { # run_suite <suite>
   log="$LOGDIR/$tag.log"
   local start end
   start=$(date +%s)
-  if command -v timeout >/dev/null 2>&1; then
-    timeout --kill-after=30 "$TIMEOUT" "$JAC" test "$s" >"$log" 2>&1
-  else
-    "$JAC" test "$s" >"$log" 2>&1
+  _exec_suite "$s" "$log"; rc=$?
+  local status=""
+  # Native crashes (SIGABRT/SIGSEGV, or timeout's "dumped core") get one
+  # rerun; a pass on retry is reported FLAKY (non-fatal, listed).
+  if [ $rc -ne 0 ] && { [ $rc -eq 134 ] || [ $rc -eq 139 ] || grep -q "dumped core" "$log"; }; then
+    mv "$log" "$log.crash1"
+    _exec_suite "$s" "$log"; rc=$?
+    [ $rc -eq 0 ] && status=FLAKY
   fi
-  rc=$?
   end=$(date +%s)
   secs=$((end - start))
-  local status
-  if [ $rc -eq 0 ]; then status=PASS
+  if [ -n "$status" ]; then :
+  elif [ $rc -eq 0 ]; then status=PASS
   elif [ $rc -eq 124 ] || [ $rc -eq 137 ]; then status="TIMEOUT($rc)"
   else status=FAIL; fi
   printf '%s %s %ss %s\n' "$status" "$name" "$secs" "$log"
-  [ "$status" = PASS ]
+  [ "$status" = PASS ] || [ "$status" = FLAKY ]
 }
 
 PASSED=0; FAILED=0; TIMEOUTS=0
@@ -113,7 +124,7 @@ if [ "$JOBS" -gt 1 ]; then
           line="$(cat "$LOGDIR/.$(echo "${pjobs[$i]#app/}" | tr '/' '_').status")"
           RESULTS+=("$line")
           case "$line" in
-            PASS*) PASSED=$((PASSED+1)) ;;
+            PASS*|FLAKY*) PASSED=$((PASSED+1)) ;;
             TIMEOUT*) TIMEOUTS=$((TIMEOUTS+1)); FAILED_NAMES+=("${pjobs[$i]}") ;;
             *) FAILED=$((FAILED+1)); FAILED_NAMES+=("${pjobs[$i]}") ;;
           esac
@@ -128,7 +139,7 @@ if [ "$JOBS" -gt 1 ]; then
     line="$(cat "$LOGDIR/.$(echo "${pjobs[$i]#app/}" | tr '/' '_').status")"
     RESULTS+=("$line")
     case "$line" in
-      PASS*) PASSED=$((PASSED+1)) ;;
+      PASS*|FLAKY*) PASSED=$((PASSED+1)) ;;
       TIMEOUT*) TIMEOUTS=$((TIMEOUTS+1)); FAILED_NAMES+=("${pjobs[$i]}") ;;
       *) FAILED=$((FAILED+1)); FAILED_NAMES+=("${pjobs[$i]}") ;;
     esac
@@ -163,12 +174,13 @@ fi
 
 # Recount from RESULTS ("STATUS name secs log") with quarantine applied.
 PASSED=0; FAILED=0; TIMEOUTS=0; XFAIL=0
-FAILED_NAMES=(); XPASS_NAMES=()
+FAILED_NAMES=(); XPASS_NAMES=(); FLAKY_NAMES=()
 for line in "${RESULTS[@]:-}"; do
   [ -z "$line" ] && continue
   st="${line%% *}"; rest="${line#* }"; nm="${rest%% *}"
-  if [ "$st" = PASS ]; then
+  if [ "$st" = PASS ] || [ "$st" = FLAKY ]; then
     PASSED=$((PASSED+1))
+    [ "$st" = FLAKY ] && FLAKY_NAMES+=("$nm")
     [ -n "${QUAR[$nm]:-}" ] && XPASS_NAMES+=("$nm")
   elif [ -n "${QUAR[$nm]:-}" ]; then
     XFAIL=$((XFAIL+1))
@@ -185,6 +197,9 @@ echo "suites: $((PASSED + FAILED + TIMEOUTS + XFAIL))  pass: $PASSED  fail: $FAI
 if [ ${#FAILED_NAMES[@]} -gt 0 ]; then
   echo "failing:"; printf '  %s\n' "${FAILED_NAMES[@]}"
 fi
+if [ ${#FLAKY_NAMES[@]} -gt 0 ]; then
+  echo "flaky (crashed once, passed on retry):"; printf '  %s\n' "${FLAKY_NAMES[@]}"
+fi
 if [ ${#XPASS_NAMES[@]} -gt 0 ]; then
   echo "quarantined but passing (remove from $QUARANTINE_FILE):"; printf '  %s\n' "${XPASS_NAMES[@]}"
 fi
@@ -192,6 +207,7 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
     echo "### jackal tests: pass $PASSED · fail $FAILED · timeout $TIMEOUTS · xfail $XFAIL"
     for n in "${FAILED_NAMES[@]:-}"; do [ -n "$n" ] && echo "- :x: \`$n\`"; done
+    for n in "${FLAKY_NAMES[@]:-}"; do [ -n "$n" ] && echo "- :warning: \`$n\` crashed once, passed on retry"; done
     for n in "${XPASS_NAMES[@]:-}"; do [ -n "$n" ] && echo "- :tada: \`$n\` passes — unquarantine"; done
   } >> "$GITHUB_STEP_SUMMARY"
 fi

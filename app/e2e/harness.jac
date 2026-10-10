@@ -14,7 +14,6 @@ import shutil;
 import tempfile;
 import subprocess;
 import time;
-import signal;
 import threading;
 import from e2e.screen { Screen }
 
@@ -308,13 +307,13 @@ obj TuiSession {
     def close() {
         if self.proc is not None and self.proc.poll() is None {
             try {
-                os.killpg(self.proc.pid, signal.SIGTERM);
+                os.killpg(int(self.proc.pid), 15);  # SIGTERM
             } except Exception {
             }
             try {
                 self.proc.wait(timeout=10);
             } except Exception {
-                try { os.killpg(self.proc.pid, signal.SIGKILL); } except Exception { }
+                try { os.killpg(int(self.proc.pid), 9); } except Exception { }  # SIGKILL
             }
         }
         self.alive = False;

@@ -218,7 +218,7 @@ def _attach_one_mcp_server(server_name: str, cmd: list[str]) {
 def _attach_mcp_servers(cfg: dict[str, any]) {
     specs = _mcp_server_specs(cfg);
     for (name, cmd) in specs.items() {
-        _mcp_set_status(name, "connecting", cmd=cmd);
+        _mcp_set_status(name, "connecting", cmd=list(cmd));
         flow _attach_one_mcp_server(name, cmd);
     }
 }
@@ -251,9 +251,9 @@ def mcp_restart(server_name: str) -> str {
         }
         plugins.mcp_tools = max(0, plugins.mcp_tools - removed);
     }
-    argv: list[str] = [str(c) for c in cmd];
-    _mcp_set_status(server_name, "connecting", cmd=argv);
-    flow _attach_one_mcp_server(server_name, argv);
+    # Status keeps its own copy; the flow gets a fresh, unaliased list.
+    _mcp_set_status(server_name, "connecting", cmd=[str(c) for c in cmd]);
+    flow _attach_one_mcp_server(server_name, [str(c) for c in cmd]);
     return "restarting mcp server " + server_name;
 }
 

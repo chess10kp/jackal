@@ -28,7 +28,11 @@ runs:
         echo "$HOME/.local/jac-bin" >> "$GITHUB_PATH"
         echo "JACKAL_ROOT=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
         echo "JACKAL_AGENT_DIR=$GITHUB_WORKSPACE/pi" >> "$GITHUB_ENV"
-    - name: Install app deps
+    # Suites run from the repo root (root jac.toml) and from app/ (app/jac.toml);
+    # each project resolves its own venv, so install both.
+    - name: Install deps
       shell: bash
-      working-directory: app
-      run: jac --version && jac install
+      run: |
+        jac --version
+        jac install
+        (cd app && jac install)
