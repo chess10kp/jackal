@@ -22,6 +22,10 @@ import from .session_config {
     set_model as _set_model,
     set_thinking_level as _set_thinking_level,
     clear_history,
+    mcp_restart,
+    mcp_status_lines,
+    mcp_server_specs,
+    drain_mcp_notices,
 }
 
 glob model: str = get_model_state(),

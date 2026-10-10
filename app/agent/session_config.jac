@@ -6,12 +6,13 @@ import json;
 import from .llm { provider_for, credential_error }
 import from .modes { DEV_MODES }
 import from .plugin_bridge { PluginBridge, fire_hook, drain_model_requests }
-import from .registry { ToolRegistry, register_native }
+import from .registry { ToolRegistry, register_native, unregister }
 import from .mcp {
     McpClient,
     create_mcp_client,
     mcp_start,
     mcp_list_tools,
+    mcp_stop,
 }
 import from .session_state {
     history,
@@ -113,33 +114,69 @@ def _make_mcp_handler(client: McpClient, server_name: str, tool_name: str) -> Ca
 }
 
 
+"""Public alias of _mcp_server_specs for UI modules (underscore names did
+not bind across modules at runtime)."""
+def mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
+    return _mcp_server_specs(cfg);
+}
+
+
+def _mcp_set_status(server_name: str, state: str, error: str = "", tools: int = 0, cmd: list[str] | None = None) {
+    prev: dict[str, any] = plugins.mcp_status.get(server_name, {});
+    plugins.mcp_status[server_name] = {
+        "state": state,
+        "error": error,
+        "tools": tools,
+        "cmd": cmd if cmd is not None else prev.get("cmd", []),
+    };
+}
+
+
+def _mcp_fail(server_name: str, error: str) {
+    _mcp_set_status(server_name, "failed", error);
+    plugins.mcp_notices.append(
+        "mcp server " + server_name + " unavailable: " + error
+        + " (/mcp for status, /mcp restart " + server_name + " to retry)"
+    );
+}
+
+
+"""Pop queued MCP notices for display (frontends call this each tick/turn)."""
+def drain_mcp_notices() -> list[str] {
+    out: list[str] = list(plugins.mcp_notices);
+    plugins.mcp_notices.clear();
+    return out;
+}
+
+
 """Spawn + initialize one MCP server, then seed namespaced tools into the
-live registry. Runs inside a background flow — never raises."""
+live registry. Runs inside a background flow — never raises; failures land
+in plugins.mcp_status and plugins.mcp_notices (never printed: stdout belongs
+to the TUI/JSONL frontends)."""
 def _attach_one_mcp_server(server_name: str, cmd: list[str]) {
     try {
         reg = plugins.reg;
         if reg is None {
             return;
         }
+        _mcp_set_status(server_name, "connecting", cmd=cmd);
         client = create_mcp_client();
         # Register the client before connecting so dispose can stop it even
         # mid-handshake.
         plugins.mcp_clients[server_name] = client;
         started = mcp_start(client, cmd);
         if not started.get("ok") {
-            print(
-                "[mcp] server " + server_name + " unavailable, skipping: "
-                + str(started.get("error", ""))
-            );
+            _mcp_fail(server_name, str(started.get("error", "spawn failed")));
             return;
         }
         listed = mcp_list_tools(client);
         if not listed.get("ok") {
-            print("[mcp] server " + server_name + " tools/list failed: " + str(listed.get("error", "")));
+            _mcp_fail(server_name, "tools/list failed: " + str(listed.get("error", "")));
             return;
         }
         raw_tools: any = listed.get("tools", []);
         if not isinstance(raw_tools, list) {
+            _mcp_fail(server_name, "tools/list returned no tool array");
             return;
         }
         sprefix = _mcp_name_chunk(server_name);
@@ -170,8 +207,9 @@ def _attach_one_mcp_server(server_name: str, cmd: list[str]) {
             }
         }
         plugins.mcp_tools += registered;
+        _mcp_set_status(server_name, "connected", tools=registered);
     } except Exception as e {
-        print("[mcp] server " + server_name + " attach failed, skipping: " + str(e));
+        _mcp_fail(server_name, "attach failed: " + str(e));
     }
 }
 
@@ -180,8 +218,57 @@ def _attach_one_mcp_server(server_name: str, cmd: list[str]) {
 def _attach_mcp_servers(cfg: dict[str, any]) {
     specs = _mcp_server_specs(cfg);
     for (name, cmd) in specs.items() {
+        _mcp_set_status(name, "connecting", cmd=cmd);
         flow _attach_one_mcp_server(name, cmd);
     }
+}
+
+
+"""Stop a server's client and drop its tools, then spawn it again in the
+background with the command it was configured with. Returns a status line."""
+def mcp_restart(server_name: str) -> str {
+    st: dict[str, any] = plugins.mcp_status.get(server_name, {});
+    cmd: any = st.get("cmd", []);
+    if not isinstance(cmd, list) or not cmd {
+        return "unknown mcp server: " + server_name;
+    }
+    old: any = plugins.mcp_clients.get(server_name);
+    if old is not None {
+        try {
+            mcp_stop(old);
+        } except Exception {
+        }
+        plugins.mcp_clients.pop(server_name, None);
+    }
+    reg = plugins.reg;
+    if reg is not None {
+        prefix: str = "mcp_" + _mcp_name_chunk(server_name) + "_";
+        removed: int = 0;
+        for tname in list(reg.tools.keys()) {
+            if str(tname).startswith(prefix) and unregister(reg, str(tname)) {
+                removed += 1;
+            }
+        }
+        plugins.mcp_tools = max(0, plugins.mcp_tools - removed);
+    }
+    _mcp_set_status(server_name, "connecting", cmd=cmd);
+    flow _attach_one_mcp_server(server_name, cmd);
+    return "restarting mcp server " + server_name;
+}
+
+
+"""One status line per known MCP server (REPL /mcp)."""
+def mcp_status_lines() -> list[str] {
+    lines: list[str] = [];
+    for name in sorted(plugins.mcp_status.keys()) {
+        st = plugins.mcp_status[name];
+        state: str = str(st.get("state", ""));
+        line: str = "  " + str(name) + " — " + state;
+        if state == "connected" { line += " · " + str(st.get("tools", 0)) + " tools"; }
+        if state == "failed" { line += ": " + str(st.get("error", "")); }
+        lines.append(line);
+    }
+    return lines;
 }
 
 

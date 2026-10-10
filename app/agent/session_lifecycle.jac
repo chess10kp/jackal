@@ -182,6 +182,8 @@ def session_boot(
     }
     # MCP attach (D21): config parse is a cheap sync file read; server spawns
     # run in background flows so boot/first frame is never blocked.
+    plugins.mcp_status.clear();
+    plugins.mcp_notices.clear();
     try {
         _attach_mcp_servers(load_project_config(plugins.cwd));
     } except Exception {
@@ -283,6 +285,8 @@ def session_dispose {
     }
     plugins.mcp_clients.clear();
     plugins.mcp_tools = 0;
+    plugins.mcp_status.clear();
+    plugins.mcp_notices.clear();
     b = plugins.bridge;
     if b is not None {
         # Pi lifecycle: extensions get session_shutdown before teardown.

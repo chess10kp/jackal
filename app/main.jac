@@ -64,6 +64,13 @@ def handle_command(line: str) -> str | None {
         _session.set_current_session_id("");
         return "history cleared";
     }
+    if line == "/mcp" {
+        rows = _session.mcp_status_lines();
+        return "mcp servers:\n" + "\n".join(rows) if rows else "no mcp servers configured";
+    }
+    if line.startswith("/mcp restart ") {
+        return _session.mcp_restart(line[len("/mcp restart "):].strip());
+    }
     if line == "/compact" { return _session.compact_now(); }
     if line == "/abort" {
         return "turn aborted" if _session.cancel_active_turn() else "no active turn";

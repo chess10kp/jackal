@@ -26,7 +26,11 @@ obj SessionPlugins {
         interactive_ui: bool = False,
         active_cancel: any = None,
         mcp_clients: dict[str, McpClient] = {},
-        mcp_tools: int = 0;
+        mcp_tools: int = 0,
+        # name -> {"state": connecting|connected|failed, "error", "tools", "cmd"}
+        mcp_status: dict[str, dict[str, any]] = {},
+        # Human-readable MCP events queued for the active frontend to show.
+        mcp_notices: list[str] = [];
 }
 
 
