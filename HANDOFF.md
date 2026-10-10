@@ -265,9 +265,13 @@ Last fully read run (before the pyte harness commit `50425d1aa`):
 - other: `constraints/roundtrip` dumps core intermittently (now covered by
   the FLAKY retry), `cordis/core` (quarantined).
 
-Run `38068166080` (commit `50425d1aa`, the pyte harness) was in flight at
-handoff. **Your first action: read its result** with
-`scripts/ci-failures.sh 38068166080`.
+Run `38068166080` (commit `50425d1aa`, the pyte harness) RESULT:
+- `check` green; `tui` shard green **including the new `tui/harness` (all 9
+  in-process scenarios) and `ui/emulated_terminal`**. The Pi-style harness works.
+- Remaining failures are exactly Phase A items: A2 (solver_dual crash → PTY
+  `e2e/tui` never boots), A3 (3 `session.test` sidecar tests, also shown under
+  `main` and `ui/keybinding_probe`), A4 (subagent e2e). Everything else is
+  quarantined/FLAKY. So skip A1 and start at A2.
 
 ---
 
