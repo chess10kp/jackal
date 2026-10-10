@@ -11,6 +11,9 @@
 #   scripts/test.sh --fail-fast           # stop on first failing suite
 #   scripts/test.sh -k edit               # keyword filter on suite names
 #   scripts/test.sh --exclude app/ui/     # skip suites matching a path substring
+#   scripts/test.sh --quarantine scripts/test-quarantine.txt
+#                                         # known failures: XFAIL (non-fatal);
+#                                         # quarantined passes report XPASS
 #
 # Env:
 #   JAC           jac binary            (default: `jac` on PATH)
@@ -28,6 +31,7 @@ FAIL_FAST=0
 FILTERS=()
 KEYWORDS=()
 EXCLUDES=()
+QUARANTINE_FILE=""
 LOGDIR="$REPO/.testlogs"
 mkdir -p "$LOGDIR"
 
@@ -36,6 +40,7 @@ while [ $# -gt 0 ]; do
     -j*) JOBS="${1#-j}"; [ -n "$JOBS" ] || { shift; JOBS="$1"; } ;;
     --fail-fast) FAIL_FAST=1 ;;
     --exclude) shift; EXCLUDES+=("$1") ;;
+    --quarantine) shift; QUARANTINE_FILE="$1" ;;
     -k*) KEYWORDS+=("${1#-k}"); [ -n "${KEYWORDS[-1]}" ] || { shift; KEYWORDS+=("$1"); } ;;
     --help|-h) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) FILTERS+=("$1") ;;
@@ -148,11 +153,46 @@ else
   done
 fi
 
+declare -A QUAR=()
+if [ -n "$QUARANTINE_FILE" ] && [ -f "$QUARANTINE_FILE" ]; then
+  while IFS= read -r q; do
+    q="${q%%#*}"; q="$(echo "$q" | xargs)"
+    [ -n "$q" ] && QUAR["$q"]=1
+  done < "$QUARANTINE_FILE"
+fi
+
+# Recount from RESULTS ("STATUS name secs log") with quarantine applied.
+PASSED=0; FAILED=0; TIMEOUTS=0; XFAIL=0
+FAILED_NAMES=(); XPASS_NAMES=()
+for line in "${RESULTS[@]:-}"; do
+  [ -z "$line" ] && continue
+  st="${line%% *}"; rest="${line#* }"; nm="${rest%% *}"
+  if [ "$st" = PASS ]; then
+    PASSED=$((PASSED+1))
+    [ -n "${QUAR[$nm]:-}" ] && XPASS_NAMES+=("$nm")
+  elif [ -n "${QUAR[$nm]:-}" ]; then
+    XFAIL=$((XFAIL+1))
+  else
+    case "$st" in TIMEOUT*) TIMEOUTS=$((TIMEOUTS+1)) ;; *) FAILED=$((FAILED+1)) ;; esac
+    FAILED_NAMES+=("$nm")
+  fi
+done
+
 echo
 echo "================ jackal test summary ================"
 if [ "$JOBS" -gt 1 ]; then printf '%s\n' "${RESULTS[@]}" | sort -k2; fi
-echo "suites: $((PASSED + FAILED + TIMEOUTS))  pass: $PASSED  fail: $FAILED  timeout: $TIMEOUTS"
+echo "suites: $((PASSED + FAILED + TIMEOUTS + XFAIL))  pass: $PASSED  fail: $FAILED  timeout: $TIMEOUTS  xfail(quarantined): $XFAIL"
 if [ ${#FAILED_NAMES[@]} -gt 0 ]; then
   echo "failing:"; printf '  %s\n' "${FAILED_NAMES[@]}"
+fi
+if [ ${#XPASS_NAMES[@]} -gt 0 ]; then
+  echo "quarantined but passing (remove from $QUARANTINE_FILE):"; printf '  %s\n' "${XPASS_NAMES[@]}"
+fi
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  {
+    echo "### jackal tests: pass $PASSED · fail $FAILED · timeout $TIMEOUTS · xfail $XFAIL"
+    for n in "${FAILED_NAMES[@]:-}"; do [ -n "$n" ] && echo "- :x: \`$n\`"; done
+    for n in "${XPASS_NAMES[@]:-}"; do [ -n "$n" ] && echo "- :tada: \`$n\` passes — unquarantine"; done
+  } >> "$GITHUB_STEP_SUMMARY"
 fi
 [ $FAILED -eq 0 ] && [ $TIMEOUTS -eq 0 ]
