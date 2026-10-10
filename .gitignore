@@ -45,3 +45,7 @@ app/.jac-test-home/
 /TODO.md
 /CURSOR_PARITY.md
 /OSPUI.md
+
+# CI log downloads (scripts/ci-failures.sh)
+.ci-logs/
+.testlogs/
