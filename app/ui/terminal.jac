@@ -54,10 +54,17 @@ obj Terminal {
         alternate_screen: bool = False,
         bracketed_paste: bool = False,
         cursor_visible: bool = True,
-        sync_active: bool = False;
+        sync_active: bool = False,
+        # Input stream closed (host loop exits).
+        eof: bool = False;
 
     def size() -> tuple[int, int] {
         return (self.columns, self.rows);
+    }
+
+    """Non-blocking input poll; base terminals have no input."""
+    def poll_input(timeout_s: float = 0.0) -> str {
+        return "";
     }
 
     def write(data: str) -> None {
@@ -288,7 +295,6 @@ obj ProcessTerminal(Terminal) {
         _old_sighup: any = None,
         _utf8: any = None,
         _stdin_buf: str = "",
-        eof: bool = False,
         on_resize: any = None,
         on_input: any = None,
         on_interrupt: any = None,

@@ -15,12 +15,24 @@ import from ui.runtime { create_session, dispose_session }
 import from ui.screen { build_main_shell, install_shell_contracts }
 import from ui.transcript { bind_transcript, set_follow_tail }
 import from ui.renderer { create_renderer }
-import from ui.terminal { ProcessTerminal, read_terminal_size }
+import from ui.terminal { Terminal, ProcessTerminal, read_terminal_size }
 import from ui.input { InputNormalizer }
 import from ui.progress_bar { ProgressBar }
 
-def create_live_shell() -> LiveShell {
-    (cols, rows) = read_terminal_size(80, 24);
+"""Build the LiveShell. `term` defaults to the process TTY; tests pass an
+EmulatedTerminal (ui/emulated_terminal.jac) and drive the same shell."""
+def create_live_shell(term: Terminal | None = None) -> LiveShell {
+    host: Terminal = ProcessTerminal();
+    cols: int = 80;
+    rows: int = 24;
+    if term is None {
+        (cols, rows) = read_terminal_size(80, 24);
+        host.columns = cols;
+        host.rows = rows;
+    } else {
+        host = term;
+        (cols, rows) = term.size();
+    }
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
@@ -32,9 +44,6 @@ def create_live_shell() -> LiveShell {
         height=max(4, rows - 7),
     );
     set_follow_tail(proj, True);
-    term = ProcessTerminal();
-    term.columns = cols;
-    term.rows = rows;
     renderer = create_renderer(cols, rows);
     progress = ProgressBar(key="live_progress", value=0.0);
     app = LiveShell(
@@ -42,7 +51,7 @@ def create_live_shell() -> LiveShell {
         shell=shell,
         proj=proj,
         renderer=renderer,
-        term=term,
+        term=host,
         normalizer=InputNormalizer(),
         progress=progress,
         columns=cols,
@@ -60,15 +69,12 @@ def create_live_shell() -> LiveShell {
 }
 
 
-def run_tui() {
+"""Boot session + shell on `term` and paint the first frame. Raises
+ValueError for an invalid JACKAL_MODE."""
+def boot_tui(term: Terminal | None = None) -> LiveShell {
     requested_mode: str = os.environ.get("JACKAL_MODE", "");
     if requested_mode {
-        try {
-            set_mode(requested_mode);
-        } except ValueError as e {
-            print("jackal: " + str(e));
-            raise SystemExit(2);
-        }
+        set_mode(requested_mode);
     }
     # Extensions load per .jackal/extensions.json (parallel sidecar when declared).
     try {
@@ -82,53 +88,75 @@ def run_tui() {
         warm_model_catalog();
     } except Exception {
     }
-    app = create_live_shell();
+    app = create_live_shell(term);
     app.cmd_q = queue.Queue();
     app.term.start();
-    try {
-        # Inside the try so any failure after start() unwinds through the
-        # finally below and restores the host terminal (replaces atexit).
-        app.term.set_title("Jackal — " + get_model());
+    app.term.set_title("Jackal — " + get_model());
+    app.dirty = True;
+    _render(app);
+    return app;
+}
+
+
+"""One host-loop iteration: resize check, input, tick, notices, paint.
+Returns False once the shell should exit."""
+def tui_step(app: LiveShell, poll_timeout_s: float = 0.04) -> bool {
+    (cols, rows) = app.term.size();
+    if cols != app.columns or rows != app.rows {
+        _apply_resize(app, cols, rows);
+    }
+    raw = app.term.poll_input(poll_timeout_s);
+    if app.term.eof {
+        app.running = False;
+        return False;
+    }
+    if raw {
+        events = app.normalizer.feed(raw);
+        _handle_host_events(app, events);
+    } elif app.normalizer.buffer == "\x1b" {
+        events = app.normalizer.flush_buffer();
+        _handle_host_events(app, events);
+    }
+    _tick_app(app);
+    for notice in drain_mcp_notices() {
+        _push_turn(app, "tool", notice);
         app.dirty = True;
-        _render(app);
-        while app.running {
-            (cols, rows) = app.term.size();
-            if cols != app.columns or rows != app.rows {
-                _apply_resize(app, cols, rows);
-            }
-            raw = app.term.poll_input(0.04);
-            if app.term.eof {
-                app.running = False;
-                break;
-            }
-            if raw {
-                events = app.normalizer.feed(raw);
-                _handle_host_events(app, events);
-            } elif app.normalizer.buffer == "\x1b" {
-                events = app.normalizer.flush_buffer();
-                _handle_host_events(app, events);
-            }
-            _tick_app(app);
-            for notice in drain_mcp_notices() {
-                _push_turn(app, "tool", notice);
-                app.dirty = True;
-            }
-            _render(app);
+    }
+    _render(app);
+    return app.running;
+}
+
+
+"""Restore the terminal and dispose the UI session (idempotent)."""
+def shutdown_tui(app: LiveShell) {
+    try {
+        app.term.hide_cursor();
+        app.term.stop();
+    } except Exception {
+    }
+    dispose_session(app.session);
+}
+
+
+def run_tui() {
+    try {
+        app = boot_tui();
+    } except ValueError as e {
+        print("jackal: " + str(e));
+        raise SystemExit(2);
+    }
+    try {
+        while tui_step(app, 0.04) {
         }
     } except KeyboardInterrupt {
         app.running = False;
     } finally {
-        try {
-            app.term.hide_cursor();
-            app.term.stop();
-        } except Exception {
-        }
-        dispose_session(app.session);
+        shutdown_tui(app);
     }
 }
 
 
-with entry {
+with entry:__main__ {
     if not sys.stdin.isatty() or not sys.stdout.isatty() {
         print("jackal tui needs a real TTY.");
         raise SystemExit(1);

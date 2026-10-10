@@ -188,7 +188,7 @@ def _mock_last_user(messages: list[dict[str, any]]) -> str {
 }
 
 def _mock_next_response(script_path: str) -> dict[str, any] | None {
-    if not script_path {
+    if not script_path or not os.path.exists(script_path) {
         return None;
     }
     try {

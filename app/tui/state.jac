@@ -4,7 +4,7 @@ import from ui.runtime { UiSession }
 import from ui.screen { ShellScreen }
 import from ui.transcript { TranscriptProjection, TranscriptMessage }
 import from ui.renderer { Renderer }
-import from ui.terminal { ProcessTerminal }
+import from ui.terminal { Terminal }
 import from ui.input { InputNormalizer }
 import from ui.progress_bar { ProgressBar }
 
@@ -62,7 +62,7 @@ obj LiveShell {
         shell: ShellScreen,
         proj: TranscriptProjection,
         renderer: Renderer,
-        term: ProcessTerminal,
+        term: Terminal,
         normalizer: InputNormalizer,
         progress: ProgressBar,
         messages: list[TranscriptMessage] = [],

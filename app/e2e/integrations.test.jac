@@ -17,11 +17,11 @@ test "mcp tools are offered on the first request and callable" {
             {"text": "mcp said hi"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "use mcp"]);
-        assert r.code == 0, r.describe();
+        assert r.code == 0, sb.explain(r);
         calls = sb.calls();
-        assert "mcp_fake_echo" in calls[0]["tools"], r.describe();
-        assert "mcp_fake_add" in calls[0]["tools"], r.describe();
-        assert calls[1]["last"]["content"] == "echo: ping", r.describe();
+        assert "mcp_fake_echo" in calls[0]["tools"], sb.explain(r);
+        assert "mcp_fake_add" in calls[0]["tools"], sb.explain(r);
+        assert calls[1]["last"]["content"] == "echo: ping", sb.explain(r);
         assert r.stdout.strip() == "mcp said hi";
     } finally {
         sb.cleanup();
@@ -35,10 +35,10 @@ test "a failing mcp server degrades without breaking the turn" {
         write_project_config(sb, _mcp_cfg(env_fail=True));
         sb.script([{"text": "still works"}]);
         r = run_jackal(sb, ["-p", "q"]);
-        assert r.code == 0, r.describe();
-        assert r.stdout.strip() == "still works", r.describe();
+        assert r.code == 0, sb.explain(r);
+        assert r.stdout.strip() == "still works", sb.explain(r);
         for t in sb.calls()[0]["tools"] {
-            assert not str(t).startswith("mcp_fake_"), r.describe();
+            assert not str(t).startswith("mcp_fake_"), sb.explain(r);
         }
     } finally {
         sb.cleanup();
@@ -53,8 +53,8 @@ test "repl /mcp reports server status" {
         sb.script([{"text": "warm"}]);
         # One turn first so the attach flow has settled before /mcp.
         r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
-        assert r.code == 0, r.describe();
-        assert "fake — connected · 2 tools" in r.stdout, r.describe();
+        assert r.code == 0, sb.explain(r);
+        assert "fake — connected · 2 tools" in r.stdout, sb.explain(r);
     } finally {
         sb.cleanup();
     }
@@ -73,12 +73,12 @@ test "subagent runs a nested loop and returns its report" {
             {"text": "subagent found kumquat"},
         ]);
         r = run_jackal(sb, ["-p", "delegate it"]);
-        assert r.code == 0, r.describe();
-        assert r.stdout.strip() == "subagent found kumquat", r.describe();
+        assert r.code == 0, sb.explain(r);
+        assert r.stdout.strip() == "subagent found kumquat", sb.explain(r);
         calls = sb.calls();
-        assert len(calls) == 4, r.describe();
+        assert len(calls) == 4, sb.explain(r);
         # Nested call 1 starts fresh: system + task only, and no recursion tool.
-        assert calls[1]["messages"] == 2, r.describe();
+        assert calls[1]["messages"] == 2, sb.explain(r);
         assert calls[1]["last"]["content"] == "find the secret word in README.md";
         assert "subagent" not in calls[1]["tools"];
         # The main loop got only the report back.
@@ -98,8 +98,8 @@ test "task tools persist the board across processes" {
             {"text": "planned"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "auto-accept", "plan work"]);
-        assert r.code == 0, r.describe();
-        assert "ship it" in sb.read(".jackal/tasks.json"), r.describe();
+        assert r.code == 0, sb.explain(r);
+        assert "ship it" in sb.read(".jackal/tasks.json"), sb.explain(r);
     } finally {
         sb.cleanup();
     }

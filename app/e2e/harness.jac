@@ -15,7 +15,7 @@ import tempfile;
 import subprocess;
 import time;
 import threading;
-import from e2e.screen { Screen }
+import from ui.emulated_terminal { EmulatedTerminal }
 
 glob E2E_TIMEOUT_S: int = 300;
 
@@ -101,6 +101,12 @@ obj Sandbox {
     def cleanup() {
         shutil.rmtree(self.base_dir, ignore_errors=True);
     }
+
+    """A run's describe() plus every model call — the assertion message to
+    use whenever a scenario fails."""
+    def explain(r: any) -> str {
+        return r.describe() + "\n--- model calls ---\n" + json.dumps(self.calls(), indent=1)[:6000];
+    }
 }
 
 
@@ -171,7 +177,6 @@ def run_jackal(
     env["JACKAL_MOCK_SCRIPT"] = sb.script_path;
     env["JACKAL_MOCK_LOG"] = sb.log_path;
     env["JACKAL_AGENT_DIR"] = sb.agent_dir;
-    env["HOME"] = sb.base_dir;
     env["NO_COLOR"] = "1";
     if env_extra is not None {
         for (k, v) in env_extra.items() { env[k] = v; }
@@ -215,7 +220,7 @@ wait_for/screen_text, and always close()."""
 obj TuiSession {
     has proc: any = None,
         master_fd: int = -1,
-        screen: Screen = Screen(),
+        screen: EmulatedTerminal | None = None,
         raw: list[str] = [],
         lock: any = None,
         reader: any = None,
@@ -236,7 +241,7 @@ obj TuiSession {
             self.lock.acquire();
             try {
                 self.raw.append(text);
-                self.screen.feed(text);
+                if self.screen is not None { self.screen.write(text); }
             } finally {
                 self.lock.release();
             }
@@ -264,7 +269,7 @@ obj TuiSession {
     def screen_text() -> str {
         self.lock.acquire();
         try {
-            return self.screen.text();
+            return self.screen.viewport_text() if self.screen is not None else "";
         } finally {
             self.lock.release();
         }
@@ -348,7 +353,6 @@ def spawn_tui(
     env["JACKAL_MOCK_SCRIPT"] = sb.script_path;
     env["JACKAL_MOCK_LOG"] = sb.log_path;
     env["JACKAL_AGENT_DIR"] = sb.agent_dir;
-    env["HOME"] = sb.base_dir;
     env["TERM"] = "xterm-256color";
     env["COLUMNS"] = str(cols);
     env["LINES"] = str(rows);
@@ -362,7 +366,7 @@ def spawn_tui(
     );
     os.close(slave_fd);
     sess = TuiSession(
-        proc=proc, master_fd=master_fd, screen=Screen(columns=cols, rows=rows),
+        proc=proc, master_fd=master_fd, screen=EmulatedTerminal(cols, rows),
         raw=[], lock=threading.Lock(), alive=True,
     );
     sess.reader = threading.Thread(target=sess._read_loop, daemon=True);

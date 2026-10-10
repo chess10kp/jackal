@@ -251,11 +251,11 @@ def term_ask(name: str, args: dict[str, any]) -> bool {
 }
 
 
-"""JSONL approval round-trip: emit approval_request, then read stdin until an
+"""JSONL approval round-trip: after react_loop's approval_request event, read stdin until an
 {"type": "approval", "approved": bool} line arrives (EOF denies). Other
 requests are rejected while the turn is blocked on the decision."""
 def json_ask(name: str, args: dict[str, any]) -> bool {
-    _session.json_event("approval_request", {"tool": name, "args": args});
+    # react_loop already emitted approval_request on the event stream.
     while True {
         raw = sys.stdin.readline();
         if not raw { return False; }

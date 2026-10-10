@@ -6,3 +6,4 @@ entry-point = "app.main"
 
 [dependencies.pypi]
 httpx = "latest"
+pyte = "~=0.8"
