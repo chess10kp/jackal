@@ -297,7 +297,7 @@ def _solver_add_with_artificial_variable(s: any, row: Row, jnl: MutationJournal)
 
     success = near_zero(artificial.constant);
 
-    if s.rows.get(art) is not None {
+    if art in s.rows {
         pivot_row = _journal_pop_row(s, art, jnl);
         if len(pivot_row.cells) > 0 {
             entering = _solver_any_pivotable_symbol(s, pivot_row);
@@ -346,7 +346,7 @@ def _solver_substitute(s: any,
         if (
             _journal_kind_of(s, row_symbol) != SymbolKind.EXTERNAL
             and s.rows[row_symbol].constant < 0.0
-            and s.infeasible_rows.count(row_symbol) == 0
+            and row_symbol not in s.infeasible_rows
         ) {
             s.infeasible_rows.append(row_symbol);
         }
