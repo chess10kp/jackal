@@ -297,7 +297,8 @@ def _solver_add_with_artificial_variable(s: any, row: Row, jnl: MutationJournal)
 
     success = near_zero(artificial.constant);
 
-    if art in sorted(s.rows.keys()) {
+    art_basic: bool = art in sorted(s.rows.keys());
+    if art_basic {
         pivot_row = _journal_pop_row(s, art, jnl);
         if len(pivot_row.cells) > 0 {
             entering = _solver_any_pivotable_symbol(s, pivot_row);
