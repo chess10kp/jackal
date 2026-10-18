@@ -141,17 +141,20 @@ test "auto-accept approves safe work but confirms destructive shell" {
 }
 
 
-test "normal mode confirms every executable call" {
+test "normal mode auto-approves reads but confirms everything else" {
     assert requires_approval("normal", "write_file", "") == "confirm";
-    assert requires_approval("normal", "read_file", "") == "confirm";
     assert requires_approval("normal", "run_command", "ls") == "confirm";
+    assert requires_approval("normal", "subagent", "") == "confirm";
+    for tool in ["read_file", "list_dir", "glob", "grep", "web_search", "web_fetch", "list_tasks", "jac_check"] {
+        assert requires_approval("normal", tool, "") == "auto";
+    }
 }
 
 
 test "unknown mode falls back to normal-mode confirmation" {
     assert requires_approval("", "write_file", "") == "confirm";
     assert requires_approval("bogus", "run_command", "rm -rf /") == "confirm";
-    assert requires_approval("bogus", "read_file", "") == "confirm";
+    assert requires_approval("bogus", "read_file", "") == "auto";
 }
 
 

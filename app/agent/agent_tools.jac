@@ -18,7 +18,7 @@ import from .subagents {
     EXCLUDED_SUBAGENT_TOOLS,
     load_project_model_overrides,
 }
-import from .modes { requires_approval, is_read_only_mode, read_only_mode_block_reason }
+import from .modes { requires_approval, is_read_only_mode, is_tool_blocked, read_only_mode_block_reason, READ_ONLY_TOOLS }
 import from .llm { react_loop, make_transport, credential_error }
 import from .system { SYSTEM_PROMPT }
 
@@ -125,6 +125,11 @@ confirm-gated calls are refused unless the session mode auto-approves them."""
 def _subagent_approve(name: str, args: dict[str, any]) -> any {
     cmd: str = str(args.get("cmd", "")) if isinstance(args, dict) else "";
     mode: str = get_mode_state();
+    # Read-only tools never need a user prompt inside a subagent (the nested
+    # loop cannot prompt); they run unless the mode blocks them outright.
+    if name in READ_ONLY_TOOLS and not is_tool_blocked(mode, name) {
+        return True;
+    }
     policy: str = requires_approval(mode, name, cmd);
     if policy == "auto" { return True; }
     if policy == "blocked" and is_read_only_mode(mode) {

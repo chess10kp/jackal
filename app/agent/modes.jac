@@ -38,6 +38,17 @@ glob READ_ONLY_MODE_BLOCKED_TOOLS: set[str] = {
     "edit_file",
 };
 
+glob READ_ONLY_TOOLS: set[str] = {
+    "read_file",
+    "list_dir",
+    "glob",
+    "grep",
+    "web_search",
+    "web_fetch",
+    "list_tasks",
+    "jac_check",
+};
+
 glob PLAN_MODE_SYSTEM_APPENDIX: str = """
 
 ## Plan mode (active)
@@ -203,6 +214,11 @@ def requires_approval(mode: str, tool_name: str, cmd: str) -> str {
         if (tool_name == "run_command" or tool_name == "bash") and is_destructive_bash(cmd) {
             return "blocked";
         }
+        return "auto";
+    }
+    # Normal mode (and unknown-mode fallback): read-only tools run without
+    # prompting; everything else needs explicit approval.
+    if tool_name in READ_ONLY_TOOLS {
         return "auto";
     }
     return "confirm";

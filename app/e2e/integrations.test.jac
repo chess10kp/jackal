@@ -72,7 +72,7 @@ test "subagent runs a nested loop and returns its report" {
             # back in the main loop
             {"text": "subagent found kumquat"},
         ]);
-        r = run_jackal(sb, ["-p", "delegate it"]);
+        r = run_jackal(sb, ["-p", "--mode", "auto-accept", "delegate it"]);
         assert r.code == 0, sb.explain(r);
         assert r.stdout.strip() == "subagent found kumquat", sb.explain(r);
         calls = sb.calls();
