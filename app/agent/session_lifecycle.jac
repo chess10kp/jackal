@@ -193,7 +193,7 @@ def session_boot(
     # the project's remembered per-provider models; missing/corrupt is fine.
     _load_model_prefs();
 
-    sidecar: own list[ExtensionDecl] = node_sidecar_decls(parsed);
+    sidecar: list[ExtensionDecl] = node_sidecar_decls(parsed);
     plugins.total = len(sidecar);
     if plugins.total == 0 {
         plugins.bridge = None;
@@ -208,7 +208,7 @@ def session_boot(
     plugins.phase = "starting";
     # Parallel warm — does not block the caller (first frame).
     warm_cwd: str = plugins.cwd;
-    warm_decls: list[ExtensionDecl] = [d for d in sidecar];
+    warm_decls: own list[ExtensionDecl] = [d for d in sidecar];
     plugins.warm_future = flow _warm_sidecar(warm_decls, warm_cwd);
     return extensions_status();
 }
