@@ -51,7 +51,7 @@ test "session_boot parallel sidecar loads fixture and run_turn uses bridge" {
     assert st.t_interactive_s >= t0;
     assert st.total == 1;
     assert "loading" in st.label or st.ready or st.phase == "starting";
-    ready = wait_extensions_ready(10.0);
+    ready = wait_extensions_ready(0.0);
     assert ready.loaded == 1, f"loaded={ready.loaded} phase={ready.phase} detail={ready.detail}";
     assert ready.ready;
     assert ready.t_ext_ready_s >= ready.t_interactive_s;
@@ -84,7 +84,7 @@ test "unsupported requires fail loud at load" {
         }],
         wait_budget_s=10.0,
     );
-    ready = wait_extensions_ready(10.0);
+    ready = wait_extensions_ready(0.0);
     # "events" is still a stubbed surface; renderers became real in P11.
     assert ready.phase == "degraded";
     assert "unsupported" in ready.detail or "events" in ready.detail;
@@ -145,7 +145,7 @@ test "session_boot mirrors extension commands and run_command round-trips" {
         [{"id": "stub.commands", "path": stub, "runtime": "node"}],
         wait_budget_s=10.0,
     );
-    ready = wait_extensions_ready(10.0);
+    ready = wait_extensions_ready(0.0);
     assert ready.phase == "ready", f"phase={ready.phase} detail={ready.detail}";
     cmds = list_commands();
     assert "upper" in cmds;
