@@ -297,7 +297,7 @@ def _solver_add_with_artificial_variable(s: any, row: Row, jnl: MutationJournal)
 
     success = near_zero(artificial.constant);
 
-    art_basic: bool = art in sorted(s.rows.keys());
+    art_basic: bool = s.rows.get(art) is not None;
     if art_basic {
         pivot_row = _journal_pop_row(s, art, jnl);
         if len(pivot_row.cells) > 0 {
