@@ -297,7 +297,8 @@ def _solver_add_with_artificial_variable(s: any, row: Row, jnl: MutationJournal)
 
     success = near_zero(artificial.constant);
 
-    if art in s.rows {
+    rows: dict[int, Row] = s.rows;
+    if art in rows {
         pivot_row = _journal_pop_row(s, art, jnl);
         if len(pivot_row.cells) > 0 {
             entering = _solver_any_pivotable_symbol(s, pivot_row);
@@ -342,11 +343,12 @@ def _solver_substitute(s: any,
     }
     # Track rows driven out of feasibility so a later suggestion's
     # dualOptimize can repair them (kiwi m_infeasible_rows).
+    infeasible: list[int] = s.infeasible_rows;
     for row_symbol in sorted(s.rows.keys()) {
         if (
             _journal_kind_of(s, row_symbol) != SymbolKind.EXTERNAL
             and s.rows[row_symbol].constant < 0.0
-            and row_symbol not in s.infeasible_rows
+            and row_symbol not in infeasible
         ) {
             s.infeasible_rows.append(row_symbol);
         }
@@ -363,7 +365,8 @@ def _solver_add_objective(s: any,
     }
     _journal_touch_objective(s, jnl);
     s.objective.insert_symbol(symbol, weight);
-    if symbol in s.rows {
+    rows: dict[int, Row] = s.rows;
+    if symbol in rows {
         s.objective.substitute(symbol, s.rows[symbol]);
     }
 }
