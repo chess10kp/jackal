@@ -346,7 +346,7 @@ def _solver_substitute(s: any,
         if (
             _journal_kind_of(s, row_symbol) != SymbolKind.EXTERNAL
             and s.rows[row_symbol].constant < 0.0
-            and row_symbol not in s.infeasible_rows
+            and s.infeasible_rows.count(row_symbol) == 0
         ) {
             s.infeasible_rows.append(row_symbol);
         }
