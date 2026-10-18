@@ -265,7 +265,18 @@ Last fully read run (before the pyte harness commit `50425d1aa`):
 - other: `constraints/roundtrip` dumps core intermittently (now covered by
   the FLAKY retry), `cordis/core` (quarantined).
 
-Run `38068166080` (commit `50425d1aa`, the pyte harness) RESULT:
+2026-10-18 session RESULT (HEAD `afc38e108`, run 39175167065): `check`, `agent`,
+`tui`, `e2e` all green — including PTY `e2e/tui` 16/16, `e2e/integrations`
+16/16 (A4 done: read-only tools auto-approve in normal mode + subagents; the
+nesting test runs in auto-accept), `other/main` 337 passed (A3 done: the warm
+flow reads sidecar decls from plugin state instead of taking the list as a
+flow argument — E1308/own-unbound; tests now block on the warm future and
+print `plugins.detail` on failure), `constraints/roundtrip` 36/36.
+Remaining red: `constraints/solver`, `ui/layout`, `ui/layout_compile` (native
+core dumps — the A2b upstream segfault), plus quarantined `cordis/core` and
+`ui/{gates,host,renderer,virtual_terminal,demo_complex_shell}`.
+
+Run `38068166080` (commit `50425d1aa`, the pyte harness) RESULT (stale):
 - `check` green; `tui` shard green **including the new `tui/harness` (all 9
   in-process scenarios) and `ui/emulated_terminal`**. The Pi-style harness works.
 - Remaining failures are exactly Phase A items: A2 (solver_dual crash → PTY
@@ -308,7 +319,7 @@ on it. Batch independent fixes into one push to save CI time.
   `/` opens an autocomplete popup that owns up/down/tab/enter/esc; a
   fully-typed command plus enter submits.
 
-**A2. Fix the TUI boot crash (real product bug).** `app/constraints/solver_dual.jac:25-30`:
+**A2. Fix the TUI boot crash (real product bug).** STATUS 2026-10-18: the E1124s are FIXED and the PTY TUI boots (`e2e/tui` 16/16, HEAD `afc38e108`), but fixing them exposed an UPSTREAM native-codegen segfault (see A2b). `app/constraints/solver_dual.jac:25-30`:
 ```jac
 def _solver_remove_core(s: any, tag: Tag, strength: StrengthTier, jnl: MutationJournal) -> SolveResult {
     ...
@@ -320,7 +331,28 @@ def _solver_remove_core(s: any, tag: Tag, strength: StrengthTier, jnl: MutationJ
 imports for where `Row` comes from). Grep the constraints package for other
 `in s.<field>` on `s: any` and fix them the same way:
 `grep -n " in s\.\| in self\." app/constraints/*.jac`.
-Verify: the e2e `tui` PTY suite reaches `● ready`.
+Verify: the e2e `tui` PTY suite reaches `● ready`. DONE 2026-10-18 (`e2e/tui` 16/16 in run 39175167065).
+
+**A2b. UPSTREAM jaclang segfault (open, human-owned).** Fixing the last E1124
+at `solver_simplex.jac:300` (`if art in s.rows`, s: any) lets the module lower
+natively, and then `constraints/solver`, `ui/layout`, `ui/layout_compile` dump
+core under `jac test` (no output, both attempts). Six condition forms all crash
+identically: typed local, typed helper fns, `.get(...) is not None`,
+`in sorted(s.rows.keys())`, typed bool, and a `sorted()+keys()+==` key loop
+(current HEAD — uses only constructs that lower cleanly everywhere else).
+So the fault is NOT the condition: it is native execution of
+`_solver_add_with_artificial_variable` (or the newly-native module), i.e. a
+jaclang native-codegen bug under jac 0.37.25 (latest per jacup index).
+Evidence: with the E1124 left in place the module demotes to server and all
+three suites pass; `constraints/roundtrip`'s crash in run 39161578782 was the
+known intermittent flake (passes now, 36/36). Owner: jaseci-labs/jac. Minimal
+fix for the human: build a small repro from `_solver_add_with_artificial_variable`
+(Row construction, `dict(row.cells)` copies, `_solver_optimize_toward` with the
+`extra: Row | None` param) and file it upstream. Do NOT quarantine
+solver/layout/layout_compile (rule: never quarantine something you broke).
+Workaround if the TUI must ship before upstream fixes it: none found — every
+lowering-safe form crashes; reverting line 300 to `if art in s.rows` restores
+solver green but re-breaks PTY TUI boot with E1124.
 
 **A3. Fix `agent/session.test.jac` sidecar tests.** They pass `os.getcwd()`
 as the base dir for extension fixtures (lines ~46, 78, 144), but suites run
