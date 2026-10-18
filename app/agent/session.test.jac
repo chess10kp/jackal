@@ -52,7 +52,7 @@ test "session_boot parallel sidecar loads fixture and run_turn uses bridge" {
     assert st.total == 1;
     assert "loading" in st.label or st.ready or st.phase == "starting";
     ready = wait_extensions_ready(10.0);
-    assert ready.loaded == 1;
+    assert ready.loaded == 1, f"loaded={ready.loaded} phase={ready.phase} detail={ready.detail}";
     assert ready.ready;
     assert ready.t_ext_ready_s >= ready.t_interactive_s;
     assert plugins.bridge is not None;
@@ -146,7 +146,7 @@ test "session_boot mirrors extension commands and run_command round-trips" {
         wait_budget_s=10.0,
     );
     ready = wait_extensions_ready(10.0);
-    assert ready.phase == "ready";
+    assert ready.phase == "ready", f"phase={ready.phase} detail={ready.detail}";
     cmds = list_commands();
     assert "upper" in cmds;
     assert cmds["upper"]["extension_id"] == "stub.commands";
