@@ -6,10 +6,11 @@ unknown-id errors, FIFO ordering, and cancel/expire abort sweeps.
 This file is tested merged with agent/approvals.jac (same-stem convention),
 so all symbols under test are referenced directly without imports.
 
-Note on modes semantics: modes.requires_approval returns "confirm" for every
-executable call in normal mode (reads included), so in normal mode even a
-read-only tool enters the queue. Reads are auto-approved only outside
-normal mode.
+Note on modes semantics: modes.requires_approval auto-approves the
+READ_ONLY_TOOLS set (read_file, list_dir, glob, grep, web_search, web_fetch,
+list_tasks, jac_check) in normal mode too, so read-only tools never enter
+the queue. Writes and shell commands still require confirmation in normal
+mode.
 """
 
 
@@ -24,13 +25,24 @@ test "read-only tool is auto-approved and never enqueued outside normal mode" {
 }
 
 
-test "read-only tool in normal mode still requires confirmation" {
+test "read-only tools are auto-approved in normal mode too" {
+    for tool in ["read_file", "list_dir", "glob", "grep", "web_search", "web_fetch", "list_tasks", "jac_check"] {
+        q = create_queue();
+        res = request_approval(q, tool, "", "normal", 1000.0);
+        assert res["decision"] == "auto";
+        assert pending(q) is None;
+        assert len(q.items) == 0;
+    }
+}
+
+
+test "write and shell tools in normal mode still require confirmation" {
     q = create_queue();
-    res = request_approval(q, "read_file", "", "normal", 1000.0);
+    res = request_approval(q, "write_file", "", "normal", 1000.0);
     assert res["decision"] == "pending";
     head = pending(q);
     assert head is not None;
-    assert head.tool_name == "read_file";
+    assert head.tool_name == "write_file";
     assert len(q.items) == 1;
 }
 
