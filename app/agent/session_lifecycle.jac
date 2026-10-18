@@ -53,7 +53,7 @@ def extensions_status() -> ExtensionStatus {
 
 
 """Warm Node sidecar and load sidecar decls (runs under flow)."""
-def _warm_sidecar(decls: list[ExtensionDecl], base_cwd: str) {
+def _warm_sidecar(base_cwd: str) {
     bridge = plugins.bridge;
     reg = plugins.reg;
     if bridge is None or reg is None {
@@ -66,6 +66,9 @@ def _warm_sidecar(decls: list[ExtensionDecl], base_cwd: str) {
     try {
         plugins.phase = "starting";
         ensure_node_host(bridge);
+        # Read the decls from the global plugin state: a list argument to the
+        # flow is not sendable (E1308) and a moved local is unbound at run time.
+        decls: list[ExtensionDecl] = node_sidecar_decls(plugins.decls);
         for d in decls {
             path = resolve_decl_path(d, base_cwd);
             load_extension_path(
@@ -208,8 +211,7 @@ def session_boot(
     plugins.phase = "starting";
     # Parallel warm — does not block the caller (first frame).
     warm_cwd: str = plugins.cwd;
-    warm_decls: own list[ExtensionDecl] = [d for d in sidecar];
-    plugins.warm_future = flow _warm_sidecar(warm_decls, warm_cwd);
+    plugins.warm_future = flow _warm_sidecar(warm_cwd);
     return extensions_status();
 }
 
