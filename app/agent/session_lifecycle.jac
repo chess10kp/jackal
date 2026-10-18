@@ -193,7 +193,7 @@ def session_boot(
     # the project's remembered per-provider models; missing/corrupt is fine.
     _load_model_prefs();
 
-    sidecar: own list[ExtensionDecl] = node_sidecar_decls(parsed);
+    sidecar: list[ExtensionDecl] = node_sidecar_decls(parsed);
     plugins.total = len(sidecar);
     if plugins.total == 0 {
         plugins.bridge = None;
