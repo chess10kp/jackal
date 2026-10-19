@@ -47,6 +47,21 @@ reintroduces the A2b crash under `jac test` until upstream fixes seam
 dispatch (see #10213). Suites must never be quarantined for this — fix the
 demotion instead.
 
+## Test infra (2026-10-19, `8e529ea7a` + `b3b6e957e`)
+
+- Suites now run from `app/` (test.sh change): repo-root context broke
+  cross-package imports (legacy `tui/`, `lib/`, `dist/` shadow app
+  packages; venv `idna/core.py` beats the `app/core` namespace package).
+  Three tui suites were silently SKIPPED on CI and are now real:
+  overlays 307/307, model_picker_ids 235/235, popup_pick 7/7.
+- `tui/*` + `ui.emulated_terminal` pinned server (seam safety, #10213);
+  the ui render stack stays native for production. Verified green on CI
+  (run 39274861926, all six jobs).
+- `tui/harness` quarantined (was silently skipped; crashes under jac
+  test driving the native ui stack — blocked on #10213 + ui.model
+  upstream walls). Unquarantine when upstream lands seam dispatch.
+- `jac x harness` (app/) runs the harness for local iteration.
+
 ## Next work (HANDOFF.md Phase B/C)
 
 - Phase B harness scenarios (abort, history, paste, pickers, model picker,
