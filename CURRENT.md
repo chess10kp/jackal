@@ -74,13 +74,26 @@ demotion instead.
   CI). GOTCHA: wait_for is a raw substring match — wrapped lines split a
   needle; put assertion markers on their own line.
 
+## Phase C3 done (2026-10-19, `6904c53c0`, CI 39334546013)
+
+- `tool_result` display: first 6 lines verbatim (200-char/line cap) +
+  `... (N more lines)` footer — was a flattened 200-char blob. Display-only:
+  the full capped result still reaches the LLM and the saved transcript.
+- Helper lives in new import-free leaf `tui/preview.jac` so its test annex
+  avoids the ui.terminal annex crash (popup_pick pattern); `tui.preview`
+  joined the tui/* server pins (seam consistency, #10213).
+- Suites: tui/preview 7/7, e2e/tui 18/18 on CI (verified in testlogs).
+
 ## Next work (HANDOFF.md Phase B/C)
 
 - Phase B harness scenarios (abort, history, paste, pickers, model picker,
   rendering invariants, markdown, error surfacing, plan mode) in
   `app/tui/harness.test.jac` / `app/e2e/*`.
-- Phase C1–C5 (streaming perf, tool-result display, TUI MCP overlay, extension
-  key bindings, cold-start noise). C8 OAuth needs user sign-off first.
+- Phase C1/C3 done (streaming perf, tool-result display). Remaining C-list:
+  TUI MCP overlay, extension key bindings, cold-start noise. C8 OAuth needs
+  user sign-off first.
+- DESLOP candidate: agent/approvals.jac ApprovalQueue is only exercised by
+  its own tests (live path = the approve callback seam) — delete, don't wire.
 - Seal (`jac build`) is still red and pre-existing: aborts at
   `ui/renderer.jac` (pinned native, E5090 EdgeRefTrailer); at the pre-restructure
   HEAD it aborted earlier inside the old solver graph. CI gates on
