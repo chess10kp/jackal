@@ -193,6 +193,14 @@ default = "native"
 "tui.state" = "server"
 "ui.emulated_terminal" = "server"
 
+# Run with `jac x <name>` from app/ (the project root).
+[scripts]
+# In-process TUI harness (tui/harness.test.jac). NOTE: currently crashes
+# under jac test at the mixed-placement seam (jaseci-labs/jac#10213, see
+# scripts/test-quarantine.txt); quarantined in CI until upstream lands
+# seam dispatch or the ui.model lowering walls.
+harness = "jac test tui/harness.test.jac"
+
 [dependencies.pypi]
 httpx = "~=0.28"
 # Terminal emulator for TUI tests (ui/emulated_terminal.jac).
