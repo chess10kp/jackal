@@ -1,18 +1,22 @@
 # Jackal — current state (2026-10-18, `main` @ post-`0d02d2a25`)
 
-## CI state at this snapshot (pushed; read the run before branching)
+## CI state (VERIFIED green — run 39258847722, head `dac56075a`)
 
-Expected green: `check`, `agent`, `tui`, `e2e`, `ui`, `other` — the three
-former core-dump suites are fixed (see A2b). Only pre-existing quarantine
-remains (`cordis/core`, `ui/{gates,host,renderer,virtual_terminal,
-demo_complex_shell}`). VERIFY on the first run after `0d02d2a25` — the notes
-below were written before that run came back.
+All six jobs pass: `check`, `agent`, `tui`, `e2e`, `ui`, `other`. First
+fully-green run; the three former core-dump suites are fixed (see A2b).
+Verified from the uploaded testlogs:
 
-- `e2e/tui` 16/16, `e2e/integrations` 16/16, json_protocol / print_mode /
-  repl pass (unchanged by the solver restructure; layout is now fully native).
-- `constraints/solver` 26/26, `constraints/layout_relations` 7/7,
-  `constraints/roundtrip` 36/36, `ui/layout` 90/90, `ui/layout_compile`
-  53/53 — verified locally on fresh caches, zero demote notes.
+- `constraints/solver` 26/26, `constraints/roundtrip` 36/36,
+  `constraints/layout_relations` 7/7, `ui/layout` 90/90 (6.3s),
+  `ui/layout_compile` 53/53 (7s), `e2e/tui`/`e2e/integrations` 17/
+  `json_protocol` 15/`print_mode` 22/`repl` 15 all pass, `main` 337/337.
+- Remaining failures are exactly the quarantine (XFAIL, non-fatal):
+  `cordis/core` + `ui/{gates,host,renderer,virtual_terminal,
+  demo_complex_shell}`. `ui/renderer` re-confirmed blocked on upstream
+  E5090 EdgeRefTrailer (edge traversal lowering) — not fixable by local
+  typing, unlike the solver's `any` walls. These stay quarantined until
+  upstream lands E5090/E5092/E5093 support (pins documented in
+  `app/jac.toml`).
 
 ## Done this session (pushed to `main`)
 
