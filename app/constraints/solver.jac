@@ -1,7 +1,9 @@
 """Constraint solver compatibility facade.
 
 The public Solver and its historical imported symbols remain here; tableau
-rows, journaling, primal simplex, and dual simplex live in focused modules.
+rows, journaling, primal simplex, and dual simplex live in the module annex
+(solver.impl.jac) — same module, so `Solver` can be named directly and the
+whole chain lowers natively (see the annex header for why that matters).
 """
 
 import from constraints.algebra {
@@ -41,25 +43,6 @@ import from constraints.solver_types {
     CostRow,
     StoredConstraint,
     EditInfo,
-}
-
-import from constraints.solver_journal {
-    _journal_expression_is_finite,
-    _journal_begin,
-    _journal_rollback,
-    _journal_witness_for_key,
-    _journal_witness_extra,
-}
-import from constraints.solver_simplex {
-    _solver_add_core,
-    _solver_rebuild_admitting,
-    _solver_replay_all,
-    _solver_adopt,
-}
-import from constraints.solver_dual {
-    _solver_remove_core,
-    _solver_dual_optimize,
-    _solver_apply_suggestion,
 }
 
 def _new_solver() -> Solver { return Solver(); }
@@ -139,7 +122,7 @@ obj Solver {
             # set of fixed deterministic elimination orders and accept if
             # any rebuild admits the new constraint. Failure across all
             # orders is reported as UNSATISFIABLE.
-            rebuilt = _solver_rebuild_admitting(self, c, _new_solver);
+            rebuilt = _solver_rebuild_admitting(self, c);
             if rebuilt is None {
                 return SolveResult(
                     ok=False,
@@ -183,9 +166,9 @@ obj Solver {
     }
 
     # Compatibility hooks retained for the solver test annex and existing
-    # diagnostic callers; algorithm bodies live in solver_simplex.
+    # diagnostic callers; algorithm bodies live in the module annex.
     def _replay_all(order: list[StoredConstraint]) -> Solver | None {
-        return _solver_replay_all(self, order, _new_solver) as Solver;
+        return _solver_replay_all(self, order);
     }
 
     def _adopt(bundle: Solver) -> None {
@@ -345,4 +328,3 @@ def solver_strength_for_key(s: Solver, key: str) -> StrengthTier {
     }
     return StrengthTier.REQUIRED;
 }
-
