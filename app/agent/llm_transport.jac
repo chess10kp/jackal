@@ -242,10 +242,18 @@ obj MockTransport (Transport) {
             return;
         }
         text: str = str(step.get("text", "") or "");
-        # Two pieces so frontends exercise incremental streaming.
-        half: int = len(text) // 2;
-        if text[:half] { yield {"content": text[:half]}; }
-        if text[half:] { yield {"content": text[half:]}; }
+        # Real providers emit many small deltas; short answers stay one
+        # chunk (tests assert exact chunk lists), long ones split into
+        # ~80-char pieces so frontends exercise per-chunk drain paths.
+        if len(text) <= 160 {
+            if text { yield {"content": text}; }
+        } else {
+            i: int = 0;
+            while i < len(text) {
+                yield {"content": text[i:i + 80]};
+                i += 80;
+            }
+        }
         raw_calls: any = step.get("tool_calls", []);
         if isinstance(raw_calls, list) and raw_calls {
             calls: list[dict[str, any]] = [];

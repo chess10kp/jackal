@@ -139,6 +139,7 @@ def _tick_stream(app: LiveShell) {
     }
     app.spin_i += 1;
     drained = False;
+    chunks_pending: bool = False;
     while True {
         try {
             item: any = app.evq.get_nowait();
@@ -150,8 +151,7 @@ def _tick_stream(app: LiveShell) {
         drained = True;
         if kind == "chunk" {
             app.stream_full = app.stream_full + str(data.get("content", ""));
-            body = app.stream_full + "█";
-            _rewrite_turn(app, app.stream_msg_id, "assistant", body);
+            chunks_pending = True;
         } elif kind == "tool_call" {
             args: any = data.get("args", {});
             parts: list[str] = [];
@@ -207,6 +207,13 @@ def _tick_stream(app: LiveShell) {
             _finish_stream(app, str(data.get("answer", "")));
             return;
         }
+    }
+    if chunks_pending {
+        # Rewrite the streaming turn at most ONCE per drain: _rewrite_turn
+        # re-projects the whole assistant body, so a rewrite per chunk made
+        # long streaming answers quadratic. This loop drains once per 40 ms
+        # tick, so rewrites are bounded by tick rate, not chunk count.
+        _rewrite_turn(app, app.stream_msg_id, "assistant", app.stream_full + "█");
     }
     if drained {
         app.dirty = True;
