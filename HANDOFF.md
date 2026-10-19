@@ -319,7 +319,7 @@ on it. Batch independent fixes into one push to save CI time.
   `/` opens an autocomplete popup that owns up/down/tab/enter/esc; a
   fully-typed command plus enter submits.
 
-**A2. Fix the TUI boot crash (real product bug).** STATUS 2026-10-18: the E1124s are FIXED and the PTY TUI boots (`e2e/tui` 16/16, HEAD `afc38e108`), but fixing them exposed an UPSTREAM native-codegen segfault (see A2b). `app/constraints/solver_dual.jac:25-30`:
+**A2. Fix the TUI boot crash (real product bug).** STATUS 2026-10-18: the E1124s are FIXED and the PTY TUI boots (`e2e/tui` 16/16, HEAD `afc38e108`), but fixing them exposed the A2b jac-test seam crash (since resolved — see A2b). `app/constraints/solver_dual.jac:25-30`:
 ```jac
 def _solver_remove_core(s: any, tag: Tag, strength: StrengthTier, jnl: MutationJournal) -> SolveResult {
     ...
@@ -333,26 +333,35 @@ imports for where `Row` comes from). Grep the constraints package for other
 `grep -n " in s\.\| in self\." app/constraints/*.jac`.
 Verify: the e2e `tui` PTY suite reaches `● ready`. DONE 2026-10-18 (`e2e/tui` 16/16 in run 39175167065).
 
-**A2b. UPSTREAM jaclang segfault (open, human-owned).** Fixing the last E1124
-at `solver_simplex.jac:300` (`if art in s.rows`, s: any) lets the module lower
-natively, and then `constraints/solver`, `ui/layout`, `ui/layout_compile` dump
-core under `jac test` (no output, both attempts). Six condition forms all crash
-identically: typed local, typed helper fns, `.get(...) is not None`,
-`in sorted(s.rows.keys())`, typed bool, and a `sorted()+keys()+==` key loop
-(current HEAD — uses only constructs that lower cleanly everywhere else).
-So the fault is NOT the condition: it is native execution of
-`_solver_add_with_artificial_variable` (or the newly-native module), i.e. a
-jaclang native-codegen bug under jac 0.37.25 (latest per jacup index).
-Evidence: with the E1124 left in place the module demotes to server and all
-three suites pass; `constraints/roundtrip`'s crash in run 39161578782 was the
-known intermittent flake (passes now, 36/36). Owner: jaseci-labs/jac. Minimal
-fix for the human: build a small repro from `_solver_add_with_artificial_variable`
-(Row construction, `dict(row.cells)` copies, `_solver_optimize_toward` with the
-`extra: Row | None` param) and file it upstream. Do NOT quarantine
-solver/layout/layout_compile (rule: never quarantine something you broke).
-Workaround if the TUI must ship before upstream fixes it: none found — every
-lowering-safe form crashes; reverting line 300 to `if art in s.rows` restores
-solver green but re-breaks PTY TUI boot with E1124.
+**A2b. UPSTREAM jac-test seam crash — RESOLVED.** RESOLVED (2026-10-18, commit 0d02d2a25): root cause found — NOT a native
+codegen bug. Under `jac test`, a natively-lowered caller reaching a function
+that demoted to its Python-only implementation dispatches through an unwired
+seam slot (SIGSEGV at address 0 / SIGABRT). `jac build` statically rejects
+such graphs and `jac run` demotes callers; `jac test` does neither, so ANY
+mixed native/Python graph in the constraints chain crashed the suites — which
+is why six different condition forms at solver_simplex.jac:300 all "crashed
+identically" (the fault was the graph shape, not the construct; the forms
+merely shifted which functions demoted). Filed upstream with a 2-file repro:
+jaseci-labs/jac#10213.
+
+Fix in this repo: eliminate the demotions. journal/simplex/dual are folded
+into the constraints.solver module via `solver.impl.jac` (impl annex — same
+module, so the `Solver` state type can be named without an import cycle) and
+every former `s: any` parameter is `s: Solver`. The whole chain now lowers
+natively with zero demotions; deleted solver_journal.jac,
+solver_simplex.jac, solver_dual.jac (no other importers).
+
+Suites green (fresh cache, local): constraints/solver 26/26,
+constraints/layout_relations 7/7, constraints/roundtrip 36/36, ui/layout
+90/90, ui/layout_compile 53/53. Rule going forward: after ANY change to a
+native-pinned module, check the compile output for `native seam -- demoting`
+notes — a single new demotion in a natively-called chain reintroduces this
+crash until upstream fixes jac test's seam dispatch.
+
+Related pre-existing (NOT this bug): `jac build` (seal) still aborts, now at
+ui/renderer.jac (pinned native, E5090 EdgeRefTrailer); at HEAD it aborted
+earlier inside the old solver graph. Seal-green is a separate workstream;
+CI gates on `jac check`, not seal.
 
 **A3. Fix `agent/session.test.jac` sidecar tests.** They pass `os.getcwd()`
 as the base dir for extension fixtures (lines ~46, 78, 144), but suites run
