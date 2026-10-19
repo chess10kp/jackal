@@ -12,6 +12,7 @@ import from ui.screen {
 }
 import from ui.progress_bar { SetProgress }
 import from ui.renderer { create_renderer }
+import from tui.preview { tool_result_preview }
 
 def _apply_resize(app: LiveShell, columns: int, rows: int) {
     if columns < 40 {
@@ -162,8 +163,11 @@ def _tick_stream(app: LiveShell) {
             app.tool_msg_id = _push_turn(app, "tool", "* " + summary);
             _rewrite_turn(app, app.tool_msg_id, "tool", "* " + summary);
         } elif kind == "tool_result" {
-            preview = str(data.get("result", ""))[:200].replace("\n", " ");
-            _push_turn(app, "tool", "  -> " + preview);
+            # C3: six-line verbatim preview + footer; full result still
+            # reaches the LLM and the saved transcript (display-only).
+            _push_turn(
+                app, "tool", "-> " + tool_result_preview(str(data.get("result", "")))
+            );
         } elif kind == "retry" {
             note = "retry " + str(data.get("attempt", "?")) + "/" + str(data.get("max_retries", "?"));
             _push_turn(app, "tool", "~ " + note + ": " + str(data.get("message", ""))[:80]);

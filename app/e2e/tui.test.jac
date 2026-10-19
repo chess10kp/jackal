@@ -113,3 +113,39 @@ test "tui streams a 20 KB answer without stalling" {
         sb.cleanup();
     }
 }
+
+test "tui previews long tool results at six lines with a more-lines footer" {
+    lines: list[str] = [];
+    for i in range(1, 11) {
+        lines.append(f"fixture line {i}");
+    }
+    sb = make_sandbox(files={"big.txt": "\n".join(lines) + "\n"});
+    tui: TuiSession | None = None;
+    try {
+        sb.script([
+            {"text": "", "tool_calls": [{"name": "read_file", "args": {"path": "big.txt"}}]},
+            {"text": "done reading"},
+        ]);
+        tui = spawn_tui(sb);
+        tui.type_text("read big.txt");
+        tui.press("enter");
+        # read_file is read-only: auto-approved in normal mode (no modal).
+        tui.wait_for("... (4 more lines)", 60.0);
+        tui.wait_for("done reading", 60.0);
+        tui.wait_for("fixture line 1", 10.0);
+        screen = tui.screen_text();
+        # Display truncates: the seventh line never renders.
+        assert "fixture line 7" not in screen, screen;
+        # Display-only: the full result still reached the model (request 2's
+        # last message is the untruncated tool result).
+        calls = sb.calls();
+        assert len(calls) >= 2, str(calls)[:2000];
+        assert "fixture line 7" in calls[1]["last"]["content"], str(calls[1])[:2000];
+        tui.press("esc");
+        code = tui.wait_exit(30.0);
+        assert code == 0, "exit " + str(code) + "\n" + tui.screen_text();
+    } finally {
+        if tui is not None { tui.close(); }
+        sb.cleanup();
+    }
+}
