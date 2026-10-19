@@ -62,6 +62,18 @@ demotion instead.
   upstream walls). Unquarantine when upstream lands seam dispatch.
 - `jac x harness` (app/) runs the harness for local iteration.
 
+## Phase C1 done (2026-10-19, `5e1fe4c57`, CI 39325100676)
+
+- `_tick_stream` (tui/runtime.jac) batches streaming rewrites: chunks
+  accumulate, one `_rewrite_turn` per 40 ms drain (was per chunk —
+  quadratic over the growing body).
+- Mock provider streams >160-char answers as ~80-char deltas (was
+  exactly 2 chunks, which hid this bug class); short answers unchanged
+  (llm.test 228/228).
+- e2e "tui streams a 20 KB answer without stalling" (16+1 = 17 passed on
+  CI). GOTCHA: wait_for is a raw substring match — wrapped lines split a
+  needle; put assertion markers on their own line.
+
 ## Next work (HANDOFF.md Phase B/C)
 
 - Phase B harness scenarios (abort, history, paste, pickers, model picker,
