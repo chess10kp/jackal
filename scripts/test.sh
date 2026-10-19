@@ -72,10 +72,15 @@ match() { # match <suite>
 }
 
 _exec_suite() { # _exec_suite <suite> <log>
+  # Suites run with cwd=app/ (the app project): module resolution, placement
+  # pins, and the app venv all resolve there. Running from the repo root
+  # makes cross-package imports (tui.*, core.*) resolve against legacy
+  # root-level shadow dirs and the root venv, skipping or crashing suites.
+  local suite="$1" log="$2" rel="${1#app/}"
   if command -v timeout >/dev/null 2>&1; then
-    timeout --kill-after=30 "$TIMEOUT" "$JAC" test "$1" >"$2" 2>&1
+    (cd "$REPO/app" && timeout --kill-after=30 "$TIMEOUT" "$JAC" test "$rel") >"$log" 2>&1
   else
-    "$JAC" test "$1" >"$2" 2>&1
+    (cd "$REPO/app" && "$JAC" test "$rel") >"$log" 2>&1
   fi
 }
 

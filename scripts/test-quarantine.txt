@@ -13,3 +13,9 @@ ui/demo_complex_shell
 # Cordis tracked-effect assertions fail (core.jac:55/64/84/92); C0 core
 # predates the native placement switch.
 cordis/core
+# Harness drives the full LiveShell (pyte + native-pinned ui render stack).
+# ui.model has upstream-walled demotions (E5092/EdgeRefTrailer), so the
+# graph mixes native and Python and jac test dies at the seam
+# (jaseci-labs/jac#10213). Unquarantine when upstream lands seam dispatch
+# or the ui.model walls. Suite was silently SKIPPED on CI before this.
+tui/harness

@@ -167,6 +167,31 @@ default = "native"
 #     constructed server-side in session.jac anyway (class-boundary wall,
 #     see agent.tool_spec above).
 "agent.extensions" = "server"
+# TUI layer pinned server for SEAM CONSISTENCY under jac test (#10213):
+# the harness graph (LiveShell + pyte EmulatedTerminal + agent.session)
+# cannot lower native (pyte is a Python module), and per-function demotions
+# in a native-preferred graph crash the test process at the seam. Server
+# pins make the tui layer fully Python with only designed seams into the
+# native-pinned ui render stack (ui.screen/transcript/renderer/terminal),
+# the same shape as server agent.session calling native core.edit.
+# PRODUCTION COST: tui/* runs Python under jac run (the ui render stack
+# stays native). Revisit when upstream fixes jac-test seam dispatch.
+"tui.commands" = "server"
+"tui.context" = "server"
+"tui.core" = "server"
+"tui.harness" = "server"
+"tui.input" = "server"
+"tui.mcp" = "server"
+"tui.model_picker_ids" = "server"
+"tui.overlay" = "server"
+"tui.overlays" = "server"
+"tui.picker_actions" = "server"
+"tui.picker_base" = "server"
+"tui.popup_pick" = "server"
+"tui.runtime" = "server"
+"tui.shell" = "server"
+"tui.state" = "server"
+"ui.emulated_terminal" = "server"
 
 [dependencies.pypi]
 httpx = "~=0.28"
