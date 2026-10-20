@@ -1,106 +1,88 @@
-"""MCP status picker data."""
-import os;
-import from tui.state { LiveShell }
-import from tui.picker_base { _open_picker }
-import from agent.compaction { load_project_config }
-import from agent.session { plugins }
+"""MCP status window — first consumer of the tui/window API.
 
-"""MCP server specs from a parsed .jackal config — local copy of
-agent.session's _mcp_server_specs shape ({name: argv}). Inlined because
-underscore-prefixed imports from agent.session did not bind at runtime
-(NameError swallowed by callers); keep in sync with session.jac."""
-def _local_mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
-    out: dict[str, list[str]] = {};
-    raw: any = cfg.get("mcp") if isinstance(cfg, dict) else None;
-    if not isinstance(raw, dict) {
-        return out;
-    }
-    servers: any = raw.get("servers");
-    if not isinstance(servers, dict) {
-        return out;
-    }
-    for (name, ent) in servers.items() {
-        if not isinstance(ent, dict) or not str(name) {
-            continue;
-        }
-        cmd: any = ent.get("command");
-        if isinstance(cmd, str) {
-            cmd = [cmd];
-        }
-        if not isinstance(cmd, list) or not cmd {
-            continue;
-        }
-        parts: list[str] = [str(c) for c in cmd];
-        extra: any = ent.get("args");
-        if isinstance(extra, list) {
-            parts.extend([str(a) for a in extra]);
-        }
-        out[str(name)] = parts;
-    }
-    return out;
-}
+Pure over (specs, status): no agent.session import here, so this module
+hosts its own test annex (tui/mcp.test.jac). The live glue (fetching
+mcp_server_specs + plugins.mcp_status, the restart action) lives in
+tui/commands.jac, which already imports the agent facade.
+
+Replaces the old picker-based overlay and its hand-copied config parser
+(_local_mcp_server_specs — deleted; agent.session_config.mcp_server_specs
+is the public alias) and the tui/overlays.test.jac replica (deleted; this
+annex is the real coverage)."""
+import from tui.window { WindowSpec, WindowState, window_lines }
 
 
-"""MCP STATUS overlay rows: one line per server declared in the walk-up
-.jackal config ("mcp": {"servers": …}), plus any runtime-attached clients
-not present in config. Connection state is honest: clients live in
-agent.session plugins.mcp_clients only after a successful spawn+handshake,
-so a configured-but-absent client is reported "not connected", and a
-present-but-uninitialized one as "spawn failed". Pure over (cwd, clients)
-— replicated in tui/overlays.test.jac (keep in sync)."""
-def _mcp_status_entries(cwd: str, clients: dict[str, any]) -> dict[str, list[str]] {
-    specs: dict[str, list[str]] = {};
-    try {
-        cfg: dict[str, any] = load_project_config(cwd);
-        parsed: dict[str, list[str]] = _local_mcp_server_specs(cfg);
-        specs = parsed;
-    } except Exception {
-        specs = {};
-    }
+"""MCP window rows from configured specs + live status.
+
+specs: {name: argv} from agent.session_config.mcp_server_specs (the
+walk-up .jackal config). status: plugins.mcp_status — {state, error,
+tools, cmd} per server, written by the attach/restart flow. A server can
+be config-only (never attached), status-only (attached but not in
+config), or both. Rows are sorted by name; the empty state names the
+config convention. Returns {"rows": [...], "ids": [...]} with ids[i] the
+server name for rows[i] ("" for the furniture row)."""
+def mcp_window_rows(
+    specs: dict[str, list[str]], status: dict[str, dict[str, any]]
+) -> dict[str, list[str]] {
     rows: list[str] = [];
     ids: list[str] = [];
-    declared: set[str] = set();
+    declared: dict[str, bool] = {};
     for name in sorted(specs) {
+        declared[str(name)] = True;
+    }
+    for name in sorted(status) {
+        declared.setdefault(str(name), True);
+    }
+    for name in sorted(declared) {
         sname: str = str(name);
-        declared.add(sname);
-        cmd_label: str = " ".join(specs[name]);
-        client: any = clients.get(sname);
-        if client is not None and client.initialized is True {
-            rows.append(sname + " — connected · " + cmd_label);
-        } elif client is not None {
-            rows.append(sname + " — spawn failed · " + cmd_label);
+        st: dict[str, any] = status.get(sname, {}) if isinstance(status.get(sname, {}), dict) else {};
+        state: str = str(st.get("state", ""));
+        cmd: any = st.get("cmd") if st.get("cmd") else specs.get(sname, []);
+        cmd_parts: list[str] = [];
+        if isinstance(cmd, list) {
+            for c in cmd {
+                cmd_parts.append(str(c));
+            }
+        }
+        cmd_label: str = " ".join(cmd_parts);
+        if state == "connected" {
+            rows.append(sname + " — connected · " + str(st.get("tools", 0)) + " tools · " + cmd_label);
+        } elif state == "connecting" {
+            rows.append(sname + " — connecting… · " + cmd_label);
+        } elif state == "failed" {
+            rows.append(sname + " — failed: " + str(st.get("error", "")) + " · " + cmd_label);
+        } elif state {
+            rows.append(sname + " — " + state + " · " + cmd_label);
         } else {
             rows.append(sname + " — configured · not connected · " + cmd_label);
         }
-        ids.append("__header__");
-    }
-    for cname in sorted(clients) {
-        if str(cname) in declared {
-            continue;
-        }
-        rows.append(str(cname) + " — attached (not in .jackal config)");
-        ids.append("__header__");
+        ids.append(sname);
     }
     if not rows {
         rows.append("no mcp servers configured (.jackal: \"mcp\": {\"servers\": …})");
-        ids.append("__header__");
+        ids.append("");
     }
     return {"rows": rows, "ids": ids};
 }
 
 
-"""Open the read-only MCP status overlay; every row is furniture, so enter
-is a no-op and esc dismisses."""
-def _open_mcp_picker(app: LiveShell) -> str {
-    clients_arg: dict[str, any] = {};
-    raw_clients: any = plugins.mcp_clients;
-    if isinstance(raw_clients, dict) {
-        clients_arg = raw_clients;
+"""Build the MCP STATUS window state over live data."""
+def _mcp_window_state(
+    specs: dict[str, list[str]], status: dict[str, dict[str, any]]
+) -> WindowState {
+    entries = mcp_window_rows(specs, status);
+    has_servers: bool = False;
+    if entries["ids"] and str(entries["ids"][0]) != "" {
+        has_servers = True;
     }
-    entries = _mcp_status_entries(os.getcwd(), clients_arg);
-    opened = _open_picker(app, "MCP STATUS", entries["rows"], entries["ids"]);
-    if not opened {
-        return "picker unavailable (overlay busy)";
-    }
-    return "";
+    return WindowState(
+        spec=WindowSpec(
+            title="MCP STATUS",
+            hint="\u2191\u2193 select · r restart · esc close",
+        ),
+        rows=list(entries["rows"]),
+        ids=[str(x) for x in entries["ids"]],
+        selected=0 if has_servers else -1,
+        keys={"r": "restart"},
+    );
 }

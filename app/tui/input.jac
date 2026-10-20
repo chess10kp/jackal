@@ -5,6 +5,7 @@ import from tui.state { LiveShell }
 import from tui.core { _push_turn, _scroll_transcript }
 import from tui.overlay { _slash_popup_state, _slash_popup_pick }
 import from tui.picker_base { _close_picker, _multi_filtered }
+import from tui.windows { _handle_window_key }
 import from tui.picker_actions { _complete_api_key_login, _start_login_provider, _cancel_login }
 import from tui.context {
     _format_mentions, _expand_quoted_context, _insert_into_draft,
@@ -260,6 +261,12 @@ def _handle_key(app: LiveShell, key: str) {
         _handle_picker_key(app, key);
         return;
     }
+    # Window stack (tui/windows.jac): modal like a picker, but a pending
+    # tool approval keeps precedence — never hide a blocking modal.
+    if app.windows and app.phase != "approval" {
+        _handle_window_key(app, key);
+        return;
+    }
     if app.shell.approval is not None {
         if key == "a" or key == "y" or key == "enter" {
             _accept_approval(app);
@@ -467,6 +474,12 @@ def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
                 }
                 continue;
             }
+            if app.windows and app.phase != "approval" {
+                for ch in event.text {
+                    _handle_window_key(app, ch);
+                }
+                continue;
+            }
             if app.shell.approval is not None {
                 if event.text in ["a", "y", "r", "n"] {
                     _handle_key(app, event.text);
@@ -481,10 +494,28 @@ def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
         } elif isinstance(event, KeyEvent) {
             _handle_key(app, event.key);
         } elif isinstance(event, PasteEvent) {
-            if app.shell.approval is None and app.phase != "streaming" and app.picker is None {
+            # Paste follows the same sink precedence as typed text: picker
+            # input mode owns it while an overlay is open (login API key,
+            # model id), then the window stack, then the prompt editor.
+            # Feeding per-char keeps parity with the TextEvent path — the
+            # picker draft API only accepts single characters.
+            if app.picker is not None {
+                for ch in event.text {
+                    _handle_picker_key(app, ch);
+                }
+                continue;
+            }
+            if app.windows and app.phase != "approval" {
+                for ch in event.text {
+                    _handle_window_key(app, ch);
+                }
+                continue;
+            }
+            if app.shell.approval is None and app.phase != "streaming" {
                 shell_insert_text(app.session, app.shell, event.text);
                 app.dirty = True;
             }
         }
     }
+
 }

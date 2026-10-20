@@ -1,3 +1,4 @@
 """E2E suite module: tui.test.jac is merged here (same-stem convention)."""
 
+import os;
 import from e2e.harness { make_sandbox, run_jackal, jsonl, spawn_tui, TuiSession, RunResult }

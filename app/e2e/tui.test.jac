@@ -149,3 +149,62 @@ test "tui previews long tool results at six lines with a more-lines footer" {
         sb.cleanup();
     }
 }
+
+test "tui mcp window opens, closes, and restart feedback flows" {
+    sb = make_sandbox();
+    tui: TuiSession | None = None;
+    try {
+        tui = spawn_tui(sb);
+        # No .jackal config in the sandbox: the window shows the empty state.
+        tui.type_text("/mcp");
+        tui.press("enter");
+        tui.wait_for("MCP STATUS", 20.0);
+        tui.wait_for("no mcp servers configured", 10.0);
+        # esc closes the window (does not quit the app): both markers vanish.
+        tui.press("esc");
+        tui.wait_gone("MCP STATUS", 20.0);
+        tui.wait_gone("no mcp servers configured", 10.0);
+        # /mcp restart NAME goes through mcp_restart without a window.
+        tui.type_text("/mcp restart ghost");
+        tui.press("enter");
+        tui.wait_for("unknown mcp server: ghost", 20.0);
+        tui.press("esc");
+        code = tui.wait_exit(30.0);
+        assert code == 0, "exit " + str(code) + "\n" + tui.screen_text();
+    } finally {
+        if tui is not None { tui.close(); }
+        sb.cleanup();
+    }
+}
+
+test "tui login api-key input accepts a bracketed paste" {
+    sb = make_sandbox();
+    tui: TuiSession | None = None;
+    try {
+        tui = spawn_tui(sb);
+        # /login -> provider picker (first row: openrouter, an api_key route)
+        # -> key input overlay.
+        tui.type_text("/login");
+        tui.press("enter");
+        tui.wait_for("LOGIN", 30.0);
+        tui.press("enter");
+        tui.wait_for("paste API key", 15.0);
+        # Exactly what a terminal sends on ctrl+shift+v. Regression: the
+        # PasteEvent branch required app.picker is None and dropped pastes
+        # while the key input overlay was open.
+        key: str = "sk-e2e-paste-1234567890";
+        tui.send("\x1b[200~" + key + "\x1b[201~");
+        tui.wait_for("*" * len(key), 10.0);
+        tui.press("enter");
+        tui.wait_for("logged in to openrouter", 15.0);
+        # The decisive assertion: the pasted bytes landed in auth.json.
+        auth_path: str = os.path.join(sb.agent_dir, "auth.json");
+        fh: any = open(auth_path, "r", encoding="utf-8");
+        stored: str = fh.read();
+        fh.close();
+        assert key in stored, stored;
+    } finally {
+        if tui is not None { tui.close(); }
+        sb.cleanup();
+    }
+}

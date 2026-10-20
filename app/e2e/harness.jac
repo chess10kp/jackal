@@ -300,7 +300,27 @@ obj TuiSession {
         );
     }
 
+    """Poll until `needle` is NOT on screen; raises AssertionError with the
+    screen dump on timeout. For overlay-close assertions: the shell paints
+    on its next tick, so an immediate screen_text() after a keypress races
+    the previous frame."""
+    def wait_gone(needle: str, timeout_s: float = 30.0) -> str {
+        deadline: float = time.time() + timeout_s;
+        while time.time() < deadline {
+            txt: str = self.screen_text();
+            if needle not in txt { return txt; }
+            if not self.alive and self.proc.poll() is not None { break; }
+            time.sleep(0.05);
+        }
+        raise AssertionError(
+            "timed out waiting for " + repr(needle) + " to disappear\n--- screen ---\n"
+            + self.screen_text() + "\n--- exit: " + str(self.proc.poll())
+        );
+    }
+
     """Wait for the process to exit; returns its code (or None on timeout)."""
+
+
     def wait_exit(timeout_s: float = 30.0) -> int | None {
         try {
             return int(self.proc.wait(timeout=timeout_s));

@@ -15,6 +15,7 @@ import from ui.renderer {
 }
 import from ui.width { display_width, truncate_text }
 import from tui.picker_base { _multi_filtered }
+import from tui.windows { _window_paint_lines }
 import from agent.session { list_commands, get_model, model_preferences }
 import from agent.llm { PROVIDER_ROUTES, catalog_models, routed_model_id, provider_for }
 """Unified-diff preview lines for a pending write_file/edit_file approval.
@@ -259,7 +260,7 @@ def _picker_lines(app: LiveShell) -> list[str] {
 }
 """Paint lines into the shared overlay node (picker/modal/approval owner).
 The caller has already decided ownership; this just guards the optional node."""
-def _paint_overlay(app: LiveShell, lines: list[str]) {
+def _paint_overlay(app: LiveShell, lines: list[str], outer_width: int = 48) {
     ov: UiNode | None = app.shell.approval;
     if ov is None {
         return;
@@ -268,7 +269,7 @@ def _paint_overlay(app: LiveShell, lines: list[str]) {
         app.renderer,
         ov,
         LayoutSpec(
-            width=fixed_axis(48),
+            width=fixed_axis(outer_width),
             height=fixed_axis(len(lines)),
             overlay_anchor=OverlayAnchor.CENTER,
         ),
@@ -534,8 +535,17 @@ def _paint(app: LiveShell) {
         overlay = _picker_lines(app);
     } elif app.ui_modal is not None {
         overlay = _ui_modal_lines(app);
-    } elif app.shell.approval is not None {
+    } elif app.phase == "approval" {
+        # Node presence is not enough: pickers/modals/windows BORROW the
+        # approval node (shell_open_approval seam); phase marks a REAL one.
         overlay = _approval_lines(app);
+    }
+    win_lines: list[str] | None = None;
+    if overlay is None and app.phase != "approval" {
+        win_lines = _window_paint_lines(app);
+        if win_lines is not None {
+            _paint_overlay(app, win_lines, len(win_lines[0]));
+        }
     }
     if overlay is not None {
         _paint_overlay(app, overlay);

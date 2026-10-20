@@ -39,7 +39,6 @@ import from agent.context_input {
     parse_line_range,
     _load_file_slice,
 }
-import from agent.compaction { load_project_config }
 
 
 # --- verbatim replica of tui/shell.jac _meter ---------------------------------
@@ -209,7 +208,7 @@ def _format_mentions(paths: list[str]) -> str {
 }
 
 
-# --- verbatim replicas of tui/shell.jac mode/filter/quote/mcp helpers -----------
+# --- verbatim replicas of tui/shell.jac mode/filter/quote helpers -------------
 
 # Quoted mention: @"path" / @"path:N[-M]" / @"path":N[-M] — an optional
 # line range is accepted inside OR after the closing quote.
@@ -347,77 +346,6 @@ def _expand_quoted_context(cwd: str, text: str) -> str {
 }
 
 
-def _local_mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
-    out: dict[str, list[str]] = {};
-    raw: any = cfg.get("mcp") if isinstance(cfg, dict) else None;
-    if not isinstance(raw, dict) {
-        return out;
-    }
-    servers: any = raw.get("servers");
-    if not isinstance(servers, dict) {
-        return out;
-    }
-    for (name, ent) in servers.items() {
-        if not isinstance(ent, dict) or not str(name) {
-            continue;
-        }
-        cmd: any = ent.get("command");
-        if isinstance(cmd, str) {
-            cmd = [cmd];
-        }
-        if not isinstance(cmd, list) or not cmd {
-            continue;
-        }
-        parts: list[str] = [str(c) for c in cmd];
-        extra: any = ent.get("args");
-        if isinstance(extra, list) {
-            parts.extend([str(a) for a in extra]);
-        }
-        out[str(name)] = parts;
-    }
-    return out;
-}
-
-
-def _mcp_status_entries(cwd: str, clients: dict[str, any]) -> dict[str, list[str]] {
-    specs: dict[str, list[str]] = {};
-    try {
-        cfg: dict[str, any] = load_project_config(cwd);
-        parsed: dict[str, list[str]] = _local_mcp_server_specs(cfg);
-        specs = parsed;
-    } except Exception {
-        specs = {};
-    }
-    rows: list[str] = [];
-    ids: list[str] = [];
-    declared: set[str] = set();
-    for name in sorted(specs) {
-        sname: str = str(name);
-        declared.add(sname);
-        cmd_label: str = " ".join(specs[name]);
-        client: any = clients.get(sname);
-        if client is not None and client.initialized is True {
-            rows.append(sname + " — connected · " + cmd_label);
-        } elif client is not None {
-            rows.append(sname + " — spawn failed · " + cmd_label);
-        } else {
-            rows.append(sname + " — configured · not connected · " + cmd_label);
-        }
-        ids.append("__header__");
-    }
-    for cname in sorted(clients) {
-        if str(cname) in declared {
-            continue;
-        }
-        rows.append(str(cname) + " — attached (not in .jackal config)");
-        ids.append("__header__");
-    }
-    if not rows {
-        rows.append("no mcp servers configured (.jackal: \"mcp\": {\"servers\": …})");
-        ids.append("__header__");
-    }
-    return {"rows": rows, "ids": ids};
-}
 
 
 # --- fixtures ------------------------------------------------------------
@@ -730,55 +658,3 @@ test "quoted context expansion attaches real file slices" {
     }
 }
 
-obj FakeMcpClient {
-    has initialized: bool = False;
-}
-
-test "mcp status reports config honestly without live connections" {
-    cwd = _make_project();
-    try {
-        # Config lives in a FILE named ".jackal" (walk-up loader).
-        cfg = {"mcp": {"servers": {
-            "zeta": {"command": ["jac", "mcp"]},
-            "alpha": {"command": "toolserv"},
-        }}};
-        fh = open(os.path.join(cwd, ".jackal"), "w");
-        json.dump(cfg, fh);
-        fh.close();
-
-        entries = _mcp_status_entries(cwd, {});
-        assert entries["ids"] == ["__header__", "__header__"];
-        # Sorted by name; string-form command is normalized to argv.
-        assert entries["rows"][0].startswith("alpha — configured · not connected · toolserv");
-        assert entries["rows"][1].startswith("zeta — configured · not connected · jac mcp");
-
-        # A handshaked client flips its row to connected; an attached
-        # client absent from config gets its own undeclared row.
-        ok_client = FakeMcpClient(initialized=True);
-        entries2 = _mcp_status_entries(
-            cwd, {"zeta": ok_client, "ghost": FakeMcpClient()}
-        );
-        assert "zeta — connected · jac mcp" in entries2["rows"];
-        assert "ghost — attached (not in .jackal config)" in entries2["rows"];
-        # alpha stays honest: configured but never spawned.
-        rows2: list[str] = [str(r) for r in entries2["rows"]];
-        assert any(
-            r.startswith("alpha — configured · not connected")
-            for r in rows2
-        );
-    } finally {
-        shutil.rmtree(cwd, ignore_errors=True);
-    }
-}
-
-test "mcp status empty state names the config convention" {
-    cwd = _make_project();
-    try {
-        entries = _mcp_status_entries(cwd, {});
-        assert len(entries["rows"]) == 1;
-        assert "no mcp servers configured" in entries["rows"][0];
-        assert "__header__" in entries["ids"];
-    } finally {
-        shutil.rmtree(cwd, ignore_errors=True);
-    }
-}

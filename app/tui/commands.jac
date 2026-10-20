@@ -10,14 +10,17 @@ import from tui.picker_actions {
     _open_skills_picker,
 }
 import from tui.context { _open_explorer_picker }
-import from tui.mcp { _open_mcp_picker }
+import from tui.mcp { _mcp_window_state }
+import from tui.windows { _open_window }
 import from tui.runtime { _begin_assistant_reply }
 import from agent.session {
     clear_history, get_history, restore_history, list_commands,
     run_command, list_extension_shortcuts, run_extension_shortcut, plugins,
     new_session_id, set_model, get_model, cancel_active_turn,
     compact_now, set_mode, set_current_session_id,
+    mcp_restart, mcp_server_specs,
 }
+import from agent.compaction { load_project_config }
 import from agent.modes { DEV_MODES }
 import from agent.compaction { compute_context_usage }
 import from agent.auth_env { logout_provider, stored_providers }
@@ -217,8 +220,19 @@ def _run_slash(app: LiveShell, line: str) -> str {
     if line == "/explorer" {
         return _open_explorer_picker(app);
     }
-    if line == "/mcp" {
-        return _open_mcp_picker(app);
+    if line == "/mcp" or line.startswith("/mcp ") {
+        rest = line[len("/mcp"):].strip();
+        if rest.startswith("restart") {
+            name = rest[len("restart"):].strip();
+            if not name {
+                return "usage: /mcp restart NAME";
+            }
+            return mcp_restart(name);
+        }
+        if rest {
+            return "usage: /mcp [restart NAME]";
+        }
+        return _open_mcp_window(app);
     }
     if line == "/skills" {
         return _open_skills_picker(app);
@@ -418,4 +432,56 @@ def _tick_ui_modal(app: LiveShell) {
     if polled is not None {
         _ui_open_modal(app, polled);
     }
+}
+
+
+"""MCP STATUS window glue: live data + restart action (tui/window API).
+
+tui/mcp.jac stays pure over (specs, status); only this module touches the
+agent facade, so the MCP annex tests run without agent.session imports."""
+
+
+def _mcp_current_specs() -> dict[str, list[str]] {
+    specs: dict[str, list[str]] = {};
+    try {
+        specs = mcp_server_specs(load_project_config(os.getcwd()));
+    } except Exception {
+        specs = {};
+    }
+    return specs;
+}
+
+
+def _mcp_window_refresh(app: LiveShell, win: any) {
+    entries = _mcp_window_state(_mcp_current_specs(), plugins.mcp_status);
+    win.rows = entries.rows;
+    win.ids = entries.ids;
+}
+
+
+def _mcp_window_action(app: LiveShell, win: any, action: str) -> str {
+    if action != "restart" {
+        return "";
+    }
+    idx = int(win.selected);
+    if idx < 0 or idx >= len(win.ids) {
+        return "";
+    }
+    name = str(win.ids[idx]);
+    if not name {
+        return "";
+    }
+    return mcp_restart(name);
+}
+
+
+"""Open the MCP status window; esc/q closes, r restarts the cursor row."""
+def _open_mcp_window(app: LiveShell) -> str {
+    win = _mcp_window_state(_mcp_current_specs(), plugins.mcp_status);
+    win.on_action = _mcp_window_action;
+    win.refresh = _mcp_window_refresh;
+    if not _open_window(app, win) {
+        return "window unavailable (overlay busy)";
+    }
+    return "";
 }

@@ -192,6 +192,8 @@ default = "native"
 "tui.runtime" = "server"
 "tui.shell" = "server"
 "tui.state" = "server"
+"tui.window" = "server"
+"tui.windows" = "server"
 "ui.emulated_terminal" = "server"
 
 # Run with `jac x <name>` from app/ (the project root).

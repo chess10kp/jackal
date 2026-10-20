@@ -7,6 +7,7 @@ import from ui.renderer { Renderer }
 import from ui.terminal { Terminal }
 import from ui.input { InputNormalizer }
 import from ui.progress_bar { ProgressBar }
+import from tui.window { WindowState }
 
 glob SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -52,7 +53,7 @@ glob SLASH_BUILTINS: dict[str, str] = {
     "checkpoint": "create a checkpoint (/checkpoint NAME)",
     "checkpoints": "browse and restore checkpoints",
     "explorer": "multi-select files as @mentions",
-    "mcp": "show MCP server connection status",
+    "mcp": "show MCP server status (/mcp restart NAME)",
     "skills": "list available skills (/skill:name)",
 };
 
@@ -90,6 +91,9 @@ obj LiveShell {
         appr_args: any = None,
         ui_modal: any = None,
         picker: any = None,
+        # Window stack (tui/window.jac API): top entry owns keys + the
+        # shared overlay node; see tui/windows.jac.
+        windows: list[WindowState] = [],
         mode: str = "normal",
         cmd_q: any = None,
         auth_flow: dict[str, any] = {},
