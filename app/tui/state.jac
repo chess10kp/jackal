@@ -90,7 +90,6 @@ obj LiveShell {
         appr_tool_name: str = "",
         appr_args: any = None,
         ui_modal: any = None,
-        picker: any = None,
         # Window stack (tui/window.jac API): top entry owns keys + the
         # shared overlay node; see tui/windows.jac.
         windows: list[WindowState] = [],

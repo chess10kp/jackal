@@ -190,7 +190,7 @@ test "tui login api-key input accepts a bracketed paste" {
         tui.press("enter");
         tui.wait_for("paste API key", 15.0);
         # Exactly what a terminal sends on ctrl+shift+v. Regression: the
-        # PasteEvent branch required app.picker is None and dropped pastes
+        # PasteEvent branch previously missed the stack-owned login input window
         # while the key input overlay was open.
         key: str = "sk-e2e-paste-1234567890";
         tui.send("\x1b[200~" + key + "\x1b[201~");
@@ -203,6 +203,27 @@ test "tui login api-key input accepts a bracketed paste" {
         stored: str = fh.read();
         fh.close();
         assert key in stored, stored;
+    } finally {
+        if tui is not None { tui.close(); }
+        sb.cleanup();
+    }
+}
+
+test "tui picker is owned by the window stack and closes cleanly" {
+    sb = make_sandbox();
+    tui: TuiSession | None = None;
+    try {
+        tui = spawn_tui(sb);
+        tui.type_text("/login");
+        tui.press("enter");
+        tui.wait_for("LOGIN", 30.0);
+        tui.press("esc");
+        tui.wait_gone("LOGIN", 20.0);
+        # Closing a picker must release its stack entry and shared overlay,
+        # not exit the application or leave the old modal active.
+        tui.type_text("/help");
+        tui.press("enter");
+        tui.wait_for("/compact", 20.0);
     } finally {
         if tui is not None { tui.close(); }
         sb.cleanup();

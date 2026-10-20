@@ -15,7 +15,7 @@ import from ui.renderer {
 }
 import from ui.width { display_width, truncate_text }
 import from tui.picker_base { _multi_filtered }
-import from tui.windows { _window_paint_lines }
+import from tui.windows {  _picker_state, _window_paint_lines }
 import from agent.session { list_commands, get_model, model_preferences }
 import from agent.llm { PROVIDER_ROUTES, catalog_models, routed_model_id, provider_for }
 import from tui.window { WindowSpec, window_frame, window_view }
@@ -162,7 +162,7 @@ def _ui_modal_lines(app: LiveShell) -> list[str] {
 Mirrors the extension-modal box styling; select mode shows rows with a
 ">" cursor, input mode shows an editable draft line."""
 def _picker_lines(app: LiveShell) -> list[str] {
-    p: any = app.picker;
+    p: any = _picker_state(app);
     inner = 46;
     head = "? " + str(p.get("title", ""));
     body: list[str] = [];
@@ -377,7 +377,7 @@ popup:
 When the user dismissed this exact draft with esc the popup stays hidden
 (see _popup_suppressed). Returns the match list or None."""
 def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
-    if app.picker is not None or app.ui_modal is not None or app.shell.approval is not None {
+    if _picker_state(app) is not None or app.ui_modal is not None or app.shell.approval is not None {
         return None;
     }
     raw = app.shell.prompt.draft;
@@ -498,7 +498,7 @@ def _paint(app: LiveShell) {
     # Shared overlay node: local pickers own it first, then extension modals,
     # then tool approvals.
     overlay: list[str] | None = None;
-    if app.picker is not None {
+    if _picker_state(app) is not None {
         overlay = _picker_lines(app);
     } elif app.ui_modal is not None {
         overlay = _ui_modal_lines(app);

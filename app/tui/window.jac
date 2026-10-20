@@ -26,6 +26,10 @@ obj WindowSpec {
 
 obj WindowState {
     has spec: WindowSpec,
+        # Owner tag lets the stack host specialized interaction state.
+        kind: str = "window",
+        # Owner-specific mutable data; picker is the first stack-owned case.
+        payload: any = None,
         rows: list[str] = [],
         # ids[i] is the action payload for rows[i] ("" for furniture rows).
         ids: list[str] = [],
@@ -35,7 +39,7 @@ obj WindowState {
         keys: dict[str, str] = {},
         # fn(app, win, action) -> feedback line ("" = silent).
         on_action: any = None,
-        # fn(app, win) — re-read live data before paint/action (status windows).
+        # fn(app, win) — re-read live data before paint (status windows).
         refresh: any = None,
         # Host bookkeeping: status hint to restore on close.
         prev_hint: str = "";

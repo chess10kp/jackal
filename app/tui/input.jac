@@ -5,7 +5,7 @@ import from tui.state { LiveShell }
 import from tui.core { _push_turn, _scroll_transcript }
 import from tui.overlay { _slash_popup_state, _slash_popup_pick }
 import from tui.picker_base { _close_picker, _multi_filtered }
-import from tui.windows { _handle_window_key }
+import from tui.windows {  _picker_state, _handle_window_key }
 import from tui.picker_actions { _complete_api_key_login, _start_login_provider, _cancel_login }
 import from tui.context {
     _format_mentions, _expand_quoted_context, _insert_into_draft,
@@ -33,7 +33,7 @@ import from ui.transcript { set_follow_tail }
 import from ui.input { HostEvent, TextEvent, KeyEvent, PasteEvent, coalesce_events }
 
 def _handle_picker_key(app: LiveShell, key: str) {
-    p: any = app.picker;
+    p: any = _picker_state(app);
     if p is None {
         return;
     }
@@ -257,7 +257,7 @@ def _handle_key(app: LiveShell, key: str) {
         _handle_ui_modal_key(app, key);
         return;
     }
-    if app.picker is not None {
+    if _picker_state(app) is not None {
         _handle_picker_key(app, key);
         return;
     }
@@ -467,7 +467,7 @@ def _handle_key(app: LiveShell, key: str) {
 def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
     for event in coalesce_events(events) {
         if isinstance(event, TextEvent) {
-            if app.picker is not None {
+            if _picker_state(app) is not None {
                 # Picker input mode owns typed characters while open.
                 for ch in event.text {
                     _handle_picker_key(app, ch);
@@ -499,7 +499,7 @@ def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
             # model id), then the window stack, then the prompt editor.
             # Feeding per-char keeps parity with the TextEvent path — the
             # picker draft API only accepts single characters.
-            if app.picker is not None {
+            if _picker_state(app) is not None {
                 for ch in event.text {
                     _handle_picker_key(app, ch);
                 }

@@ -21,8 +21,8 @@ import from agent.checkpoints {
     restore_checkpoint_files, format_checkpoint_overlay_row,
 }
 import from agent.skills { load_jackal_skills }
-import from ui.screen { shell_open_approval }
 import from tui.context { _skills_picker_entries }
+import from tui.windows { _picker_state }
 
 """Provider rows for /login. Native routes use API-key auth today; routes
 that advertise an OAuth authType are retained so their explicit network seam
@@ -69,9 +69,9 @@ def _login_error(app: LiveShell, message: str) {
     app.auth_flow = transition_auth_flow(
         app.auth_flow,
         "set_error",
-        {"message": message, "providerId": app.picker.get("providerId", "") if app.picker is not None else ""},
+        {"message": message, "providerId": _picker_state(app).get("providerId", "") if _picker_state(app) is not None else ""},
     );
-    if app.picker is not None {
+    if _picker_state(app) is not None {
         _close_picker(app);
     }
     _push_turn(app, "tool", "login error: " + message);
@@ -82,7 +82,7 @@ def _login_error(app: LiveShell, message: str) {
 
 def _cancel_login(app: LiveShell) {
     app.auth_flow = transition_auth_flow(app.auth_flow, "cancel");
-    if app.picker is not None {
+    if _picker_state(app) is not None {
         _close_picker(app);
     }
     _push_turn(app, "tool", "login cancelled");
@@ -128,15 +128,15 @@ def _start_login_provider(app: LiveShell, provider_id: str) {
         _login_error(app, "provider " + provider_id + " has no interactive login");
         return;
     }
-    if app.picker is None {
+    if _picker_state(app) is None {
         _login_error(app, "login overlay unavailable");
         return;
     }
-    app.picker["mode"] = "input";
-    app.picker["providerId"] = provider_id;
-    app.picker["authType"] = auth_type;
-    app.picker["keyEnv"] = key_env;
-    app.picker["draft"] = "";
+    _picker_state(app)["mode"] = "input";
+    _picker_state(app)["providerId"] = provider_id;
+    _picker_state(app)["authType"] = auth_type;
+    _picker_state(app)["keyEnv"] = key_env;
+    _picker_state(app)["draft"] = "";
     app.auth_flow = transition_auth_flow(
         app.auth_flow,
         "set_api_key_input",
@@ -169,7 +169,7 @@ def _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
         "set_logged_in",
         {"providerId": provider_id, "nextStep": "done"},
     );
-    if app.picker is not None {
+    if _picker_state(app) is not None {
         _close_picker(app);
     }
     _push_turn(app, "tool", "logged in to " + provider_id + "; credentials saved to " + path);
@@ -187,20 +187,10 @@ def _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
             return "unknown login provider: " + provider_arg;
         }
         app.auth_flow = initial_auth_flow_state();
-        app.picker = {
-            "title": "LOGIN",
-            "options": [],
-            "ids": [],
-            "selected": 0,
-            "mode": "select",
-            "draft": "",
-            "multi": False,
-            "toggled": [],
-            "filter": "",
-            "prev_hint": app.status_hint,
-            "providerId": provider_arg,
-        };
-        shell_open_approval(app.session, app.shell);
+        if not _open_picker(app, "LOGIN", [], []) {
+            return "login unavailable (overlay busy)";
+        }
+        _picker_state(app)["providerId"] = provider_arg;
         app.auth_data = entries.get("stored", {});
         _start_login_provider(app, provider_arg);
         return "";

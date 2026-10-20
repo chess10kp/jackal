@@ -24,7 +24,10 @@ Returns False (no-op) while a picker or extension modal owns the screen.
 Stacking a window on top of a window is allowed (e.g. a confirm over a
 status list)."""
 def _open_window(app: LiveShell, win: WindowState) -> bool {
-    if app.picker is not None or app.ui_modal is not None {
+    if app.ui_modal is not None {
+        return False;
+    }
+    if app.windows and app.windows[len(app.windows) - 1].kind == "picker" {
         return False;
     }
     if win.refresh is not None {
@@ -56,9 +59,7 @@ def _close_top_window(app: LiveShell) -> bool {
     if not app.windows {
         shell_close_approval(app.session, app.shell);
     }
-    if win.prev_hint {
-        app.status_hint = win.prev_hint;
-    }
+    app.status_hint = win.prev_hint;
     app.dirty = True;
     return True;
 }
@@ -127,4 +128,11 @@ def _window_paint_lines(app: LiveShell) -> list[str] | None {
         }
     }
     return window_lines(win);
+}
+
+def _picker_state(app: LiveShell) -> any {
+    if app.windows and app.windows[len(app.windows) - 1].kind == "picker" {
+        return app.windows[len(app.windows) - 1].payload;
+    }
+    return None;
 }

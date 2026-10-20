@@ -1,6 +1,7 @@
 """Shared picker state transitions."""
 import from tui.state { LiveShell }
-import from ui.screen { shell_open_approval, shell_close_approval }
+import from tui.window { WindowSpec, WindowState }
+import from tui.windows { _open_window, _close_top_window, _picker_state }
 """Open a generic list-picker on the shared overlay node (one at a time).
 rows are display labels; ids map 1:1 onto action payloads. When
 extra_last_input is set, a trailing "type name…" row flips the picker into
@@ -13,7 +14,7 @@ def _open_picker(
     extra_last_input: bool = False,
     multi: bool = False,
 ) -> bool {
-    if app.picker is not None or app.ui_modal is not None or app.shell.approval is not None {
+    if app.windows or app.ui_modal is not None or app.phase == "approval" {
         return False;
     }
     options = list(rows);
@@ -22,10 +23,10 @@ def _open_picker(
         options.append("type name…");
         full_ids.append("__type__");
     }
-    if not options {
+    if not options and title != "LOGIN" {
         return False;
     }
-    app.picker = {
+    state: dict[str, any] = {
         "title": title,
         "options": options,
         "ids": full_ids,
@@ -37,7 +38,15 @@ def _open_picker(
         "filter": "",
         "prev_hint": app.status_hint,
     };
-    shell_open_approval(app.session, app.shell);
+    win = WindowState(
+        spec=WindowSpec(title="? " + title, width=46),
+        kind="picker",
+        payload=state,
+    );
+    if not _open_window(app, win) {
+        return False;
+    }
+
     if multi {
         app.status_hint = "type filter · space toggle · enter insert · esc";
     } else {
@@ -50,13 +59,10 @@ def _open_picker(
 
 """Dismiss the picker and restore the pre-open status hint."""
 def _close_picker(app: LiveShell) {
-    p: any = app.picker;
-    app.picker = None;
-    shell_close_approval(app.session, app.shell);
-    if p is not None {
-        app.status_hint = str(p.get("prev_hint", app.status_hint));
+    if _picker_state(app) is None {
+        return;
     }
-    app.dirty = True;
+    _close_top_window(app);
 }
 """Multi-select rows narrowed by the picker's type-to-filter text.
 
