@@ -1,7 +1,7 @@
 """Shared picker state transitions."""
 import from tui.state { LiveShell }
 import from tui.window { WindowSpec, WindowState }
-import from tui.windows { _open_window, _close_top_window, _picker_state }
+import from tui.windows { _open_window, _close_top_window, _picker_state, _ui_modal_state }
 """Open a generic list-picker on the shared overlay node (one at a time).
 rows are display labels; ids map 1:1 onto action payloads. When
 extra_last_input is set, a trailing "type name…" row flips the picker into
@@ -14,7 +14,7 @@ def _open_picker(
     extra_last_input: bool = False,
     multi: bool = False,
 ) -> bool {
-    if app.windows or app.ui_modal is not None or app.phase == "approval" {
+    if app.windows or _ui_modal_state(app) is not None or app.phase == "approval" {
         return False;
     }
     options = list(rows);

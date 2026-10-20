@@ -15,7 +15,7 @@ import from ui.renderer {
 }
 import from ui.width { display_width, truncate_text }
 import from tui.picker_base { _multi_filtered }
-import from tui.windows {  _picker_state, _window_paint_lines }
+import from tui.windows {  _picker_state, _window_paint_lines, _ui_modal_state }
 import from agent.session { list_commands, get_model, model_preferences }
 import from agent.llm { PROVIDER_ROUTES, catalog_models, routed_model_id, provider_for }
 import from tui.window { WindowSpec, window_frame, window_view }
@@ -119,7 +119,7 @@ def _approval_lines(app: LiveShell) -> list[str] {
 """Foreground extension-ui modal content — painted into the shared
 overlay node while app.ui_modal is set."""
 def _ui_modal_lines(app: LiveShell) -> list[str] {
-    m: any = app.ui_modal;
+    m: any = _ui_modal_state(app);
     inner = 46;
     method = str(m.get("method", ""));
     head = "? [ui] " + method.upper();
@@ -377,7 +377,7 @@ popup:
 When the user dismissed this exact draft with esc the popup stays hidden
 (see _popup_suppressed). Returns the match list or None."""
 def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
-    if _picker_state(app) is not None or app.ui_modal is not None or app.shell.approval is not None {
+    if _picker_state(app) is not None or _ui_modal_state(app) is not None or app.shell.approval is not None {
         return None;
     }
     raw = app.shell.prompt.draft;
@@ -500,7 +500,7 @@ def _paint(app: LiveShell) {
     overlay: list[str] | None = None;
     if _picker_state(app) is not None {
         overlay = _picker_lines(app);
-    } elif app.ui_modal is not None {
+    } elif _ui_modal_state(app) is not None {
         overlay = _ui_modal_lines(app);
     } elif app.phase == "approval" {
         # Node presence is not enough: pickers/modals/windows BORROW the

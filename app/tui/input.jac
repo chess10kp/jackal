@@ -5,7 +5,7 @@ import from tui.state { LiveShell }
 import from tui.core { _push_turn, _scroll_transcript }
 import from tui.overlay { _slash_popup_state, _slash_popup_pick }
 import from tui.picker_base { _close_picker, _multi_filtered }
-import from tui.windows {  _picker_state, _handle_window_key }
+import from tui.windows {  _picker_state, _handle_window_key, _ui_modal_state }
 import from tui.picker_actions { _complete_api_key_login, _start_login_provider, _cancel_login }
 import from tui.context {
     _format_mentions, _expand_quoted_context, _insert_into_draft,
@@ -253,7 +253,7 @@ def _handle_key(app: LiveShell, key: str) {
     }
     # Extension-UI modal first: it shares the overlay node with approvals,
     # so the generic approval branch would otherwise swallow every key.
-    if app.ui_modal is not None {
+    if _ui_modal_state(app) is not None {
         _handle_ui_modal_key(app, key);
         return;
     }
@@ -467,6 +467,12 @@ def _handle_key(app: LiveShell, key: str) {
 def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
     for event in coalesce_events(events) {
         if isinstance(event, TextEvent) {
+            if _ui_modal_state(app) is not None {
+                for ch in event.text {
+                    _handle_ui_modal_key(app, ch);
+                }
+                continue;
+            }
             if _picker_state(app) is not None {
                 # Picker input mode owns typed characters while open.
                 for ch in event.text {
@@ -499,6 +505,12 @@ def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
             # model id), then the window stack, then the prompt editor.
             # Feeding per-char keeps parity with the TextEvent path — the
             # picker draft API only accepts single characters.
+            if _ui_modal_state(app) is not None {
+                for ch in event.text {
+                    _handle_ui_modal_key(app, ch);
+                }
+                continue;
+            }
             if _picker_state(app) is not None {
                 for ch in event.text {
                     _handle_picker_key(app, ch);

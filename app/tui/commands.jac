@@ -11,7 +11,7 @@ import from tui.picker_actions {
 }
 import from tui.context { _open_explorer_picker }
 import from tui.mcp { _mcp_window_state }
-import from tui.windows { _open_window }
+import from tui.windows {  _ui_modal_state,  _close_top_window, _open_window }
 import from tui.runtime { _begin_assistant_reply }
 import from agent.session {
     clear_history, get_history, restore_history, list_commands,
@@ -30,8 +30,8 @@ import from agent.sessions {
 }
 import from agent.skills { load_jackal_skills, expand_skill_command }
 import from agent.plugin_bridge { poll_ui_request, respond_ui, cancel_ui }
-import from ui.screen { shell_open_approval, shell_close_approval }
 import from ui.transcript { apply_transcript_revision }
+import from tui.window { WindowSpec, WindowState }
 
 """Restore a saved session by id and repaint the transcript from it.
 Shared by /resume NAME and the resume picker's enter action."""
@@ -288,24 +288,31 @@ def _run_slash(app: LiveShell, line: str) -> str {
 """Open the foreground extension-UI modal (one at a time; approval owns the
 overlay node while it is up, so UI requests queue behind it)."""
 def _ui_open_modal(app: LiveShell, rec: dict[str, any]) -> bool {
-    if app.ui_modal is not None or app.shell.approval is not None {
+    if _ui_modal_state(app) is not None or app.shell.approval is not None {
         return False;
     }
     m: dict[str, any] = dict(rec);
     m["selected"] = 0;
     m["draft"] = "";
-    m["prev_hint"] = app.status_hint;
-    app.ui_modal = m;
-    shell_open_approval(app.session, app.shell);
     method = str(rec.get("method", ""));
+    if not _open_window(
+        app,
+        WindowState(
+            spec=WindowSpec(title="? [ui] " + method.upper(), width=46),
+            kind="ui_modal",
+            payload=m,
+        ),
+    ) {
+        return False;
+    }
     label = str(rec.get("title", "")) or str(rec.get("message", ""));
     _push_turn(app, "tool", "? [ui] " + method + ": " + label[:80]);
     if method == "select" {
-        app.status_hint = "\u2191\u2193 move \u00b7 enter choose \u00b7 esc cancel";
+        app.status_hint = "↑↓ move · enter choose · esc cancel";
     } elif method == "confirm" {
-        app.status_hint = "y confirm \u00b7 n/esc cancel";
+        app.status_hint = "y confirm · n/esc cancel";
     } else {
-        app.status_hint = "type \u00b7 enter submit \u00b7 esc cancel";
+        app.status_hint = "type · enter submit · esc cancel";
     }
     app.dirty = True;
     return True;
@@ -314,12 +321,11 @@ def _ui_open_modal(app: LiveShell, rec: dict[str, any]) -> bool {
 
 """Settle the modal: answer via the bridge and restore the prompt state."""
 def _ui_settle(app: LiveShell, value: any, use_cancel: bool = False) {
-    m: any = app.ui_modal;
+    m: any = _ui_modal_state(app);
     if m is None {
         return;
     }
-    app.ui_modal = None;
-    shell_close_approval(app.session, app.shell);
+    _close_top_window(app);
     b = plugins.bridge;
     delivered = False;
     if b is not None {
@@ -333,9 +339,8 @@ def _ui_settle(app: LiveShell, value: any, use_cancel: bool = False) {
     if not delivered {
         _push_turn(app, "tool", "[ui] request expired");
     } elif not use_cancel {
-        _push_turn(app, "tool", "\u2713 answered");
+        _push_turn(app, "tool", "✓ answered");
     }
-    app.status_hint = str(m.get("prev_hint", app.status_hint));
     app.dirty = True;
 }
 
@@ -365,7 +370,7 @@ def _run_ext_command_async(app: LiveShell, name: str, args: str) -> str {
 
 
 def _handle_ui_modal_key(app: LiveShell, key: str) {
-    m: any = app.ui_modal;
+    m: any = _ui_modal_state(app);
     if m is None {
         return;
     }
@@ -421,7 +426,7 @@ def _handle_ui_modal_key(app: LiveShell, key: str) {
 
 """Poll the bridge interaction queue; open the oldest request as a modal."""
 def _tick_ui_modal(app: LiveShell) {
-    if app.ui_modal is not None or app.shell.approval is not None {
+    if _ui_modal_state(app) is not None or app.shell.approval is not None {
         return;
     }
     b = plugins.bridge;
