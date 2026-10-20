@@ -18,7 +18,7 @@ import from tui.picker_base { _multi_filtered }
 import from tui.windows { _window_paint_lines }
 import from agent.session { list_commands, get_model, model_preferences }
 import from agent.llm { PROVIDER_ROUTES, catalog_models, routed_model_id, provider_for }
-import from tui.window { WindowSpec, window_frame }
+import from tui.window { WindowSpec, window_frame, window_view }
 """Unified-diff preview lines for a pending write_file/edit_file approval.
 Capped at 20 diff lines with a trailing truncation marker; returns [] when
 no old/new text pair can be assembled (missing args, unreadable baseline)."""
@@ -177,9 +177,6 @@ def _picker_lines(app: LiveShell) -> list[str] {
         }
         body.append("  > " + shown[:inner - 8] + "▌");
     } elif bool(p.get("multi", False)) {
-        # Multi-select (EXPLORER): optional type-to-filter row, [x]/[ ]
-        # toggle boxes, and a sliding 8-row window over the FILTERED rows so
-        # the cursor stays visible in long file lists.
         vis: tuple[list[str], list[str]] = _multi_filtered(p);
         vis_options: list[str] = vis[0];
         vis_ids: list[str] = vis[1];
@@ -191,37 +188,28 @@ def _picker_lines(app: LiveShell) -> list[str] {
         if not vis_options {
             body.append("(no matches)");
         }
-        sel = min(int(p.get("selected", 0)), max(0, len(vis_options) - 1));
-        start = 0;
-        if sel >= 8 {
-            start = sel - 7;
-        }
-        window: any = vis_options[start:start + 8];
-        i = start;
-        for opt in window {
+        display_rows: list[str] = [];
+        i = 0;
+        for opt in vis_options {
             rid = str(vis_ids[i]) if i < len(vis_ids) else "";
             box = "x" if rid in toggled else " ";
-            mark = ">" if i == sel else " ";
-            body.append(mark + " [" + box + "] " + str(opt)[:inner - 10]);
+            display_rows.append("[" + box + "] " + str(opt)[:inner - 10]);
             i += 1;
         }
-        more = len(vis_options) - start - len(window);
-        if more > 0 {
-            body.append("… " + str(more) + " more");
-        }
+        view: tuple[list[str], int] = window_view(
+            display_rows, int(p.get("selected", 0)), 8
+        );
+        body.extend(view[0]);
     } else {
         options2: list[any] = list(p.get("options", []));
-        sel = int(p.get("selected", 0));
-        i = 0;
-        for opt in options2[:8] {
-            mark = ">" if i == sel else " ";
-            body.append(mark + " " + str(opt)[:inner - 6]);
-            i += 1;
+        display_rows2: list[str] = [];
+        for opt in options2 {
+            display_rows2.append(str(opt)[:inner - 6]);
         }
-        more = len(options2) - 8;
-        if more > 0 {
-            body.append("… " + str(more) + " more");
-        }
+        view2: tuple[list[str], int] = window_view(
+            display_rows2, int(p.get("selected", 0)), 8
+        );
+        body.extend(view2[0]);
     }
     body.append("");
     if str(p.get("mode", "select")) == "input" {
