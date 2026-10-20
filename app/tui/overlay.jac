@@ -18,6 +18,7 @@ import from tui.picker_base { _multi_filtered }
 import from tui.windows { _window_paint_lines }
 import from agent.session { list_commands, get_model, model_preferences }
 import from agent.llm { PROVIDER_ROUTES, catalog_models, routed_model_id, provider_for }
+import from tui.window { WindowSpec, window_frame }
 """Unified-diff preview lines for a pending write_file/edit_file approval.
 Capped at 20 diff lines with a trailing truncation marker; returns [] when
 no old/new text pair can be assembled (missing args, unreadable baseline)."""
@@ -108,18 +109,10 @@ def _approval_lines(app: LiveShell) -> list[str] {
     if not body {
         body.append("(no details available)");
     }
-    lines: list[str] = [
-        "╭" + _rule(inner, "─") + "╮",
-        "│" + _pad_to("  " + head, inner) + "│",
-        "│" + _pad_to("", inner) + "│",
-    ];
-    for ln in body {
-        lines.append("│" + _pad_to("  " + ln, inner) + "│");
-    }
-    lines.append("│" + _pad_to("", inner) + "│");
-    lines.append("│" + _pad_to("  [a] Accept    [r] Reject    [esc]", inner) + "│");
-    lines.append("╰" + _rule(inner, "─") + "╯");
-    return lines;
+    body = [""] + body;
+    body.append("");
+    body.append("  [a] Accept    [r] Reject    [esc]");
+    return window_frame(WindowSpec(title=head, width=inner), body);
 }
 
 
@@ -161,13 +154,7 @@ def _ui_modal_lines(app: LiveShell) -> list[str] {
         body.append("");
         body.append("  [enter] submit (empty allowed)   [esc] cancel");
     }
-    lines: list[str] = ["\u256d" + _rule(inner, "\u2500") + "\u256e"];
-    lines.append("\u2502" + _pad_to("  " + head, inner) + "\u2502");
-    for ln in body {
-        lines.append("\u2502" + _pad_to("  " + ln, inner) + "\u2502");
-    }
-    lines.append("\u2570" + _rule(inner, "\u2500") + "\u256f");
-    return lines;
+    return window_frame(WindowSpec(title=head, width=inner), body);
 }
 
 
@@ -248,15 +235,7 @@ def _picker_lines(app: LiveShell) -> list[str] {
     } else {
         body.append("  [↑↓] move   [enter] choose   [esc] cancel");
     }
-    lines: list[str] = [
-        "╭" + _rule(inner, "─") + "╮",
-        "│" + _pad_to("  " + head, inner) + "│",
-    ];
-    for ln in body {
-        lines.append("│" + _pad_to("  " + ln, inner) + "│");
-    }
-    lines.append("╰" + _rule(inner, "─") + "╯");
-    return lines;
+    return window_frame(WindowSpec(title=head, width=inner), body);
 }
 """Paint lines into the shared overlay node (picker/modal/approval owner).
 The caller has already decided ownership; this just guards the optional node."""
