@@ -84,6 +84,29 @@ demotion instead.
   joined the tui/* server pins (seam consistency, #10213).
 - Suites: tui/preview 7/7, e2e/tui 18/18 on CI (verified in testlogs).
 
+## Phase C4 partial: general windowing + MCP window (2026-10-20, `13f9cd5f1`, CI 39350634553)
+
+- New general windowing API: `tui/window.jac` (pure leaf: WindowSpec /
+  WindowState / window_frame / window_view sliding viewport / window_lines,
+  annex 20/20) + `tui/windows.jac` host (LiveShell.windows stack, up/down/
+  esc/q keys, on_action + refresh hooks; borrows the shared overlay node
+  like pickers).
+- MCP status window is the first consumer: `tui/mcp.jac` rewritten pure over
+  (specs, live plugins.mcp_status); `_local_mcp_server_specs` and the
+  overlays.test.jac replica DELETED (tui/mcp.test.jac 26/26 is the real
+  coverage). `/mcp` opens the window, `r` restarts the cursor row,
+  `/mcp restart NAME` goes to mcp_restart.
+- Approval precedence now keys on `app.phase == "approval"` in paint AND
+  key routing (windows borrow the approval node, so node presence no longer
+  implies a real approval).
+- Harness: `TuiSession.wait_gone` for overlay-close asserts (paint ticks
+  race immediate screen_text). GOTCHA: harness KEYS has "esc" NOT "escape"
+  — press("escape") silently types the word (KEYS.get fallback).
+- Suites on CI: e2e/tui 20, tui/window 20, tui/mcp 26, tui/overlays 81.
+- Remaining windowing migration (later commits): move _picker_lines /
+  _ui_modal_lines / _approval_lines onto window_frame/window_view and fold
+  the three owners into the stack.
+
 ## Next work (HANDOFF.md Phase B/C)
 
 - Phase B harness scenarios (abort, history, paste, pickers, model picker,
