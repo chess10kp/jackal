@@ -81,10 +81,10 @@ test "tui slash commands and mode cycling" {
         tui.press("enter");
         tui.wait_for("/compact", 20.0);
         tui.press("shift+tab");
-        tui.wait_for("AUTO", 10.0);
+        tui.wait_for("auto-accept", 10.0);
         tui.type_text("/mode plan");
         tui.press("enter");
-        tui.wait_for("PLAN", 10.0);
+        tui.wait_for("[plan]", 10.0);
         assert sb.calls() == [];
     } finally {
         if tui is not None { tui.close(); }
