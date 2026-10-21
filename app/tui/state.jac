@@ -86,9 +86,6 @@ obj LiveShell {
         tool_msg_id: str = "",
         appr_event: any = None,
         appr_approved: bool = False,
-        appr_tool: str = "",
-        appr_tool_name: str = "",
-        appr_args: any = None,
         # Window stack (tui/window.jac API): top entry owns keys + the
         # shared overlay node; see tui/windows.jac.
         windows: list[WindowState] = [],

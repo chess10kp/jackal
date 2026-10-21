@@ -8,11 +8,13 @@ import from agent.modes {
     requires_approval, is_read_only_mode, read_only_mode_block_reason,
 }
 import from ui.screen {
-    shell_open_approval, shell_close_approval, shell_resize,
+      shell_resize,
 }
 import from ui.progress_bar { SetProgress }
 import from ui.renderer { create_renderer }
 import from tui.preview { tool_result_preview }
+import from tui.window { WindowSpec, WindowState }
+import from tui.windows { _open_window, _close_top_window, _approval_state }
 
 def _apply_resize(app: LiveShell, columns: int, rows: int) {
     if columns < 40 {
@@ -198,14 +200,21 @@ def _tick_stream(app: LiveShell) {
                     parts.append(str(pair[0]) + "=" + str(pair[1])[:60]);
                 }
             }
-            app.appr_tool = tool_name + "(" + (", ".join(parts))[:160] + ")";
-            app.appr_tool_name = tool_name;
-            app.appr_args = args if isinstance(args, dict) else {};
+            approval_args: dict[str, any] = args if isinstance(args, dict) else {};
+            approval_label = tool_name + "(" + (", ".join(parts))[:160] + ")";
             app.phase = "approval";
             app.shell.status.phase = "approval";
-            shell_open_approval(app.session, app.shell);
-            _push_turn(app, "tool", "? approve " + app.appr_tool);
-            app.status_hint = "a accept · r deny";
+            _open_window(
+                app,
+                WindowState(
+                    spec=WindowSpec(title="TOOL APPROVAL", width=46),
+                    kind="approval",
+                    payload={"tool": tool_name, "args": approval_args},
+                ),
+                force=True,
+            );
+            _push_turn(app, "tool", "? approve " + approval_label);
+                    app.status_hint = "a accept · r deny";
             app.dirty = True;
         } elif kind == "__done__" {
             _finish_stream(app, str(data.get("answer", "")));
@@ -224,39 +233,46 @@ def _tick_stream(app: LiveShell) {
     }
 }
 def _accept_approval(app: LiveShell) {
-    if app.phase != "approval" {
+    if app.phase != "approval" or _approval_state(app) is None {
         return;
     }
-    shell_close_approval(app.session, app.shell);
+    _close_top_window(app);
     app.appr_approved = True;
     if app.appr_event is not None {
         app.appr_event.set();
     }
-    _push_turn(app, "tool", "\u2713 approved");
+    _push_turn(app, "tool", "✓ approved");
     app.phase = "streaming";
     app.shell.status.phase = "streaming";
-    app.status_hint = "streaming \u00b7 esc abort";
+    if not app.windows {
+        app.status_hint = "streaming · esc abort";
+    }
     app.dirty = True;
 }
 
 
 def _reject_approval(app: LiveShell) {
     if app.phase == "approval" {
-        shell_close_approval(app.session, app.shell);
+        if _approval_state(app) is None {
+            return;
+        }
+        _close_top_window(app);
         app.appr_approved = False;
         if app.appr_event is not None {
             app.appr_event.set();
         }
-        _push_turn(app, "tool", "\u2717 denied");
+        _push_turn(app, "tool", "✗ denied");
         app.phase = "streaming";
         app.shell.status.phase = "streaming";
-        app.status_hint = "streaming \u00b7 esc abort";
+        if not app.windows {
+            app.status_hint = "streaming · esc abort";
+        }
         app.dirty = True;
         return;
     }
     if app.phase == "streaming" {
         cancel_active_turn();
-        app.status_hint = "aborting\u2026";
+        app.status_hint = "aborting…";
         app.dirty = True;
         return;
     }

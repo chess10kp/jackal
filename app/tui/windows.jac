@@ -23,8 +23,8 @@ import from ui.screen { shell_open_approval, shell_close_approval }
 Returns False (no-op) while a picker or extension modal owns the screen.
 Stacking a window on top of a window is allowed (e.g. a confirm over a
 status list)."""
-def _open_window(app: LiveShell, win: WindowState) -> bool {
-    if app.windows and (
+def _open_window(app: LiveShell, win: WindowState, force: bool = False) -> bool {
+    if not force and app.windows and (
         app.windows[len(app.windows) - 1].kind == "picker"
         or app.windows[len(app.windows) - 1].kind == "ui_modal"
     ) {
@@ -139,6 +139,13 @@ def _picker_state(app: LiveShell) -> any {
 
 def _ui_modal_state(app: LiveShell) -> any {
     if app.windows and app.windows[len(app.windows) - 1].kind == "ui_modal" {
+        return app.windows[len(app.windows) - 1].payload;
+    }
+    return None;
+}
+
+def _approval_state(app: LiveShell) -> any {
+    if app.windows and app.windows[len(app.windows) - 1].kind == "approval" {
         return app.windows[len(app.windows) - 1].payload;
     }
     return None;

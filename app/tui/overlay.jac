@@ -15,7 +15,7 @@ import from ui.renderer {
 }
 import from ui.width { display_width, truncate_text }
 import from tui.picker_base { _multi_filtered }
-import from tui.windows {  _picker_state, _window_paint_lines, _ui_modal_state }
+import from tui.windows {  _picker_state, _window_paint_lines, _ui_modal_state, _approval_state }
 import from agent.session { list_commands, get_model, model_preferences }
 import from agent.llm { PROVIDER_ROUTES, catalog_models, routed_model_id, provider_for }
 import from tui.window { WindowSpec, window_frame, window_view }
@@ -78,20 +78,22 @@ def _approval_diff_preview(name: str, args: dict[str, any]) -> list[str] {
 or generic key=value pairs, then a capped unified-diff preview."""
 def _approval_lines(app: LiveShell) -> list[str] {
     inner = 46;
-    head = "TOOL APPROVAL · " + app.appr_tool_name;
+    approval: any = _approval_state(app);
+    tool_name = str(approval.get("tool", "?"));
+    args: any = approval.get("args", {});
+    head = "TOOL APPROVAL · " + tool_name;
     body: list[str] = [];
-    args: any = app.appr_args;
     if isinstance(args, dict) {
-        if app.appr_tool_name == "run_command" {
+        if tool_name == "run_command" {
             body.append("$ " + str(args.get("cmd", "")));
             timeout_secs = str(args.get("timeout_secs", ""));
             if timeout_secs {
                 body.append("timeout " + timeout_secs + "s");
             }
-        } elif app.appr_tool_name == "write_file" {
+        } elif tool_name == "write_file" {
             body.append(str(args.get("path", "")));
             body.append("+ " + str(len(str(args.get("content", "")))) + " chars");
-        } elif app.appr_tool_name == "edit_file" {
+        } elif tool_name == "edit_file" {
             body.append(str(args.get("path", "")));
             body.append(
                 "- " + str(len(str(args.get("old_text", ""))))
@@ -104,7 +106,7 @@ def _approval_lines(app: LiveShell) -> list[str] {
             }
             body.append((", ".join(parts))[:inner - 6]);
         }
-        body.extend(_approval_diff_preview(app.appr_tool_name, args));
+        body.extend(_approval_diff_preview(tool_name, args));
     }
     if not body {
         body.append("(no details available)");
@@ -495,17 +497,15 @@ def _paint(app: LiveShell) {
         ),
     );
 
-    # Shared overlay node: local pickers own it first, then extension modals,
-    # then tool approvals.
+    # Shared overlay node: real approvals take precedence; otherwise the
+    # active stack owner supplies the picker or extension-modal content.
     overlay: list[str] | None = None;
-    if _picker_state(app) is not None {
+    if app.phase == "approval" {
+        overlay = _approval_lines(app);
+    } elif _picker_state(app) is not None {
         overlay = _picker_lines(app);
     } elif _ui_modal_state(app) is not None {
         overlay = _ui_modal_lines(app);
-    } elif app.phase == "approval" {
-        # Node presence is not enough: pickers/modals/windows BORROW the
-        # approval node (shell_open_approval seam); phase marks a REAL one.
-        overlay = _approval_lines(app);
     }
     win_lines: list[str] | None = None;
     if overlay is None and app.phase != "approval" {

@@ -251,8 +251,16 @@ def _handle_key(app: LiveShell, key: str) {
         app.dirty = True;
         return;
     }
-    # Extension-UI modal first: it shares the overlay node with approvals,
-    # so the generic approval branch would otherwise swallow every key.
+    # A real tool approval always wins over a picker, extension modal, or
+    # status window that may be underneath it in the shared stack.
+    if app.phase == "approval" {
+        if key == "a" or key == "y" or key == "enter" {
+            _accept_approval(app);
+        } elif key == "r" or key == "n" or key == "escape" {
+            _reject_approval(app);
+        }
+        return;
+    }
     if _ui_modal_state(app) is not None {
         _handle_ui_modal_key(app, key);
         return;
@@ -261,30 +269,13 @@ def _handle_key(app: LiveShell, key: str) {
         _handle_picker_key(app, key);
         return;
     }
-    # Window stack (tui/windows.jac): modal like a picker, but a pending
-    # tool approval keeps precedence — never hide a blocking modal.
-    if app.windows and app.phase != "approval" {
+    if app.windows {
         _handle_window_key(app, key);
         return;
     }
-    if app.shell.approval is not None {
-        if key == "a" or key == "y" or key == "enter" {
-            _accept_approval(app);
-            return;
-        }
-        if key == "r" or key == "n" {
-            _reject_approval(app);
-            return;
-        }
-        if key == "escape" {
-            _reject_approval(app);
-            return;
-        }
-        return;
-    }
-    # Extension keyboard shortcuts (pi.registerShortcut): modifier-combo keys
-    # registered by loaded extensions shadow built-in navigation, matching Pi
-    # global-binding semantics. ctrl+c / modals / approvals keep precedence.
+    
+    # Extension keyboard shortcuts (pi.registerShortcut) from loaded
+    # extensions shadow built-in navigation when no modal owner is active.
     scs = list_extension_shortcuts();
     if key in scs {
         meta: dict[str, any] = scs[key];
@@ -309,7 +300,7 @@ def _handle_key(app: LiveShell, key: str) {
         }
         _push_turn(app, "system", note);
         app.status_hint = "mode " + app.mode + " · shift+tab cycles";
-        app.dirty = True;
+            app.dirty = True;
         return;
     }
     # Slash-command autocomplete popup: owns up/down/tab/enter/escape while
@@ -467,6 +458,12 @@ def _handle_key(app: LiveShell, key: str) {
 def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
     for event in coalesce_events(events) {
         if isinstance(event, TextEvent) {
+            if app.phase == "approval" {
+                if event.text in ["a", "y", "r", "n"] {
+                    _handle_key(app, event.text);
+                }
+                continue;
+            }
             if _ui_modal_state(app) is not None {
                 for ch in event.text {
                     _handle_ui_modal_key(app, ch);
@@ -500,6 +497,9 @@ def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
         } elif isinstance(event, KeyEvent) {
             _handle_key(app, event.key);
         } elif isinstance(event, PasteEvent) {
+            if app.phase == "approval" {
+                continue;
+            }
             # Paste follows the same sink precedence as typed text: picker
             # input mode owns it while an overlay is open (login API key,
             # model id), then the window stack, then the prompt editor.
