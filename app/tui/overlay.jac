@@ -2,8 +2,7 @@
 import os;
 import from tui.state { LiveShell, SLASH_BUILTINS }
 import from tui.core {
-    _rule, _pad_to, _prompt_prefix,
-    _status_line, _prompt_lines,
+    _rule, _pad_to, _prompt_prefix, _prompt_lines,
 }
 import from core.edit { compute_unified_diff }
 import from ui.model { UiNode }
@@ -478,7 +477,6 @@ def _transcript_lines(app: LiveShell) -> list[str] {
 
 def _paint(app: LiveShell) {
     lines = _transcript_lines(app);
-    status = _status_line(app);
     prompt_lines = _prompt_lines(app);
 
     # Slash autocomplete: extra rows painted ABOVE the prompt box inside the
@@ -519,10 +517,8 @@ def _paint(app: LiveShell) {
     }
 
     set_node_content(app.renderer, app.shell.transcript, lines);
-    set_node_content(app.renderer, app.shell.status, [status]);
     set_node_content(app.renderer, app.shell.prompt, popup_rows + prompt_lines);
     mark_semantic_dirty(app.renderer, app.shell.transcript);
-    mark_semantic_dirty(app.renderer, app.shell.status);
     mark_semantic_dirty(app.renderer, app.shell.prompt);
     mark_layout_dirty(app.renderer, app.shell.screen);
 

@@ -2,10 +2,11 @@
 tui/harness.jac). Every assertion reads the emulated screen."""
 
 
-test "first frame: status line, prompt, terminal modes" {
+test "first frame: header hidden, prompt, terminal modes" {
     h = open_tui();
     try {
-        h.wait_for("● ready");
+        h.wait_for("❯");
+        assert h.term.find("● ready") is None, h.dump();
         assert h.term.find("❯") is not None, h.dump();
         assert h.term.alternate_screen and h.term.bracketed_paste, h.dump();
         assert h.term.title.startswith("Jackal"), h.term.title;
@@ -139,7 +140,7 @@ test "resize reflows within the new bounds" {
         h.wait_for("fairly long");
         h.wait_idle();
         h.resize(50, 20);
-        h.wait_for("● ready");
+        h.wait_for("❯");
         for line in h.term.viewport() {
             assert len(line) <= 50, h.dump();
         }

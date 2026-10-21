@@ -40,9 +40,7 @@ obj WindowState {
         # fn(app, win, action) -> feedback line ("" = silent).
         on_action: any = None,
         # fn(app, win) — re-read live data before paint (status windows).
-        refresh: any = None,
-        # Host bookkeeping: status hint to restore on close.
-        prev_hint: str = "";
+        refresh: any = None;
 }
 
 

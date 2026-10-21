@@ -133,7 +133,6 @@ def _handle_picker_key(app: LiveShell, key: str) {
         if chosen_id == "__type__" {
             p["mode"] = "input";
             p["draft"] = "";
-            app.status_hint = "type model id · enter submit · esc cancel";
             app.dirty = True;
             return;
         }
@@ -233,7 +232,7 @@ def _tick_app(app: LiveShell) {
     if app.phase == "streaming" {
         _tick_stream(app);
     } elif app.phase == "approval" {
-        # Keep the status meter alive while the modal sits.
+        # Keep frames ticking while the modal sits.
         app.spin_i += 1;
         if app.spin_i % 4 == 0 {
             app.dirty = True;
@@ -279,8 +278,6 @@ def _handle_key(app: LiveShell, key: str) {
     scs = list_extension_shortcuts();
     if key in scs {
         meta: dict[str, any] = scs[key];
-        desc = str(meta.get("description", "") or "");
-        app.status_hint = "shortcut " + key + (" — " + desc if desc else "");
         reply = run_extension_shortcut(key);
         if reply {
             _push_turn(app, "tool", reply);
@@ -299,7 +296,6 @@ def _handle_key(app: LiveShell, key: str) {
             note += "  (write tools blocked)";
         }
         _push_turn(app, "system", note);
-        app.status_hint = "mode " + app.mode + " · shift+tab cycles";
             app.dirty = True;
         return;
     }
@@ -364,20 +360,17 @@ def _handle_key(app: LiveShell, key: str) {
     if key == "home" {
         set_follow_tail(app.proj, False);
         app.proj.view.scroll_offset = 0;
-        app.status_hint = "scrollback top · end/pgdn = live";
         app.dirty = True;
         return;
     }
     if key == "end" {
         set_follow_tail(app.proj, True);
-        app.status_hint = "enter · ↑↓ history · esc quit";
         app.dirty = True;
         return;
     }
     if key == "escape" {
         if app.phase == "streaming" {
             cancel_active_turn();
-            app.status_hint = "aborting…";
             app.dirty = True;
             return;
         }

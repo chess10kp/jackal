@@ -1,5 +1,5 @@
 """Transcript, layout, and formatting helpers for LiveShell."""
-import from tui.state { LiveShell, SPINNER }
+import from tui.state { LiveShell }
 import from agent.modes { is_read_only_mode }
 import from ui.transcript {
     TranscriptMessage, apply_transcript_revision, measure_message_height, set_follow_tail,
@@ -108,7 +108,7 @@ def _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
 def _install_layout(app: LiveShell) {
     # Permanent shell specs first (screen fill/fill, transcript grow+scroll,
     # status/prompt legacy heights), then this shell's parity override:
-    # hide the framework header and keep the prompt at three rows.
+    # hide the framework header and status row, keep the prompt at three rows.
     configure_main_shell_layout(app.renderer.layout, app.shell);
     set_node_contract(
         app.renderer,
@@ -117,61 +117,14 @@ def _install_layout(app: LiveShell) {
     );
     set_node_contract(
         app.renderer,
+        app.shell.status,
+        LayoutSpec(width=fill_axis(), height=fixed_axis(0)),
+    );
+    set_node_contract(
+        app.renderer,
         app.shell.prompt,
         LayoutSpec(width=fill_axis(), height=fixed_axis(3)),
     );
-}
-
-
-"""Status-line badge for the active dev mode (empty for normal)."""
-def _mode_badge(mode: str) -> str {
-    if mode == "normal" {
-        return "";
-    }
-    if mode == "auto-accept" {
-        return " AUTO ";
-    }
-    if mode == "yolo" {
-        return " YOLO ";
-    }
-    if mode == "plan" {
-        return " PLAN ";
-    }
-    if mode == "ask" {
-        return " ASK ";
-    }
-    return " " + mode.upper() + " ";
-}
-
-
-def _status_line(app: LiveShell) -> str {
-    spin = SPINNER[app.spin_i % len(SPINNER)];
-    phase: str = app.phase;
-    if app.phase == "streaming" {
-        phase = spin + " stream";
-    } elif app.phase == "approval" {
-        phase = "◈ approve";
-    } elif app.phase == "ready" {
-        phase = "● ready";
-    }
-    badge = _mode_badge(app.mode);
-    left = "";
-    if badge {
-        # Read-only modes get the loudest marker; yolo/auto stay visible
-        # but quieter (no trailing !).
-        if is_read_only_mode(app.mode) {
-            left = badge + "! ";
-        } else {
-            left = badge + " ";
-        }
-    }
-    left = left + phase + "  " + _meter(app.progress_value, 14);
-    right = app.status_hint;
-    gap = app.columns - display_width(left) - display_width(right) - 2;
-    if gap < 1 {
-        return truncate_text(left + "  " + right, app.columns, ellipsis="…");
-    }
-    return left + (" " * gap) + right;
 }
 
 
@@ -251,11 +204,6 @@ def _scroll_transcript(app: LiveShell, delta: int) {
     proj.view.scroll_offset = off;
     if off >= max_off and not proj.view.follow_tail {
         set_follow_tail(proj, True);
-        app.status_hint = "enter · ↑↓ history · esc quit";
-    } else {
-        app.status_hint = (
-            "scrollback " + str(off) + "/" + str(max_off) + " · end/pgdn = live"
-        );
     }
     app.dirty = True;
 }

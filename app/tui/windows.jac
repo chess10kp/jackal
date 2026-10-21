@@ -36,21 +36,17 @@ def _open_window(app: LiveShell, win: WindowState, force: bool = False) -> bool 
         } except Exception {
         }
     }
-    win.prev_hint = app.status_hint;
     if app.shell.approval is None {
         shell_open_approval(app.session, app.shell);
     }
     app.windows.append(win);
-    if win.spec.hint {
-        app.status_hint = win.spec.hint;
-    }
     app.dirty = True;
     return True;
 }
 
 
-"""Pop the top window; restore its pre-open status hint. Releases the
-overlay node only when the stack empties."""
+"""Pop the top window. Releases the overlay node only when the stack
+empties."""
 def _close_top_window(app: LiveShell) -> bool {
     if not app.windows {
         return False;
@@ -59,7 +55,6 @@ def _close_top_window(app: LiveShell) -> bool {
     if not app.windows {
         shell_close_approval(app.session, app.shell);
     }
-    app.status_hint = win.prev_hint;
     app.dirty = True;
     return True;
 }

@@ -215,26 +215,6 @@ def _format_mentions(paths: list[str]) -> str {
 glob _QUOTED_MENTION_PATTERN: str = r'@"([^"]+)"(?::(\d+)(?:-(\d+))?)?';
 
 
-def _mode_badge(mode: str) -> str {
-    if mode == "normal" {
-        return "";
-    }
-    if mode == "auto-accept" {
-        return " AUTO ";
-    }
-    if mode == "yolo" {
-        return " YOLO ";
-    }
-    if mode == "plan" {
-        return " PLAN ";
-    }
-    if mode == "ask" {
-        return " ASK ";
-    }
-    return " " + mode.upper() + " ";
-}
-
-
 def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
     options: list[str] = list(p.get("options", []));
     ids: list[str] = list(p.get("ids", []));
@@ -556,17 +536,7 @@ test "mention formatting dedupes and trails a space" {
 }
 
 
-# --- mode badge / explorer filter / quoted mention / mcp status tests ------
-
-test "mode badge is empty for normal and loud for read-only modes" {
-    assert _mode_badge("normal") == "";
-    assert _mode_badge("auto-accept") == " AUTO ";
-    assert _mode_badge("yolo") == " YOLO ";
-    assert _mode_badge("plan") == " PLAN ";
-    assert _mode_badge("ask") == " ASK ";
-    # Unknown modes still surface (uppercased), never silently hidden.
-    assert _mode_badge("wat") == " WAT ";
-}
+# --- explorer filter / quoted mention / mcp status tests ------
 
 test "multi filter narrows rows case-insensitively with aligned ids" {
     p: dict[str, any] = {

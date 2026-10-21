@@ -6,10 +6,7 @@ import from ui.transcript { TranscriptProjection, TranscriptMessage }
 import from ui.renderer { Renderer }
 import from ui.terminal { Terminal }
 import from ui.input { InputNormalizer }
-import from ui.progress_bar { ProgressBar }
 import from tui.window { WindowState }
-
-glob SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 # /explorer walk bounds + skip list (dot-dirs are always skipped; dot-FILES
 # stay selectable). Caps keep huge trees responsive inside an 8-row overlay.
@@ -65,12 +62,10 @@ obj LiveShell {
         renderer: Renderer,
         term: Terminal,
         normalizer: InputNormalizer,
-        progress: ProgressBar,
         messages: list[TranscriptMessage] = [],
         rev: int = 0,
         msg_n: int = 0,
         phase: str = "ready",
-        progress_value: float = 0.0,
         stream_full: str = "",
         stream_shown: int = 0,
         stream_msg_id: str = "",
@@ -80,7 +75,6 @@ obj LiveShell {
         dirty: bool = True,
         columns: int = 80,
         rows: int = 24,
-        status_hint: str = "enter · ↑↓ history · esc quit",
         evq: any = None,
         worker: any = None,
         tool_msg_id: str = "",

@@ -10,7 +10,6 @@ import from agent.modes {
 import from ui.screen {
       shell_resize,
 }
-import from ui.progress_bar { SetProgress }
 import from ui.renderer { create_renderer }
 import from tui.preview { tool_result_preview }
 import from tui.window { WindowSpec, WindowState }
@@ -32,7 +31,7 @@ def _apply_resize(app: LiveShell, columns: int, rows: int) {
     app.renderer = create_renderer(columns, rows);
     _install_layout(app);
     app.proj.viewport_width = max(12, columns - 2);
-    app.proj.viewport_height = max(4, rows - 7);
+    app.proj.viewport_height = max(4, rows - 6);
     app.dirty = True;
 }
 
@@ -48,9 +47,6 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
     payload = model_text if model_text else user_text;
     _push_turn(app, "user", user_text);
     app.phase = "streaming";
-    app.shell.status.phase = "streaming";
-    app.progress_value = 0.05;
-    app.progress spawn SetProgress(value=app.progress_value);
     app.stream_full = "";
     app.stream_shown = 0;
     app.stream_tick = 0;
@@ -59,8 +55,6 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
     q = queue.Queue();
     app.evq = q;
     app.stream_msg_id = _push_turn(app, "assistant", "▍");
-    app.status_hint = "streaming · esc abort";
-
     def collector(kind: str, data: dict[str, any]) {
         try {
             q.put((str(kind), dict(data)));
@@ -126,10 +120,6 @@ def _finish_stream(app: LiveShell, final_body: str) {
     }
     _rewrite_turn(app, app.stream_msg_id, "assistant", body.rstrip());
     app.phase = "ready";
-    app.shell.status.phase = "ready";
-    app.progress_value = 0.0;
-    app.progress spawn SetProgress(value=0.0);
-    app.status_hint = "enter · ↑↓ history · esc quit";
     app.worker = None;
     app.evq = None;
     app.dirty = True;
@@ -203,7 +193,6 @@ def _tick_stream(app: LiveShell) {
             approval_args: dict[str, any] = args if isinstance(args, dict) else {};
             approval_label = tool_name + "(" + (", ".join(parts))[:160] + ")";
             app.phase = "approval";
-            app.shell.status.phase = "approval";
             _open_window(
                 app,
                 WindowState(
@@ -214,8 +203,7 @@ def _tick_stream(app: LiveShell) {
                 force=True,
             );
             _push_turn(app, "tool", "? approve " + approval_label);
-                    app.status_hint = "a accept · r deny";
-            app.dirty = True;
+                    app.dirty = True;
         } elif kind == "__done__" {
             _finish_stream(app, str(data.get("answer", "")));
             return;
@@ -243,10 +231,6 @@ def _accept_approval(app: LiveShell) {
     }
     _push_turn(app, "tool", "✓ approved");
     app.phase = "streaming";
-    app.shell.status.phase = "streaming";
-    if not app.windows {
-        app.status_hint = "streaming · esc abort";
-    }
     app.dirty = True;
 }
 
@@ -263,16 +247,11 @@ def _reject_approval(app: LiveShell) {
         }
         _push_turn(app, "tool", "✗ denied");
         app.phase = "streaming";
-        app.shell.status.phase = "streaming";
-        if not app.windows {
-            app.status_hint = "streaming · esc abort";
-        }
         app.dirty = True;
         return;
     }
     if app.phase == "streaming" {
         cancel_active_turn();
-        app.status_hint = "aborting…";
         app.dirty = True;
         return;
     }

@@ -75,7 +75,6 @@ def _login_error(app: LiveShell, message: str) {
         _close_picker(app);
     }
     _push_turn(app, "tool", "login error: " + message);
-    app.status_hint = "login failed · /login to retry";
     app.dirty = True;
 }
 
@@ -86,7 +85,6 @@ def _cancel_login(app: LiveShell) {
         _close_picker(app);
     }
     _push_turn(app, "tool", "login cancelled");
-    app.status_hint = "login cancelled · enter · ↑↓ history · esc quit";
     app.dirty = True;
 }
 
@@ -142,7 +140,6 @@ def _start_login_provider(app: LiveShell, provider_id: str) {
         "set_api_key_input",
         {"providerId": provider_id},
     );
-    app.status_hint = "paste API key · enter save · esc cancel";
     app.dirty = True;
 }
 
@@ -173,7 +170,6 @@ def _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
         _close_picker(app);
     }
     _push_turn(app, "tool", "logged in to " + provider_id + "; credentials saved to " + path);
-    app.status_hint = "login complete · enter · ↑↓ history · esc quit";
     app.dirty = True;
 }
 """Open /login's provider picker. An optional provider argument skips the
@@ -216,7 +212,6 @@ def _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
             for i in range(len(ids))
         ]},
     );
-    app.status_hint = "↑↓ provider · enter choose · esc cancel";
     app.dirty = True;
     return "";
 

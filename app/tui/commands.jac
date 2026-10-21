@@ -307,13 +307,6 @@ def _ui_open_modal(app: LiveShell, rec: dict[str, any]) -> bool {
     }
     label = str(rec.get("title", "")) or str(rec.get("message", ""));
     _push_turn(app, "tool", "? [ui] " + method + ": " + label[:80]);
-    if method == "select" {
-        app.status_hint = "↑↓ move · enter choose · esc cancel";
-    } elif method == "confirm" {
-        app.status_hint = "y confirm · n/esc cancel";
-    } else {
-        app.status_hint = "type · enter submit · esc cancel";
-    }
     app.dirty = True;
     return True;
 }

@@ -17,7 +17,6 @@ import from ui.transcript { bind_transcript, set_follow_tail }
 import from ui.renderer { create_renderer }
 import from ui.terminal { Terminal, ProcessTerminal, read_terminal_size }
 import from ui.input { InputNormalizer }
-import from ui.progress_bar { ProgressBar }
 
 """Build the LiveShell. `term` defaults to the process TTY; tests pass an
 EmulatedTerminal (ui/emulated_terminal.jac) and drive the same shell."""
@@ -41,11 +40,10 @@ def create_live_shell(term: Terminal | None = None) -> LiveShell {
         shell.transcript,
         "live.transcript",
         width=max(12, cols - 2),
-        height=max(4, rows - 7),
+        height=max(4, rows - 6),
     );
     set_follow_tail(proj, True);
     renderer = create_renderer(cols, rows);
-    progress = ProgressBar(key="live_progress", value=0.0);
     app = LiveShell(
         session=session,
         shell=shell,
@@ -53,7 +51,6 @@ def create_live_shell(term: Terminal | None = None) -> LiveShell {
         renderer=renderer,
         term=host,
         normalizer=InputNormalizer(),
-        progress=progress,
         columns=cols,
         rows=rows,
         mode=get_mode(),

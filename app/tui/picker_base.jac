@@ -36,7 +36,6 @@ def _open_picker(
         "multi": multi,
         "toggled": [],
         "filter": "",
-        "prev_hint": app.status_hint,
     };
     win = WindowState(
         spec=WindowSpec(title="? " + title, width=46),
@@ -47,11 +46,6 @@ def _open_picker(
         return False;
     }
 
-    if multi {
-        app.status_hint = "type filter · space toggle · enter insert · esc";
-    } else {
-        app.status_hint = "↑↓ move · enter choose · esc cancel";
-    }
     app.dirty = True;
     return True;
 }
