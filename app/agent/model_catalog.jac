@@ -11,13 +11,15 @@ subject to:
 
 The fetch itself never runs for local routes (`base_url` startswith
 "local://" — mockllm) and never raises: a catalog problem must degrade to
-the static hints, not break `/model`. I/O is confined to `_fetch_route_models`
-and `refresh_model_catalog`; everything else is pure and unit-tested.
+the static hints, not break `/model`. Picker reads never wait for network I/O;
+stale catalogs refresh in a deduplicated background flow.
 """
 
 import os;
 import time;
 import from .llm_transport { PROVIDER_ROUTES }
+
+glob _CATALOG_REFRESHING: dict[str, bool] = {};
 
 """Freshness window in milliseconds (fx: provider_versions refresh 60 s)."""
 glob CATALOG_TTL_MS: int = 60_000;
@@ -176,8 +178,7 @@ def _fetch_route_models(route: dict[str, any]) -> list[str] {
         if api_key {
             headers["Authorization"] = "Bearer " + api_key;
         }
-        # Short timeout: this runs at picker time, not stream time (fx allows
-        # 30 s for background refreshes; the picker itself serves cache).
+        # Short timeout for background refreshes; picker reads never wait here.
         client_obj: any = httpx.Client(timeout=5.0);
         try {
             r: any = client_obj.get(url, headers=headers);
@@ -194,36 +195,27 @@ def _fetch_route_models(route: dict[str, any]) -> list[str] {
 }
 
 
-"""Catalog ids shown for one provider: fresh cache, else refresh, else
-last-good, else static hints. Never raises; unknown providers get []."""
+"""Return provider catalog immediately: cached ids or static hints. Stale/missing
+catalogs refresh in the background; unknown providers get []. Never raises."""
 def catalog_models(provider: str) -> list[str] {
     route: dict[str, any] | None = None;
     raw_route: any = PROVIDER_ROUTES.get(provider);
     if isinstance(raw_route, dict) {
         route = raw_route;
     }
-    if _is_local_route(route) {
+    if (_is_local_route(route)) {
         return _static_models(route);
     }
-    if _entry_is_fresh(_CATALOG_CACHE.get(provider), _now_ms(), _ttl_ms()) {
-        cached: any = _CATALOG_CACHE.get(provider);
-        models: any = cached.get("models") if isinstance(cached, dict) else None;
-        if isinstance(models, list) {
-            return list(models);
+    cached: any = _CATALOG_CACHE.get(provider);
+    models: any = cached.get("models") if isinstance(cached, dict) else None;
+    if (isinstance(models, list) and models) {
+        if not _entry_is_fresh(cached, _now_ms(), _ttl_ms()) {
+            _schedule_catalog_refresh(provider);
         }
+        return list(models);
     }
-    fetched = _fetch_route_models(route) if route is not None else [];
-    return _merge_catalog_result(provider, fetched, _static_models(route), _now_ms());
-}
-
-
-"""Background warm for one provider (boot-time flow target). Never raises
-and never blocks the caller beyond the spawn."""
-def _warm_one(provider: str) {
-    try {
-        catalog_models(provider);
-    } except Exception {
-    }
+    _schedule_catalog_refresh(provider);
+    return _static_models(route);
 }
 
 
@@ -232,7 +224,7 @@ seam right after credentials are hydrated so `/model` opens with live
 catalogs already cached (fx's preload thread, in flow form)."""
 def warm_model_catalog() {
     for prov in PROVIDER_ROUTES {
-        flow _warm_one(str(prov));
+        _schedule_catalog_refresh(str(prov));
     }
 }
 
@@ -256,4 +248,26 @@ def refresh_model_catalog() -> dict[str, int] {
         counts[provider] = len(shown);
     }
     return counts;
+}
+
+def _refresh_one(provider: str) {
+    try {
+        raw_route: any = PROVIDER_ROUTES.get(provider);
+        route: dict[str, any] = raw_route if isinstance(raw_route, dict) else {};
+        if not _is_local_route(route) {
+            fetched: list[str] = _fetch_route_models(route);
+            _merge_catalog_result(provider, fetched, _static_models(route), _now_ms());
+        }
+    } except Exception {
+    } finally {
+        _CATALOG_REFRESHING.pop(provider, None);
+    }
+}
+
+def _schedule_catalog_refresh(provider: str) {
+    if _CATALOG_REFRESHING.get(provider, False) {
+        return;
+    }
+    _CATALOG_REFRESHING[provider] = True;
+    flow _refresh_one(provider);
 }
