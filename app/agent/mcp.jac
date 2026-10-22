@@ -24,7 +24,8 @@ import threading;
 import time;
 
 glob DEFAULT_TIMEOUT_S: float = 15.0,
-     MAX_NOTIFICATIONS: int = 1000;
+     MAX_NOTIFICATIONS: int = 1000,
+     MAX_LIST_PAGES: int = 64;
 
 # Protocol version we offer during initialize; servers negotiate down.
 glob MCP_PROTOCOL_VERSION: str = "2025-06-18";
@@ -32,7 +33,8 @@ glob MCP_PROTOCOL_VERSION: str = "2025-06-18";
 
 obj McpClient {
     """State holder for one MCP server subprocess."""
-    has proc: any = None,
+    has dead: bool = False,
+        proc: any = None,
         server_cmd: list[str] = [],
         next_id: int = 1,
         timeout_s: float = DEFAULT_TIMEOUT_S,
@@ -115,12 +117,26 @@ def _reader_loop(client: McpClient) {
             continue;
         }
         rid: any = parsed.get("id");
-        is_response = (
-            "id" in parsed
-            and rid is not None
-            and "method" not in parsed
-        );
-        if is_response {
+        method: any = parsed.get("method");
+        if rid is not None and method is not None {
+            # Server->client REQUEST (sampling/roots/elicitation): answer
+            # immediately with a JSON-RPC error so servers never hang on us.
+            reply: dict[str, any] = {
+                "jsonrpc": "2.0",
+                "id": rid,
+                "error": {
+                    "code": -32601,
+                    "message": "method not supported by client: " + str(method),
+                },
+            };
+            try {
+                _write_line(client, reply);
+            } except Exception {
+            }
+            continue;
+        }
+        if rid is not None and method is None {
+            # Response to one of ours: correlate by id.
             key = str(rid);
             waiter: any = client.pending.get(key);
             if waiter is not None {
@@ -132,9 +148,23 @@ def _reader_loop(client: McpClient) {
             }
             continue;
         }
-        # Notification or server->client request: buffer for inspection.
+        # True notification: buffer for the session dispatcher (bounded).
         if len(client.notifications) < MAX_NOTIFICATIONS {
             client.notifications.append(parsed);
+        }
+    }
+    # EOF while the client still wanted reads: record unexpected death and
+    # fail every in-flight waiter fast instead of burning their timeouts.
+    if stop is None or not stop.is_set() {
+        client.dead = True;
+    }
+    for leftover in list(client.pending.values()) {
+        if isinstance(leftover, dict) and leftover.get("msg") is None {
+            leftover["eof"] = True;
+            ev2: any = leftover.get("event");
+            if ev2 is not None {
+                ev2.set();
+            }
         }
     }
 }
@@ -186,9 +216,7 @@ def _write_line(client: McpClient, msg: dict[str, any]) {
 """Send a JSON-RPC request and wait for the correlated response.
 
 Internal: raises TimeoutError/RuntimeError. Public seam wraps this."""
-def _request(
-    client: McpClient, method: str, params: dict[str, any], timeout_s: float
-) -> dict[str, any] {
+def _request(client: McpClient, method: str, params: dict[str, any], timeout_s: float) -> dict[str, any] {
     _ensure_io(client);
     rid = client.next_id;
     client.next_id += 1;
@@ -218,6 +246,11 @@ def _request(
             got: any = waiter["msg"];
             return got as dict;
         }
+        if waiter.get("eof") {
+            # Reader hit EOF: the server is gone — fail fast, honestly.
+            client.pending.pop(key, None);
+            raise RuntimeError("mcp server closed connection");
+        }
         ok = waiter["event"].wait(timeout=remaining);
         if not ok and time.monotonic() >= deadline {
             client.pending.pop(key, None);
@@ -225,8 +258,6 @@ def _request(
         }
     }
 }
-
-
 """Extract {"ok": ...} payload from a JSON-RPC response dict."""
 def _response_payload(resp: dict[str, any]) -> dict[str, any] {
     err: any = resp.get("error");
@@ -262,6 +293,7 @@ def mcp_start(client: McpClient, server_cmd: list[str], timeout_s: float = -1.0)
     if _alive(client) {
         return {"ok": False, "error": "mcp client already started"};
     }
+    client.dead = False;
     timeout = _effective_timeout(client, timeout_s);
     _ensure_io(client);
     try {
@@ -325,35 +357,52 @@ def mcp_start(client: McpClient, server_cmd: list[str], timeout_s: float = -1.0)
 }
 
 
-"""List tools exposed by the server. Returns {"ok", "tools": [...]}."""
+"""List tools exposed by the server, following nextCursor pagination
+(capped at MAX_LIST_PAGES so a broken cursor cannot loop forever).
+Returns {"ok", "tools": [...]} with all pages merged."""
 def mcp_list_tools(client: McpClient, timeout_s: float = -1.0) -> dict[str, any] {
     if not client.initialized or not _alive(client) {
         return {"ok": False, "error": "mcp client not initialized"};
     }
     timeout = _effective_timeout(client, timeout_s);
-    try {
-        resp = _request(client, "tools/list", {}, timeout);
-    } except Exception as e {
-        return {"ok": False, "error": str(e)};
-    }
-    payload = _response_payload(resp);
-    if not payload["ok"] {
-        return payload;
-    }
-    result: any = payload["result"];
-    raw_tools: any = result.get("tools", []);
     tools: list[dict[str, any]] = [];
-    if isinstance(raw_tools, list) {
-        for t in raw_tools {
-            if isinstance(t, dict) and t.get("name") {
-                schema: any = t.get("inputSchema");
-                tools.append({
-                    "name": str(t.get("name")),
-                    "description": str(t.get("description", "")),
-                    "inputSchema": schema if isinstance(schema, dict) else {},
-                });
+    cursor: str = "";
+    pages: int = 0;
+    while True {
+        params: dict[str, any] = {};
+        if cursor {
+            params["cursor"] = cursor;
+        }
+        try {
+            resp = _request(client, "tools/list", params, timeout);
+        } except Exception as e {
+            return {"ok": False, "error": str(e)};
+        }
+        payload = _response_payload(resp);
+        if not payload["ok"] {
+            return payload;
+        }
+        result: any = payload["result"];
+        raw_tools: any = result.get("tools", []);
+        if isinstance(raw_tools, list) {
+            for t in raw_tools {
+                if isinstance(t, dict) and t.get("name") {
+                    schema: any = t.get("inputSchema");
+                    tools.append({
+                        "name": str(t.get("name")),
+                        "description": str(t.get("description", "")),
+                        "inputSchema": schema if isinstance(schema, dict) else {},
+                    });
+                }
             }
         }
+        pages += 1;
+        nc: any = result.get("nextCursor");
+        next_cur: str = str(nc) if nc else "";
+        if not next_cur or pages >= MAX_LIST_PAGES {
+            break;
+        }
+        cursor = next_cur;
     }
     return {"ok": True, "tools": tools};
 }
@@ -479,4 +528,19 @@ def mcp_tool_specs(client: McpClient, prefix: str = "", timeout_s: float = -1.0)
         });
     }
     return specs;
+}
+
+
+"""Public liveness: process running and no unexpected EOF observed."""
+def mcp_is_alive(client: McpClient) -> bool {
+    return _alive(client) and not client.dead;
+}
+
+
+"""Pop and return all buffered server notifications (the reader keeps the
+buffer bounded); the session dispatcher consumes the result."""
+def mcp_drain_notifications(client: McpClient) -> list[dict[str, any]] {
+    out: list[dict[str, any]] = list(client.notifications);
+    client.notifications.clear();
+    return out;
 }
