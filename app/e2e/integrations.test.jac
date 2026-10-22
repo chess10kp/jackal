@@ -1,5 +1,6 @@
 """E2E: MCP servers and subagents through the real entry and mock model."""
 
+import os;
 import sys;
 
 
@@ -102,6 +103,27 @@ test "an enabled:false mcp server never attaches" {
             assert not str(t).startswith("mcp_off_"), sb.explain(r);
         }
         assert "off — disabled" in r.stdout, sb.explain(r);
+    } finally {
+        sb.cleanup();
+    }
+}
+
+
+test "a dead mcp server degrades, then recovers on the next call" {
+    sb = make_sandbox();
+    try {
+        write_project_config(sb, _mcp_cfg());
+        sb.script([
+            {"text": "", "tool_calls": [{"name": "mcp_fake_die", "args": {}}]},
+            {"text": ""},
+            {"tool_calls": [{"name": "mcp_fake_echo", "args": {"text": "back"}}]},
+            {"text": "recovered"},
+        ]);
+        r = run_jackal(sb, ["-p", "--mode", "yolo", "kill then use"]);
+        assert r.code == 0, sb.explain(r);
+        calls = sb.calls();
+        assert calls[1]["last"]["content"] == "dying", sb.explain(r);
+        assert calls[3]["last"]["content"] == "echo: back", sb.explain(r);
     } finally {
         sb.cleanup();
     }

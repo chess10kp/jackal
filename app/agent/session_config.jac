@@ -4,6 +4,7 @@ import os;
 import json;
 import time;
 import fnmatch;
+import threading;
 
 import from .compaction { load_project_config }
 import from .llm { provider_for, credential_error }
@@ -35,6 +36,11 @@ import from .session_state {
     get_thinking_level_state,
     adopt_model_prefs,
 }
+
+
+# Serializes transparent restarts so concurrent tool calls against a dead
+# server produce exactly ONE restart, never a loop.
+glob _MCP_REVIVE_LOCK: any = threading.Lock();
 
 
 def set_mode(next_mode: str) -> str {
@@ -151,6 +157,14 @@ native dispatch path does not require dynamic keyword unpacking."""
 def _make_mcp_handler(client: McpClient, server_name: str, tool_name: str) -> Callable[[dict[str, any]], str] {
     def handle(args: dict[str, any]) -> str {
         res: dict[str, any] = client.call_tool(tool_name, args);
+        if not res.get("ok") and not mcp_is_alive(client) {
+            # The server died between calls: attempt exactly one transparent
+            # restart + retry (no auto-restart loop); if it still fails, the
+            # honest ERROR below is what the model sees.
+            if _revive_client(server_name) {
+                res = client.call_tool(tool_name, args);
+            }
+        }
         if res.get("ok") {
             if res.get("is_error") {
                 return (
@@ -272,10 +286,89 @@ def _mcp_fail(server_name: str, error: str) {
 }
 
 
+"""Synchronously restart one dead server in place (same spec, same client
+object so registered handlers keep working). Returns True when a healthy
+initialized client is available afterwards. Serialized by a module lock:
+concurrent callers collapse into one restart and reuse the result."""
+def _revive_client(server_name: str) -> bool {
+    client: any = plugins.mcp_clients.get(server_name);
+    if client is None {
+        return False;
+    }
+    spec: dict[str, any] = dict(plugins.mcp_specs.get(server_name, {}));
+    cmd: list[str] = [str(c) for c in spec.get("cmd", [])];
+    if not cmd {
+        return False;
+    }
+    env_extra: dict[str, str] = {};
+    raw_env: any = spec.get("env", {});
+    if isinstance(raw_env, dict) {
+        for (env_k, env_v) in raw_env.items() {
+            env_extra[str(env_k)] = str(env_v);
+        }
+    }
+    cwd: str = str(spec.get("cwd", "") or "");
+    timeout: float = -1.0;
+    raw_to: any = spec.get("timeout", -1.0);
+    if isinstance(raw_to, (int, float)) {
+        timeout = float(raw_to);
+    }
+    lock: any = _MCP_REVIVE_LOCK;
+    lock.acquire();
+    try {
+        # Another thread may have revived it while we waited on the lock.
+        if client.initialized and mcp_is_alive(client) {
+            return True;
+        }
+        mcp_stop(client);
+        _mcp_set_status(server_name, "connecting", cmd=cmd);
+        started = mcp_start(client, cmd, env_extra=env_extra, cwd=cwd);
+        if not started.get("ok") {
+            _mcp_fail(server_name, str(started.get("error", "restart failed")));
+            return False;
+        }
+        prev_tools: any = plugins.mcp_status.get(server_name, {}).get("tools", 0);
+        _mcp_set_status(server_name, "connected", tools=int(prev_tools));
+        plugins.mcp_notices.append(
+            "mcp server " + server_name + " restarted after unexpected death"
+        );
+        return True;
+    } finally {
+        lock.release();
+    }
+}
+
+
+"""Detect unexpected server death: any client whose status still says
+`connected` but whose process is gone (or whose reader hit EOF) flips to
+`failed` with a notice. Frontends call this via drain_mcp_notices, so a
+death surfaces within one tick/turn without extra threads."""
+def mcp_health_check() {
+    for (name, client) in list(plugins.mcp_clients.items()) {
+        st: dict[str, any] = plugins.mcp_status.get(name, {});
+        if str(st.get("state", "")) != "connected" {
+            continue;
+        }
+        if mcp_is_alive(client) {
+            continue;
+        }
+        detail: str = "server process died unexpectedly";
+        try {
+            if client.proc is not None and client.proc.poll() is not None {
+                detail += " (exit code " + str(client.proc.poll()) + ")";
+            }
+        } except Exception {
+        }
+        _mcp_fail(name, detail);
+    }
+}
+
+
 """Pop queued MCP notices for display (frontends call this each tick/turn).
-Also pumps buffered server notifications first so list_changed events are
-consumed even when nothing else reads them."""
+Also pumps buffered server notifications (list_changed diff) and runs the
+death health check first, so both surface within one tick/turn."""
 def drain_mcp_notices() -> list[str] {
+    mcp_health_check();
     mcp_pump_notifications();
     out: list[str] = list(plugins.mcp_notices);
     plugins.mcp_notices.clear();

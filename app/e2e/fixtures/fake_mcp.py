@@ -19,6 +19,8 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {}, "required": []}},
     {"name": "envpeek", "description": "Report FAKE_MCP_TOKEN from the server environment.",
      "inputSchema": {"type": "object", "properties": {}, "required": []}},
+    {"name": "die", "description": "Reply once, then exit the server process.",
+     "inputSchema": {"type": "object", "properties": {}, "required": []}},
 ]
 
 
@@ -57,6 +59,10 @@ for line in sys.stdin:
             text = os.getcwd()
         elif name == "envpeek":
             text = "token=" + os.environ.get("FAKE_MCP_TOKEN", "unset")
+        elif name == "die":
+            reply(rid, {"content": [{"type": "text", "text": "dying"}]})
+            sys.stdout.flush()
+            os._exit(7)
         else:
             reply(rid, {"content": [{"type": "text", "text": "unknown tool"}], "isError": True})
             continue

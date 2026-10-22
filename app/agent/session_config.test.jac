@@ -160,6 +160,9 @@ for raw in sys.stdin:
             {"name": name, "description": "refcount tool",
              "inputSchema": {"type": "object", "properties": {},
                              "required": []}}]}})
+    elif method == "tools/call":
+        send({"jsonrpc": "2.0", "id": rid, "result": {
+            "content": [{"type": "text", "text": "pong"}], "isError": False}})
     elif rid is not None:
         send({"jsonrpc": "2.0", "id": rid, "error": {
             "code": -32601, "message": "method not found"}})
@@ -266,6 +269,72 @@ test "cross-server tool name collisions rename deterministically" {
         assert get_tool(reg, "mcp_a_b_x_2") is not None;
         assert get_tool(reg, "mcp_a_b_x_3") is None;
     } finally {
+        _reset_mcp_plugin_state();
+    }
+}
+
+test "health check flips dead servers to failed with a notice" {
+    tmp = tempfile.mkdtemp(prefix="jackal-mcp-hc-");
+    reg = ToolRegistry();
+    plugins.reg = reg;
+    client = create_mcp_client();
+    try {
+        path = os.path.join(tmp, "hc_server.py");
+        fh: any = open(path, "w");
+        fh.write(REF_SERVER_SRC);
+        fh.close();
+        cmd = [sys.executable, path];
+        assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
+        plugins.mcp_clients["t"] = client;
+        plugins.mcp_specs["t"] = _spec_for(cmd);
+        plugins.mcp_status["t"] = {"state": "connected", "error": "", "tools": 1, "cmd": cmd};
+        # Kill the process out from under the healthy status.
+        client.proc.kill();
+        client.proc.wait(timeout=5);
+        mcp_health_check();
+        assert str(plugins.mcp_status["t"]["state"]) == "failed";
+        assert "died" in str(plugins.mcp_status["t"]["error"]);
+        joined = " ".join(plugins.mcp_notices);
+        assert "unavailable" in joined;
+    } finally {
+        mcp_stop(client);
+        shutil.rmtree(tmp, ignore_errors=True);
+        _reset_mcp_plugin_state();
+    }
+}
+
+
+test "a tool call against a dead server revives once and succeeds" {
+    tmp = tempfile.mkdtemp(prefix="jackal-mcp-rv-");
+    reg = ToolRegistry();
+    plugins.reg = reg;
+    client = create_mcp_client();
+    try {
+        path = os.path.join(tmp, "rv_server.py");
+        fh: any = open(path, "w");
+        fh.write(REF_SERVER_SRC);
+        fh.close();
+        cmd = [sys.executable, path];
+        assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
+        plugins.mcp_clients["t"] = client;
+        plugins.mcp_specs["t"] = _spec_for(cmd);
+        plugins.mcp_status["t"] = {"state": "connected", "error": "", "tools": 1, "cmd": cmd};
+        handler = _make_mcp_handler(client, "t", "ping");
+        # Kill the server, then call: transparent restart + retry must land.
+        client.proc.kill();
+        client.proc.wait(timeout=5);
+        res: str = handler({});
+        assert res == "pong", res;
+        assert str(plugins.mcp_status["t"]["state"]) == "connected";
+        joined = " ".join(plugins.mcp_notices);
+        assert "restarted after unexpected death" in joined;
+        # A healthy client is reused, not restarted again.
+        notices_before = len(plugins.mcp_notices);
+        assert handler({}) == "pong";
+        assert len(plugins.mcp_notices) == notices_before;
+    } finally {
+        mcp_stop(client);
+        shutil.rmtree(tmp, ignore_errors=True);
         _reset_mcp_plugin_state();
     }
 }
