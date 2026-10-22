@@ -148,6 +148,7 @@ Pruned as stale (legacy-runtime-bound, moot after deletion): `@jac/pi` hook nami
 | `docs/PLUGIN-HOST-PLAN.md` | Parallel Node sidecar; JS must not block first frame (D11/D13/D21); §14 lessons from P0–P5 |
 | `docs/VENDOR-JAC.md` | Vendored Jac compiler subtree — build, edit, sync, push-back rules |
 | `docs/CORDIS-DESIGN.md` | Dynamic composition design |
+| `docs/MCP.md` | MCP client: config schema, approvals, /mcp commands, failure behavior |
 | `docs/decisions.org` | Architecture decision log |
 | `tui/js2jac/SYNC.md` | js2jac conversion workstream contract |
 
