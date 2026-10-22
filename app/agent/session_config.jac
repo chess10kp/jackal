@@ -398,6 +398,145 @@ def mcp_configured_specs() -> dict[str, list[str]] {
 }
 
 
+"""Legacy mcp.json discovery sources (stdio-shaped entries only):
+the pi bundle, Cursor, and VS Code (linux/mac). Missing files are skipped."""
+def _legacy_mcp_sources(agent_dir: str) -> list[str] {
+    home: str = os.path.expanduser("~");
+    cands: list[str] = [];
+    if agent_dir {
+        cands.append(os.path.join(agent_dir, "mcp.json"));
+    }
+    cands.append(os.path.join(home, ".cursor", "mcp.json"));
+    cands.append(os.path.join(home, ".config", "Code", "User", "mcp.json"));
+    cands.append(
+        os.path.join(home, "Library", "Application Support", "Code", "User", "mcp.json")
+    );
+    out: list[str] = [];
+    for c in cands {
+        if os.path.isfile(c) {
+            out.append(c);
+        }
+    }
+    return out;
+}
+
+
+"""One-time import of legacy mcp.json server entries (pi bundle, Cursor,
+VS Code) into the user-level config, with an onboarding notice.
+
+Rules: only stdio-shaped entries (command/args[/env]) import; Cursor's
+`disabled` maps to `enabled: false`; names already configured in the user
+OR project config are skipped (project wins by design); the first source
+naming a server wins. The import target is the first existing user config
+($JACKAL_AGENT_DIR/config.json, then ~/.jackal/config.json); when neither
+exists, ~/.jackal/config.json is created. Runs once per machine — marker
+file <home>/.jackal/mcp_import_done; JACKAL_MCP_NO_IMPORT=1 disables.
+home_dir/sources are injectable for tests. Returns the imported names
+(never raises — a failed import must not break attach)."""
+def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] {
+    home: str = home_dir if home_dir else os.path.expanduser("~");
+    imported: list[str] = [];
+    try {
+        if os.environ.get("JACKAL_MCP_NO_IMPORT", "") {
+            return imported;
+        }
+        marker: str = os.path.join(home, ".jackal", "mcp_import_done");
+        if os.path.isfile(marker) {
+            return imported;
+        }
+        agent_dir: str = os.environ.get("JACKAL_AGENT_DIR", "");
+        srcs: list[str] = sources if sources else _legacy_mcp_sources(agent_dir);
+        # Target: first existing user config; else create ~/.jackal/config.json.
+        target: str = os.path.join(home, ".jackal", "config.json");
+        if agent_dir {
+            cand: str = os.path.join(agent_dir, "config.json");
+            if os.path.isfile(cand) {
+                target = cand;
+            }
+        }
+        user_cfg: dict[str, any] = _load_json_dict(target);
+        raw_um: any = user_cfg.get("mcp");
+        um: dict[str, any] = raw_um if isinstance(raw_um, dict) else {};
+        raw_us: any = um.get("servers");
+        us: dict[str, any] = raw_us if isinstance(raw_us, dict) else {};
+        cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
+        proj_cfg: dict[str, any] = load_project_config(cwd);
+        proj_specs: dict[str, dict[str, any]] = _mcp_server_specs(proj_cfg);
+        changed: bool = False;
+        for src_path in srcs {
+            legacy: dict[str, any] = _load_json_dict(src_path);
+            raw_servers: any = legacy.get("mcpServers");
+            if not isinstance(raw_servers, dict) {
+                continue;
+            }
+            for (name, ent) in raw_servers.items() {
+                sname: str = str(name);
+                if not sname or not isinstance(ent, dict) {
+                    continue;
+                }
+                if sname in us or sname in proj_specs {
+                    continue;
+                }
+                raw_cmd: any = ent.get("command");
+                if not isinstance(raw_cmd, (str, list)) or not raw_cmd {
+                    continue;  # http-shaped or malformed: not importable
+                }
+                server_entry: dict[str, any] = {};
+                if isinstance(raw_cmd, str) {
+                    server_entry["command"] = str(raw_cmd);
+                } else {
+                    parts: list[str] = [];
+                    for c in raw_cmd {
+                        parts.append(str(c));
+                    }
+                    server_entry["command"] = parts;
+                }
+                raw_args: any = ent.get("args");
+                if isinstance(raw_args, list) {
+                    args_out: list[str] = [];
+                    for a in raw_args {
+                        args_out.append(str(a));
+                    }
+                    server_entry["args"] = args_out;
+                }
+                raw_env: any = ent.get("env");
+                if isinstance(raw_env, dict) {
+                    env_out: dict[str, str] = {};
+                    for (ek, ev) in raw_env.items() {
+                        env_out[str(ek)] = str(ev);
+                    }
+                    server_entry["env"] = env_out;
+                }
+                if ent.get("disabled") is True {
+                    server_entry["enabled"] = False;
+                }
+                us[sname] = server_entry;
+                imported.append(sname);
+                changed = True;
+            }
+        }
+        if changed {
+            um["servers"] = us;
+            user_cfg["mcp"] = um;
+            os.makedirs(os.path.dirname(target), exist_ok=True);
+            tmp_write: str = target + ".tmp";
+            with open(tmp_write, "w", encoding="utf-8") as fh {
+                json.dump(user_cfg, fh, indent=2, sort_keys=True);
+                fh.write("\n");
+            }
+            os.replace(tmp_write, target);
+        }
+        # One-time even when nothing imported: remember that we looked.
+        os.makedirs(os.path.dirname(marker), exist_ok=True);
+        with open(marker, "w", encoding="utf-8") as fh {
+            fh.write("done\n");
+        }
+    } except Exception {
+    }
+    return imported;
+}
+
+
 def _mcp_set_status(server_name: str, state: str, error: str = "", tools: int = 0, cmd: list[str] | None = None, denied: int = 0) {
     prev: dict[str, any] = plugins.mcp_status.get(server_name, {});
     plugins.mcp_status[server_name] = {
@@ -893,6 +1032,15 @@ each declared server. Disabled servers get a `disabled` status entry and
 never attach."""
 def _attach_mcp_servers() {
     cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
+    imported: list[str] = mcp_import_legacy();
+    if imported {
+        plugins.mcp_notices.append(
+            "mcp: imported " + str(len(imported)) + " server(s) from legacy"
+            + " mcp.json sources: " + ", ".join(imported)
+            + " (user-level config; remove entries there or set"
+            + " JACKAL_MCP_NO_IMPORT=1 to opt out)"
+        );
+    }
     specs = _mcp_server_specs(mcp_config(cwd));
     for (name, spec) in specs.items() {
         plugins.mcp_specs[name] = dict(spec);

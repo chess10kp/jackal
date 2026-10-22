@@ -2,6 +2,7 @@
 
 import os;
 import sys;
+import json;
 import subprocess;
 
 
@@ -103,6 +104,42 @@ test "an enabled:false mcp server never attaches" {
             assert not str(t).startswith("mcp_off_"), sb.explain(r);
         }
         assert "off — disabled" in r.stdout, sb.explain(r);
+    } finally {
+        sb.cleanup();
+    }
+}
+
+
+test "legacy mcp.json import attaches imported servers with a notice" {
+    sb = make_sandbox();
+    try {
+        # sandbox HOME + opt back in; legacy source in the sandbox agent dir
+        home = os.path.join(sb.base_dir, "home");
+        os.makedirs(home);
+        legacy = os.path.join(sb.agent_dir, "mcp.json");
+        with open(legacy, "w") as f {
+            f.write(json.dumps({"mcpServers": {
+                "leg": {"command": sys.executable,
+                        "args": [fixture_path("fake_mcp.py")]},
+            }}));
+        }
+        sb.script([{"text": "warm"}]);
+        r = run_jackal(
+            sb, [], stdin_text="hi\n/mcp\n/exit\n",
+            env_extra={"JACKAL_MCP_NO_IMPORT": "", "HOME": home},
+        );
+        assert r.code == 0, sb.explain(r);
+        # imported server attached from the legacy source...
+        assert "leg — connected · 6 tools" in r.stdout, sb.explain(r);
+        # ...and the onboarding notice surfaced
+        assert "imported 1 server(s) from legacy" in r.stdout, sb.explain(r);
+        # the marker makes it one-time: a second run imports nothing new
+        r2 = run_jackal(
+            sb, [], stdin_text="hi\n/exit\n",
+            env_extra={"JACKAL_MCP_NO_IMPORT": "", "HOME": home},
+        );
+        assert r2.code == 0, sb.explain(r2);
+        assert "imported" not in r2.stdout, sb.explain(r2);
     } finally {
         sb.cleanup();
     }

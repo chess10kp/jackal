@@ -121,6 +121,12 @@ def make_sandbox(files: dict[str, str] | None = None) -> Sandbox {
     );
     os.makedirs(sb.project);
     os.makedirs(sb.agent_dir);
+    # An EMPTY user-level config in the sandbox agent dir pins the
+    # user-config lookup here, so real ~/.jackal/config.json (or a legacy
+    # import of it) can never leak into an e2e run.
+    cfg_fh: any = open(os.path.join(sb.agent_dir, "config.json"), "w");
+    cfg_fh.write("{}");
+    cfg_fh.close();
     if files is not None {
         for (rel, text) in files.items() { sb.write(rel, text); }
     }
@@ -178,6 +184,9 @@ def run_jackal(
     env["JACKAL_MOCK_LOG"] = sb.log_path;
     env["JACKAL_AGENT_DIR"] = sb.agent_dir;
     env["NO_COLOR"] = "1";
+    # Hermeticity: never import real legacy mcp.json sources into the real
+    # user config during e2e runs (the import e2e opts back in explicitly).
+    env["JACKAL_MCP_NO_IMPORT"] = "1";
     if env_extra is not None {
         for (k, v) in env_extra.items() { env[k] = v; }
     }

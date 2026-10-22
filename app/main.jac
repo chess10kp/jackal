@@ -423,6 +423,16 @@ with entry:__main__ {
     ended = False;
     try {
         while True {
+            # Surface queued MCP notices (import/death/restart) each input
+            # cycle — the TUI drains these per tick; the line/JSONL loops
+            # per iteration. Also pumps death detection + list_changed.
+            for note in _session.drain_mcp_notices() {
+                if json_mode {
+                    _session.json_event("notice", {"text": str(note)});
+                } else {
+                    print("[mcp] " + str(note));
+                }
+            }
             if json_mode {
                 raw = sys.stdin.readline();
                 if not raw { break; }
