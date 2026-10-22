@@ -56,6 +56,12 @@ for line in sys.stdin:
         reply(rid, {"description": "A greeting",
                     "messages": [{"role": "user",
                                   "content": {"type": "text", "text": "Hello, " + str(who) + "!"}}]})
+    elif method == "resources/list":
+        reply(rid, {"resources": [{"uri": "memo://1", "name": "memo",
+                                   "description": "The memo.", "mimeType": "text/plain"}]})
+    elif method == "resources/read":
+        reply(rid, {"contents": [{"uri": "memo://1", "mimeType": "text/plain",
+                                  "text": "the memo body"}]})
     elif method == "tools/call":
         name = req["params"]["name"]
         args = req["params"].get("arguments", {})

@@ -55,7 +55,7 @@ test "repl /mcp reports server status" {
         # One turn first so the attach flow has settled before /mcp.
         r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
         assert r.code == 0, sb.explain(r);
-        assert "fake — connected · 5 tools" in r.stdout, sb.explain(r);
+        assert "fake — connected · 6 tools" in r.stdout, sb.explain(r);
     } finally {
         sb.cleanup();
     }
@@ -136,6 +136,40 @@ test "repl /mcp SERVER PROMPT expands the server prompt" {
         r = run_jackal(sb, [], stdin_text='hi\n/mcp fake greet {"who": "jackal"}\n/exit\n');
         assert r.code == 0, sb.explain(r);
         assert "Hello, jackal!" in r.stdout, sb.explain(r);
+    } finally {
+        sb.cleanup();
+    }
+}
+
+
+test "mcp resources surface as a generated read-only tool" {
+    sb = make_sandbox();
+    try {
+        write_project_config(sb, _mcp_cfg());
+        sb.script([
+            {"text": "", "tool_calls": [{"name": "mcp_fake_read_resource", "args": {"uri": "memo://1"}}]},
+            {"text": "read the memo"},
+        ]);
+        r = run_jackal(sb, ["-p", "--mode", "yolo", "read the resource"]);
+        assert r.code == 0, sb.explain(r);
+        calls = sb.calls();
+        assert "mcp_fake_read_resource" in calls[0]["tools"], sb.explain(r);
+        assert calls[1]["last"]["content"] == "the memo body", sb.explain(r);
+    } finally {
+        sb.cleanup();
+    }
+}
+
+
+test "repl /mcp resources lists and reads" {
+    sb = make_sandbox();
+    try {
+        write_project_config(sb, _mcp_cfg());
+        sb.script([{"text": "warm"}]);
+        r = run_jackal(sb, [], stdin_text="hi\n/mcp resources\n/mcp resources fake memo://1\n/exit\n");
+        assert r.code == 0, sb.explain(r);
+        assert "memo://1 — memo (text/plain)" in r.stdout, sb.explain(r);
+        assert "the memo body" in r.stdout, sb.explain(r);
     } finally {
         sb.cleanup();
     }

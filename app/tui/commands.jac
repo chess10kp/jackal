@@ -18,7 +18,7 @@ import from agent.session {
     run_command, list_extension_shortcuts, run_extension_shortcut, plugins,
     new_session_id, set_model, get_model, cancel_active_turn,
     compact_now, set_mode, set_current_session_id,
-    mcp_restart, mcp_restart_failed, mcp_prompt, mcp_configured_specs,
+    mcp_restart, mcp_restart_failed, mcp_prompt, mcp_resources, mcp_configured_specs,
 }
 import from agent.modes { DEV_MODES }
 import from agent.compaction { compute_context_usage }
@@ -228,13 +228,22 @@ def _run_slash(app: LiveShell, line: str) -> str {
             }
             return mcp_restart(name);
         }
+        if rest == "resources" or rest.startswith("resources ") {
+            sub: str = rest[len("resources"):].strip();
+            if not sub {
+                return mcp_resources("", "");
+            }
+            stoks: list[str] = sub.split(None, 1);
+            s_uri: str = stoks[1] if len(stoks) > 1 else "";
+            return mcp_resources(str(stoks[0]), s_uri);
+        }
         toks: list[str] = rest.split(None, 2);
         if len(toks) >= 2 {
             args_json: str = toks[2] if len(toks) >= 3 else "";
             return mcp_prompt(str(toks[0]), str(toks[1]), args_json);
         }
         if rest {
-            return "usage: /mcp [restart [NAME] | SERVER PROMPT [JSON_ARGS]]";
+            return "usage: /mcp [restart [NAME] | resources [SERVER [URI]] | SERVER PROMPT [JSON_ARGS]]";
         }
         return _open_mcp_window(app);
     }

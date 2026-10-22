@@ -20,6 +20,8 @@ import from .mcp {
     mcp_drain_notifications,
     mcp_is_alive,
     mcp_get_prompt,
+    mcp_list_resources,
+    mcp_read_resource,
 }
 import from .session_state {
     history,
@@ -196,6 +198,72 @@ def _make_mcp_handler(client: McpClient, server_name: str, tool_name: str) -> Ca
         return "ERROR: " + str(res.get("error", "mcp call failed"));
     }
     return handle as Callable[[dict[str, any]], str];
+}
+
+
+"""Handler for the auto-generated per-server resource reader (revive-aware,
+mirrors _make_mcp_handler but drives resources/read)."""
+def _make_mcp_resource_handler(client: McpClient, server_name: str) -> Callable[[dict[str, any]], str] {
+    def handle(args: dict[str, any]) -> str {
+        uri: str = str(args.get("uri", ""));
+        res: dict[str, any] = mcp_read_resource(client, uri);
+        if not res.get("ok") and not mcp_is_alive(client) {
+            if _revive_client(server_name) {
+                res = mcp_read_resource(client, uri);
+            }
+        }
+        if res.get("ok") {
+            return str(res.get("text", ""));
+        }
+        return "ERROR: " + str(res.get("error", "resource read failed"));
+    }
+    return handle as Callable[[dict[str, any]], str];
+}
+
+
+"""Auto-register one `mcp_<server>_read_resource` tool when the server
+exposes resources. Reading a resource is inherently read-only, so the
+generated tool is marked plan/ask-safe. A server-declared tool already
+owning the name wins (the generated reader is skipped, notice explains).
+Returns 1 when registered."""
+def _register_resource_tool(reg: ToolRegistry, server_name: str, client: McpClient) -> int {
+    listed = mcp_list_resources(client, timeout_s=5.0);
+    if not listed.get("ok") {
+        return 0;  # resources capability absent: normal, not an error
+    }
+    raw_res: any = listed.get("resources", []);
+    if not isinstance(raw_res, list) or not raw_res {
+        return 0;
+    }
+    sprefix: str = _mcp_name_chunk(server_name);
+    full_name: str = "mcp_" + sprefix + "_read_resource";
+    if get_tool(reg, full_name) is not None {
+        plugins.mcp_notices.append(
+            "mcp server " + server_name + " exposes resources but its own "
+            + full_name + " tool wins; no generated resource reader"
+        );
+        return 0;
+    }
+    try {
+        register_native(
+            reg,
+            full_name,
+            "Read one resource by URI from mcp server " + server_name
+            + ". Run /mcp resources " + server_name + " for the URI list.",
+            {"type": "object", "properties": {"uri": {"type": "string"}}, "required": ["uri"]},
+            _make_mcp_resource_handler(client, server_name),
+        );
+    } except Exception {
+        return 0;
+    }
+    plugins.mcp_owned[full_name] = server_name;
+    register_mcp_read_only_tools([full_name]);
+    owned_ro: list[str] = list(plugins.mcp_read_only.get(server_name, []));
+    if full_name not in owned_ro {
+        owned_ro.append(full_name);
+        plugins.mcp_read_only[server_name] = owned_ro;
+    }
+    return 1;
 }
 
 
@@ -476,9 +544,13 @@ def _refresh_server_tools(server_name: str) {
     if ro_names {
         register_mcp_read_only_tools(ro_names);
     }
-    plugins.mcp_read_only[server_name] = ro_names;
-    plugins.mcp_tools = max(0, plugins.mcp_tools - removed) + int(stats["registered"]);
-    _mcp_set_status(server_name, "connected", tools=int(stats["registered"]), denied=int(stats["denied"]));
+    n_res: int = _register_resource_tool(reg, server_name, client);
+    plugins.mcp_read_only[server_name] = list(plugins.mcp_read_only.get(server_name, []));
+    plugins.mcp_tools = max(0, plugins.mcp_tools - removed) + int(stats["registered"]) + n_res;
+    _mcp_set_status(
+        server_name, "connected",
+        tools=int(stats["registered"]) + n_res, denied=int(stats["denied"]),
+    );
     plugins.mcp_notices.append(
         "mcp server " + server_name + " tool list changed: +"
         + str(int(stats["registered"])) + " now registered, -" + str(removed) + " removed"
@@ -714,7 +786,8 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
         }
         stats = _register_server_tools(reg, server_name, client, spec, raw_tools);
         plugins.mcp_read_only[server_name] = list(stats["ro_names"]);
-        plugins.mcp_tools += int(stats["registered"]);
+        n_res: int = _register_resource_tool(reg, server_name, client);
+        plugins.mcp_tools += int(stats["registered"]) + n_res;
         if int(stats["lost"]) > 0 {
             plugins.mcp_notices.append(
                 "mcp server " + server_name + " lost " + str(stats["lost"])
@@ -729,7 +802,10 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
                 + ", ".join([str(x) for x in stats["denied_names"]])
             );
         }
-        _mcp_set_status(server_name, "connected", tools=int(stats["registered"]), denied=int(stats["denied"]));
+        _mcp_set_status(
+            server_name, "connected",
+            tools=int(stats["registered"]) + n_res, denied=int(stats["denied"]),
+        );
     } except Exception as e {
         _mcp_fail(server_name, "attach failed: " + str(e));
     }
@@ -797,6 +873,61 @@ def mcp_restart(server_name: str) -> str {
     spec_wire: str = json.dumps(spec);
     flow _attach_one_mcp_server(server_name, spec_wire);
     return "restarting mcp server " + server_name;
+}
+
+
+"""List (or read) MCP resources for display. server_name "" lists every
+connected server (live, bounded 5s per server); with uri, one resource is
+read and its text returned. Servers without resources are skipped
+silently — status carries their detail."""
+def mcp_resources(server_name: str, uri: str) -> str {
+    if uri {
+        client: any = plugins.mcp_clients.get(server_name);
+        if client is None {
+            return "ERROR: unknown mcp server: " + server_name;
+        }
+        res = mcp_read_resource(client, uri);
+        if not res.get("ok") {
+            return "ERROR: " + str(res.get("error", "resources/read failed"));
+        }
+        return str(res.get("text", ""));
+    }
+    names: list[str] = [];
+    if server_name {
+        if server_name not in plugins.mcp_clients {
+            return "ERROR: unknown mcp server: " + server_name;
+        }
+        names.append(server_name);
+    } else {
+        for name in sorted(plugins.mcp_clients.keys()) {
+            names.append(str(name));
+        }
+    }
+    lines: list[str] = [];
+    for name in names {
+        client2: any = plugins.mcp_clients.get(name);
+        listed = mcp_list_resources(client2, timeout_s=5.0);
+        if not listed.get("ok") {
+            continue;
+        }
+        raw_res: any = listed.get("resources", []);
+        if not isinstance(raw_res, list) or not raw_res {
+            continue;
+        }
+        lines.append(name + ":");
+        for r in raw_res {
+            line: str = "  " + str(r.get("uri", ""));
+            nm: str = str(r.get("name", ""));
+            if nm { line += " — " + nm; }
+            mt: str = str(r.get("mimeType", ""));
+            if mt { line += " (" + mt + ")"; }
+            lines.append(line);
+        }
+    }
+    if not lines {
+        return "no mcp resources";
+    }
+    return "\n".join(lines);
 }
 
 

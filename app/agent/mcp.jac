@@ -706,3 +706,102 @@ def mcp_get_prompt(
     }
     return {"ok": True, "description": str(result.get("description", "")), "messages": messages};
 }
+
+
+"""List resources exposed by the server (pagination-aware, capped like
+tools/list). Returns {"ok", "resources": [{uri, name, description,
+mimeType}]}. Servers without the resources capability come back ok False
+(method not found) — callers treat that as an absent capability, not an
+error."""
+def mcp_list_resources(client: McpClient, timeout_s: float = -1.0) -> dict[str, any] {
+    if not client.initialized or not _alive(client) {
+        return {"ok": False, "error": "mcp client not initialized"};
+    }
+    timeout = _effective_timeout(client, timeout_s);
+    resources: list[dict[str, any]] = [];
+    cursor: str = "";
+    pages: int = 0;
+    while True {
+        params: dict[str, any] = {};
+        if cursor {
+            params["cursor"] = cursor;
+        }
+        try {
+            resp = _request(client, "resources/list", params, timeout);
+        } except Exception as e {
+            return {"ok": False, "error": str(e)};
+        }
+        payload = _response_payload(resp);
+        if not payload["ok"] {
+            return payload;
+        }
+        result: any = payload["result"];
+        raw_res: any = result.get("resources", []);
+        if isinstance(raw_res, list) {
+            for r in raw_res {
+                if isinstance(r, dict) and r.get("uri") {
+                    resources.append({
+                        "uri": str(r.get("uri")),
+                        "name": str(r.get("name", "")),
+                        "description": str(r.get("description", "")),
+                        "mimeType": str(r.get("mimeType", "")),
+                    });
+                }
+            }
+        }
+        pages += 1;
+        nc: any = result.get("nextCursor");
+        next_cur: str = str(nc) if nc else "";
+        if not next_cur or pages >= MAX_LIST_PAGES {
+            break;
+        }
+        cursor = next_cur;
+    }
+    return {"ok": True, "resources": resources};
+}
+
+
+"""Read one resource by URI. Text contents join into "text"; blob contents
+render as an honest stub line (never dropped). Returns {"ok", "uri",
+"text", "contents"} with the raw contents riding along."""
+def mcp_read_resource(client: McpClient, uri: str, timeout_s: float = -1.0) -> dict[str, any] {
+    if not client.initialized or not _alive(client) {
+        return {"ok": False, "error": "mcp client not initialized"};
+    }
+    if not uri {
+        return {"ok": False, "error": "resource uri must not be empty"};
+    }
+    params: dict[str, any] = {"uri": str(uri)};
+    timeout = _effective_timeout(client, timeout_s);
+    try {
+        resp = _request(client, "resources/read", params, timeout);
+    } except Exception as e {
+        return {"ok": False, "error": str(e)};
+    }
+    payload = _response_payload(resp);
+    if not payload["ok"] {
+        return payload;
+    }
+    result: any = payload["result"];
+    parts: list[str] = [];
+    contents: list[dict[str, any]] = [];
+    raw_contents: any = result.get("contents", []);
+    if isinstance(raw_contents, list) {
+        for c in raw_contents {
+            if not isinstance(c, dict) {
+                continue;
+            }
+            contents.append(c);
+            if c.get("text") is not None {
+                parts.append(str(c.get("text", "")));
+            } elif isinstance(c.get("blob"), str) {
+                blob: str = str(c.get("blob", ""));
+                mt: str = str(c.get("mimeType", "unknown"));
+                parts.append("[blob resource: " + mt + ", " + str(len(blob)) + " b64 chars]");
+            } else {
+                parts.append("[resource without text or blob content]");
+            }
+        }
+    }
+    return {"ok": True, "uri": str(uri), "text": "\n".join(parts), "contents": contents};
+}

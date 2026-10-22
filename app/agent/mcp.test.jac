@@ -123,6 +123,23 @@ for raw in sys.stdin:
                 {"role": "user", "content": {"type": "text",
                                              "text": "Hello, " + who + "!"}},
             ]}})
+    elif method == "resources/list":
+        send({"jsonrpc": "2.0", "id": rid, "result": {"resources": [
+            {"uri": "mem://notes/1", "name": "notes", "description": "First note.",
+             "mimeType": "text/plain"},
+            {"uri": "mem://bin/1", "name": "blobby", "mimeType": "application/octet-stream"},
+        ]}})
+    elif method == "resources/read":
+        uri = str((req.get("params") or {}).get("uri", ""))
+        if uri == "mem://notes/1":
+            send({"jsonrpc": "2.0", "id": rid, "result": {"contents": [
+                {"uri": uri, "mimeType": "text/plain", "text": "resource one"}]}})
+        elif uri == "mem://bin/1":
+            send({"jsonrpc": "2.0", "id": rid, "result": {"contents": [
+                {"uri": uri, "mimeType": "application/octet-stream", "blob": "QUJD"}]}})
+        else:
+            send({"jsonrpc": "2.0", "id": rid, "error": {
+                "code": -32602, "message": "unknown resource"}})
     elif method == "tools/call":
         name = str(req.get("params", {}).get("name", ""))
         args = req.get("params", {}).get("arguments", {}) or {}
@@ -378,6 +395,40 @@ test "prompts list and get round trip" {
         # unknown prompt -> honest error at the seam
         bad = mcp_get_prompt(client, "nope", {}, timeout_s=10.0);
         assert bad["ok"] is False;
+    } finally {
+        mcp_stop(client);
+        shutil.rmtree(tmp, ignore_errors=True);
+    }
+}
+
+
+test "resources list and read round trip" {
+    tmp = tempfile.mkdtemp();
+    client = create_mcp_client();
+    try {
+        cmd = _write_fake_server(tmp);
+        assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
+        listed = mcp_list_resources(client, timeout_s=10.0);
+        assert listed["ok"] is True;
+        res: any = listed.get("resources", []);
+        assert len(res) == 2;
+        assert str(res[0]["uri"]) == "mem://notes/1";
+        assert str(res[0]["name"]) == "notes";
+        assert str(res[1]["mimeType"]) == "application/octet-stream";
+        # text content joins into "text", raw contents ride along
+        got = mcp_read_resource(client, "mem://notes/1", timeout_s=10.0);
+        assert got["ok"] is True;
+        assert str(got.get("text", "")) == "resource one";
+        contents: any = got.get("contents", []);
+        assert isinstance(contents, list) and len(contents) == 1;
+        # blob content surfaces as an honest stub, never dropped
+        blob = mcp_read_resource(client, "mem://bin/1", timeout_s=10.0);
+        assert blob["ok"] is True;
+        assert "[blob resource: application/octet-stream, 4 b64 chars]" in str(blob.get("text", ""));
+        # unknown uri -> honest JSON-RPC error at the seam
+        bad = mcp_read_resource(client, "mem://nope", timeout_s=10.0);
+        assert bad["ok"] is False;
+        assert "unknown resource" in str(bad.get("error", ""));
     } finally {
         mcp_stop(client);
         shutil.rmtree(tmp, ignore_errors=True);

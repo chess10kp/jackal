@@ -77,12 +77,21 @@ def handle_command(line: str) -> str | None {
         if rest.startswith("restart ") {
             return _session.mcp_restart(rest[len("restart "):].strip());
         }
+        if rest == "resources" or rest.startswith("resources ") {
+            sub: str = rest[len("resources"):].strip();
+            if not sub {
+                return _session.mcp_resources("", "");
+            }
+            stoks: list[str] = sub.split(None, 1);
+            s_uri: str = stoks[1] if len(stoks) > 1 else "";
+            return _session.mcp_resources(str(stoks[0]), s_uri);
+        }
         toks: list[str] = rest.split(None, 2);
         if len(toks) >= 2 {
             args_json: str = toks[2] if len(toks) >= 3 else "";
             return _session.mcp_prompt(str(toks[0]), str(toks[1]), args_json);
         }
-        return "usage: /mcp [restart [NAME] | SERVER PROMPT [JSON_ARGS]]";
+        return "usage: /mcp [restart [NAME] | resources [SERVER [URI]] | SERVER PROMPT [JSON_ARGS]]";
     }
     if line == "/compact" { return _session.compact_now(); }
     if line == "/abort" {
