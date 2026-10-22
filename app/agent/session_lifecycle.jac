@@ -186,6 +186,8 @@ def session_boot(
     # run in background flows so boot/first frame is never blocked.
     plugins.mcp_status.clear();
     plugins.mcp_notices.clear();
+    plugins.mcp_specs.clear();
+    plugins.mcp_read_only.clear();
     try {
         _attach_mcp_servers();
     } except Exception {
@@ -289,6 +291,8 @@ def session_dispose {
     plugins.mcp_tools = 0;
     plugins.mcp_status.clear();
     plugins.mcp_notices.clear();
+    plugins.mcp_specs.clear();
+    plugins.mcp_read_only.clear();
     b = plugins.bridge;
     if b is not None {
         # Pi lifecycle: extensions get session_shutdown before teardown.

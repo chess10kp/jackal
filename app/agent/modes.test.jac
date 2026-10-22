@@ -179,3 +179,45 @@ test "block reason names the tool and mode with a recovery hint" {
     assert "edit_file" in p;
     assert "plan mode" in p;
 }
+
+test "mcp tools confirm in normal mode and run in yolo/auto-accept" {
+    assert requires_approval("normal", "mcp_db_query", "") == "confirm";
+    assert requires_approval("yolo", "mcp_db_query", "") == "auto";
+    assert requires_approval("auto-accept", "mcp_db_query", "") == "auto";
+}
+
+
+test "plan and ask block unmarked mcp tools with an actionable reason" {
+    for mode in ["plan", "ask"] {
+        assert requires_approval(mode, "mcp_db_write", "") == "blocked";
+        assert requires_approval(mode, "mcp_db_write", "INSERT INTO t") == "blocked";
+        assert requires_approval(mode, "mcp_browser_navigate", "{}") == "blocked";
+        reason = read_only_mode_block_reason("mcp_db_write", mode);
+        assert "read_only" in reason;
+        assert "mcp_db_write" in reason;
+    }
+}
+
+
+test "registered read-only mcp tools stay usable in plan/ask" {
+    register_mcp_read_only_tools(["mcp_docs_search", "mcp_db_query"]);
+    try {
+        assert requires_approval("plan", "mcp_docs_search", "") == "auto";
+        assert requires_approval("ask", "mcp_db_query", "") == "auto";
+        # unmarked siblings stay blocked
+        assert requires_approval("plan", "mcp_db_write", "") == "blocked";
+    } finally {
+        unregister_mcp_read_only_tools(["mcp_docs_search", "mcp_db_query"]);
+    }
+    # dropped from the registry -> blocked again
+    assert requires_approval("plan", "mcp_docs_search", "") == "blocked";
+    assert requires_approval("ask", "mcp_db_query", "") == "blocked";
+}
+
+
+test "native tools never trip the mcp namespace check" {
+    assert is_mcp_tool("write_file") is False;
+    assert is_mcp_tool("mcp_srv_tool") is True;
+    # and the native blocked set is unaffected by the mcp registry
+    assert requires_approval("plan", "write_file", "") == "blocked";
+}

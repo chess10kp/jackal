@@ -29,6 +29,8 @@ obj SessionPlugins {
         # name -> full attach spec {cmd, env, cwd, enabled, timeout} as
         # parsed from config; restart reuses it instead of the bare argv.
         mcp_specs: dict[str, dict[str, any]] = {},
+        # server -> sanitized tool names currently marked plan/ask-safe
+        mcp_read_only: dict[str, list[str]] = {},
         mcp_tools: int = 0,
         # name -> {"state": connecting|connected|failed, "error", "tools", "cmd"}
         mcp_status: dict[str, dict[str, any]] = {},

@@ -14,6 +14,12 @@ execute_command) and their harness equivalents (write_file, edit_file).
 run_command is NOT blanket-blocked: like `bash` in the original, shell
 commands stay usable in plan/ask but destructive ones are refused
 (see requires_approval).
+
+MCP tools (namespaced `mcp_*`) confirm in normal mode and are BLOCKED in
+read-only modes (plan/ask) unless registered as read-only — a config-declared
+safe set (`read_only` server flag or `read_only_tools` globs, populated by
+agent/session_config.jac at attach time). This module stays I/O-free: the
+registry is plain module state.
 """
 
 import re;
@@ -48,6 +54,11 @@ glob READ_ONLY_TOOLS: set[str] = {
     "list_tasks",
     "jac_check",
 };
+
+# Sanitized names of MCP tools declared safe by config (server
+# "read_only": true, or "read_only_tools" globs). Populated at MCP attach
+# time; membership decides plan/ask gating for mcp_* tools.
+glob MCP_READ_ONLY_TOOLS: set[str] = set();
 
 glob PLAN_MODE_SYSTEM_APPENDIX: str = """
 
@@ -105,8 +116,36 @@ def is_tool_blocked(mode: str, tool_name: str) -> bool {
 }
 
 
+"""True when the tool name belongs to the MCP namespace."""
+def is_mcp_tool(tool_name: str) -> bool {
+    return tool_name.startswith("mcp_");
+}
+
+
+"""Mark MCP tools (sanitized registry names) as safe for read-only modes."""
+def register_mcp_read_only_tools(names: list[str]) {
+    for n in names {
+        MCP_READ_ONLY_TOOLS.add(str(n));
+    }
+}
+
+
+"""Drop MCP tools from the read-only registry (refresh/restart housekeeping)."""
+def unregister_mcp_read_only_tools(names: list[str]) {
+    for n in names {
+        MCP_READ_ONLY_TOOLS.discard(str(n));
+    }
+}
+
+
 """Human-facing reason string for a blocked tool in a read-only mode."""
 def read_only_mode_block_reason(tool_name: str, mode: str) -> str {
+    if is_mcp_tool(tool_name) {
+        return (
+            'MCP tool "' + tool_name + '" is not marked read-only, so it is blocked in '
+            + mode + ' mode. Mark the server "read_only": true (or list "read_only_tools") in the mcp config to allow it.'
+        );
+    }
     if mode == "ask" {
         return 'Tool "' + tool_name + '" cannot modify files in ask mode. Switch to normal mode (Shift+Tab) to make changes.';
     }
@@ -212,6 +251,11 @@ def requires_approval(mode: str, tool_name: str, cmd: str) -> str {
         # Shell stays available in read-only modes (mirrors the original's
         # "use bash freely"), but destructive commands are refused outright.
         if (tool_name == "run_command" or tool_name == "bash") and is_destructive_bash(cmd) {
+            return "blocked";
+        }
+        # MCP tools may do anything (DB writes, browser navigation): block
+        # them in read-only modes unless config declared them read-only.
+        if is_mcp_tool(tool_name) and tool_name not in MCP_READ_ONLY_TOOLS {
             return "blocked";
         }
         return "auto";

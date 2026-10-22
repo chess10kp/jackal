@@ -3,10 +3,11 @@
 import os;
 import json;
 import time;
+import fnmatch;
 
 import from .compaction { load_project_config }
 import from .llm { provider_for, credential_error }
-import from .modes { DEV_MODES }
+import from .modes { DEV_MODES, register_mcp_read_only_tools, unregister_mcp_read_only_tools }
 import from .plugin_bridge { PluginBridge, fire_hook, drain_model_requests }
 import from .registry { ToolRegistry, register_native, unregister }
 import from .mcp {
@@ -67,6 +68,8 @@ Spec shape (all keys present, defaults shown):
   cwd: str              child working directory ("" = inherit)
   enabled: bool         False -> the server is never attached (status: disabled)
   timeout: float        per-server default call timeout seconds (-1.0 = global)
+  read_only: bool       true -> every tool of this server is plan/ask-safe
+  read_only_tools: list[str]  globs/exact names of plan/ask-safe tools
 Malformed entries are skipped silently."""
 def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
     out: dict[str, dict[str, any]] = {};
@@ -112,12 +115,26 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
         if isinstance(raw_to, (int, float)) and float(raw_to) > 0.0 {
             timeout = float(raw_to);
         }
+        read_only: bool = False;
+        raw_ro: any = ent.get("read_only", False);
+        if isinstance(raw_ro, bool) {
+            read_only = raw_ro;
+        }
+        read_only_tools: list[str] = [];
+        raw_rot: any = ent.get("read_only_tools");
+        if isinstance(raw_rot, list) {
+            for pat in raw_rot {
+                read_only_tools.append(str(pat));
+            }
+        }
         out[str(name)] = {
             "cmd": parts,
             "env": env,
             "cwd": cwd,
             "enabled": enabled,
             "timeout": timeout,
+            "read_only": read_only,
+            "read_only_tools": read_only_tools,
         };
     }
     return out;
@@ -284,6 +301,13 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
             return;
         }
         spec: dict[str, any] = parsed_spec;
+        # This server's plan/ask-safe marks are recomputed every attach;
+        # stale marks from a previous incarnation must not linger.
+        stale_ro: list[str] = list(plugins.mcp_read_only.get(server_name, []));
+        if stale_ro {
+            unregister_mcp_read_only_tools(stale_ro);
+        }
+        plugins.mcp_read_only[server_name] = [];
         cmd: list[str] = [str(c) for c in spec.get("cmd", [])];
         env_extra: dict[str, str] = {};
         raw_env: any = spec.get("env", {});
@@ -319,7 +343,16 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
             return;
         }
         sprefix = _mcp_name_chunk(server_name);
+        spec_read_only: bool = bool(spec.get("read_only", False));
+        ro_globs: list[str] = [];
+        raw_globs: any = spec.get("read_only_tools", []);
+        if isinstance(raw_globs, list) {
+            for pat in raw_globs {
+                ro_globs.append(str(pat));
+            }
+        }
         registered = 0;
+        ro_names: list[str] = [];
         for t in raw_tools {
             if not isinstance(t, dict) {
                 continue;
@@ -333,10 +366,23 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
             if not isinstance(schema, dict) or not schema {
                 schema = {"type": "object", "properties": {}, "required": []};
             }
+            full_name: str = "mcp_" + sprefix + "_" + tname;
+            ro_hit: bool = spec_read_only;
+            if not ro_hit {
+                for pat in ro_globs {
+                    if fnmatch.fnmatch(raw_tool, pat) {
+                        ro_hit = True;
+                        break;
+                    }
+                }
+            }
+            if ro_hit {
+                ro_names.append(full_name);
+            }
             try {
                 register_native(
                     reg,
-                    "mcp_" + sprefix + "_" + tname,
+                    full_name,
                     str(t.get("description", "")),
                     schema,
                     _make_mcp_handler(client, server_name, raw_tool),
@@ -344,6 +390,10 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
                 registered += 1;
             } except Exception {
             }
+        }
+        if ro_names {
+            register_mcp_read_only_tools(ro_names);
+            plugins.mcp_read_only[server_name] = ro_names;
         }
         plugins.mcp_tools += registered;
         _mcp_set_status(server_name, "connected", tools=registered);
