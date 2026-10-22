@@ -79,3 +79,27 @@ test "window state wires the restart key and a cursor only over real rows" {
     lines = window_lines(empty);
     assert any("no mcp servers configured" in ln for ln in lines), str(lines);
 }
+
+test "connected row shows denied count when tools were filtered" {
+    out = mcp_window_rows(
+        {"zeta": ["jac", "mcp"]},
+        {"zeta": {"state": "connected", "error": "", "tools": 2, "denied": 4, "cmd": ["jac", "mcp"]}},
+    );
+    assert out["rows"] == ["zeta — connected · 2 tools · 4 denied · jac mcp"], str(out["rows"]);
+    # zero denied stays out of the row
+    out2 = mcp_window_rows(
+        {"zeta": ["jac", "mcp"]},
+        {"zeta": {"state": "connected", "error": "", "tools": 2, "denied": 0, "cmd": ["jac", "mcp"]}},
+    );
+    assert out2["rows"] == ["zeta — connected · 2 tools · jac mcp"], str(out2["rows"]);
+}
+
+
+test "disabled servers surface their config state" {
+    out = mcp_window_rows(
+        {"off": ["toolserv"]},
+        {"off": {"state": "disabled", "error": "", "tools": 0, "cmd": ["toolserv"]}},
+    );
+    rows: list[str] = [str(r) for r in out["rows"]];
+    assert "off — disabled · toolserv" in rows, str(rows);
+}

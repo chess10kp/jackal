@@ -338,3 +338,28 @@ test "a tool call against a dead server revives once and succeeds" {
         _reset_mcp_plugin_state();
     }
 }
+
+test "allow_tools and deny_tools gate registration (deny wins)" {
+    reg = ToolRegistry();
+    plugins.reg = reg;
+    dummy = create_mcp_client();
+    try {
+        spec = _spec_for(["noop"]);
+        spec["allow_tools"] = ["read_*"];
+        spec["deny_tools"] = ["read_secret*"];
+        tools = [
+            {"name": "read_docs", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
+            {"name": "read_secret", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
+            {"name": "write_docs", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
+        ];
+        stats = _register_server_tools(reg, "g", dummy, spec, tools);
+        assert int(stats["registered"]) == 1;
+        assert get_tool(reg, "mcp_g_read_docs") is not None;
+        assert get_tool(reg, "mcp_g_read_secret") is None;
+        assert get_tool(reg, "mcp_g_write_docs") is None;
+        assert int(stats["denied"]) == 2;
+        assert sorted([str(x) for x in stats["denied_names"]]) == ["read_secret", "write_docs"];
+    } finally {
+        _reset_mcp_plugin_state();
+    }
+}

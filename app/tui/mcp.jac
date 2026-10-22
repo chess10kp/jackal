@@ -46,7 +46,12 @@ def mcp_window_rows(
         }
         cmd_label: str = " ".join(cmd_parts);
         if state == "connected" {
-            rows.append(sname + " — connected · " + str(st.get("tools", 0)) + " tools · " + cmd_label);
+            denied_n: int = int(st.get("denied", 0) or 0);
+            row: str = sname + " — connected · " + str(st.get("tools", 0)) + " tools";
+            if denied_n > 0 {
+                row += " · " + str(denied_n) + " denied";
+            }
+            rows.append(row + " · " + cmd_label);
         } elif state == "connecting" {
             rows.append(sname + " — connecting… · " + cmd_label);
         } elif state == "failed" {

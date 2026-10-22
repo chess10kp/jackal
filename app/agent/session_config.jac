@@ -78,6 +78,8 @@ Spec shape (all keys present, defaults shown):
   timeout: float        per-server default call timeout seconds (-1.0 = global)
   read_only: bool       true -> every tool of this server is plan/ask-safe
   read_only_tools: list[str]  globs/exact names of plan/ask-safe tools
+  allow_tools: list[str]      when non-empty, ONLY matching tools register
+  deny_tools: list[str]       matching tools never register (deny wins)
 Malformed entries are skipped silently."""
 def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
     out: dict[str, dict[str, any]] = {};
@@ -135,6 +137,20 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
                 read_only_tools.append(str(pat));
             }
         }
+        allow_tools: list[str] = [];
+        raw_allow: any = ent.get("allow_tools");
+        if isinstance(raw_allow, list) {
+            for pat in raw_allow {
+                allow_tools.append(str(pat));
+            }
+        }
+        deny_tools: list[str] = [];
+        raw_deny: any = ent.get("deny_tools");
+        if isinstance(raw_deny, list) {
+            for pat in raw_deny {
+                deny_tools.append(str(pat));
+            }
+        }
         out[str(name)] = {
             "cmd": parts,
             "env": env,
@@ -143,6 +159,8 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
             "timeout": timeout,
             "read_only": read_only,
             "read_only_tools": read_only_tools,
+            "allow_tools": allow_tools,
+            "deny_tools": deny_tools,
         };
     }
     return out;
@@ -266,13 +284,14 @@ def mcp_configured_specs() -> dict[str, list[str]] {
 }
 
 
-def _mcp_set_status(server_name: str, state: str, error: str = "", tools: int = 0, cmd: list[str] | None = None) {
+def _mcp_set_status(server_name: str, state: str, error: str = "", tools: int = 0, cmd: list[str] | None = None, denied: int = 0) {
     prev: dict[str, any] = plugins.mcp_status.get(server_name, {});
     plugins.mcp_status[server_name] = {
         "state": state,
         "error": error,
         "tools": tools,
         "cmd": cmd if cmd is not None else prev.get("cmd", []),
+        "denied": denied if denied else int(prev.get("denied", 0) or 0),
     };
 }
 
@@ -458,7 +477,7 @@ def _refresh_server_tools(server_name: str) {
     }
     plugins.mcp_read_only[server_name] = ro_names;
     plugins.mcp_tools = max(0, plugins.mcp_tools - removed) + int(stats["registered"]);
-    _mcp_set_status(server_name, "connected", tools=int(stats["registered"]));
+    _mcp_set_status(server_name, "connected", tools=int(stats["registered"]), denied=int(stats["denied"]));
     plugins.mcp_notices.append(
         "mcp server " + server_name + " tool list changed: +"
         + str(int(stats["registered"])) + " now registered, -" + str(removed) + " removed"
@@ -493,6 +512,22 @@ def _register_server_tools(
     lost: int = 0;
     lost_names: list[str] = [];
     ro_names: list[str] = [];
+    denied: int = 0;
+    denied_names: list[str] = [];
+    allow_globs: list[str] = [];
+    raw_allow: any = spec.get("allow_tools", []);
+    if isinstance(raw_allow, list) {
+        for pat in raw_allow {
+            allow_globs.append(str(pat));
+        }
+    }
+    deny_globs: list[str] = [];
+    raw_deny: any = spec.get("deny_tools", []);
+    if isinstance(raw_deny, list) {
+        for pat in raw_deny {
+            deny_globs.append(str(pat));
+        }
+    }
     for t in tools {
         if not isinstance(t, dict) {
             continue;
@@ -500,6 +535,31 @@ def _register_server_tools(
         raw_tool: str = str(t.get("name", ""));
         tname = _mcp_name_chunk(raw_tool);
         if not tname {
+            continue;
+        }
+        # allow/deny gate (deny wins; empty allow list permits everything).
+        denied_hit: bool = False;
+        for pat in deny_globs {
+            if fnmatch.fnmatch(raw_tool, pat) {
+                denied_hit = True;
+                break;
+            }
+        }
+        if not denied_hit and allow_globs {
+            allowed_hit: bool = False;
+            for pat in allow_globs {
+                if fnmatch.fnmatch(raw_tool, pat) {
+                    allowed_hit = True;
+                    break;
+                }
+            }
+            if not allowed_hit {
+                denied_hit = True;
+            }
+        }
+        if denied_hit {
+            denied += 1;
+            denied_names.append(raw_tool);
             continue;
         }
         schema: any = t.get("inputSchema");
@@ -576,6 +636,8 @@ def _register_server_tools(
         "lost": lost,
         "lost_names": lost_names,
         "ro_names": ro_names,
+        "denied": denied,
+        "denied_names": denied_names,
     };
 }
 
@@ -654,7 +716,14 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
                 + ", ".join([str(x) for x in stats["lost_names"]])
             );
         }
-        _mcp_set_status(server_name, "connected", tools=int(stats["registered"]));
+        if int(stats["denied"]) > 0 {
+            plugins.mcp_notices.append(
+                "mcp server " + server_name + " denied " + str(stats["denied"])
+                + " tool(s) by allow_tools/deny_tools: "
+                + ", ".join([str(x) for x in stats["denied_names"]])
+            );
+        }
+        _mcp_set_status(server_name, "connected", tools=int(stats["registered"]), denied=int(stats["denied"]));
     } except Exception as e {
         _mcp_fail(server_name, "attach failed: " + str(e));
     }
