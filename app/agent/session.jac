@@ -25,6 +25,7 @@ import from .session_config {
     mcp_restart,
     mcp_restart_failed,
     mcp_prompt,
+    mcp_configured_specs,
     mcp_status_lines,
     mcp_server_specs,
     drain_mcp_notices,
