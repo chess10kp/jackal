@@ -18,7 +18,7 @@ import from agent.session {
     run_command, list_extension_shortcuts, run_extension_shortcut, plugins,
     new_session_id, set_model, get_model, cancel_active_turn,
     compact_now, set_mode, set_current_session_id,
-    mcp_restart, mcp_configured_specs,
+    mcp_restart, mcp_restart_failed, mcp_configured_specs,
 }
 import from agent.modes { DEV_MODES }
 import from agent.compaction { compute_context_usage }
@@ -224,7 +224,7 @@ def _run_slash(app: LiveShell, line: str) -> str {
         if rest.startswith("restart") {
             name = rest[len("restart"):].strip();
             if not name {
-                return "usage: /mcp restart NAME";
+                return mcp_restart_failed();
             }
             return mcp_restart(name);
         }

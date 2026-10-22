@@ -794,6 +794,25 @@ def mcp_restart(server_name: str) -> str {
 }
 
 
+"""Restart every server whose status is `failed` (bare /mcp restart).
+Returns a summary line; servers that were fine are left alone."""
+def mcp_restart_failed() -> str {
+    doomed: list[str] = [];
+    for name in sorted(plugins.mcp_status.keys()) {
+        if str(plugins.mcp_status[name].get("state", "")) == "failed" {
+            doomed.append(str(name));
+        }
+    }
+    if not doomed {
+        return "no failed mcp servers";
+    }
+    for name in doomed {
+        mcp_restart(name);
+    }
+    return "restarting mcp servers: " + ", ".join(doomed);
+}
+
+
 """Block (bounded) until no MCP server is still connecting, so the first
 model request sees every tool that is going to attach. Budget comes from
 JACKAL_MCP_WAIT_S (default 10s). Returns True when nothing is pending."""

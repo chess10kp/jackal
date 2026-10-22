@@ -363,3 +363,27 @@ test "allow_tools and deny_tools gate registration (deny wins)" {
         _reset_mcp_plugin_state();
     }
 }
+
+test "mcp_restart_failed restarts only failed servers" {
+    reg = ToolRegistry();
+    plugins.reg = reg;
+    try {
+        plugins.mcp_status = {
+            "dead": {"state": "failed", "error": "boom", "tools": 0, "cmd": ["true"]},
+            "alive": {"state": "connected", "error": "", "tools": 1, "cmd": ["true"]},
+        };
+        # Give the failed server a resolvable spec so restart can proceed.
+        plugins.mcp_specs["dead"] = _spec_for(["true"]);
+        out: str = mcp_restart_failed();
+        assert out.startswith("restarting mcp servers: dead"), out;
+        # The alive server is untouched (still its old status object state).
+        assert str(plugins.mcp_status["alive"]["state"]) == "connected";
+        # (The failed server's re-attach runs in a background flow; its state
+        # moves connecting -> connected/failed on its own schedule.)
+        # Nothing failed now -> honest no-op.
+        plugins.mcp_status["dead"]["state"] = "connected";
+        assert mcp_restart_failed() == "no failed mcp servers";
+    } finally {
+        _reset_mcp_plugin_state();
+    }
+}

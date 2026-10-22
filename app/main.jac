@@ -69,6 +69,9 @@ def handle_command(line: str) -> str | None {
         if not mcp_rows { return "no mcp servers configured"; }
         return "mcp servers:\n" + "\n".join(mcp_rows);
     }
+    if line == "/mcp restart" {
+        return _session.mcp_restart_failed();
+    }
     if line.startswith("/mcp restart ") {
         return _session.mcp_restart(line[len("/mcp restart "):].strip());
     }

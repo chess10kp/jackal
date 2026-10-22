@@ -23,6 +23,7 @@ import from .session_config {
     set_thinking_level as _set_thinking_level,
     clear_history,
     mcp_restart,
+    mcp_restart_failed,
     mcp_status_lines,
     mcp_server_specs,
     drain_mcp_notices,
