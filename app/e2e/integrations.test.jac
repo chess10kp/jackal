@@ -61,6 +61,53 @@ test "repl /mcp reports server status" {
 }
 
 
+test "mcp env and cwd reach the server subprocess" {
+    sb = make_sandbox();
+    try {
+        sub = os.path.join(sb.project, "sub");
+        os.makedirs(sub);
+        write_project_config(sb, {"mcp": {"servers": {"fake": {
+            "command": [sys.executable, fixture_path("fake_mcp.py")],
+            "env": {"FAKE_MCP_TOKEN": "xyz42"},
+            "cwd": "sub",
+        }}}});
+        sb.script([
+            {"text": "", "tool_calls": [{"name": "mcp_fake_envpeek", "args": {}}]},
+            {"text": ""},
+            {"tool_calls": [{"name": "mcp_fake_where", "args": {}}]},
+            {"text": "probed"},
+        ]);
+        r = run_jackal(sb, ["-p", "--mode", "yolo", "probe the server"]);
+        assert r.code == 0, sb.explain(r);
+        calls = sb.calls();
+        assert calls[1]["last"]["content"] == "token=xyz42", sb.explain(r);
+        assert calls[3]["last"]["content"] == sub, sb.explain(r);
+    } finally {
+        sb.cleanup();
+    }
+}
+
+
+test "an enabled:false mcp server never attaches" {
+    sb = make_sandbox();
+    try {
+        write_project_config(sb, {"mcp": {"servers": {"off": {
+            "command": [sys.executable, fixture_path("fake_mcp.py")],
+            "enabled": False,
+        }}}});
+        sb.script([{"text": "warm"}]);
+        r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
+        assert r.code == 0, sb.explain(r);
+        for t in sb.calls()[0]["tools"] {
+            assert not str(t).startswith("mcp_off_"), sb.explain(r);
+        }
+        assert "off — disabled" in r.stdout, sb.explain(r);
+    } finally {
+        sb.cleanup();
+    }
+}
+
+
 test "subagent runs a nested loop and returns its report" {
     sb = make_sandbox({"README.md": "secret word: kumquat\n"});
     try {

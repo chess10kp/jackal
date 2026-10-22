@@ -13,7 +13,7 @@ Fake server modes:
 """
 
 glob FAKE_SERVER_SRC: str = """
-import sys, json, time, os, select
+import sys, json, time, os
 
 def send(obj):
     sys.stdout.write(json.dumps(obj) + "\\n")
@@ -22,14 +22,11 @@ def send(obj):
 mode = sys.argv[1] if len(sys.argv) > 1 else "normal"
 
 def read_replies(want_ids, deadline):
+    # Plain blocking readline (no select): the stdin iterator readahead can
+    # park bytes in the userspace buffer where select cannot see them. The
+    # client under test always answers or its own request timeout fires.
     got = {}
     while len(got) < len(want_ids) and time.time() < deadline:
-        remaining = deadline - time.time()
-        if remaining <= 0:
-            break
-        ready, _, _ = select.select([sys.stdin], [], [], remaining)
-        if not ready:
-            break
         line = sys.stdin.readline()
         if not line:
             break

@@ -26,6 +26,9 @@ obj SessionPlugins {
         interactive_ui: bool = False,
         active_cancel: any = None,
         mcp_clients: dict[str, McpClient] = {},
+        # name -> full attach spec {cmd, env, cwd, enabled, timeout} as
+        # parsed from config; restart reuses it instead of the bare argv.
+        mcp_specs: dict[str, dict[str, any]] = {},
         mcp_tools: int = 0,
         # name -> {"state": connecting|connected|failed, "error", "tools", "cmd"}
         mcp_status: dict[str, dict[str, any]] = {},

@@ -284,9 +284,17 @@ def _effective_timeout(client: McpClient, timeout_s: float) -> float {
 
 """Spawn the MCP server subprocess and run the initialize handshake.
 
-server_cmd example: ["jac", "mcp"]. Returns {"ok": True, "server_info": ...}
-or {"ok": False, "error": ...}; never raises."""
-def mcp_start(client: McpClient, server_cmd: list[str], timeout_s: float = -1.0) -> dict[str, any] {
+server_cmd example: ["jac", "mcp"]. env_extra merges over os.environ for the
+child; cwd sets the child working directory ("" = inherit). Returns
+{"ok": True, "server_info": ...} or {"ok": False, "error": ...}; never
+raises."""
+def mcp_start(
+    client: McpClient,
+    server_cmd: list[str],
+    timeout_s: float = -1.0,
+    env_extra: dict[str, str] | None = None,
+    cwd: str = "",
+) -> dict[str, any] {
     if not server_cmd {
         return {"ok": False, "error": "server_cmd must not be empty"};
     }
@@ -296,6 +304,20 @@ def mcp_start(client: McpClient, server_cmd: list[str], timeout_s: float = -1.0)
     client.dead = False;
     timeout = _effective_timeout(client, timeout_s);
     _ensure_io(client);
+    # env_extra merges over the inherited environment (Popen env=None would
+    # mean "inherit everything, change nothing"); cwd="" keeps inheritance.
+    popen_env: any = None;
+    if env_extra {
+        base_env: dict[str, str] = dict(os.environ);
+        for (env_k, env_v) in env_extra.items() {
+            base_env[str(env_k)] = str(env_v);
+        }
+        popen_env = base_env;
+    }
+    popen_cwd: any = None;
+    if cwd {
+        popen_cwd = str(cwd);
+    }
     try {
         client.proc = subprocess.Popen(
             [str(c) for c in server_cmd],
@@ -304,6 +326,8 @@ def mcp_start(client: McpClient, server_cmd: list[str], timeout_s: float = -1.0)
             stderr=subprocess.DEVNULL,
             text=True,
             bufsize=1,
+            env=popen_env,
+            cwd=popen_cwd,
         );
     } except Exception as e {
         client.proc = None;

@@ -4,6 +4,7 @@ import os;
 import json;
 import time;
 
+import from .compaction { load_project_config }
 import from .llm { provider_for, credential_error }
 import from .modes { DEV_MODES }
 import from .plugin_bridge { PluginBridge, fire_hook, drain_model_requests }
@@ -58,10 +59,17 @@ def _mcp_name_chunk(raw: any) -> str {
 }
 
 
-"""Extract {name: argv} MCP server specs from a parsed .jackal config.
+"""Extract {name: spec} MCP server entries from a parsed config.
+
+Spec shape (all keys present, defaults shown):
+  cmd: list[str]        argv to spawn
+  env: dict[str, str]   extra environment vars merged over os.environ
+  cwd: str              child working directory ("" = inherit)
+  enabled: bool         False -> the server is never attached (status: disabled)
+  timeout: float        per-server default call timeout seconds (-1.0 = global)
 Malformed entries are skipped silently."""
-def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
-    out: dict[str, list[str]] = {};
+def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
+    out: dict[str, dict[str, any]] = {};
     raw: any = cfg.get("mcp") if isinstance(cfg, dict) else None;
     if not isinstance(raw, dict) {
         return out;
@@ -86,7 +94,31 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
         if isinstance(extra, list) {
             parts.extend([str(a) for a in extra]);
         }
-        out[str(name)] = parts;
+        env: dict[str, str] = {};
+        raw_env: any = ent.get("env");
+        if isinstance(raw_env, dict) {
+            for (env_k, env_v) in raw_env.items() {
+                env[str(env_k)] = str(env_v);
+            }
+        }
+        cwd: str = str(ent.get("cwd", "") or "");
+        enabled: bool = True;
+        raw_enabled: any = ent.get("enabled", True);
+        if isinstance(raw_enabled, bool) {
+            enabled = raw_enabled;
+        }
+        timeout: float = -1.0;
+        raw_to: any = ent.get("timeout");
+        if isinstance(raw_to, (int, float)) and float(raw_to) > 0.0 {
+            timeout = float(raw_to);
+        }
+        out[str(name)] = {
+            "cmd": parts,
+            "env": env,
+            "cwd": cwd,
+            "enabled": enabled,
+            "timeout": timeout,
+        };
     }
     return out;
 }
@@ -116,9 +148,88 @@ def _make_mcp_handler(client: McpClient, server_name: str, tool_name: str) -> Ca
 
 
 """Public alias of _mcp_server_specs for UI modules (underscore names did
-not bind across modules at runtime)."""
+not bind across modules at runtime): {name: argv} (windows show commands)."""
 def mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
-    return _mcp_server_specs(cfg);
+    rich = _mcp_server_specs(cfg);
+    out: dict[str, list[str]] = {};
+    for (name, spec) in rich.items() {
+        out[name] = [str(c) for c in spec["cmd"]];
+    }
+    return out;
+}
+
+
+"""User-level config path: JACKAL_AGENT_DIR/config.json first, then the
+home-level ~/.jackal/config.json. Empty string when neither exists."""
+def _user_config_path() -> str {
+    agent_dir: str = os.environ.get("JACKAL_AGENT_DIR", "");
+    if agent_dir {
+        cand: str = os.path.join(agent_dir, "config.json");
+        if os.path.isfile(cand) {
+            return cand;
+        }
+    }
+    home: str = os.path.expanduser("~");
+    home_cand: str = os.path.join(home, ".jackal", "config.json");
+    if os.path.isfile(home_cand) {
+        return home_cand;
+    }
+    return "";
+}
+
+
+"""Defensive JSON read: {} for missing/corrupt/non-dict files."""
+def _load_json_dict(path: str) -> dict[str, any] {
+    out: dict[str, any] = {};
+    if not path or not os.path.isfile(path) {
+        return out;
+    }
+    try {
+        with open(path, "r", encoding="utf-8") as fh {
+            parsed = json.load(fh);
+        }
+        if isinstance(parsed, dict) {
+            out = parsed;
+        }
+    } except Exception {
+    }
+    return out;
+}
+
+
+"""Effective MCP config: user-level config merged BENEATH the project
+config. Per-server entries are replaced wholesale by the project (same
+name wins), so a project can override a user server's env/cwd/flags."""
+def mcp_config(cwd: str) -> dict[str, any] {
+    user: dict[str, any] = _load_json_dict(_user_config_path());
+    proj: dict[str, any] = load_project_config(cwd);
+    raw_u: any = user.get("mcp");
+    raw_p: any = proj.get("mcp");
+    um: dict[str, any] = raw_u if isinstance(raw_u, dict) else {};
+    pm: dict[str, any] = raw_p if isinstance(raw_p, dict) else {};
+    merged: dict[str, any] = dict(um);
+    for (key, val) in pm.items() {
+        if key == "servers" and isinstance(val, dict) {
+            raw_us: any = merged.get("servers");
+            us: dict[str, any] = raw_us if isinstance(raw_us, dict) else {};
+            servers: dict[str, any] = dict(us);
+            for (sname, sent) in val.items() {
+                servers[sname] = sent;
+            }
+            merged["servers"] = servers;
+        } else {
+            merged[key] = val;
+        }
+    }
+    return {"mcp": merged};
+}
+
+
+"""Configured MCP servers (all sources merged) as {name: argv} for UI glue
+that must not parse config itself."""
+def mcp_configured_specs() -> dict[str, list[str]] {
+    cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
+    return mcp_server_specs(mcp_config(cwd));
 }
 
 
@@ -150,22 +261,49 @@ def drain_mcp_notices() -> list[str] {
 }
 
 
-"""Spawn + initialize one MCP server, then seed namespaced tools into the
-live registry. Runs inside a background flow — never raises; failures land
-in plugins.mcp_status and plugins.mcp_notices (never printed: stdout belongs
-to the TUI/JSONL frontends)."""
-def _attach_one_mcp_server(server_name: str, cmd: list[str]) {
+"""Spawn + initialize one MCP server from its JSON-encoded spec dict,
+then seed namespaced tools into the live registry. Runs inside a
+background flow — never raises; failures land in plugins.mcp_status and
+plugins.mcp_notices (never printed: stdout belongs to the TUI/JSONL
+frontends)."""
+def _attach_one_mcp_server(server_name: str, spec_json: str) {
     try {
         reg = plugins.reg;
         if reg is None {
             return;
         }
+        # The spec crosses the flow boundary as an immutable JSON string.
+        parsed_spec: any = None;
+        try {
+            parsed_spec = json.loads(spec_json);
+        } except Exception {
+            parsed_spec = None;
+        }
+        if not isinstance(parsed_spec, dict) {
+            _mcp_fail(server_name, "attach spec did not parse");
+            return;
+        }
+        spec: dict[str, any] = parsed_spec;
+        cmd: list[str] = [str(c) for c in spec.get("cmd", [])];
+        env_extra: dict[str, str] = {};
+        raw_env: any = spec.get("env", {});
+        if isinstance(raw_env, dict) {
+            for (env_k, env_v) in raw_env.items() {
+                env_extra[str(env_k)] = str(env_v);
+            }
+        }
+        cwd: str = str(spec.get("cwd", "") or "");
+        timeout: float = -1.0;
+        raw_to: any = spec.get("timeout", -1.0);
+        if isinstance(raw_to, (int, float)) {
+            timeout = float(raw_to);
+        }
         _mcp_set_status(server_name, "connecting", cmd=cmd);
-        client = create_mcp_client();
+        client = create_mcp_client(timeout_s=timeout);
         # Register the client before connecting so dispose can stop it even
         # mid-handshake.
         plugins.mcp_clients[server_name] = client;
-        started = mcp_start(client, cmd);
+        started = mcp_start(client, cmd, env_extra=env_extra, cwd=cwd);
         if not started.get("ok") {
             _mcp_fail(server_name, str(started.get("error", "spawn failed")));
             return;
@@ -215,12 +353,21 @@ def _attach_one_mcp_server(server_name: str, cmd: list[str]) {
 }
 
 
-"""Parse .jackal mcp config and background-spawn each declared server."""
-def _attach_mcp_servers(cfg: dict[str, any]) {
-    specs = _mcp_server_specs(cfg);
-    for (name, cmd) in specs.items() {
-        _mcp_set_status(name, "connecting", cmd=list(cmd));
-        flow _attach_one_mcp_server(name, cmd);
+"""Parse the effective (user + project) MCP config and background-spawn
+each declared server. Disabled servers get a `disabled` status entry and
+never attach."""
+def _attach_mcp_servers() {
+    cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
+    specs = _mcp_server_specs(mcp_config(cwd));
+    for (name, spec) in specs.items() {
+        plugins.mcp_specs[name] = dict(spec);
+        cmd: list[str] = [str(c) for c in spec["cmd"]];
+        if not spec["enabled"] {
+            _mcp_set_status(name, "disabled", cmd=cmd);
+            continue;
+        }
+        _mcp_set_status(name, "connecting", cmd=cmd);
+        flow _attach_one_mcp_server(name, json.dumps(spec));
     }
 }
 
@@ -228,10 +375,20 @@ def _attach_mcp_servers(cfg: dict[str, any]) {
 """Stop a server's client and drop its tools, then spawn it again in the
 background with the command it was configured with. Returns a status line."""
 def mcp_restart(server_name: str) -> str {
+    spec: dict[str, any] = dict(plugins.mcp_specs.get(server_name, {}));
     st: dict[str, any] = plugins.mcp_status.get(server_name, {});
-    cmd: any = st.get("cmd", []);
+    cmd: any = spec.get("cmd") if spec.get("cmd") else st.get("cmd", []);
     if not isinstance(cmd, list) or not cmd {
         return "unknown mcp server: " + server_name;
+    }
+    if not spec {
+        spec = {
+            "cmd": [str(c) for c in cmd],
+            "env": {},
+            "cwd": "",
+            "enabled": True,
+            "timeout": -1.0,
+        };
     }
     old: any = plugins.mcp_clients.get(server_name);
     if old is not None {
@@ -252,13 +409,9 @@ def mcp_restart(server_name: str) -> str {
         }
         plugins.mcp_tools = max(0, plugins.mcp_tools - removed);
     }
-    # Same shape as _attach_mcp_servers: a typed spec map whose loop values
-    # are sendable into the flow.
-    specs: dict[str, list[str]] = {server_name: [str(c) for c in cmd]};
-    for (name, argv) in specs.items() {
-        _mcp_set_status(name, "connecting", cmd=list(argv));
-        flow _attach_one_mcp_server(name, argv);
-    }
+    _mcp_set_status(server_name, "connecting", cmd=[str(c) for c in spec["cmd"]]);
+    spec_wire: str = json.dumps(spec);
+    flow _attach_one_mcp_server(server_name, spec_wire);
     return "restarting mcp server " + server_name;
 }
 

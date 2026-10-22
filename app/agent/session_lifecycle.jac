@@ -5,7 +5,6 @@ import time;
 
 import from .session_state { plugins }
 import from .session_config { set_mode, _attach_mcp_servers, _load_model_prefs }
-import from .compaction { load_project_config }
 import from .agent_tools { register_agent_tools }
 import from .tools { default_registry }
 import from .registry { get_tool }
@@ -188,7 +187,7 @@ def session_boot(
     plugins.mcp_status.clear();
     plugins.mcp_notices.clear();
     try {
-        _attach_mcp_servers(load_project_config(plugins.cwd));
+        _attach_mcp_servers();
     } except Exception {
     }
 

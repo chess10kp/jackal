@@ -15,6 +15,10 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
     {"name": "add", "description": "Add two numbers.",
      "inputSchema": {"type": "object", "properties": {"a": {"type": "number"}, "b": {"type": "number"}}, "required": ["a", "b"]}},
+    {"name": "where", "description": "Report the server process working directory.",
+     "inputSchema": {"type": "object", "properties": {}, "required": []}},
+    {"name": "envpeek", "description": "Report FAKE_MCP_TOKEN from the server environment.",
+     "inputSchema": {"type": "object", "properties": {}, "required": []}},
 ]
 
 
@@ -49,6 +53,10 @@ for line in sys.stdin:
             text = "echo: " + str(args.get("text", ""))
         elif name == "add":
             text = str(args.get("a", 0) + args.get("b", 0))
+        elif name == "where":
+            text = os.getcwd()
+        elif name == "envpeek":
+            text = "token=" + os.environ.get("FAKE_MCP_TOKEN", "unset")
         else:
             reply(rid, {"content": [{"type": "text", "text": "unknown tool"}], "isError": True})
             continue

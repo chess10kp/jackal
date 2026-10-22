@@ -18,9 +18,8 @@ import from agent.session {
     run_command, list_extension_shortcuts, run_extension_shortcut, plugins,
     new_session_id, set_model, get_model, cancel_active_turn,
     compact_now, set_mode, set_current_session_id,
-    mcp_restart, mcp_server_specs,
+    mcp_restart, mcp_configured_specs,
 }
-import from agent.compaction { load_project_config }
 import from agent.modes { DEV_MODES }
 import from agent.compaction { compute_context_usage }
 import from agent.auth_env { logout_provider, stored_providers }
@@ -442,7 +441,7 @@ agent facade, so the MCP annex tests run without agent.session imports."""
 def _mcp_current_specs() -> dict[str, list[str]] {
     specs: dict[str, list[str]] = {};
     try {
-        specs = mcp_server_specs(load_project_config(os.getcwd()));
+        specs = mcp_configured_specs();
     } except Exception {
         specs = {};
     }
