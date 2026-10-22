@@ -613,3 +613,96 @@ def mcp_drain_notifications(client: McpClient) -> list[dict[str, any]] {
     client.notifications.clear();
     return out;
 }
+
+"""List prompts exposed by the server (pagination-aware, capped like
+tools/list). Returns {"ok", "prompts": [{name, description, arguments}]}."""
+def mcp_list_prompts(client: McpClient, timeout_s: float = -1.0) -> dict[str, any] {
+    if not client.initialized or not _alive(client) {
+        return {"ok": False, "error": "mcp client not initialized"};
+    }
+    timeout = _effective_timeout(client, timeout_s);
+    prompts: list[dict[str, any]] = [];
+    cursor: str = "";
+    pages: int = 0;
+    while True {
+        params: dict[str, any] = {};
+        if cursor {
+            params["cursor"] = cursor;
+        }
+        try {
+            resp = _request(client, "prompts/list", params, timeout);
+        } except Exception as e {
+            return {"ok": False, "error": str(e)};
+        }
+        payload = _response_payload(resp);
+        if not payload["ok"] {
+            return payload;
+        }
+        result: any = payload["result"];
+        raw_prompts: any = result.get("prompts", []);
+        if isinstance(raw_prompts, list) {
+            for pr in raw_prompts {
+                if isinstance(pr, dict) and pr.get("name") {
+                    args_out: list[any] = [];
+                    raw_args: any = pr.get("arguments", []);
+                    if isinstance(raw_args, list) {
+                        args_out = raw_args;
+                    }
+                    prompts.append({
+                        "name": str(pr.get("name")),
+                        "description": str(pr.get("description", "")),
+                        "arguments": args_out,
+                    });
+                }
+            }
+        }
+        pages += 1;
+        nc: any = result.get("nextCursor");
+        next_cur: str = str(nc) if nc else "";
+        if not next_cur or pages >= MAX_LIST_PAGES {
+            break;
+        }
+        cursor = next_cur;
+    }
+    return {"ok": True, "prompts": prompts};
+}
+
+
+"""Fetch one prompt's messages. Returns
+{"ok", "description", "messages": [{role, content}, ...]}."""
+def mcp_get_prompt(
+    client: McpClient, name: str, arguments: dict[str, any], timeout_s: float = -1.0
+) -> dict[str, any] {
+    if not client.initialized or not _alive(client) {
+        return {"ok": False, "error": "mcp client not initialized"};
+    }
+    if not name {
+        return {"ok": False, "error": "prompt name must not be empty"};
+    }
+    args: dict[str, any] = {};
+    if isinstance(arguments, dict) {
+        args = arguments;
+    }
+    params: dict[str, any] = {"name": str(name), "arguments": args};
+    timeout = _effective_timeout(client, timeout_s);
+    try {
+        resp = _request(client, "prompts/get", params, timeout);
+    } except Exception as e {
+        return {"ok": False, "error": str(e)};
+    }
+    payload = _response_payload(resp);
+    if not payload["ok"] {
+        return payload;
+    }
+    result: any = payload["result"];
+    messages: list[dict[str, any]] = [];
+    raw_msgs: any = result.get("messages", []);
+    if isinstance(raw_msgs, list) {
+        for m in raw_msgs {
+            if isinstance(m, dict) {
+                messages.append(m);
+            }
+        }
+    }
+    return {"ok": True, "description": str(result.get("description", "")), "messages": messages};
+}

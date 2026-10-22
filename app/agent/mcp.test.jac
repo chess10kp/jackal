@@ -105,6 +105,24 @@ for raw in sys.stdin:
                  "inputSchema": {"type": "object",
                                  "properties": {}, "required": []}},
             ]}})
+    elif method == "prompts/list":
+        send({"jsonrpc": "2.0", "id": rid, "result": {"prompts": [
+            {"name": "greet", "description": "Greet someone.",
+             "arguments": [{"name": "who", "required": False}]},
+        ]}})
+    elif method == "prompts/get":
+        pname = str(req.get("params", {}).get("name", ""))
+        if pname != "greet":
+            send({"jsonrpc": "2.0", "id": rid, "error": {
+                "code": -32602, "message": "unknown prompt"}})
+            continue
+        who = str(req.get("params", {}).get("arguments", {}).get("who", "world"))
+        send({"jsonrpc": "2.0", "id": rid, "result": {
+            "description": "A greeting",
+            "messages": [
+                {"role": "user", "content": {"type": "text",
+                                             "text": "Hello, " + who + "!"}},
+            ]}})
     elif method == "tools/call":
         name = str(req.get("params", {}).get("name", ""))
         args = req.get("params", {}).get("arguments", {}) or {}
@@ -333,6 +351,33 @@ test "non-text content blocks surface as stubs and ride along raw" {
         assert "[resource_link: file:///y.txt]" in text, text;
         blocks: any = res.get("content", []);
         assert isinstance(blocks, list) and len(blocks) == 3;
+    } finally {
+        mcp_stop(client);
+        shutil.rmtree(tmp, ignore_errors=True);
+    }
+}
+
+test "prompts list and get round trip" {
+    tmp = tempfile.mkdtemp();
+    client = create_mcp_client();
+    try {
+        cmd = _write_fake_server(tmp);
+        assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
+        listed = mcp_list_prompts(client, timeout_s=10.0);
+        assert listed["ok"] is True;
+        prompts: any = listed.get("prompts", []);
+        assert len(prompts) == 1;
+        assert str(prompts[0]["name"]) == "greet";
+        got = mcp_get_prompt(client, "greet", {"who": "jackal"}, timeout_s=10.0);
+        assert got["ok"] is True;
+        assert str(got.get("description", "")) == "A greeting";
+        msgs: any = got.get("messages", []);
+        assert len(msgs) == 1;
+        text: str = str(msgs[0].get("content", {}).get("text", ""));
+        assert text == "Hello, jackal!", text;
+        # unknown prompt -> honest error at the seam
+        bad = mcp_get_prompt(client, "nope", {}, timeout_s=10.0);
+        assert bad["ok"] is False;
     } finally {
         mcp_stop(client);
         shutil.rmtree(tmp, ignore_errors=True);

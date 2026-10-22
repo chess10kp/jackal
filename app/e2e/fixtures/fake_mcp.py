@@ -48,6 +48,14 @@ for line in sys.stdin:
                     "capabilities": {"tools": {}}, "serverInfo": {"name": "fake", "version": "0"}})
     elif method == "tools/list":
         reply(rid, {"tools": TOOLS})
+    elif method == "prompts/list":
+        reply(rid, {"prompts": [{"name": "greet", "description": "Greet someone.",
+                                 "arguments": [{"name": "who"}]}]})
+    elif method == "prompts/get":
+        who = req["params"].get("arguments", {}).get("who", "world")
+        reply(rid, {"description": "A greeting",
+                    "messages": [{"role": "user",
+                                  "content": {"type": "text", "text": "Hello, " + str(who) + "!"}}]})
     elif method == "tools/call":
         name = req["params"]["name"]
         args = req["params"].get("arguments", {})

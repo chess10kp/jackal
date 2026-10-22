@@ -69,11 +69,20 @@ def handle_command(line: str) -> str | None {
         if not mcp_rows { return "no mcp servers configured"; }
         return "mcp servers:\n" + "\n".join(mcp_rows);
     }
-    if line == "/mcp restart" {
-        return _session.mcp_restart_failed();
-    }
-    if line.startswith("/mcp restart ") {
-        return _session.mcp_restart(line[len("/mcp restart "):].strip());
+    if line.startswith("/mcp ") {
+        rest = line[len("/mcp"):].strip();
+        if rest == "restart" {
+            return _session.mcp_restart_failed();
+        }
+        if rest.startswith("restart ") {
+            return _session.mcp_restart(rest[len("restart "):].strip());
+        }
+        toks: list[str] = rest.split(None, 2);
+        if len(toks) >= 2 {
+            args_json: str = toks[2] if len(toks) >= 3 else "";
+            return _session.mcp_prompt(str(toks[0]), str(toks[1]), args_json);
+        }
+        return "usage: /mcp [restart [NAME] | SERVER PROMPT [JSON_ARGS]]";
     }
     if line == "/compact" { return _session.compact_now(); }
     if line == "/abort" {

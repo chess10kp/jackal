@@ -55,7 +55,7 @@ test "repl /mcp reports server status" {
         # One turn first so the attach flow has settled before /mcp.
         r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
         assert r.code == 0, sb.explain(r);
-        assert "fake — connected · 2 tools" in r.stdout, sb.explain(r);
+        assert "fake — connected · 5 tools" in r.stdout, sb.explain(r);
     } finally {
         sb.cleanup();
     }
@@ -74,15 +74,14 @@ test "mcp env and cwd reach the server subprocess" {
         }}}});
         sb.script([
             {"text": "", "tool_calls": [{"name": "mcp_fake_envpeek", "args": {}}]},
-            {"text": ""},
-            {"tool_calls": [{"name": "mcp_fake_where", "args": {}}]},
+            {"text": "", "tool_calls": [{"name": "mcp_fake_where", "args": {}}]},
             {"text": "probed"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "probe the server"]);
         assert r.code == 0, sb.explain(r);
         calls = sb.calls();
         assert calls[1]["last"]["content"] == "token=xyz42", sb.explain(r);
-        assert calls[3]["last"]["content"] == sub, sb.explain(r);
+        assert calls[2]["last"]["content"] == sub, sb.explain(r);
     } finally {
         sb.cleanup();
     }
@@ -115,15 +114,28 @@ test "a dead mcp server degrades, then recovers on the next call" {
         write_project_config(sb, _mcp_cfg());
         sb.script([
             {"text": "", "tool_calls": [{"name": "mcp_fake_die", "args": {}}]},
-            {"text": ""},
-            {"tool_calls": [{"name": "mcp_fake_echo", "args": {"text": "back"}}]},
+            {"text": "", "tool_calls": [{"name": "mcp_fake_echo", "args": {"text": "back"}}]},
             {"text": "recovered"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "kill then use"]);
         assert r.code == 0, sb.explain(r);
         calls = sb.calls();
         assert calls[1]["last"]["content"] == "dying", sb.explain(r);
-        assert calls[3]["last"]["content"] == "echo: back", sb.explain(r);
+        assert calls[2]["last"]["content"] == "echo: back", sb.explain(r);
+    } finally {
+        sb.cleanup();
+    }
+}
+
+
+test "repl /mcp SERVER PROMPT expands the server prompt" {
+    sb = make_sandbox();
+    try {
+        write_project_config(sb, _mcp_cfg());
+        sb.script([{"text": "warm"}]);
+        r = run_jackal(sb, [], stdin_text='hi\n/mcp fake greet {"who": "jackal"}\n/exit\n');
+        assert r.code == 0, sb.explain(r);
+        assert "Hello, jackal!" in r.stdout, sb.explain(r);
     } finally {
         sb.cleanup();
     }

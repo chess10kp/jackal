@@ -19,6 +19,7 @@ import from .mcp {
     mcp_stop,
     mcp_drain_notifications,
     mcp_is_alive,
+    mcp_get_prompt,
 }
 import from .session_state {
     history,
@@ -687,7 +688,12 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
             timeout = float(raw_to);
         }
         _mcp_set_status(server_name, "connecting", cmd=cmd);
-        client = create_mcp_client(timeout_s=timeout);
+        # spec timeout -1.0 means "global default" — only override when set.
+        if timeout > 0.0 {
+            client = create_mcp_client(timeout_s=timeout);
+        } else {
+            client = create_mcp_client();
+        }
         # Register the client before connecting so dispose can stop it even
         # mid-handshake.
         plugins.mcp_clients[server_name] = client;
@@ -791,6 +797,52 @@ def mcp_restart(server_name: str) -> str {
     spec_wire: str = json.dumps(spec);
     flow _attach_one_mcp_server(server_name, spec_wire);
     return "restarting mcp server " + server_name;
+}
+
+
+"""Resolve an MCP server prompt to its text (one line per message,
+role-prefixed). Returns the prompt text or an ERROR string callers can
+print directly; args_json must be a JSON object when given."""
+def mcp_prompt(server_name: str, prompt_name: str, args_json: str) -> str {
+    client: any = plugins.mcp_clients.get(server_name);
+    if client is None {
+        return "ERROR: unknown mcp server: " + server_name;
+    }
+    args: dict[str, any] = {};
+    trimmed: str = args_json.strip();
+    if trimmed {
+        parsed: any = None;
+        try {
+            parsed = json.loads(trimmed);
+        } except Exception {
+            return "ERROR: prompt args must be valid JSON";
+        }
+        if not isinstance(parsed, dict) {
+            return "ERROR: prompt args must be a JSON object";
+        }
+        args = parsed;
+    }
+    res = mcp_get_prompt(client, prompt_name, args);
+    if not res.get("ok") {
+        return "ERROR: " + str(res.get("error", "prompts/get failed"));
+    }
+    parts: list[str] = [];
+    raw_msgs: any = res.get("messages", []);
+    if isinstance(raw_msgs, list) {
+        for m in raw_msgs {
+            if not isinstance(m, dict) {
+                continue;
+            }
+            content: any = m.get("content");
+            if isinstance(content, dict) and str(content.get("type", "")) == "text" {
+                parts.append("[" + str(m.get("role", "user")) + "] " + str(content.get("text", "")));
+            }
+        }
+    }
+    if not parts {
+        return "ERROR: prompt returned no text messages";
+    }
+    return "\n".join(parts);
 }
 
 
