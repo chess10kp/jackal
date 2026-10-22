@@ -188,6 +188,7 @@ def session_boot(
     plugins.mcp_notices.clear();
     plugins.mcp_specs.clear();
     plugins.mcp_read_only.clear();
+    plugins.mcp_owned.clear();
     try {
         _attach_mcp_servers();
     } except Exception {
@@ -293,6 +294,7 @@ def session_dispose {
     plugins.mcp_notices.clear();
     plugins.mcp_specs.clear();
     plugins.mcp_read_only.clear();
+    plugins.mcp_owned.clear();
     b = plugins.bridge;
     if b is not None {
         # Pi lifecycle: extensions get session_shutdown before teardown.

@@ -9,13 +9,15 @@ import from .compaction { load_project_config }
 import from .llm { provider_for, credential_error }
 import from .modes { DEV_MODES, register_mcp_read_only_tools, unregister_mcp_read_only_tools }
 import from .plugin_bridge { PluginBridge, fire_hook, drain_model_requests }
-import from .registry { ToolRegistry, register_native, unregister }
+import from .registry { ToolRegistry, register_native, unregister, get_tool }
 import from .mcp {
     McpClient,
     create_mcp_client,
     mcp_start,
     mcp_list_tools,
     mcp_stop,
+    mcp_drain_notifications,
+    mcp_is_alive,
 }
 import from .session_state {
     history,
@@ -270,11 +272,218 @@ def _mcp_fail(server_name: str, error: str) {
 }
 
 
-"""Pop queued MCP notices for display (frontends call this each tick/turn)."""
+"""Pop queued MCP notices for display (frontends call this each tick/turn).
+Also pumps buffered server notifications first so list_changed events are
+consumed even when nothing else reads them."""
 def drain_mcp_notices() -> list[str] {
+    mcp_pump_notifications();
     out: list[str] = list(plugins.mcp_notices);
     plugins.mcp_notices.clear();
     return out;
+}
+
+
+"""Consume buffered server notifications for every connected client.
+
+tools/list_changed triggers a bounded re-list + diff (register new tools,
+unregister vanished ones) without a respawn; progress and logging
+notifications are dropped safely. Bounded work only: the refresh uses a
+short list timeout so a wedged server cannot stall the caller for long."""
+def mcp_pump_notifications() {
+    for (name, client) in list(plugins.mcp_clients.items()) {
+        st: dict[str, any] = plugins.mcp_status.get(name, {});
+        if str(st.get("state", "")) != "connected" {
+            continue;
+        }
+        notes_raw: any = None;
+        try {
+            notes_raw = mcp_drain_notifications(client);
+        } except Exception {
+            continue;
+        }
+        if not isinstance(notes_raw, list) {
+            continue;
+        }
+        for note in notes_raw {
+            if isinstance(note, dict) and str(note.get("method", "")) == "notifications/tools/list_changed" {
+                _refresh_server_tools(name);
+            }
+        }
+    }
+}
+
+
+"""Re-list one server's tools and diff-register against the live registry
+(no respawn). On failure the current tools are kept and a notice explains
+why; a successful diff updates counts and announces the delta."""
+def _refresh_server_tools(server_name: str) {
+    client: any = plugins.mcp_clients.get(server_name);
+    reg = plugins.reg;
+    if client is None or reg is None {
+        return;
+    }
+    listed = mcp_list_tools(client, timeout_s=5.0);
+    if not listed.get("ok") {
+        plugins.mcp_notices.append(
+            "mcp server " + server_name + " tools/list failed: "
+            + str(listed.get("error", "")) + " (keeping current tools)"
+        );
+        return;
+    }
+    raw_tools: any = listed.get("tools", []);
+    if not isinstance(raw_tools, list) {
+        plugins.mcp_notices.append(
+            "mcp server " + server_name
+            + " tools/list returned no tool array (keeping current tools)"
+        );
+        return;
+    }
+    prefix: str = "mcp_" + _mcp_name_chunk(server_name) + "_";
+    wanted_full: set[str] = set();
+    for t in raw_tools {
+        if isinstance(t, dict) and str(t.get("name", "")) {
+            wanted_full.add(prefix + _mcp_name_chunk(str(t.get("name", ""))));
+        }
+    }
+    removed: int = 0;
+    for tname in list(reg.tools.keys()) {
+        n: str = str(tname);
+        mine: bool = plugins.mcp_owned.get(n, "") == server_name;
+        if n.startswith(prefix) and mine and (n not in wanted_full) {
+            if unregister(reg, n) {
+                plugins.mcp_owned.pop(n, None);
+                removed += 1;
+            }
+        }
+    }
+    spec: dict[str, any] = dict(plugins.mcp_specs.get(server_name, {}));
+    stats = _register_server_tools(reg, server_name, client, spec, raw_tools);
+    ro_names: list[str] = list(stats["ro_names"]);
+    unregister_mcp_read_only_tools(list(plugins.mcp_read_only.get(server_name, [])));
+    if ro_names {
+        register_mcp_read_only_tools(ro_names);
+    }
+    plugins.mcp_read_only[server_name] = ro_names;
+    plugins.mcp_tools = max(0, plugins.mcp_tools - removed) + int(stats["registered"]);
+    _mcp_set_status(server_name, "connected", tools=int(stats["registered"]));
+    plugins.mcp_notices.append(
+        "mcp server " + server_name + " tool list changed: +"
+        + str(int(stats["registered"])) + " now registered, -" + str(removed) + " removed"
+    );
+}
+
+
+"""Register one server's tools into the registry with collision handling.
+
+Same-server re-registration (refresh/restart) replaces silently. A name
+owned by ANOTHER server or a foreign tool is renamed deterministically
+with a _<n> suffix; if no slot is found the tool is reported lost (never
+silently swallowed). Returns {"registered", "lost", "lost_names",
+"ro_names"} and records ownership in plugins.mcp_owned.""" 
+def _register_server_tools(
+    reg: ToolRegistry,
+    server_name: str,
+    client: McpClient,
+    spec: dict[str, any],
+    tools: list[any],
+) -> dict[str, any] {
+    sprefix: str = _mcp_name_chunk(server_name);
+    spec_read_only: bool = bool(spec.get("read_only", False));
+    ro_globs: list[str] = [];
+    raw_globs: any = spec.get("read_only_tools", []);
+    if isinstance(raw_globs, list) {
+        for pat in raw_globs {
+            ro_globs.append(str(pat));
+        }
+    }
+    registered: int = 0;
+    lost: int = 0;
+    lost_names: list[str] = [];
+    ro_names: list[str] = [];
+    for t in tools {
+        if not isinstance(t, dict) {
+            continue;
+        }
+        raw_tool: str = str(t.get("name", ""));
+        tname = _mcp_name_chunk(raw_tool);
+        if not tname {
+            continue;
+        }
+        schema: any = t.get("inputSchema");
+        if not isinstance(schema, dict) or not schema {
+            schema = {"type": "object", "properties": {}, "required": []};
+        }
+        full_name: str = "mcp_" + sprefix + "_" + tname;
+        existing = get_tool(reg, full_name);
+        if existing is not None and plugins.mcp_owned.get(full_name, "") != server_name {
+            renamed: bool = False;
+            # Prefer this server's own previous renamed slot so repeated
+            # attaches stay on one stable name instead of marching _2, _3…
+            for n in range(2, 51) {
+                prev: str = full_name + "_" + str(n);
+                if plugins.mcp_owned.get(prev, "") == server_name {
+                    full_name = prev;
+                    renamed = True;
+                    break;
+                }
+            }
+            if not renamed {
+                # Collision with a foreign tool: rename deterministically.
+                for n in range(2, 51) {
+                    cand: str = full_name + "_" + str(n);
+                    if get_tool(reg, cand) is None {
+                        full_name = cand;
+                        renamed = True;
+                        plugins.mcp_notices.append(
+                            "mcp tool collision: " + raw_tool + " from "
+                            + server_name + " registered as " + full_name
+                        );
+                        break;
+                    }
+                }
+            }
+            if not renamed {
+                lost += 1;
+                lost_names.append(raw_tool);
+                continue;
+            }
+        }
+        ro_hit: bool = spec_read_only;
+        if not ro_hit {
+            for pat in ro_globs {
+                if fnmatch.fnmatch(raw_tool, pat) {
+                    ro_hit = True;
+                    break;
+                }
+            }
+        }
+        if ro_hit {
+            ro_names.append(full_name);
+        }
+        try {
+            register_native(
+                reg,
+                full_name,
+                str(t.get("description", "")),
+                schema,
+                _make_mcp_handler(client, server_name, raw_tool),
+            );
+            plugins.mcp_owned[full_name] = server_name;
+            registered += 1;
+        } except Exception {
+            lost += 1;
+            lost_names.append(raw_tool);
+        }
+    }
+    if ro_names {
+        register_mcp_read_only_tools(ro_names);
+    }
+    return {
+        "registered": registered,
+        "lost": lost,
+        "lost_names": lost_names,
+        "ro_names": ro_names,
+    };
 }
 
 
@@ -342,61 +551,17 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
             _mcp_fail(server_name, "tools/list returned no tool array");
             return;
         }
-        sprefix = _mcp_name_chunk(server_name);
-        spec_read_only: bool = bool(spec.get("read_only", False));
-        ro_globs: list[str] = [];
-        raw_globs: any = spec.get("read_only_tools", []);
-        if isinstance(raw_globs, list) {
-            for pat in raw_globs {
-                ro_globs.append(str(pat));
-            }
+        stats = _register_server_tools(reg, server_name, client, spec, raw_tools);
+        plugins.mcp_read_only[server_name] = list(stats["ro_names"]);
+        plugins.mcp_tools += int(stats["registered"]);
+        if int(stats["lost"]) > 0 {
+            plugins.mcp_notices.append(
+                "mcp server " + server_name + " lost " + str(stats["lost"])
+                + " tool(s) to unresolvable name collisions: "
+                + ", ".join([str(x) for x in stats["lost_names"]])
+            );
         }
-        registered = 0;
-        ro_names: list[str] = [];
-        for t in raw_tools {
-            if not isinstance(t, dict) {
-                continue;
-            }
-            raw_tool: str = str(t.get("name", ""));
-            tname = _mcp_name_chunk(raw_tool);
-            if not tname {
-                continue;
-            }
-            schema: any = t.get("inputSchema");
-            if not isinstance(schema, dict) or not schema {
-                schema = {"type": "object", "properties": {}, "required": []};
-            }
-            full_name: str = "mcp_" + sprefix + "_" + tname;
-            ro_hit: bool = spec_read_only;
-            if not ro_hit {
-                for pat in ro_globs {
-                    if fnmatch.fnmatch(raw_tool, pat) {
-                        ro_hit = True;
-                        break;
-                    }
-                }
-            }
-            if ro_hit {
-                ro_names.append(full_name);
-            }
-            try {
-                register_native(
-                    reg,
-                    full_name,
-                    str(t.get("description", "")),
-                    schema,
-                    _make_mcp_handler(client, server_name, raw_tool),
-                );
-                registered += 1;
-            } except Exception {
-            }
-        }
-        if ro_names {
-            register_mcp_read_only_tools(ro_names);
-            plugins.mcp_read_only[server_name] = ro_names;
-        }
-        plugins.mcp_tools += registered;
-        _mcp_set_status(server_name, "connected", tools=registered);
+        _mcp_set_status(server_name, "connected", tools=int(stats["registered"]));
     } except Exception as e {
         _mcp_fail(server_name, "attach failed: " + str(e));
     }
@@ -455,6 +620,7 @@ def mcp_restart(server_name: str) -> str {
         for tname in list(reg.tools.keys()) {
             if str(tname).startswith(prefix) and unregister(reg, str(tname)) {
                 removed += 1;
+                plugins.mcp_owned.pop(str(tname), None);
             }
         }
         plugins.mcp_tools = max(0, plugins.mcp_tools - removed);

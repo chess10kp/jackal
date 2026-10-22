@@ -31,6 +31,8 @@ obj SessionPlugins {
         mcp_specs: dict[str, dict[str, any]] = {},
         # server -> sanitized tool names currently marked plan/ask-safe
         mcp_read_only: dict[str, list[str]] = {},
+        # registered tool name -> owning server (collision arbitration)
+        mcp_owned: dict[str, str] = {},
         mcp_tools: int = 0,
         # name -> {"state": connecting|connected|failed, "error", "tools", "cmd"}
         mcp_status: dict[str, dict[str, any]] = {},
