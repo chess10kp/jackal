@@ -1,9 +1,13 @@
-"""MCP client — talks to `jac mcp` (or any MCP server) as a stdio subprocess.
+"""MCP client — talks to `jac mcp` (or any MCP server) as a stdio subprocess,
+or to a remote server over streamable HTTP.
 
-Transport: newline-delimited JSON-RPC 2.0 over stdin/stdout (verified against
-`jac mcp`, which speaks one JSON object per line, no Content-Length framing).
-Lifecycle: start -> initialize handshake -> notifications/initialized ->
-tools/list / tools/call -> stop.
+Transports: (stdio) newline-delimited JSON-RPC 2.0 over stdin/stdout
+(verified against `jac mcp`, which speaks one JSON object per line, no
+Content-Length framing); (http) streamable-HTTP — each request is a POST,
+responses come back as JSON or a text/event-stream body (parsed until the
+correlated response), the Mcp-Session-Id from initialize is echoed on every
+call, and no GET listener stream is opened. Lifecycle: start -> initialize
+handshake -> notifications/initialized -> tools/list / tools/call -> stop.
 
 Style mirrors plugin_bridge.jac: obj state + module-level functions taking
 the client as first arg, defensive dict access, background stdout reader
@@ -22,6 +26,8 @@ import sys;
 import tempfile;
 import threading;
 import time;
+import urllib.error;
+import urllib.request;
 
 glob DEFAULT_TIMEOUT_S: float = 15.0,
      MAX_NOTIFICATIONS: int = 1000,
@@ -45,7 +51,12 @@ obj McpClient {
         notifications: list[dict[str, any]] = [],
         write_lock: any = None,
         reader_stop: any = None,
-        reader_thread: any = None;
+        reader_thread: any = None,
+        # streamable-HTTP transport state (transport: "stdio" | "http")
+        transport: str = "stdio",
+        url: str = "",
+        headers: dict[str, str] = {},
+        session_id: str = "";
 
     def start(server_cmd: list[str], timeout_s: float = -1.0) -> dict[str, any] {
         return mcp_start(self, server_cmd, timeout_s);
@@ -71,6 +82,9 @@ def create_mcp_client(timeout_s: float = DEFAULT_TIMEOUT_S) -> McpClient {
 
 
 def _alive(client: McpClient) -> bool {
+    if client.transport == "http" {
+        return client.initialized and not client.dead;
+    }
     if client.proc is None {
         return False;
     }
@@ -170,6 +184,128 @@ def _reader_loop(client: McpClient) {
 }
 
 
+"""Map an HTTPError to a response: a JSON-RPC error/result body in the
+error payload surfaces as a normal response dict; otherwise 404/5xx mark
+the client dead (session gone / server error) and a RuntimeError carries
+the status."""
+def _http_error_response(client: McpClient, he: any) -> dict[str, any] {
+    raw: bytes = b"";
+    try {
+        raw = he.read();
+    } except Exception {
+    }
+    parsed: any = None;
+    try {
+        parsed = json.loads(raw.decode("utf-8", "replace"));
+    } except Exception {
+    }
+    if isinstance(parsed, dict) and ("error" in parsed or "result" in parsed) {
+        return parsed;
+    }
+    if he.code == 404 or he.code >= 500 {
+        client.dead = True;
+    }
+    raise RuntimeError(f"http {he.code} from mcp server");
+}
+
+
+"""POST one JSON-RPC message over streamable HTTP and return the response
+dict for the correlated id. JSON bodies parse directly; text/event-stream
+bodies are parsed until the correlated response event (notifications seen
+on the stream are buffered, bounded); 202 / expect_body=False returns None.
+HTTP 4xx with a JSON-RPC error body surfaces as a normal response; 404 and
+5xx mark the client dead (session gone / server error) so health and revive
+machinery see it. Raises RuntimeError/TimeoutError."""
+def _http_exchange(client: McpClient, msg: dict[str, any], timeout_s: float, expect_body: bool) -> any {
+    hdrs: dict[str, str] = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    };
+    for (hk, hv) in client.headers.items() {
+        hdrs[str(hk)] = str(hv);
+    }
+    if client.session_id {
+        hdrs["Mcp-Session-Id"] = client.session_id;
+    }
+    body: bytes = json.dumps(msg).encode("utf-8");
+    req = urllib.request.Request(client.url, data=body, headers=hdrs, method="POST");
+    resp: any = None;
+    try {
+        resp = urllib.request.urlopen(req, timeout=timeout_s);
+    } except urllib.error.HTTPError as he {
+        return _http_error_response(client, he);
+    } except urllib.error.URLError as ue {
+        rsn: any = getattr(ue, "reason", ue);
+        if isinstance(rsn, TimeoutError) or "timed out" in str(rsn).lower() {
+            raise TimeoutError(f"http request timed out after {timeout_s}s");
+        }
+        client.dead = True;
+        raise RuntimeError(f"http transport failed: {ue}");
+    }
+    try {
+        sid: any = resp.headers.get("Mcp-Session-Id", "");
+        if sid and not client.session_id {
+            client.session_id = str(sid);
+        }
+        status: int = int(resp.status);
+        if status == 202 or not expect_body {
+            return None;
+        }
+        ctype: str = str(resp.headers.get("Content-Type", "") or "");
+        if ctype.startswith("text/event-stream") {
+            # Streamable HTTP: the response may ride as SSE events; parse
+            # until the correlated response arrives, buffering anything
+            # else (notifications, server requests) bounded like stdio.
+            while True {
+                line_raw: any = resp.readline();
+                if not line_raw {
+                    break;
+                }
+                if isinstance(line_raw, bytes) {
+                    line_s: str = line_raw.decode("utf-8", "replace").strip();
+                } else {
+                    line_s: str = str(line_raw).strip();
+                }
+                if not line_s.startswith("data:") {
+                    continue;
+                }
+                payload: str = line_s[len("data:"):].strip();
+                if not payload {
+                    continue;
+                }
+                try {
+                    got: any = json.loads(payload);
+                } except Exception {
+                    continue;
+                }
+                if isinstance(got, dict) and got.get("id") == msg.get("id") and "method" not in got {
+                    return got;
+                }
+                if isinstance(got, dict) and len(client.notifications) < MAX_NOTIFICATIONS {
+                    client.notifications.append(got);
+                }
+            }
+            return {
+                "jsonrpc": "2.0",
+                "id": msg.get("id"),
+                "error": {"code": -32000, "message": "sse stream ended without a response"},
+            };
+        }
+        raw2: bytes = resp.read();
+        parsed2: any = json.loads(raw2.decode("utf-8", "replace"));
+        if isinstance(parsed2, dict) {
+            return parsed2;
+        }
+        raise RuntimeError("mcp server returned a non-object response");
+    } finally {
+        try {
+            resp.close();
+        } except Exception {
+        }
+    }
+}
+
+
 def _start_reader(client: McpClient) {
     _ensure_io(client);
     if client.reader_thread is not None and client.reader_thread.is_alive() {
@@ -193,6 +329,12 @@ def _stop_reader(client: McpClient) {
 
 
 def _write_line(client: McpClient, msg: dict[str, any]) {
+    if client.transport == "http" {
+        # Streamable HTTP: client->server notifications are fire-and-forget
+        # POSTs (202 expected, no body).
+        _http_exchange(client, msg, client.timeout_s, False);
+        return;
+    }
     if not _alive(client) or client.proc.stdin is None {
         raise RuntimeError("mcp server not running");
     }
@@ -217,6 +359,30 @@ def _write_line(client: McpClient, msg: dict[str, any]) {
 
 Internal: raises TimeoutError/RuntimeError. Public seam wraps this."""
 def _request(client: McpClient, method: str, params: dict[str, any], timeout_s: float) -> dict[str, any] {
+    if client.transport == "http" {
+        rid_h: int = client.next_id;
+        client.next_id += 1;
+        req_h: dict[str, any] = {
+            "jsonrpc": "2.0",
+            "id": rid_h,
+            "method": method,
+            "params": params if params else {},
+        };
+        got_h: any = None;
+        try {
+            got_h = _http_exchange(client, req_h, timeout_s, True);
+        } except TimeoutError {
+            raise TimeoutError(f"timed out waiting for {method}");
+        }
+        if got_h is None {
+            return {
+                "jsonrpc": "2.0",
+                "id": rid_h,
+                "error": {"code": -32000, "message": "http server accepted without a response"},
+            };
+        }
+        return got_h as dict;
+    }
     _ensure_io(client);
     rid = client.next_id;
     client.next_id += 1;
@@ -381,6 +547,80 @@ def mcp_start(
 }
 
 
+"""Connect to a streamable-HTTP MCP server and run the initialize
+handshake (no subprocess, no reader thread). url: the server endpoint
+(http:// or https://); headers: static extra headers such as
+Authorization. The Mcp-Session-Id issued on initialize is captured and
+echoed on every later request. Returns the same shape as mcp_start; never
+raises."""
+def mcp_start_http(
+    client: McpClient,
+    url: str,
+    headers: dict[str, str] | None = None,
+    timeout_s: float = -1.0,
+) -> dict[str, any] {
+    if not url or not str(url).startswith(("http://", "https://")) {
+        return {"ok": False, "error": "http mcp server needs an http(s) url"};
+    }
+    if _alive(client) {
+        return {"ok": False, "error": "mcp client already started"};
+    }
+    client.transport = "http";
+    client.dead = False;
+    client.proc = None;
+    client.url = str(url);
+    client.session_id = "";
+    client.headers = {};
+    if isinstance(headers, dict) {
+        for (hk, hv) in headers.items() {
+            client.headers[str(hk)] = str(hv);
+        }
+    }
+    timeout = _effective_timeout(client, timeout_s);
+    _ensure_io(client);
+    init_params: dict[str, any] = {
+        "protocolVersion": MCP_PROTOCOL_VERSION,
+        "capabilities": {},
+        "clientInfo": {"name": "jackal", "version": "0.1.0"},
+    };
+    try {
+        resp = _request(client, "initialize", init_params, timeout);
+    } except Exception as e {
+        return {"ok": False, "error": f"initialize failed: {e}"};
+    }
+    payload = _response_payload(resp);
+    if not payload["ok"] {
+        return payload;
+    }
+    result: any = payload["result"];
+    pv = str(result.get("protocolVersion", ""));
+    if pv {
+        client.protocol_version = pv;
+    }
+    raw_info: any = result.get("serverInfo");
+    info: dict[str, any] = {};
+    if isinstance(raw_info, dict) {
+        info = raw_info;
+    }
+    client.server_info = info;
+    # Handshake completion notification (fire-and-forget POST).
+    try {
+        _write_line(client, {"jsonrpc": "2.0", "method": "notifications/initialized"});
+    } except Exception as e {
+        return {"ok": False, "error": f"initialized notification failed: {e}"};
+    }
+    client.initialized = True;
+    out: dict[str, any] = {"ok": True};
+    if info.get("name") {
+        out["server_name"] = str(info.get("name"));
+    }
+    if pv {
+        out["protocol_version"] = pv;
+    }
+    return out;
+}
+
+
 """List tools exposed by the server, following nextCursor pagination
 (capped at MAX_LIST_PAGES so a broken cursor cannot loop forever).
 Returns {"ok", "tools": [...]} with all pages merged."""
@@ -529,6 +769,29 @@ def mcp_call_tool(
 
 """Stop the server subprocess and tear down reader state. Never raises."""
 def mcp_stop(client: McpClient) -> dict[str, any] {
+    if client.transport == "http" {
+        # Best-effort session teardown (DELETE), then reset state. The
+        # notification buffer stays drained by the session dispatcher.
+        if client.session_id {
+            try {
+                hdrs: dict[str, str] = dict(client.headers);
+                hdrs["Mcp-Session-Id"] = client.session_id;
+                req = urllib.request.Request(
+                    client.url, data=b"", headers=hdrs, method="DELETE"
+                );
+                resp: any = urllib.request.urlopen(req, timeout=2.0);
+                try {
+                    resp.close();
+                } except Exception {
+                }
+            } except Exception {
+            }
+        }
+        client.initialized = False;
+        client.session_id = "";
+        client.pending = {};
+        return {"ok": True};
+    }
     proc = client.proc;
     if proc is not None {
         try {

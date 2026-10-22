@@ -2,6 +2,7 @@
 
 import os;
 import sys;
+import subprocess;
 
 
 def _mcp_cfg(env_fail: bool = False) -> dict[str, any] {
@@ -137,6 +138,75 @@ test "repl /mcp SERVER PROMPT expands the server prompt" {
         assert r.code == 0, sb.explain(r);
         assert "Hello, jackal!" in r.stdout, sb.explain(r);
     } finally {
+        sb.cleanup();
+    }
+}
+
+
+test "an http mcp server attaches and its tools are callable" {
+    sb = make_sandbox();
+    proc: any = None;
+    try {
+        # ephemeral fake streamable-HTTP server on loopback
+        proc = subprocess.Popen(
+            [sys.executable, fixture_path("fake_mcp_http.py")],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, bufsize=1,
+        );
+        out_pipe: any = proc.stdout;
+        ready: str = out_pipe.readline().strip();
+        assert ready.startswith("READY "), ready;
+        port: str = ready.split(" ")[1];
+        write_project_config(sb, {"mcp": {"servers": {"rem": {
+            "type": "http",
+            "url": "http://127.0.0.1:" + port + "/mcp",
+        }}}});
+        sb.script([
+            {"text": "", "tool_calls": [{"name": "mcp_rem_echo", "args": {"text": "hi"}}]},
+            {"text": "remote done"},
+        ]);
+        r = run_jackal(sb, ["-p", "--mode", "yolo", "use the remote server"]);
+        assert r.code == 0, sb.explain(r);
+        calls = sb.calls();
+        assert "mcp_rem_echo" in calls[0]["tools"], sb.explain(r);
+        assert calls[1]["last"]["content"] == "echo:hi", sb.explain(r);
+        assert r.stdout.strip() == "remote done";
+    } finally {
+        if proc is not None {
+            proc.terminate();
+            try { proc.wait(timeout=5.0); } except Exception { proc.kill(); }
+        }
+        sb.cleanup();
+    }
+}
+
+
+test "repl /mcp reports an http server as connected" {
+    sb = make_sandbox();
+    proc: any = None;
+    try {
+        proc = subprocess.Popen(
+            [sys.executable, fixture_path("fake_mcp_http.py")],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, bufsize=1,
+        );
+        out_pipe: any = proc.stdout;
+        ready: str = out_pipe.readline().strip();
+        assert ready.startswith("READY "), ready;
+        port: str = ready.split(" ")[1];
+        write_project_config(sb, {"mcp": {"servers": {"rem": {
+            "type": "http",
+            "url": "http://127.0.0.1:" + port + "/mcp",
+        }}}});
+        sb.script([{"text": "warm"}]);
+        r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
+        assert r.code == 0, sb.explain(r);
+        assert "rem — connected · 1 tools" in r.stdout, sb.explain(r);
+    } finally {
+        if proc is not None {
+            proc.terminate();
+            try { proc.wait(timeout=5.0); } except Exception { proc.kill(); }
+        }
         sb.cleanup();
     }
 }

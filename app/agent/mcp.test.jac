@@ -10,6 +10,11 @@ Fake server modes:
   requests - sends sampling/roots server->client requests before tools/list;
              the listed tool name proves whether the client answered them
   dieafter - exits immediately after the initialized notification (EOF path)
+
+A second fixture (FAKE_HTTP_SERVER_SRC) is a streamable-HTTP MCP server:
+initialize issues Mcp-Session-Id sess-42 and post-initialize requests
+without that header are rejected, tools/list answers as JSON, tools/call
+answers as text/event-stream (both client response paths).
 """
 
 glob FAKE_SERVER_SRC: str = """
@@ -433,4 +438,168 @@ test "resources list and read round trip" {
         mcp_stop(client);
         shutil.rmtree(tmp, ignore_errors=True);
     }
+}
+
+
+glob FAKE_HTTP_SERVER_SRC: str = """
+import json, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+SID = "sess-42"
+TOOLS = [{"name": "echo", "description": "Echo the given text back.",
+          "inputSchema": {"type": "object",
+                          "properties": {"text": {"type": "string"}},
+                          "required": ["text"]}}]
+
+
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def _json(self, code, obj, extra=None):
+        payload = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", 0))
+        req = json.loads(self.rfile.read(n) or b"{}")
+        method = req.get("method", "")
+        rid = req.get("id")
+        if method == "initialize":
+            self._json(200, {"jsonrpc": "2.0", "id": rid, "result": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "fake-http-mcp", "version": "0"}}},
+                {"Mcp-Session-Id": SID})
+        elif method.startswith("notifications/"):
+            self.send_response(202)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        elif self.headers.get("Mcp-Session-Id") != SID:
+            self._json(400, {"jsonrpc": "2.0", "id": rid, "error": {
+                "code": -32001, "message": "missing or stale session id"}})
+        elif method == "tools/list":
+            self._json(200, {"jsonrpc": "2.0", "id": rid, "result": {"tools": TOOLS}})
+        elif method == "tools/call":
+            nm = str(req.get("params", {}).get("name", ""))
+            if nm != "echo":
+                self._json(200, {"jsonrpc": "2.0", "id": rid, "error": {
+                    "code": -32601, "message": "method not found"}})
+                return
+            text = str(req.get("params", {}).get("arguments", {}).get("text", ""))
+            body = {"jsonrpc": "2.0", "id": rid, "result": {
+                "content": [{"type": "text", "text": "echo:" + text}],
+                "isError": False}}
+            payload = json.dumps(body)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            self.wfile.write(("event: message\\ndata: " + payload + "\\n\\n").encode())
+        else:
+            self._json(200, {"jsonrpc": "2.0", "id": rid, "error": {
+                "code": -32601, "message": "method not found"}})
+
+
+srv = HTTPServer(("127.0.0.1", 0), H)
+print("READY %d" % srv.server_address[1], flush=True)
+srv.serve_forever()
+""";
+
+
+"""Spawn the fake HTTP server on an ephemeral port; returns the process and
+its URL (blocks until the server prints READY <port>)."""
+def _start_fake_http_server(tmp: str) -> tuple[any, str] {
+    path: str = os.path.join(tmp, "mcp_http_server.py");
+    with open(path, "w") as f { f.write(FAKE_HTTP_SERVER_SRC); }
+    err_path: str = os.path.join(tmp, "mcp_http_server.err");
+    err_fh: any = open(err_path, "w");
+    proc = subprocess.Popen(
+        [sys.executable, path], stdout=subprocess.PIPE,
+        stderr=err_fh, text=True, bufsize=1,
+    );
+    out_pipe: any = proc.stdout;
+    ready: str = out_pipe.readline().strip();
+    if not ready.startswith("READY ") {
+        proc.terminate();
+        try { proc.wait(timeout=5.0); } except Exception {
+            proc.kill();
+        }
+        err_fh.close();
+        err_txt: str = "";
+        try {
+            err_txt = open(err_path).read()[:500];
+        } except Exception {
+        }
+        raise RuntimeError(
+            "fake http server did not start: " + ready + " | stderr: " + err_txt
+        );
+    }
+    err_fh.close();
+    port: int = int(ready.split(" ")[1]);
+    url: str = "http://127.0.0.1:" + str(port) + "/mcp";
+    return (proc, url);
+}
+
+
+test "http transport round trip: initialize, session echo, json and sse bodies" {
+    tmp = tempfile.mkdtemp();
+    proc: any = None;
+    client = create_mcp_client();
+    try {
+        started_up = _start_fake_http_server(tmp);
+        proc = started_up[0];
+        url: str = started_up[1];
+        res = mcp_start_http(client, url, {"X-Probe": "on"}, timeout_s=10.0);
+        assert res["ok"] is True, res;
+        assert res.get("server_name") == "fake-http-mcp";
+        # session id captured from the initialize response
+        assert client.session_id == "sess-42";
+        # tools/list over the JSON body path (session id must be echoed or
+        # the server rejects with 400)
+        listed = mcp_list_tools(client, timeout_s=10.0);
+        assert listed["ok"] is True, listed;
+        tools: any = listed.get("tools", []);
+        assert len(tools) == 1;
+        assert str(tools[0]["name"]) == "echo";
+        # tools/call over the text/event-stream body path
+        call = mcp_call_tool(client, "echo", {"text": "hi"}, timeout_s=10.0);
+        assert call["ok"] is True, call;
+        assert str(call.get("result", "")) == "echo:hi";
+        # unknown method -> honest JSON-RPC error
+        bad = mcp_call_tool(client, "nope", {}, timeout_s=10.0);
+        assert bad["ok"] is False;
+        assert "method not found" in str(bad.get("error", ""));
+        # stop sends DELETE; a fresh initialize on the same client works
+        assert mcp_stop(client)["ok"] is True;
+        again = mcp_start_http(client, url, timeout_s=10.0);
+        assert again["ok"] is True, again;
+    } finally {
+        mcp_stop(client);
+        if proc is not None {
+            proc.terminate();
+            try { proc.wait(timeout=5.0); } except Exception {
+                proc.kill();
+            }
+        }
+        shutil.rmtree(tmp, ignore_errors=True);
+    }
+}
+
+
+test "http transport refuses bad urls and reports unreachable servers" {
+    client = create_mcp_client();
+    bad_scheme = mcp_start_http(client, "ftp://example.invalid/mcp");
+    assert bad_scheme["ok"] is False;
+    assert "http(s) url" in str(bad_scheme.get("error", ""));
+    # port 9 on loopback: nothing listens -> connection refused, fast
+    refused = mcp_start_http(client, "http://127.0.0.1:9/mcp", timeout_s=5.0);
+    assert refused["ok"] is False;
+    err: str = str(refused.get("error", ""));
+    assert "initialize failed" in err, err;
 }

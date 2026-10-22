@@ -15,6 +15,7 @@ import from .mcp {
     McpClient,
     create_mcp_client,
     mcp_start,
+    mcp_start_http,
     mcp_list_tools,
     mcp_stop,
     mcp_drain_notifications,
@@ -74,16 +75,19 @@ def _mcp_name_chunk(raw: any) -> str {
 """Extract {name: spec} MCP server entries from a parsed config.
 
 Spec shape (all keys present, defaults shown):
-  cmd: list[str]        argv to spawn
-  env: dict[str, str]   extra environment vars merged over os.environ
-  cwd: str              child working directory ("" = inherit)
+  type: str             "stdio" (default) or "http" (streamable HTTP)
+  cmd: list[str]        argv to spawn (stdio only; empty for http)
+  url: str              server endpoint (http only)
+  headers: dict[str, str]  static extra request headers (http only)
+  env: dict[str, str]   extra environment vars merged over os.environ (stdio)
+  cwd: str              child working directory ("" = inherit; stdio only)
   enabled: bool         False -> the server is never attached (status: disabled)
   timeout: float        per-server default call timeout seconds (-1.0 = global)
   read_only: bool       true -> every tool of this server is plan/ask-safe
   read_only_tools: list[str]  globs/exact names of plan/ask-safe tools
   allow_tools: list[str]      when non-empty, ONLY matching tools register
   deny_tools: list[str]       matching tools never register (deny wins)
-Malformed entries are skipped silently."""
+Malformed entries (and unsupported types) are skipped silently."""
 def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
     out: dict[str, dict[str, any]] = {};
     raw: any = cfg.get("mcp") if isinstance(cfg, dict) else None;
@@ -98,18 +102,12 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
         if not isinstance(ent, dict) or not str(name) {
             continue;
         }
-        cmd: any = ent.get("command");
-        if isinstance(cmd, str) {
-            cmd = [cmd];
+        stype: str = "stdio";
+        raw_type: any = ent.get("type", "stdio");
+        if isinstance(raw_type, str) and str(raw_type).strip() {
+            stype = str(raw_type).strip().lower();
         }
-        if not isinstance(cmd, list) or not cmd {
-            continue;
-        }
-        parts: list[str] = [str(c) for c in cmd];
-        extra: any = ent.get("args");
-        if isinstance(extra, list) {
-            parts.extend([str(a) for a in extra]);
-        }
+        # common scalar/policy keys parse identically for both transports
         env: dict[str, str] = {};
         raw_env: any = ent.get("env");
         if isinstance(raw_env, dict) {
@@ -154,8 +152,51 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
                 deny_tools.append(str(pat));
             }
         }
+        if stype in ("http", "streamable-http", "streamable_http") {
+            url: str = str(ent.get("url", "") or "");
+            if not url.startswith(("http://", "https://")) {
+                continue;
+            }
+            headers: dict[str, str] = {};
+            raw_hdrs: any = ent.get("headers");
+            if isinstance(raw_hdrs, dict) {
+                for (hk, hv) in raw_hdrs.items() {
+                    headers[str(hk)] = str(hv);
+                }
+            }
+            out[str(name)] = {
+                "type": "http",
+                "cmd": [],
+                "url": url,
+                "headers": headers,
+                "env": env,
+                "cwd": cwd,
+                "enabled": enabled,
+                "timeout": timeout,
+                "read_only": read_only,
+                "read_only_tools": read_only_tools,
+                "allow_tools": allow_tools,
+                "deny_tools": deny_tools,
+            };
+            continue;
+        }
+        cmd: any = ent.get("command");
+        if isinstance(cmd, str) {
+            cmd = [cmd];
+        }
+        if not isinstance(cmd, list) or not cmd {
+            continue;
+        }
+        parts: list[str] = [str(c) for c in cmd];
+        extra: any = ent.get("args");
+        if isinstance(extra, list) {
+            parts.extend([str(a) for a in extra]);
+        }
         out[str(name)] = {
+            "type": "stdio",
             "cmd": parts,
+            "url": "",
+            "headers": {},
             "env": env,
             "cwd": cwd,
             "enabled": enabled,
@@ -273,7 +314,11 @@ def mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
     rich = _mcp_server_specs(cfg);
     out: dict[str, list[str]] = {};
     for (name, spec) in rich.items() {
-        out[name] = [str(c) for c in spec["cmd"]];
+        if str(spec.get("type", "stdio")) == "http" {
+            out[name] = [str(spec.get("url", ""))];
+        } else {
+            out[name] = [str(c) for c in spec["cmd"]];
+        }
     }
     return out;
 }
@@ -384,8 +429,9 @@ def _revive_client(server_name: str) -> bool {
         return False;
     }
     spec: dict[str, any] = dict(plugins.mcp_specs.get(server_name, {}));
+    spec_type: str = str(spec.get("type", "stdio"));
     cmd: list[str] = [str(c) for c in spec.get("cmd", [])];
-    if not cmd {
+    if not cmd and spec_type != "http" {
         return False;
     }
     env_extra: dict[str, str] = {};
@@ -401,6 +447,14 @@ def _revive_client(server_name: str) -> bool {
     if isinstance(raw_to, (int, float)) {
         timeout = float(raw_to);
     }
+    url: str = str(spec.get("url", "") or "");
+    headers: dict[str, str] = {};
+    raw_hdrs: any = spec.get("headers", {});
+    if isinstance(raw_hdrs, dict) {
+        for (hk, hv) in raw_hdrs.items() {
+            headers[str(hk)] = str(hv);
+        }
+    }
     lock: any = _MCP_REVIVE_LOCK;
     lock.acquire();
     try {
@@ -409,8 +463,13 @@ def _revive_client(server_name: str) -> bool {
             return True;
         }
         mcp_stop(client);
-        _mcp_set_status(server_name, "connecting", cmd=cmd);
-        started = mcp_start(client, cmd, env_extra=env_extra, cwd=cwd);
+        if spec_type == "http" {
+            _mcp_set_status(server_name, "connecting", cmd=[url]);
+            started = mcp_start_http(client, url, headers);
+        } else {
+            _mcp_set_status(server_name, "connecting", cmd=cmd);
+            started = mcp_start(client, cmd, env_extra=env_extra, cwd=cwd);
+        }
         if not started.get("ok") {
             _mcp_fail(server_name, str(started.get("error", "restart failed")));
             return False;
@@ -759,7 +818,20 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
         if isinstance(raw_to, (int, float)) {
             timeout = float(raw_to);
         }
-        _mcp_set_status(server_name, "connecting", cmd=cmd);
+        spec_type: str = str(spec.get("type", "stdio"));
+        url: str = str(spec.get("url", "") or "");
+        headers: dict[str, str] = {};
+        raw_hdrs: any = spec.get("headers", {});
+        if isinstance(raw_hdrs, dict) {
+            for (hk, hv) in raw_hdrs.items() {
+                headers[str(hk)] = str(hv);
+            }
+        }
+        if spec_type == "http" {
+            _mcp_set_status(server_name, "connecting", cmd=[url]);
+        } else {
+            _mcp_set_status(server_name, "connecting", cmd=cmd);
+        }
         # spec timeout -1.0 means "global default" — only override when set.
         if timeout > 0.0 {
             client = create_mcp_client(timeout_s=timeout);
@@ -769,7 +841,11 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
         # Register the client before connecting so dispose can stop it even
         # mid-handshake.
         plugins.mcp_clients[server_name] = client;
-        started = mcp_start(client, cmd, env_extra=env_extra, cwd=cwd);
+        if spec_type == "http" {
+            started = mcp_start_http(client, url, headers);
+        } else {
+            started = mcp_start(client, cmd, env_extra=env_extra, cwd=cwd);
+        }
         if not started.get("ok") {
             _mcp_fail(server_name, str(started.get("error", "spawn failed")));
             return;
@@ -821,6 +897,9 @@ def _attach_mcp_servers() {
     for (name, spec) in specs.items() {
         plugins.mcp_specs[name] = dict(spec);
         cmd: list[str] = [str(c) for c in spec["cmd"]];
+        if str(spec.get("type", "stdio")) == "http" {
+            cmd = [str(spec.get("url", ""))];
+        }
         if not spec["enabled"] {
             _mcp_set_status(name, "disabled", cmd=cmd);
             continue;
@@ -836,8 +915,12 @@ background with the command it was configured with. Returns a status line."""
 def mcp_restart(server_name: str) -> str {
     spec: dict[str, any] = dict(plugins.mcp_specs.get(server_name, {}));
     st: dict[str, any] = plugins.mcp_status.get(server_name, {});
+    is_http: bool = str(spec.get("type", "")) == "http";
     cmd: any = spec.get("cmd") if spec.get("cmd") else st.get("cmd", []);
-    if not isinstance(cmd, list) or not cmd {
+    if is_http and not spec.get("url") {
+        return "unknown mcp server: " + server_name;
+    }
+    if not is_http and (not isinstance(cmd, list) or not cmd) {
         return "unknown mcp server: " + server_name;
     }
     if not spec {
