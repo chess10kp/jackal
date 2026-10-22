@@ -432,10 +432,13 @@ def mcp_list_tools(client: McpClient, timeout_s: float = -1.0) -> dict[str, any]
 }
 
 
-"""Call a tool on the server. Returns {"ok", "result"/"error", "is_error"?}.
+"""Call a tool on the server. Returns {"ok", "result", "is_error"?, ...}.
 
-MCP-level tool failures (isError=true) come back ok=True with is_error=True
-and the error text in "result" — the transport succeeded; semantics failed."""
+Text content blocks join into "result"; image/audio/resource/resource_link
+blocks render as honest text stubs in "result" and are preserved raw under
+"content". MCP-level tool failures (isError=true) come back ok=True with
+is_error=True and the error text in "result" — the transport succeeded;
+semantics failed."""
 def mcp_call_tool(
     client: McpClient, name: str, arguments: dict[str, any], timeout_s: float = -1.0
 ) -> dict[str, any] {
@@ -461,19 +464,61 @@ def mcp_call_tool(
         return payload;
     }
     result: any = payload["result"];
-    # Flatten content blocks to text (standard MCP text-content shape).
+    # Flatten content blocks: text joins directly; non-text blocks become
+    # honest text stubs (never dropped silently) and the raw blocks ride
+    # along under "content" for richer plumbing later.
     parts: list[str] = [];
     raw_content: any = result.get("content", []);
+    blocks: list[dict[str, any]] = [];
     if isinstance(raw_content, list) {
         for block in raw_content {
-            if isinstance(block, dict) and str(block.get("type", "")) == "text" {
+            if not isinstance(block, dict) {
+                continue;
+            }
+            blocks.append(block);
+            btype: str = str(block.get("type", ""));
+            if btype == "text" {
                 parts.append(str(block.get("text", "")));
+            } elif btype == "image" {
+                parts.append(
+                    "[image: " + str(block.get("mimeType", "unknown"))
+                    + ", " + str(len(str(block.get("data", "")))) + " b64 chars]"
+                );
+            } elif btype == "audio" {
+                parts.append(
+                    "[audio: " + str(block.get("mimeType", "unknown"))
+                    + ", " + str(len(str(block.get("data", "")))) + " b64 chars]"
+                );
+            } elif btype == "resource" {
+                res: any = block.get("resource");
+                if isinstance(res, dict) {
+                    stub: str = "[resource: " + str(res.get("uri", "unknown"));
+                    if res.get("mimeType") {
+                        stub += " " + str(res.get("mimeType"));
+                    }
+                    stub += "]";
+                    parts.append(stub);
+                    if res.get("text") {
+                        parts.append(str(res.get("text", "")));
+                    }
+                } else {
+                    parts.append("[resource: unknown]");
+                }
+            } elif btype == "resource_link" {
+                parts.append(
+                    "[resource_link: " + str(block.get("uri", block.get("name", "unknown"))) + "]"
+                );
+            } else {
+                parts.append("[unsupported content block: " + (btype if btype else "unknown") + "]");
             }
         }
     }
     text = "\n".join(parts);
     is_err = bool(result.get("isError", False));
     out: dict[str, any] = {"ok": True, "result": text, "is_error": is_err};
+    if blocks {
+        out["content"] = blocks;
+    }
     structured: any = result.get("structuredContent");
     if isinstance(structured, dict) {
         out["structured"] = structured;

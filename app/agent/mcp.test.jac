@@ -101,6 +101,9 @@ for raw in sys.stdin:
                 {"name": "boom", "description": "Always fails.",
                  "inputSchema": {"type": "object",
                                  "properties": {}, "required": []}},
+                {"name": "rich", "description": "Returns mixed content blocks.",
+                 "inputSchema": {"type": "object",
+                                 "properties": {}, "required": []}},
             ]}})
     elif method == "tools/call":
         name = str(req.get("params", {}).get("name", ""))
@@ -109,6 +112,17 @@ for raw in sys.stdin:
             text = str(args.get("text", ""))
             send({"jsonrpc": "2.0", "id": rid, "result": {
                 "content": [{"type": "text", "text": "echo:" + text}],
+                "isError": False}})
+        elif name == "rich":
+            send({"jsonrpc": "2.0", "id": rid, "result": {
+                "content": [
+                    {"type": "image", "data": "aGVsbG8=",
+                     "mimeType": "image/png"},
+                    {"type": "resource", "resource": {
+                        "uri": "file:///x.txt", "mimeType": "text/plain",
+                        "text": "resource body"}},
+                    {"type": "resource_link", "uri": "file:///y.txt"},
+                ],
                 "isError": False}})
         else:
             send({"jsonrpc": "2.0", "id": rid, "error": {
@@ -160,7 +174,7 @@ test "tools/list maps to ToolSpec-shaped specs" {
         cmd = _write_fake_server(tmp);
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         specs = mcp_tool_specs(client);
-        assert len(specs) == 2;
+        assert len(specs) == 3;
         echo: any = None;
         for s in specs {
             if s["name"] == "echo" { echo = s; }
@@ -302,4 +316,25 @@ test "spawn failure and empty-cmd fail loud without raising" {
     assert lt["ok"] is False;
     ct = mcp_call_tool(fresh, "x", {});
     assert ct["ok"] is False;
+}
+
+test "non-text content blocks surface as stubs and ride along raw" {
+    tmp = tempfile.mkdtemp();
+    client = create_mcp_client();
+    try {
+        cmd = _write_fake_server(tmp);
+        assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
+        res = mcp_call_tool(client, "rich", {}, timeout_s=10.0);
+        assert res["ok"] is True;
+        text: str = str(res.get("result", ""));
+        assert "[image: image/png, 8 b64 chars]" in text, text;
+        assert "[resource: file:///x.txt text/plain]" in text, text;
+        assert "resource body" in text, text;
+        assert "[resource_link: file:///y.txt]" in text, text;
+        blocks: any = res.get("content", []);
+        assert isinstance(blocks, list) and len(blocks) == 3;
+    } finally {
+        mcp_stop(client);
+        shutil.rmtree(tmp, ignore_errors=True);
+    }
 }
