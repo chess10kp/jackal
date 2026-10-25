@@ -1100,7 +1100,13 @@ def mcp_restart(server_name: str) -> str {
         }
         plugins.mcp_tools = max(0, plugins.mcp_tools - removed);
     }
-    _mcp_set_status(server_name, "connecting", cmd=[str(c) for c in spec["cmd"]]);
+    # HTTP specs have no argv; keep their endpoint in status so the live
+    # status window continues to show the right reconnect target.
+    restart_cmd: list[str] = (
+        [str(spec.get("url", ""))] if is_http
+        else [str(c) for c in spec.get("cmd", cmd)]
+    );
+    _mcp_set_status(server_name, "connecting", cmd=restart_cmd);
     spec_wire: str = json.dumps(spec);
     flow _attach_one_mcp_server(server_name, spec_wire);
     return "restarting mcp server " + server_name;
