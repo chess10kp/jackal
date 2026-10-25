@@ -44,9 +44,8 @@ tool. Do NOT delete other sessions' dirs under `/tmp/claude-1000/`. Deleting
 `/tmp/pytest-of-jac` is safe.
 
 ### Toolchain
-- `jac` on PATH = jacup-managed **0.37.25** (`~/.local/share/jacup/bin/jac`).
-  The `vendor/jac` subtree is gone for good (user-confirmed).
-- jac 0.37 config shape: `[placement] default = "native"`,
+- `./jac` at the repository root = locally built upstream `main`; rebuild with `./scripts/setup-vendor-jac.sh` (Zig 0.16.0 required).
+- Jac config shape: `[placement] default = "native"`,
   `[placement.pins]`, `[dependencies.pypi]`, `entry-point = "main"`.
 - Python deps: `app/jac.toml` **and** root `jac.toml` both list
   `httpx` and `pyte` under `[dependencies.pypi]`. Suites run from the repo
@@ -123,7 +122,7 @@ fails to compile makes **every importer** fail with the misleading
 ## 3. What exists now (all on `main`)
 
 ### CI: `.github/workflows/app-tests.yml`
-- Composite action `.github/actions/setup-jac`: downloads jac 0.37.25 release
+- Composite action `.github/actions/setup-jac`: downloads jac 0.38.2 release
   binary (sha256 pinned), caches it, runs `jac install` in the repo root AND `app/`,
   exports `JACKAL_ROOT`, `JACKAL_AGENT_DIR`.
 - Jobs: `check` (`cd app && jac check .`), and `test` matrix shards

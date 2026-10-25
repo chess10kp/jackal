@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  JAC_VERSION: "0.37.25"
-  JAC_SHA256: "a7d29cc7b35cc25b8697510e7d31fcb3403a11451d5693f57e0918a7420cf2c2"
+  JAC_VERSION: "0.38.2"
+  JAC_SHA256: "c712b056820f67e3035d962a547c7eaea1908a497b63b4b89093fecb9b533ed4"
 
 jobs:
   check:

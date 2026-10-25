@@ -9,7 +9,7 @@ Jac-native terminal coding agent.
 ## Rules for agents working in this repo
 
 1. **Commit** after each feature or bugfix (unless the user says otherwise).
-2. **Do not modify** `jac-client`. There is no vendored compiler: jac is the jacup-managed release (0.37.25). Compiler bugs go upstream to jaseci-labs/jac (see Human handoff).
+2. **Do not modify** `jac-client`. Jackal uses the workspace-built Jac binary at `./jac`, built from the latest source in `vendor/jac`. Compiler bugs go upstream to jaseci-labs/jac (see Human handoff).
 3. **Native lowering discipline:** write Jac that lowers natively — annotate types (including kwargs and intermediates) so modules lower without implicit server fallback; keep `jac build` green on `app/`; change `[placement.pins]` in `app/jac.toml` only via deliberate commits with a stated reason.
 4. **Do not extend legacy code.** `src/`, `templates/`, `tui/*.tsx`, `lib/jac/`, and the TS test suites are frozen pending deletion. No new features, no fixes unless a deletion commit depends on it.
 5. **Framework/plugin gaps** → stop, document symptom + owning repo + minimal recommended fix for the **human** (see [Human handoff](#human-handoff)).
@@ -21,17 +21,17 @@ Jac-native terminal coding agent.
 
 ```bash
 # Native harness (the product)
-cd app && jac run main.jac     # term REPL frontend (--json for JSONL protocol)
-jac run tui/shell.jac                # native TUI (TTY required)
+cd app && ../jac run main.jac       # term REPL frontend (--json for JSONL protocol)
+../jac run tui/shell.jac            # native TUI (TTY required)
 
 # Build / check
-cd app && jac build            # native compile check over app/
-jac test app/<file>.test.jac   # per-file jac tests
+cd app && ../jac build               # native compile check over app/
+./jac test app/<file>.test.jac       # per-file Jac tests
 ```
 
-**Running:** no launcher script — from `app/`: `jac run tui/shell.jac` boots the native TUI (needs a TTY); headless: `jac run main.jac` (line REPL) or `jac run main.jac -- --json` (JSONL protocol). Set `JACKAL_AGENT_DIR=<repo>/pi` and `JACKAL_ROOT=<repo>` so auth/catalogs resolve.
+**Running:** `./run.sh` launches Jackal through the workspace-built `./jac`. Direct commands from `app/` use `../jac run tui/shell.jac` (TTY required) or `../jac run main.jac` (line REPL, add `-- --json` for JSONL protocol). Set `JACKAL_AGENT_DIR=<repo>/pi` and `JACKAL_ROOT=<repo>` so auth/catalogs resolve.
 
-**Requirements:** `jac` 0.37.25 via jacup (`jacup install 0.37.25`; CI pins the same release binary); a TTY for the TUI; provider API keys via env or auth.json (see below).
+**Requirements:** build Jac with `./scripts/setup-vendor-jac.sh` (Zig 0.16.0 required); a TTY for the TUI; provider API keys via env or auth.json (see below).
 
 ---
 
@@ -75,7 +75,7 @@ app/ui/  OSP differential-TUI framework (terminal, renderer, editor,
 | `app/cordis/core.jac` | Cordis-style composition core (revertible effects + reactive coeffects) |
 | `app/plugin_host/` | Pi-compatible Node sidecar: `host.mjs`, `pi_shim.mjs`, fixtures |
 
-Tests live next to code as `<module>.test.jac` (~55 files across `app/`); run per-file with `jac test`.
+Tests live next to code as `<module>.test.jac` (~55 files across `app/`); run per-file with `./jac test`.
 
 ---
 
@@ -122,7 +122,7 @@ See [`docs/TESTING.md`](docs/TESTING.md). Tests run on GitHub Actions — the de
 
 Offline model for any manual or scripted run: `JACKAL_MODEL=mock` with `JACKAL_MOCK_SCRIPT` / `JACKAL_MOCK_LOG` (see TESTING.md). Known failures live in `scripts/test-quarantine.txt` (with reasons).
 
-Note: a repo-root `jac build` sweeps everything, including legacy `templates/*.cl.jac` (which fail by design — the `.cl.jac` marker was retired) and skill asset samples. Judge build health on the `app/` tree: `cd app && jac build`.
+Note: a repo-root `./jac build` sweeps everything, including legacy `templates/*.cl.jac` (which fail by design — the `.cl.jac` marker was retired) and skill asset samples. Judge build health on the `app/` tree: `cd app && ../jac build`.
 
 ---
 
@@ -174,7 +174,7 @@ Pruned as stale (legacy-runtime-bound, moot after deletion): `@jac/pi` hook nami
 - `agent-session`-style dependencies flow through `agent/session.jac`; leaf-module changes propagate upward.
 - After editing a `.jac` module, check it compiles/lowers before running the dependent test file.
 - The TUI paint/layout logic lives in `app/ui/demo_live_shell.jac` (upstream of `tui/shell.jac`); change paint behavior there, not in the shell driver.
-- Toolchain: jacup-managed jac 0.37.25 (`~/.local/share/jacup/bin/jac`); NOT `/usr/bin/jac` (stale 0.30.9). The old `vendor/jac` subtree was removed.
+- Toolchain: workspace-built `./jac` from `vendor/jac`; run `./scripts/setup-vendor-jac.sh` after syncing compiler sources.
 
 ## LLVM slice — reuse the shared copy, never fetch a private one
 

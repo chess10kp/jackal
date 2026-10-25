@@ -32,7 +32,9 @@ __pycache__/
 .ralph/
 
 # Vendored compiler build/download artifacts
+/vendor/jac/
 vendor/jac/jac/jaclang/runtimelib/
+/jac
 
 # App test runtime state (embedded postgres, session fixtures)
 app/.jac-test-home/

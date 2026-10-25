@@ -11,7 +11,7 @@ locally.
 | Unit | `app/**/<mod>.test.jac` | One module, merged with `<mod>.jac` by stem (symbols visible without imports) |
 | E2E headless | `app/e2e/{print_mode,json_protocol,repl}.test.jac` | The real `main.jac` process: flags, exit codes, output formats, approvals, sessions |
 | TUI (in-process) | `app/tui/harness.test.jac` | The real LiveShell rendering into `EmulatedTerminal` (pyte VT emulator — Pi's xterm-headless `VirtualTerminal` equivalent); the test steps the host loop and asserts on the exact screen |
-| E2E TUI (PTY) | `app/e2e/tui.test.jac` | `jac run tui/shell.jac` as a real process under a pseudo-terminal: boot, terminal restore |
+| E2E TUI (PTY) | `app/e2e/tui.test.jac` | `../jac run tui/shell.jac` as a real process under a pseudo-terminal: boot, terminal restore |
 
 Every `*.test.jac` needs a same-stem `*.jac` module (the runner imports it);
 e2e suites use tiny modules that only import the harness.

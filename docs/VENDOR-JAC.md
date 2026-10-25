@@ -1,10 +1,10 @@
-# Vendored Jac compiler (`vendor/jac`)
+# Local Jac compiler checkout (`vendor/jac`)
 
-**Updated:** 2026-08-30 · **Source:** `jaseci-labs/jac` `main` @ `fe4b7c760ae55d8259ab8f9da7a879fd45aa135e` · **Form:** `git subtree --squash`
+**Updated:** 2026-10-25 · **Source:** `jaseci-labs/jac` `main` @ `eafdb1682321f93d60c8590119e1d7e1b6e4fd38` · **Form:** local shallow clone (ignored by git)
 
-## Why a vendor copy
+## Why a local checkout
 
-Jackal's native-completion path (see `~/notes/jackal-native-gap-analysis.md`, mirrored in `ROADMAP.md` §N5) needs fixes inside the Jac compiler itself: `na_stdlib` floors (`re`, `subprocess`, `threading`, `tempfile`, terminal FFI), lowering gaps (E1032/E5092), and IR-gen work. Upstream PR review latency is weeks — we cannot block product work on it. So the compiler lives here:
+Jackal runs against the newest upstream compiler through a workspace-local binary. The source checkout and build products stay ignored; `./jac` is also ignored and is rebuilt with `./scripts/setup-vendor-jac.sh`.
 
 - **Fix now, in-repo**: any native-path fix lands in `vendor/jac/**` and the dev binary picks it up immediately.
 - **PR upstream in parallel**: the same change goes to jaseci-labs/jac; when it eventually merges we sync and drop our local copy.
@@ -13,7 +13,7 @@ Jackal's native-completion path (see `~/notes/jackal-native-gap-analysis.md`, mi
 ## Layout
 
 ```
-vendor/jac/                  # upstream repo root (subtree root)
+vendor/jac/                  # upstream repo root (local shallow clone)
 ├── jac/                     # the compiler package
 │   ├── build.zig            # one-command entry (fetch-llvm, fetch-bun, -Ddev, release)
 │   ├── jaclang/             # compiler source — edits here run live under -Ddev
@@ -24,7 +24,7 @@ vendor/jac/                  # upstream repo root (subtree root)
 └── scripts/                 # upstream helpers (fresh_env.sh — see gotchas)
 ```
 
-`vendor/jac` maps the upstream **repo root** 1:1, so upstream file paths need no translation when reading upstream READMEs or syncing.
+`vendor/jac` maps the upstream **repo root** 1:1. The build script fetches the latest `main`, builds in `vendor/jac/jac`, then installs the resulting executable at the Jackal root as `./jac`.
 
 ## Build
 
@@ -34,7 +34,7 @@ export PATH="$PWD/vendor/jac/jac/zig-out/bin:$PATH"
 jac --version
 ```
 
-Requirements: zig 0.16.0, network for the one-time pinned fetches (LLVM slice ~84 MB, bun, pbs CPython). The `-Ddev` binary **links the in-tree compiler source live**: edit `vendor/jac/jac/jaclang/**` and re-run — no rebuild. Rebuild only for launcher `.zig`, `sitecustomize.py`/`_jac_finder.py`, or bundled-CPython changes.
+Requirements: Zig 0.16.0 and network access for upstream source and pinned build dependencies. The `-Ddev` binary **links the local compiler source live**; run the setup script again after updating compiler sources or launcher files.
 
 ## Editing rules
 
@@ -45,9 +45,8 @@ Requirements: zig 0.16.0, network for the one-time pinned fetches (LLVM slice ~8
 ## Sync from upstream
 
 ```bash
-# from the Jackal root; use a clean checkout of upstream main
-git subtree pull --prefix=vendor/jac /home/jac/repos/jaseci main --squash
-# resolve conflicts inside vendor/jac/**, commit the merge
+# from the Jackal root; setup fetches latest upstream main before rebuilding
+./scripts/setup-vendor-jac.sh
 ```
 
 ## Push a fix upstream

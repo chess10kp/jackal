@@ -24,7 +24,8 @@ set -u
 cd "$(dirname "$0")/.."
 REPO="$PWD"
 
-JAC="${JAC:-jac}"
+JAC="${JAC:-$REPO/jac}"
+if [ ! -x "$JAC" ]; then JAC=jac; fi
 TIMEOUT="${TIMEOUT:-600}"
 JOBS=1
 FAIL_FAST=0
