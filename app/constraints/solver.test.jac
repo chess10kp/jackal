@@ -807,16 +807,16 @@ test "edit variables track suggestions under hard constraints" {
     )).ok;
 
     assert s.add_edit_variable(width, StrengthTier.STRONG).ok;
-    import from sys { stderr }
-    stderr.write("rows=" + str(len(s.rows)) + "\n");
+    import sys;
+    sys.stderr.write("rows=" + str(len(s.rows)) + "\n");
     for suggested in [40.0, 80.0, 20.0, 0.0] {
         r = s.suggest_value(width, suggested);
         if not r.ok {
-            stderr.write("SUGGEST FAILED " + r.error.value + " " + r.message + "\n");
+            sys.stderr.write("SUGGEST FAILED " + r.error.value + " " + r.message + "\n");
         }
         assert r.ok;
         snap = s.snapshot();
-        stderr.write("suggested=" + str(suggested) + " width=" + str(snap.values[width.id]) + " child=" + str(snap.values[child.id]) + "\n");
+        sys.stderr.write("suggested=" + str(suggested) + " width=" + str(snap.values[width.id]) + " child=" + str(snap.values[child.id]) + "\n");
         assert snap.values[width.id] == suggested;
         assert abs(snap.values[child.id] - suggested / 2.0) < 1e-9;
     }

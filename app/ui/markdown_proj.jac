@@ -85,12 +85,12 @@ def project_inline_spans(text: str) -> list[ProjSpan] {
     out: list[ProjSpan] = [];
     i = 0;
     for m in _INLINE_RE.finditer(text) {
-        start = m.start();
-        end = m.end();
+        start: int = m.start();
+        end: int = m.end();
         if start > i {
             out.append(_span(text[i:start], "default"));
         }
-        raw = m.group(0);
+        raw: str = m.group(0);
         if raw.startswith("**") and raw.endswith("**") and len(raw) >= 4 {
             out.append(_span(raw[2:-2], "strong"));
         } elif raw.startswith("~~") and raw.endswith("~~") and len(raw) >= 4 {
@@ -130,13 +130,13 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
     if not source {
         return [_line_plain("")];
     }
-    raw_lines = source.replace("\r\n", "\n").replace("\r", "\n").split("\n");
+    raw_lines: list[str] = source.replace("\r\n", "\n").replace("\r", "\n").split("\n");
     i = 0;
     n = len(raw_lines);
     in_fence = False;
     fence_marker = "";
     while i < n {
-        line = raw_lines[i];
+        line: str = raw_lines[i];
         if in_fence {
             if line.startswith(fence_marker) {
                 in_fence = False;
@@ -152,7 +152,8 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
         fence = _FENCE_RE.match(line);
         if fence {
             in_fence = True;
-            fence_marker = fence.group(1)[0] * len(fence.group(1));
+            marker: str = fence.group(1);
+            fence_marker = marker[0] * len(marker);
             i += 1;
             continue;
         }
@@ -164,7 +165,7 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
         }
         heading = _HEADING_RE.match(line);
         if heading {
-            body = heading.group(2);
+            body: str = heading.group(2);
             for wrapped in wrap_text(body, max(1, width)) {
                 lines_out.append(_line_plain(wrapped, "heading"));
             }
@@ -196,7 +197,7 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
         }
         ul = _UL_RE.match(line);
         if ul {
-            body = ul.group(3);
+            body: str = ul.group(3);
             marker = "• ";
             room = max(1, width - display_width(marker));
             first = True;
@@ -218,8 +219,9 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
         }
         ol = _OL_RE.match(line);
         if ol {
-            body = ol.group(3);
-            marker = ol.group(2) + ". ";
+            body: str = ol.group(3);
+            number_text: str = ol.group(2);
+            marker: str = number_text + ". ";
             room = max(1, width - display_width(marker));
             first = True;
             for wrapped in wrap_text(body if body else " ", room) {
