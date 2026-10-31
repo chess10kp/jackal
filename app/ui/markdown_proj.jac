@@ -84,7 +84,11 @@ def project_inline_spans(text: str) -> list[ProjSpan] {
     }
     out: list[ProjSpan] = [];
     i = 0;
-    for m in _INLINE_RE.finditer(text) {
+    while i < len(text) {
+        m = _INLINE_RE.search(text, i);
+        if m is None {
+            break;
+        }
         start: int = m.start();
         end: int = m.end();
         if start > i {
