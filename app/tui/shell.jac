@@ -59,8 +59,9 @@ def create_live_shell(term: Terminal | None = None) -> LiveShell {
     _push_turn(
         app,
         "system",
-        "session attached · detached graph · retained paint\n"
-        + "say something — watch the stream, then the approval modal",
+        "Jackal · " + get_model() + " · " + app.mode + " mode\n"
+        + "cwd " + os.getcwd()
+        + " · /help for commands · shift+tab cycles mode · ctrl+c cancels a turn",
     );
     return app;
 }
