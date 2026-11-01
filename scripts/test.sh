@@ -33,6 +33,7 @@ FILTERS=()
 KEYWORDS=()
 EXCLUDES=()
 QUARANTINE_FILE=""
+FAIL_ON_XPASS=0
 LOGDIR="$REPO/.testlogs"
 mkdir -p "$LOGDIR"
 
@@ -42,6 +43,7 @@ while [ $# -gt 0 ]; do
     --fail-fast) FAIL_FAST=1 ;;
     --exclude) shift; EXCLUDES+=("$1") ;;
     --quarantine) shift; QUARANTINE_FILE="$1" ;;
+    --fail-on-xpass) FAIL_ON_XPASS=1 ;;
     -k*) KEYWORDS+=("${1#-k}"); [ -n "${KEYWORDS[-1]}" ] || { shift; KEYWORDS+=("$1"); } ;;
     --help|-h) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) FILTERS+=("$1") ;;
@@ -217,4 +219,11 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     for n in "${XPASS_NAMES[@]:-}"; do [ -n "$n" ] && echo "- :tada: \`$n\` passes — unquarantine"; done
   } >> "$GITHUB_STEP_SUMMARY"
 fi
-[ $FAILED -eq 0 ] && [ $TIMEOUTS -eq 0 ]
+if [ $FAILED -eq 0 ] && [ $TIMEOUTS -eq 0 ]; then
+  if [ "$FAIL_ON_XPASS" -eq 1 ] && [ ${#XPASS_NAMES[@]} -gt 0 ]; then
+    echo "fail-on-xpass: ${#XPASS_NAMES[@]} quarantined suite(s) now pass" >&2
+    exit 1
+  fi
+  exit 0
+fi
+exit 1
