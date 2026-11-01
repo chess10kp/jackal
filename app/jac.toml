@@ -16,6 +16,15 @@ api_key = ""
 default = "native"
 
 [placement.pins]
+# BUILD REALITY 2026-11-01: with ANY explicit `"x" = "native"` pin present,
+# `jac build` currently aborts during application preparation — the kernel
+# jc_compile child dies with signal 6 in the emitted hasattr primitive
+# (jaseci-labs/jac#10485; reproduced with dev and release binaries, --jobs
+# serial, cold and warm caches, and pin subsets). Without native pins the
+# seal completes but bakes a server-only source bundle. The pins below stay
+# because they record the intended native surface; expect `jac build` red
+# until #10485 lands. `jac run` / `jac test` are unaffected (no pinned-unit
+# seal path).
 # Pin semantics (verified 2026-11-01 on macOS arm64, vendor 5103ea5cf):
 # an explicit `"x" = "native"` pin is a HARD requirement — if the unit does
 # not lower, `jac build` fails the app seal. A module left UNPINNED under
