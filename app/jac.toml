@@ -16,28 +16,25 @@ api_key = ""
 default = "native"
 
 [placement.pins]
-# BUILD REALITY 2026-11-01: with ANY explicit `"x" = "native"` pin present,
-# `jac build` currently aborts during application preparation — the kernel
-# jc_compile child dies with signal 6 in the emitted hasattr primitive
-# (jaseci-labs/jac#10485; reproduced with dev and release binaries, --jobs
-# serial, cold and warm caches, and pin subsets). Without native pins the
-# seal completes but bakes a server-only source bundle. The pins below stay
-# because they record the intended native surface; expect `jac build` red
-# until #10485 lands. `jac run` / `jac test` are unaffected (no pinned-unit
-# seal path).
+# SEAL STATUS 2026-11-01: `cd app && ../jac build` is GREEN on macOS arm64
+# with a current native kernel — `Built dist/jackal.jab` with a native payload
+# (.jac/native/libjackal.dylib, 63 units, no hard walls). The earlier red seal
+# was a kernel bug, not these pins: vendor commit 5103ea5cf added emit_hasattr,
+# which the kernel shipped as an abort() stub (jaseci-labs/jac#10485); the
+# commit is reverted locally and the kernel rebuilt. Before reading any seal,
+# check `jac native status` — a stale kernel runs the bytecode floor and
+# reports a different wall set.
 # Pin semantics (verified 2026-11-01 on macOS arm64, vendor 5103ea5cf):
 # an explicit `"x" = "native"` pin is a HARD requirement — if the unit does
 # not lower, `jac build` fails the app seal. A module left UNPINNED under
-# `default = "native"` demotes softly to server with a build note. So the
-# native pins below are the true "must stay native" set; keeping a walled
-# unit pinned documents the frontier at the cost of a red seal.
+# `default = "native"` demotes softly to server with a build note.
 # SEAL KEYS: markup/terminal/transcript/width/renderer cleared 2026-11-01
-# (tuple[...] ret spellings, dead `codecs` import). Remaining hard wall:
-# ui.screen (E5106 private-bridge to walker InsertText/Submit/Cancel from
-# server-pinned ui.events + E5093 event/UiSession class boundary). Marking
-# those walkers `walker:protect` clears E5106 on paper but currently trips a
-# kernel SIGABRT during prepare (jaseci-labs/jac#10485) — do not apply until
-# upstream lands the fix.
+# (tuple[...] ret spellings, dead `codecs` import). ui.screen stays an
+# explicit server pin: its walker handlers bridge InsertText/Submit/Cancel
+# from server-pinned ui.events and its API moves UiSession/ShellScreen, i.e.
+# it is the next N6 target, not a seal blocker (a server pin seals as pinned).
+# Marking those walkers `walker:protect` is the documented route to native;
+# it is gated on the kernel-side issue above, not on the app.
 # Current frontier: 12 explicit server pins remain (was 15; terminal/vt went
 # native 2026-08-31); N6 requires reducing this count to zero. Keep each
 # temporary pin annotated with its compiler/runtime wall.

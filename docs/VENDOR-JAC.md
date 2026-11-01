@@ -1,6 +1,15 @@
 # Local Jac compiler checkout (`vendor/jac`)
 
-**Updated:** 2026-10-25 · **Source:** `jaseci-labs/jac` `main` @ `eafdb1682321f93d60c8590119e1d7e1b6e4fd38` · **Form:** local shallow clone (ignored by git)
+**Updated:** 2026-11-01 · **Source:** `jaseci-labs/jac` `main` @ `eafdb1682321f93d60c8590119e1d7e1b6e4fd38` · **Form:** local shallow clone (ignored by git)
+
+**Local divergence (2026-11-01):** branch `fix/native-hasattr-fields` carries
+`5103ea5cf` ("lower hasattr for Jac object fields") and its revert
+`3338d7ab3`/`4eb936b5f`. The feature is upstream-able in principle, but as
+compiled into the *kernel* it shipped as an `abort()` stub and made every
+`jac build`/`jac test` of a module containing `hasattr` die with SIGABRT
+(jaseci-labs/jac#10485; follow-ups #10492, #10493). Upstream `main` still has
+`emit_hasattr -> None`, so the revert restores upstream behavior. Do not
+re-apply it without rebuilding the kernel and running the `hasattr` repro.
 
 ## Why a local checkout
 

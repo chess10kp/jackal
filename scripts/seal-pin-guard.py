@@ -46,7 +46,7 @@ from dataclasses import dataclass, field
 
 try:  # Python >= 3.11
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - older hosts
+except ModuleNotFoundError:  # pragma: no cover - stock macOS python3 is 3.9
     tomllib = None
 
 ANNEX_SUFFIXES = (".impl.jac", ".test.jac")
@@ -97,16 +97,37 @@ class Finding:
 
 
 def parse_pins(toml_path: str) -> PinConfig:
-    if tomllib is None:
-        raise SystemExit("python3 >= 3.11 required (tomllib)")
+    if tomllib is not None:
+        with open(toml_path, "rb") as fh:
+            data = tomllib.load(fh)
+        placement = data.get("placement", {})
+        default_space = placement.get("default", "native")
+        pins = placement.get("pins", {}) or {}
+        return PinConfig(default_space=default_space, pins=dict(pins))
 
-    with open(toml_path, "rb") as fh:
-        data = tomllib.load(fh)
-
-    placement = data.get("placement", {})
-    default_space = placement.get("default", "native")
-    pins = placement.get("pins", {}) or {}
-    return PinConfig(default_space=default_space, pins=dict(pins))
+    # Stock macOS python3 is 3.9 (no tomllib). jac.toml's placement block is
+    # flat, so read just what this guard needs.
+    default_space = "native"
+    pins: dict[str, str] = {}
+    section = ""
+    key_re = re.compile(r'^\s*("[^"]+"|[A-Za-z0-9_.-]+)\s*=\s*"([^"]*)"\s*(?:#.*)?$')
+    with open(toml_path, encoding="utf-8") as fh:
+        for line in fh:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("[") and stripped.endswith("]"):
+                section = stripped[1:-1].strip()
+                continue
+            m = key_re.match(line)
+            if m is None:
+                continue
+            key = m.group(1).strip('"')
+            if section == "placement" and key == "default":
+                default_space = m.group(2)
+            elif section == "placement.pins":
+                pins[key] = m.group(2)
+    return PinConfig(default_space=default_space, pins=pins)
 
 
 def module_name(app_dir: str, path: str) -> str:
