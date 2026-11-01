@@ -8,8 +8,8 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
 ## Soundness status (2026-11-01, macOS arm64, vendor 5103ea5cf + hasattr revert)
 
 - **Seal is GREEN.** `cd app && ../jac build` → `Built dist/jackal.jab`
-  (25.1 MB gzip / 64.9 MB unpacked) with a real native payload:
-  `.jac/native/libjackal.dylib` (4.1 MB) over 63 units — the pinned native
+  (25.3 MB gzip / ~65 MB unpacked) with a real native payload:
+  `.jac/native/libjackal.dylib` (4.17 MB) over 63 units — the pinned native
   surface plus the `na_stdlib` floors and the jaclang/osp runtime. **No hard
   walls.** The remaining `native seam -- demoting` notes are per-element
   (`layout_compile_*` signature types, renderer/vt test annexes, `oracle_driver`)
@@ -21,10 +21,13 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
   **`abort()` stub** (`emit_hasattr.__slot` → `abort` in the crash report). Any
   app module containing `hasattr` then aborted the kernel `jc_compile` child —
   no pins or `walker:protect` required (6-line repro in the issue comment).
-  The commit is local only (upstream `main` still has
-  `emit_hasattr -> None`): reverted it in the vendor checkout
-  (`3338d7ab3`) and rebuilt the kernel (`jac native build kernel`, 25.5 min);
-  `jac test` and the seal are green since. Upstream follow-ups filed:
+  The kernel build's own seam note named the culprit: the literal fast path
+  used `getattr(node, "lit_value", None)`, a 3-arg `FuncCall` the backend
+  refuses. Dropped the fast path (the runtime `strcmp` loop is semantically
+  identical) and rebuilt the kernel: `emit_hasattr` now lowers with **no
+  demotion**, literal and dynamic `hasattr` return the right answers, and the
+  seal is green on the same tree. Vendor branch `fix/native-hasattr-fields` =
+  `5103ea5cf` + `383015f8b` (kernel-safe body). Upstream follow-ups filed:
   [#10492](https://github.com/jaseci-labs/jac/issues/10492) (built artifacts
   ship `abort()` stubs silently) and
   [#10493](https://github.com/jaseci-labs/jac/issues/10493) (`jac test` runs

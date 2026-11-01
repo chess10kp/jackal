@@ -2,14 +2,17 @@
 
 **Updated:** 2026-11-01 · **Source:** `jaseci-labs/jac` `main` @ `eafdb1682321f93d60c8590119e1d7e1b6e4fd38` · **Form:** local shallow clone (ignored by git)
 
-**Local divergence (2026-11-01):** branch `fix/native-hasattr-fields` carries
-`5103ea5cf` ("lower hasattr for Jac object fields") and its revert
-`3338d7ab3`/`4eb936b5f`. The feature is upstream-able in principle, but as
-compiled into the *kernel* it shipped as an `abort()` stub and made every
-`jac build`/`jac test` of a module containing `hasattr` die with SIGABRT
-(jaseci-labs/jac#10485; follow-ups #10492, #10493). Upstream `main` still has
-`emit_hasattr -> None`, so the revert restores upstream behavior. Do not
-re-apply it without rebuilding the kernel and running the `hasattr` repro.
+**Local divergence (2026-11-01):** branch `fix/native-hasattr-fields` is
+upstream `eafdb1682` + `5103ea5cf` ("lower hasattr for Jac object fields") +
+`383015f8b` (kernel-safe body). The original body's literal fast path used a
+3-arg `getattr(node, "lit_value", None)`; the native backend refuses that
+`FuncCall`, so when the compiler is compiled *into the kernel* the function
+became an `abort()` stub and every build/test of a module containing `hasattr`
+died with SIGABRT (jaseci-labs/jac#10485). `383015f8b` drops the fast path (the
+runtime `strcmp` loop is semantically identical) and the kernel lowers it with
+no demotion. After touching this file, rebuild the kernel
+(`jac native build kernel`) and re-run the `hasattr` repro: a seam note
+demoting `emit_hasattr` means the published kernel will abort on user builds.
 
 ## Why a local checkout
 
