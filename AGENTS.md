@@ -11,9 +11,9 @@ Jac-native terminal coding agent.
 1. **Commit** after each feature or bugfix (unless the user says otherwise).
 2. **Do not modify** `jac-client`. Jackal uses the workspace-built Jac binary at `./jac`, built from the latest source in `vendor/jac`. Compiler bugs go upstream to jaseci-labs/jac (see Human handoff).
 3. **Native lowering discipline:** write Jac that lowers natively — annotate types (including kwargs and intermediates) so modules lower without implicit server fallback; keep `jac build` green on `app/`; change `[placement.pins]` in `app/jac.toml` only via deliberate commits with a stated reason.
-4. **Do not extend legacy code.** `src/`, `templates/`, `tui/*.tsx`, `lib/jac/`, and the TS test suites are frozen pending deletion. No new features, no fixes unless a deletion commit depends on it.
-5. **Framework/plugin gaps** → stop, document symptom + owning repo + minimal recommended fix for the **human** (see [Human handoff](#human-handoff)).
-6. **Forward product work:** `app/`, its tests, and docs.
+4. **Framework/plugin gaps** → stop, document symptom + owning repo + minimal recommended fix for the **human** (see [Human handoff](#human-handoff)).
+5. **Forward product work:** `app/`, its tests, and docs.
+6. **Jac compiler bugs:** file an upstream issue at jaseci-labs/jac without waiting for the user, make the fix in the `vendor/jac` checkout so work can continue, and put the implementation details in that issue.
 
 ---
 
@@ -29,7 +29,9 @@ cd app && ../jac build               # native compile check over app/
 ./jac test app/<file>.test.jac       # per-file Jac tests
 ```
 
-**Running:** `./run.sh` launches Jackal through the workspace-built `./jac`. Direct commands from `app/` use `../jac run tui/shell.jac` (TTY required) or `../jac run main.jac` (line REPL, add `-- --json` for JSONL protocol). Set `JACKAL_AGENT_DIR=<repo>/pi` and `JACKAL_ROOT=<repo>` so auth/catalogs resolve.
+**Running:** `./run.sh` launches Jackal through the workspace-built `./jac` (one process, from `app/`, with `JACKAL_ROOT`/`JACKAL_AGENT_DIR` set). Direct commands from `app/` use `../jac run tui/shell.jac` (TTY required) or `../jac run main.jac` (line REPL, add `-- --json` for JSONL protocol). Set `JACKAL_AGENT_DIR=<repo>/pi` and `JACKAL_ROOT=<repo>` so auth/catalogs resolve.
+
+**Dev fast path (dogfooding).** A dev `jac run` inside `app/` always prepares the whole application first, and the `[placement.pins]` there pull the native JIT into that prepare: cold ~6 min, and a *warm* restore hangs (>5 min in `MCJIT`, inside `_restore_sections` → `_load_native_from_cache`). `run.sh` therefore exports `JAC_IGNORE_PLACEMENT_PINS=1` (the vendored compiler honors it and treats every module as server/plain Python): ~3 s warm, ~2 min cold on the bytecode floor. `JACKAL_NATIVE=1 ./run.sh` keeps the pins. Never set `JAC_IGNORE_PLACEMENT_PINS` for `jac build` or a seal read — it would silently drop the pins the seal exists to enforce.
 
 **Requirements:** build Jac with `./scripts/setup-vendor-jac.sh` (Zig 0.16.0 required); a TTY for the TUI; provider API keys via env or auth.json (see below).
 
@@ -108,6 +110,8 @@ These paths are frozen. A deletion commit is upcoming — do not extend them:
 | `JACKAL_LOG` | `agent/logging.jac` | Structured JSONL debug log. `1` → `<cwd>/.jackal/logs/<date>-<pid>.jsonl`; any other value is a sink path. Unset/`0` = off |
 | `JACKAL_LOG_LEVEL` | `agent/logging.jac` | `debug`/`info`/`warn`/`error` threshold (default `info`) |
 | `JACKAL_SANDBOX_ROOT` | `agent/tools.jac` | When set, file tools reject paths outside this root (lexical `..` containment; off by default) |
+| `JAC_IGNORE_PLACEMENT_PINS` | vendored jac (`project/`, `compiler/placement/`) | Mutes `[placement.pins]` for this run — the dev fast path `run.sh` sets it. Never for `jac build`. |
+| `JACKAL_NATIVE` | `run.sh` | `1` keeps the native placement pins instead of the fast path |
 | `JACKAL_ALLOW_PRIVATE_HOSTS` | `agent/web_tools.jac` | Offline-test escape hatch: lets `web_fetch` reach loopback/private hosts that the SSRF guard blocks. Never set in a normal session |
 
 Legacy vars (`JACKAL_HEAP_MB`, `JACKAL_TUI_OUT`, `JACKAL_SKIP_TUI_COMPILE`) belong to the old launcher path and die with the launcher cleanup. Provider keys come from env (e.g. `OPENROUTER_API_KEY`) or `auth.json` (byte-compatible with the legacy pi-ai shape; see `app/agent/auth.jac`).
