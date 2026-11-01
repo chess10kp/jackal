@@ -118,7 +118,7 @@ match() { # match <suite> — filters/keywords are unions; excludes win
   return 0
 }
 
-_exec_suite() { # _exec_suite <suite> <log>
+_exec_suite() { # _exec_suite <suite> <log> — 124/137/143 mean the timeout bit
   # Suites run with cwd=app/ (the app project): module resolution, placement
   # pins, and the app venv all resolve there. Running from the repo root
   # makes cross-package imports (tui.*, core.*) resolve against legacy
@@ -126,9 +126,27 @@ _exec_suite() { # _exec_suite <suite> <log>
   local suite="$1" log="$2" rel="${1#app/}"
   if command -v timeout >/dev/null 2>&1; then
     (cd "$REPO/app" && timeout --kill-after=30 "$TIMEOUT" "$JAC" test "$rel") >"$log" 2>&1
-  else
-    (cd "$REPO/app" && "$JAC" test "$rel") >"$log" 2>&1
+    return $?
   fi
+  # Stock macOS has no coreutils `timeout`. Run the suite in its own process
+  # group and let a watchdog take the whole group down: a hung suite must not
+  # block the run, and its children (servers, subprocesses) must die with it.
+  set -m
+  ( cd "$REPO/app" && exec "$JAC" test "$rel" ) >"$log" 2>&1 &
+  local child=$!
+  set +m
+  (
+    sleep "$TIMEOUT"
+    kill -TERM -"$child" 2>/dev/null
+    sleep 10
+    kill -KILL -"$child" 2>/dev/null
+  ) &
+  local watchdog=$!
+  wait "$child"
+  local rc=$?
+  kill "$watchdog" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  return $rc
 }
 
 run_suite() { # run_suite <suite>
@@ -152,7 +170,7 @@ run_suite() { # run_suite <suite>
   secs=$((end - start))
   if [ -n "$status" ]; then :
   elif [ $rc -eq 0 ]; then status=PASS
-  elif [ $rc -eq 124 ] || [ $rc -eq 137 ]; then status="TIMEOUT($rc)"
+  elif [ $rc -eq 124 ] || [ $rc -eq 137 ] || [ $rc -eq 143 ]; then status="TIMEOUT($rc)"
   else status=FAIL; fi
   printf '%s %s %ss %s\n' "$status" "$name" "$secs" "$log"
   [ "$status" = PASS ] || [ "$status" = FLAKY ]
