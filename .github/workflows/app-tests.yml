@@ -29,6 +29,28 @@ jobs:
         working-directory: app
         run: jac check .
 
+  # Memory profile of the harness process tree under the mock provider.
+  # Always annotates; the strict 100 MB resident budget gates in
+  # continue-with-warning mode until the native-only runtime lands
+  # (bytecode-floor prep phase not counted).
+  mem-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-jac
+        with:
+          version: ${{ env.JAC_VERSION }}
+          sha256: ${{ env.JAC_SHA256 }}
+      - name: Memory profile (resident + boot peaks)
+        run: |
+          scripts/mem-profile.sh \
+            --budget-resident "${MEM_RESIDENT_BUDGET_MB:-700}" \
+            --budget-boot "${MEM_BOOT_BUDGET_MB:-1400}"
+      - name: Strict 100 MB resident target (warning until native-only)
+        continue-on-error: true
+        run: scripts/mem-profile.sh --budget-resident 100
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
