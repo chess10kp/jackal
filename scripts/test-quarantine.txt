@@ -20,8 +20,10 @@
 # order-independent and demoted callees are bridged instead of aborted).
 cordis/core
 # Harness drives the full LiveShell (pyte + native-pinned ui render stack).
-# ui.model has upstream-walled demotions (E5092/EdgeRefTrailer), so the
-# graph mixes native and Python and jac test dies at the seam
-# (jaseci-labs/jac#10213). Unquarantine when upstream lands seam dispatch
-# or the ui.model walls. Suite was silently SKIPPED on CI before this.
+# It now RUNS (592 passed, 3 failed) instead of skipping — the old skip was
+# the missing httpx dependency. The 3 failures are text assertions against the
+# in-flight tui/* + ui/demo_live_shell_messages work: the mode badge never
+# renders ("YOLO"/"AUTO") and the approval flow's "wrote a.txt" never appears
+# although the tool ran. Not a compiler/lowering failure — re-check once that
+# work lands, then unquarantine or open a real bug.
 tui/harness

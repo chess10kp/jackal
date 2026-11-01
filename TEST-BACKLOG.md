@@ -101,9 +101,11 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
 - **Memory (measured 2026-11-01, macOS arm64, release binary)**:
   - **Native artifact (post-seal, the number that matters)**:
     `scripts/mem-profile.sh --idle 8 ../jac run dist/jackal.jab --mode yolo`
-    → resident 243 MB, peak 243 MB, one mock turn completed. That is 5.3×
-    below the old source-bundle figure and the first measurement of a real
-    native payload. Still 2.4× the 100 MB budget.
+    → **127 MB resident on a warm compiler cache**, 243 MB on the first run
+    after a kernel rebuild (the parent `jac` recompiles compiler modules; the
+    whole tree is sampled). One mock turn completes. That is 5-10× below the
+    old source-bundle figure. 127 MB is 1.3× the 100 MB budget; the warm
+    number is the honest one for steady state.
   - trivial `jac run` (2-line sleep script): RSS 266 MB, 174 MB of it
     `IOAccelerator` GPU mapping — upstream jac#10487.
   - jackal *source* bundle (pre-native-seal, historical): idle 1.29 GB;
