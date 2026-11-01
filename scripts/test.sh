@@ -28,10 +28,18 @@ JAC="${JAC:-$REPO/jac}"
 if [ ! -x "$JAC" ]; then JAC=jac; fi
 TIMEOUT="${TIMEOUT:-600}"
 JOBS=1
+# `wait -n` (parallel mode) needs bash 4.3+; stock macOS bash 3.2 degrades
+# to sequential instead of silently matching zero suites.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 3 ]; }; then
+  JAC_SERIAL_ONLY=1
+fi
 FAIL_FAST=0
-FILTERS=()
-KEYWORDS=()
-EXCLUDES=()
+# Sentinel empty element: bash 3.2 mishandles ${arr[@]+"${arr[@]}"} for
+# multi-element arrays (joins them into one word), so arrays start with ""
+# and every loop skips empties.
+FILTERS=("")
+KEYWORDS=("")
+EXCLUDES=("")
 QUARANTINE_FILE=""
 FAIL_ON_XPASS=0
 LOGDIR="$REPO/.testlogs"
@@ -54,23 +62,39 @@ done
 export JACKAL_ROOT="${JACKAL_ROOT:-$REPO}"
 export JACKAL_AGENT_DIR="${JACKAL_AGENT_DIR:-$REPO/pi}"
 
-mapfile -t SUITES < <(find app -name '*.test.jac' | sort)
+# bash 3.2 (stock macOS) has no mapfile; a read loop keeps the runner portable.
+SUITES=()
+while IFS= read -r _suite; do
+  SUITES+=("$_suite")
+done < <(find app -name '*.test.jac' | sort)
 [ ${#SUITES[@]} -gt 0 ] || { echo "no suites found"; exit 2; }
+if [ "${JAC_SERIAL_ONLY:-0}" = "1" ] && [ "$JOBS" -gt 1 ]; then
+  echo "test.sh: bash ${BASH_VERSION%%(*} lacks 'wait -n'; running sequentially" >&2
+  JOBS=1
+fi
 
-match() { # match <suite>
-  local s="$1" f k x
-  for x in "${EXCLUDES[@]:-}"; do
+match() { # match <suite> — filters/keywords are unions; excludes win
+  local s="$1" f k x matched
+  for x in "${EXCLUDES[@]}"; do
     [ -z "$x" ] && continue
     case "$s" in *"$x"*) return 1 ;; esac
   done
-  for f in "${FILTERS[@]:-}"; do
+  matched=0
+  for f in "${FILTERS[@]}"; do
     [ -z "$f" ] && continue
-    case "$s" in *"$f"*) ;; *) return 1 ;; esac
+    case "$s" in *"$f"*) matched=1 ;; esac
   done
-  for k in "${KEYWORDS[@]:-}"; do
+  if [ -n "${FILTERS[*]}" ] && [ "$matched" -eq 0 ]; then
+    return 1
+  fi
+  matched=0
+  for k in "${KEYWORDS[@]}"; do
     [ -z "$k" ] && continue
-    case "$(basename "$s")" in *"$k"*) ;; *) return 1 ;; esac
+    case "$(basename "$s")" in *"$k"*) matched=1 ;; esac
   done
+  if [ -n "${KEYWORDS[*]}" ] && [ "$matched" -eq 0 ]; then
+    return 1
+  fi
   return 0
 }
 
@@ -116,7 +140,7 @@ run_suite() { # run_suite <suite>
 
 PASSED=0; FAILED=0; TIMEOUTS=0
 FAILED_NAMES=()
-declare -a RESULTS
+declare -a RESULTS=("")
 
 if [ "$JOBS" -gt 1 ]; then
   pids=(); pjobs=()
@@ -172,25 +196,36 @@ else
   done
 fi
 
-declare -A QUAR=()
+# bash 3.2 has no associative arrays: keep the list newline-delimited.
+QUAR_LIST="
+"
+_is_quarantined() { # _is_quarantined <suite-name>
+  case "$QUAR_LIST" in
+    *"
+$1
+"*) return 0 ;;
+  esac
+  return 1
+}
 if [ -n "$QUARANTINE_FILE" ] && [ -f "$QUARANTINE_FILE" ]; then
   while IFS= read -r q; do
     q="${q%%#*}"; q="$(echo "$q" | xargs)"
-    [ -n "$q" ] && QUAR["$q"]=1
+    [ -n "$q" ] && QUAR_LIST="$QUAR_LIST$q
+"
   done < "$QUARANTINE_FILE"
 fi
 
 # Recount from RESULTS ("STATUS name secs log") with quarantine applied.
 PASSED=0; FAILED=0; TIMEOUTS=0; XFAIL=0
-FAILED_NAMES=(); XPASS_NAMES=(); FLAKY_NAMES=()
-for line in "${RESULTS[@]:-}"; do
+FAILED_NAMES=(""); XPASS_NAMES=(""); FLAKY_NAMES=("")
+for line in "${RESULTS[@]}"; do
   [ -z "$line" ] && continue
   st="${line%% *}"; rest="${line#* }"; nm="${rest%% *}"
   if [ "$st" = PASS ] || [ "$st" = FLAKY ]; then
     PASSED=$((PASSED+1))
     [ "$st" = FLAKY ] && FLAKY_NAMES+=("$nm")
-    [ -n "${QUAR[$nm]:-}" ] && XPASS_NAMES+=("$nm")
-  elif [ -n "${QUAR[$nm]:-}" ]; then
+    _is_quarantined "$nm" && XPASS_NAMES+=("$nm")
+  elif _is_quarantined "$nm"; then
     XFAIL=$((XFAIL+1))
   else
     case "$st" in TIMEOUT*) TIMEOUTS=$((TIMEOUTS+1)) ;; *) FAILED=$((FAILED+1)) ;; esac
@@ -200,23 +235,25 @@ done
 
 echo
 echo "================ jackal test summary ================"
-if [ "$JOBS" -gt 1 ]; then printf '%s\n' "${RESULTS[@]}" | sort -k2; fi
+if [ "$JOBS" -gt 1 ] && [ -n "${RESULTS[*]}" ]; then
+  printf '%s\n' "${RESULTS[@]}" | sort -k2
+fi
 echo "suites: $((PASSED + FAILED + TIMEOUTS + XFAIL))  pass: $PASSED  fail: $FAILED  timeout: $TIMEOUTS  xfail(quarantined): $XFAIL"
-if [ ${#FAILED_NAMES[@]} -gt 0 ]; then
-  echo "failing:"; printf '  %s\n' "${FAILED_NAMES[@]}"
+if [ -n "${FAILED_NAMES[*]}" ]; then
+  echo "failing:"; for n in "${FAILED_NAMES[@]}"; do [ -n "$n" ] && printf '  %s\n' "$n"; done
 fi
-if [ ${#FLAKY_NAMES[@]} -gt 0 ]; then
-  echo "flaky (crashed once, passed on retry):"; printf '  %s\n' "${FLAKY_NAMES[@]}"
+if [ -n "${FLAKY_NAMES[*]}" ]; then
+  echo "flaky (crashed once, passed on retry):"; for n in "${FLAKY_NAMES[@]}"; do [ -n "$n" ] && printf '  %s\n' "$n"; done
 fi
-if [ ${#XPASS_NAMES[@]} -gt 0 ]; then
-  echo "quarantined but passing (remove from $QUARANTINE_FILE):"; printf '  %s\n' "${XPASS_NAMES[@]}"
+if [ -n "${XPASS_NAMES[*]}" ]; then
+  echo "quarantined but passing (remove from $QUARANTINE_FILE):"; for n in "${XPASS_NAMES[@]}"; do [ -n "$n" ] && printf '  %s\n' "$n"; done
 fi
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
     echo "### jackal tests: pass $PASSED · fail $FAILED · timeout $TIMEOUTS · xfail $XFAIL"
-    for n in "${FAILED_NAMES[@]:-}"; do [ -n "$n" ] && echo "- :x: \`$n\`"; done
-    for n in "${FLAKY_NAMES[@]:-}"; do [ -n "$n" ] && echo "- :warning: \`$n\` crashed once, passed on retry"; done
-    for n in "${XPASS_NAMES[@]:-}"; do [ -n "$n" ] && echo "- :tada: \`$n\` passes — unquarantine"; done
+    for n in "${FAILED_NAMES[@]}"; do [ -n "$n" ] && echo "- :x: \`$n\`"; done
+    for n in "${FLAKY_NAMES[@]}"; do [ -n "$n" ] && echo "- :warning: \`$n\` crashed once, passed on retry"; done
+    for n in "${XPASS_NAMES[@]}"; do [ -n "$n" ] && echo "- :tada: \`$n\` passes — unquarantine"; done
   } >> "$GITHUB_STEP_SUMMARY"
 fi
 if [ $FAILED -eq 0 ] && [ $TIMEOUTS -eq 0 ]; then
