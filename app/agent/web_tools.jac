@@ -84,7 +84,7 @@ sem ip_is_public = "Classify an ipaddress object as a routable public address.";
 """Offline host check: literal blocked names/suffixes and IP literals.
 Returns an error string, or "" when the host is acceptable. Hostname
 resolution is deliberately NOT done here (validate stays offline/no-DNS);
-`_assert_host_resolves_public` enforces the resolved-address check at
+`assert_host_resolves_public` enforces the resolved-address check at
 connect time."""
 def host_block_reason(host: str) -> str {
     raw: str = str(host or "").strip();

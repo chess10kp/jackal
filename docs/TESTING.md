@@ -149,6 +149,22 @@ Three things to know before reading a run (learned 2026-11-01):
   subprocesses die with it. On bash 3.2 the runner is sequential — there is no
   `wait -n` — so a 75-suite pass takes 2-4 h there.
 
+## Debugging a failing suite
+
+Swallowed `except` blocks still talk, but only when asked:
+
+```bash
+JACKAL_LOG=1 JACKAL_LOG_LEVEL=debug ./jac test agent/checkpoints.test.jac
+# one JSON object per line in <cwd>/.jackal/logs/<date>-<pid>.jsonl
+```
+
+`JACKAL_LOG=<path>` writes to one explicit sink instead (tests use this);
+unset or `JACKAL_LOG=0` is off. Records carry `ts level source msg pid` and
+optional `fields` (tool name, path, exception type/detail/traceback). The
+sink is shared by `agent/logging.jac` callers — checkpoint capture misses,
+store read failures, and tool-handler exceptions land there rather than
+disappearing.
+
 ## Quarantine
 
 `scripts/test-quarantine.txt` lists known-failing suites, each with a reason.
