@@ -5,15 +5,15 @@
 # when one starts passing CI lists it as XPASS — delete its line then.
 # Every entry needs a reason.
 
-# Native-lowered UI paths dump core under jac test (no output before crash).
-ui/gates
-ui/renderer
-ui/host
-ui/virtual_terminal
-ui/demo_complex_shell
+# (ui/gates, ui/renderer, ui/host, ui/virtual_terminal, ui/demo_complex_shell
+# were quarantined 2026-10-10 for "dump core under jac test". That was the
+# kernel-side hasattr `abort()` stub, jaseci-labs/jac#10485 — they XPASS on a
+# kernel rebuilt without the stub (216/146/39/15/237 on 2026-11-01) and were
+# removed.)
 
-# Cordis tracked-effect assertions fail (core.jac:55/64/84/92); C0 core
-# predates the native placement switch.
+# Cordis tracked-effect assertions fail (core.jac:55/64/84/92) and the suite
+# now SIGSEGVs under jac test with no output; C0 core predates the native
+# placement switch. Re-read on a current kernel before unquarantining.
 cordis/core
 # Harness drives the full LiveShell (pyte + native-pinned ui render stack).
 # ui.model has upstream-walled demotions (E5092/EdgeRefTrailer), so the

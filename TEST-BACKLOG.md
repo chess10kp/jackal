@@ -29,12 +29,31 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
   ship `abort()` stubs silently) and
   [#10493](https://github.com/jaseci-labs/jac/issues/10493) (`jac test` runs
   every imported module's `.test.jac`).
-- **Full-suite baseline (macOS, 75 suites)**: after `cd app && jac install`
-  (the tree was missing the declared `httpx` dependency) and the kernel fix,
-  the only failing suite is the quarantined `cordis/core` (SIGSEGV). Five
-  quarantine entries are XPASS (`ui/gates`, `ui/renderer`, `ui/host`,
-  `ui/virtual_terminal`, `ui/demo_complex_shell`) and were deleted;
+- **Full-suite baseline (macOS, 75 suites)**: the 2026-11-01 09:42 run left
+  13 suites red, but all 13 collapsed to two tests in `agent/llm.test.jac`
+  that import `httpx` inside the test body while the tree was missing the
+  declared `pypi` dependency (so the runner's import-time optional-dep skip
+  cannot catch it). `cd app && jac install` fixes it (and did not change the
+  other suites' package resolutions). Re-running the whole 75-suite set
+  sequentially on the shared box projects 2-4 h, so the delta was verified
+  suite-by-suite instead:
+  - previously red, now green: `agent/agent_tools`, `agent/auth_env`,
+    `agent/chains`, `agent/compaction`, `agent/llm` (232), `agent/session`
+    (323), `agent/session_config` (262), `agent/session_turn`,
+    `agent/subagents` (248), `main` (360), `tui/model_picker_ids` (239),
+    `ui/keybinding_probe` (328);
+  - five XPASS quarantine entries removed: `ui/gates` (216), `ui/renderer`
+    (146), `ui/host` (39), `ui/virtual_terminal` (15),
+    `ui/demo_complex_shell` (237);
+  - touched suites: `ui/markup` (25), `ui/screen` (82).
+  Only the quarantined `cordis/core` still dies (SIGSEGV, no output);
   `tui/harness` still reports XFAIL (skipped).
+  **Caveat:** two isolated `rc=134` aborts in `ui/gates`/`ui/renderer`
+  happened only while a second `jac` process was chasing the same suite in
+  the same tree; every clean re-run passed (3/3 for the single test, then
+  full suites). Treat concurrent `jac test` runs on one tree as unsafe, and
+  do not read a bare SIGABRT-with-no-output as a suite regression without a
+  clean re-run.
 - **Test-annex pins (found 2026-11-01 on Linux x86_64, same vendor)**: the
   seal folds `<mod>.test.jac` into `<mod>`'s native unit, so a hard-pinned
   module whose *tests* import a server module fails the module's pin. That was
@@ -60,18 +79,20 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
   "pin honored".
 
 - **Memory (measured 2026-11-01, macOS arm64, release binary)**:
+  - **Native artifact (post-seal, the number that matters)**:
+    `scripts/mem-profile.sh --idle 8 ../jac run dist/jackal.jab --mode yolo`
+    → resident 243 MB, peak 243 MB, one mock turn completed. That is 5.3×
+    below the old source-bundle figure and the first measurement of a real
+    native payload. Still 2.4× the 100 MB budget.
   - trivial `jac run` (2-line sleep script): RSS 266 MB, 174 MB of it
     `IOAccelerator` GPU mapping — upstream jac#10487.
-  - jackal *source* bundle (pre-native-seal): idle 1.29 GB; startup ~20 s CPU;
-    maps `libjac_compiler.dylib` (143 MB) + `libjacllvm.dylib` (122 MB) and
-    re-runs native lowering at load ("native seam -- demoting ..." in the
-    run log); malloc ~372-424 MB across 1.7 M allocations; IOAccelerator
-    496 MB — upstream jac#10488.
-  - That artifact was a **server-only source bundle** (verified manifest:
-    139/139 server, 221 `.jac` files, no native payload). The seal now
-    produces a native payload, so this number must be **re-measured**:
-    `scripts/mem-profile.sh` against `dist/jackal.jab` built from a current
-    kernel.
+  - jackal *source* bundle (pre-native-seal, historical): idle 1.29 GB;
+    startup ~20 s CPU; maps `libjac_compiler.dylib` (143 MB) +
+    `libjacllvm.dylib` (122 MB) and re-runs native lowering at load ("native
+    seam -- demoting ..." in the run log); malloc ~372-424 MB across 1.7 M
+    allocations; IOAccelerator 496 MB — upstream jac#10488.
+  - 243 MB vs 266 MB for a two-line script says the floor is the runtime
+    itself (interpreter + LLVM/kernel mappings), not the app.
   - The 100 MB resident budget therefore needs: (a) a native artifact
     (blocked by #10485), (b) runtime not loading compiler/LLVM (#10488),
     (c) the GPU mapping addressed (#10487).
