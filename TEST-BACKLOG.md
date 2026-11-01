@@ -5,6 +5,26 @@ jaseci-labs/jac, `[ops]` CI/tooling change.
 
 Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](docs/TESTING.md).
 
+## Soundness status (2026-11-01, macOS arm64, vendor 5103ea5cf)
+
+- **Native seal**: the app tree reaches `Built dist/jackal.jab` when explicit
+  `"x" = "native"` pins that cannot lower are removed (default-native modules
+  demote softly). With the pins in place the sole hard wall is `ui.screen`
+  (E5106 private-bridge to `InsertText`/`Submit`/`Cancel` from server-pinned
+  `ui.events`; E5093 event/UiSession class boundary). The documented
+  `walker:protect` workaround trips a kernel prepare abort —
+  [jaseci-labs/jac#10485](https://github.com/jaseci-labs/jac/issues/10485).
+  Tuple-union annotation collapse is
+  [#10480](https://github.com/jaseci-labs/jac/issues/10480) (worked around).
+- **Memory**: sealed app `.jab` idles at ~1.25 GB RSS on macOS in a **-Ddev**
+  compiler build: `libjac_compiler.dylib` (143 MB) + `libjacllvm.dylib`
+  (122 MB) are mapped and lowering runs again at load ("native seam --
+  demoting ..." lines in the run log), 1.7 M malloc objects, plus ~500 MB
+  `IOAccelerator` GPU mapping. Release-build comparison is the next datapoint;
+  the 100 MB budget presumes neither compiler nor LLVM is resident at run.
+- **Test gate**: CI has no native-lowering job yet (only `jac check`);
+  `mem-profile` job landed in `app-tests.yml`.
+
 ## Quarantine triage (see scripts/test-quarantine.txt)
 
 | Suite | Origin | Action |
