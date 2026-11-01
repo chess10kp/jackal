@@ -22,6 +22,7 @@ import from .web_tools {
 
 glob MAX_TOOL_OUTPUT: int = MAX_TOOL_RESULT,
      READ_LINE_CAP: int = 2_000,
+     SANDBOX_ROOT_ENV: str = "JACKAL_SANDBOX_ROOT",
      # Kept for compatibility with older session wiring; current boot wraps
      # run_command at the registry boundary instead of using this callback.
      user_bash_fire: Callable[[str, str], None] | None = None;
@@ -32,10 +33,63 @@ glob _os_dirname: any = os.path.dirname,
      _os_relpath: any = os.path.relpath,
      _fnmatch: any = fnmatch.fnmatch;
 
-"""Resolve a path against the process cwd; reject empty paths."""
+"""Lexically normalize a path: collapse '.', '..', and duplicate separators.
+Purely textual — symlinks are NOT resolved (see `resolve_path`)."""
+def _normalize_abs(path: str) -> str {
+    parts: list[str] = [];
+    for seg in str(path).replace("\\", "/").split("/") {
+        if not seg or seg == "." {
+            continue;
+        }
+        if seg == ".." {
+            if parts {
+                parts.pop();
+            }
+            continue;
+        }
+        parts.append(seg);
+    }
+    return "/" + "/".join(parts);
+}
+
+
+"""Absolute sandbox root from JACKAL_SANDBOX_ROOT, or "" when unset."""
+def _sandbox_root() -> str {
+    raw: str = str(os.environ.get(SANDBOX_ROOT_ENV, "")).strip();
+    if not raw {
+        return "";
+    }
+    expanded: str = os.path.expanduser(raw);
+    if not os.path.isabs(expanded) {
+        expanded = os.path.join(os.getcwd(), expanded);
+    }
+    return _normalize_abs(expanded);
+}
+
+
+"""Resolve a path against the process cwd; reject empty paths.
+
+When JACKAL_SANDBOX_ROOT is set, the resolved path must stay inside that
+root (lexical containment: `..` segments are collapsed before the check, so
+`root/../etc/passwd` is rejected). Containment is lexical, not physical —
+a symlink inside the root can still point outside it. Off by default."""
 def resolve_path(path: str) -> str {
-    if not path { raise ValueError("path must not be empty"); }
-    return path if os.path.isabs(path) else os.path.join(os.getcwd(), path);
+    if not path {
+        raise ValueError("path must not be empty");
+    }
+    full: str = path if os.path.isabs(path) else os.path.join(os.getcwd(), path);
+    sandbox: str = _sandbox_root();
+    if not sandbox {
+        return full;
+    }
+    target: str = _normalize_abs(full);
+    prefix: str = f"{sandbox.rstrip('/')}/";
+    if target != sandbox and not target.startswith(prefix) {
+        raise ValueError(
+            f"path escapes {SANDBOX_ROOT_ENV} ({sandbox}): {path}"
+        );
+    }
+    return full;
 }
 sem resolve_path = "Resolve a possibly-relative path to an absolute one. Internal helper.";
 sem resolve_path.path = "Filesystem path, relative or absolute.";

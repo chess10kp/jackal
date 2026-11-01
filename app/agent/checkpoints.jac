@@ -31,6 +31,7 @@ import json;
 import shutil;
 import subprocess;
 import datetime;
+import from .logging { log_debug, log_warn, log_exception }
 
 glob _MAX_CHECKPOINT_FILES: int = 500,
      _DESCRIPTION_LENGTH: int = 80,
@@ -124,7 +125,8 @@ def _git_commit_hash(cwd: str) -> str | None {
             ["git", "rev-parse", "HEAD"],
             cwd=cwd, capture_output=True, text=True, timeout=5,
         );
-    } except Exception {
+    } except Exception as exc {
+        log_debug("checkpoints.git_head", "git rev-parse failed", {"cwd": cwd, "error": str(exc)});
         return None;
     }
     if result.returncode != 0 {
@@ -162,7 +164,9 @@ def get_modified_files(cwd: str) -> list[str] {
                 all_files.append(fp);
             }
         }
-    } except Exception {}
+    } except Exception as exc {
+        log_exception("checkpoints.modified_files", exc, {"cwd": cwd});
+    }
     return all_files[:_MAX_CHECKPOINT_FILES];
 }
 
@@ -191,7 +195,15 @@ def _capture_files(cwd: str, file_paths: list[str]) -> dict[str, str] {
             }
             rel: str = _path_relpath(abs_path, cwd).replace("\\\\", "/");
             snapshots[rel] = content;
-        } except Exception {}
+        } except Exception as exc {
+            # The toolchain silently skips unreadable files; that is how a
+            # checkpoint ends up claiming to capture files it never read.
+            log_warn(
+                "checkpoints.capture",
+                "skipping unreadable file",
+                {"path": fp, "cwd": cwd, "error": str(exc)}
+            );
+        }
     }
     return snapshots;
 }
@@ -333,7 +345,13 @@ def load_checkpoint(cwd: str, name: str) -> dict[str, any] {
                     } finally {
                         fh.close();
                     }
-                } except Exception {}
+                } except Exception as exc {
+                    log_warn(
+                        "checkpoints.load",
+                        "missing snapshot file",
+                        {"rel": str(rel_path), "error": str(exc)}
+                    );
+                }
             }
         }
     }
@@ -357,12 +375,15 @@ def list_checkpoints(cwd: str) -> list[dict[str, any]] {
     cp_dir = checkpoints_dir(cwd);
     try {
         os.makedirs(cp_dir, exist_ok=True);
-    } except OSError {}
+    } except OSError as exc {
+        log_warn("checkpoints.list", "cannot create store dir", {"dir": cp_dir, "error": str(exc)});
+    }
 
     items: list[dict[str, any]] = [];
     try {
         entries = os.listdir(cp_dir);
-    } except OSError {
+    } except OSError as exc {
+        log_warn("checkpoints.list", "cannot read store dir", {"dir": cp_dir, "error": str(exc)});
         return [];
     }
 
@@ -382,7 +403,13 @@ def list_checkpoints(cwd: str) -> list[dict[str, any]] {
                 "metadata": metadata,
                 "sizeBytes": _dir_size(dir_path),
             });
-        } except Exception {}
+        } except Exception as exc {
+            log_warn(
+                "checkpoints.list",
+                "skipping unreadable checkpoint",
+                {"name": str(name_entry), "error": str(exc)}
+            );
+        }
     }
     return sorted(items, key=_timestamp_key, reverse=True);
 }

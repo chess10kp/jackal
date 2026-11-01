@@ -531,3 +531,41 @@ test "format_checkpoint_list prints header lines or the empty-state hint" {
     assert out.startswith("Checkpoints:\n");
     assert "- cp-1 (2026-01-01 12:30, 7 msgs, 1 files, 1KB)" in out;
 }
+
+
+test "a swallowed capture failure is recorded in the debug log" {
+    # The toolchain skips unreadable files silently; checkpoints must still
+    # surface the skip when JACKAL_LOG is on, or a zero-file checkpoint looks
+    # like a clean capture.
+    tmp = _make_tmp();
+    old_log = os.environ.get("JACKAL_LOG");
+    old_level = os.environ.get("JACKAL_LOG_LEVEL");
+    try {
+        sink = os.path.join(tmp, "calls.jsonl");
+        os.environ["JACKAL_LOG"] = sink;
+        os.environ["JACKAL_LOG_LEVEL"] = "debug";
+        project = os.path.join(tmp, "project");
+        os.makedirs(project);
+        snaps = _capture_files(project, ["missing.txt"]);
+        assert snaps == {}, snaps;
+        fh: any = open(sink, "r");
+        lines: list[str] = fh.read().splitlines();
+        fh.close();
+        records: list[dict[str, any]] = [json.loads(line) for line in lines if line.strip()];
+        assert len(records) == 1, records;
+        assert records[0]["source"] == "checkpoints.capture", records[0];
+        assert records[0]["fields"]["path"] == "missing.txt", records[0];
+    } finally {
+        if old_log is None {
+            os.environ.pop("JACKAL_LOG", None);
+        } else {
+            os.environ["JACKAL_LOG"] = old_log;
+        }
+        if old_level is None {
+            os.environ.pop("JACKAL_LOG_LEVEL", None);
+        } else {
+            os.environ["JACKAL_LOG_LEVEL"] = old_level;
+        }
+        shutil.rmtree(tmp, ignore_errors=True);
+    }
+}

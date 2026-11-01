@@ -105,6 +105,10 @@ These paths are frozen. A deletion commit is upcoming — do not extend them:
 | `JACKAL_AGENT_DIR` | `agent/auth.jac`, `skills.jac`, `chains.jac` | Bundle dir: auth.json, skills, catalogs |
 | `JACKAL_ROOT` | `skills.jac`, `chains.jac` | Repo-root fallback for catalogs |
 | `JACKAL_NODE_BIN` | `agent/plugin_bridge.jac` | Node binary for the plugin sidecar |
+| `JACKAL_LOG` | `agent/logging.jac` | Structured JSONL debug log. `1` → `<cwd>/.jackal/logs/<date>-<pid>.jsonl`; any other value is a sink path. Unset/`0` = off |
+| `JACKAL_LOG_LEVEL` | `agent/logging.jac` | `debug`/`info`/`warn`/`error` threshold (default `info`) |
+| `JACKAL_SANDBOX_ROOT` | `agent/tools.jac` | When set, file tools reject paths outside this root (lexical `..` containment; off by default) |
+| `JACKAL_ALLOW_PRIVATE_HOSTS` | `agent/web_tools.jac` | Offline-test escape hatch: lets `web_fetch` reach loopback/private hosts that the SSRF guard blocks. Never set in a normal session |
 
 Legacy vars (`JACKAL_HEAP_MB`, `JACKAL_TUI_OUT`, `JACKAL_SKIP_TUI_COMPILE`) belong to the old launcher path and die with the launcher cleanup. Provider keys come from env (e.g. `OPENROUTER_API_KEY`) or `auth.json` (byte-compatible with the legacy pi-ai shape; see `app/agent/auth.jac`).
 

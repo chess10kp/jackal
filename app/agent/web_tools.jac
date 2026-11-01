@@ -16,21 +16,148 @@ import html;
 import os;
 import socket;
 import threading;
+import ipaddress;
 import urllib.parse;
 import urllib.request;
+import urllib.error;
 import from .tool_spec { MAX_TOOL_RESULT }
 
 glob WEB_TIMEOUT_SECS: int = 15,
      FETCH_BODY_CAP: int = MAX_TOOL_RESULT,
      DEFAULT_SEARCH_RESULTS: int = 5,
      MAX_FETCH_RESULTS: int = 20,
+     MAX_REDIRECT_HOPS: int = 5,
+     ALLOW_PRIVATE_ENV: str = "JACKAL_ALLOW_PRIVATE_HOSTS",
+     REDIRECT_CODES: list[int] = [301, 302, 303, 307, 308],
+     BLOCKED_HOSTS: list[str] = [
+         "localhost",
+         "localhost.localdomain",
+         "ip6-localhost",
+         "ip6-loopback",
+         "metadata",
+         "metadata.google.internal",
+         "instance-data",
+         "instance-data.ec2.internal",
+     ],
+     BLOCKED_SUFFIXES: list[str] = [
+         ".localhost",
+         ".local",
+         ".internal",
+         ".home.arpa",
+     ],
      SEARCH_USER_AGENT: str = (
          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
          "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
      );
 
 
-"""Validate an http(s) URL; reject everything else (no file://, no data:).
+"""True when the SSRF guard is explicitly relaxed (offline test servers).
+Never set this in a normal session: it exists so the harness can bind a
+loopback HTTP server and fetch from it."""
+def private_hosts_allowed() -> bool {
+    raw: str = str(os.environ.get(ALLOW_PRIVATE_ENV, "")).strip().lower();
+    return raw in ("1", "on", "true", "yes");
+}
+sem private_hosts_allowed = "Escape hatch for loopback fetches in offline tests.";
+
+
+"""True for addresses a model-controlled URL must never reach: loopback,
+private, link-local, CGNAT, multicast, reserved, unspecified."""
+def ip_is_public(addr: any) -> bool {
+    try {
+        return bool(
+            addr.is_global
+            and not addr.is_loopback
+            and not addr.is_private
+            and not addr.is_link_local
+            and not addr.is_multicast
+            and not addr.is_reserved
+            and not addr.is_unspecified
+        );
+    } except Exception {
+        return False;
+    }
+}
+sem ip_is_public = "Classify an ipaddress object as a routable public address.";
+
+
+"""Offline host check: literal blocked names/suffixes and IP literals.
+Returns an error string, or "" when the host is acceptable. Hostname
+resolution is deliberately NOT done here (validate stays offline/no-DNS);
+`_assert_host_resolves_public` enforces the resolved-address check at
+connect time."""
+def host_block_reason(host: str) -> str {
+    raw: str = str(host or "").strip();
+    if not raw {
+        return "missing host";
+    }
+    h: str = raw.lower().strip("[]").rstrip(".");
+    if h in BLOCKED_HOSTS {
+        return "blocked host '" + h + "'";
+    }
+    for suffix in BLOCKED_SUFFIXES {
+        if h.endswith(suffix) {
+            return "blocked host suffix '" + suffix + "'";
+        }
+    }
+    try {
+        addr = ipaddress.ip_address(h.split("%")[0]);
+        if not ip_is_public(addr) {
+            return "blocked address " + h;
+        }
+        return "";
+    } except ValueError {
+        return "";
+    } except Exception {
+        return "unparseable host '" + h + "'";
+    }
+    return "";
+}
+sem host_block_reason = "Reject loopback/private/metadata host literals without doing DNS.";
+
+
+"""Resolve `host` and reject when ANY address is non-public. Raises
+ValueError (caught by the tool seam) on a blocked or unresolvable host.
+The check runs immediately before each connect so a redirect target is
+re-screened too."""
+def assert_host_resolves_public(host: str) -> None {
+    if private_hosts_allowed() {
+        return;
+    }
+    h: str = str(host or "").strip().lower().strip("[]");
+    if not h {
+        raise ValueError("url is missing a host");
+    }
+    reason: str = host_block_reason(h);
+    if reason {
+        raise ValueError(reason);
+    }
+    infos: any = None;
+    try {
+        infos = socket.getaddrinfo(h, None);
+    } except Exception {
+        raise ValueError("could not resolve host '" + h + "'");
+    }
+    for info in infos {
+        addr_text: str = str(info[4][0]).split("%")[0];
+        try {
+            addr = ipaddress.ip_address(addr_text);
+        } except Exception {
+            raise ValueError("host '" + h + "' resolved to an unparseable address");
+        }
+        if not ip_is_public(addr) {
+            raise ValueError(
+                "host '" + h + "' resolves to blocked address " + addr_text
+            );
+        }
+    }
+}
+sem assert_host_resolves_public = "Reject hosts whose resolved addresses are loopback/private/metadata.";
+
+
+"""Validate an http(s) URL; reject everything else (no file://, no data:)
+and refuse loopback/private/metadata hosts. Redirects are handled by the
+caller (`_open_checked`), which re-validates every hop.
 Returns ("", error_message) on failure."""
 def validate_web_url(raw: str) -> tuple[str, str] {
     url = (raw or "").strip();
@@ -45,9 +172,77 @@ def validate_web_url(raw: str) -> tuple[str, str] {
     if not parsed.netloc {
         return ("", f"Invalid URL (missing host): {url}");
     }
+    if not private_hosts_allowed() {
+        reason: str = host_block_reason(str(parsed.hostname or ""));
+        if reason {
+            return ("", f"Blocked URL ({reason}): {url}");
+        }
+    }
     return (url, "");
 }
-sem validate_web_url = "Reject non-http(s) URLs before any network I/O.";
+sem validate_web_url = "Reject non-http(s) and loopback/private/metadata URLs before any network I/O.";
+
+
+"""Redirect handler that does not follow; `_open_checked` validates the
+Location header before issuing the next request (urllib would otherwise
+fetch a private/metadata target given a public redirector)."""
+obj _NoRedirectHandler(urllib.request.HTTPRedirectHandler) {
+    def redirect_request(req: any, fp: any, code: any, msg: any, headers: any, newurl: any) -> any {
+        raise urllib.error.HTTPError(str(newurl), int(code), "redirect", headers, fp);
+    }
+}
+
+
+"""Open `url`, following at most MAX_REDIRECT_HOPS redirects, and re-run the
+scheme/host/DNS check on every hop. Raises ValueError for a blocked target;
+callers at the tool seam turn that into a {"ok": false} payload."""
+def _open_checked(url: str) -> any {
+    vr: tuple[str, str] = validate_web_url(url);
+    if str(vr[1]) {
+        raise ValueError(str(vr[1]));
+    }
+    current: str = str(vr[0]);
+    opener: any = urllib.request.build_opener(_NoRedirectHandler());
+    hops: int = 0;
+    while True {
+        hop: any = urllib.parse.urlparse(current);
+        assert_host_resolves_public(str(hop.hostname or ""));
+        req: any = urllib.request.Request(
+            current, headers={"User-Agent": SEARCH_USER_AGENT}
+        );
+        try {
+            return opener.open(req, timeout=WEB_TIMEOUT_SECS);
+        } except urllib.error.HTTPError as exc {
+            code: int = int(exc.code);
+            if not (code in REDIRECT_CODES) or hops >= MAX_REDIRECT_HOPS {
+                raise exc;
+            }
+            location: str = "";
+            try {
+                if exc.headers {
+                    location = str(exc.headers.get("Location", ""));
+                }
+            } except Exception {
+                location = "";
+            }
+            if not location {
+                raise exc;
+            }
+            next_url: str = urllib.parse.urljoin(current, location);
+            hops += 1;
+            try {
+                exc.close();
+            } except Exception {}
+            vr2: tuple[str, str] = validate_web_url(next_url);
+            if str(vr2[1]) {
+                raise ValueError(str(vr2[1]));
+            }
+            current = str(vr2[0]);
+        }
+    }
+    return None;
+}
+sem _open_checked = "HTTP open with SSRF-safe manual redirect following.";
 
 """Decode a DuckDuckGo outbound link into the real target URL."""
 def _decode_ddg_href(href_attr: str) -> str {
@@ -173,8 +368,7 @@ def web_fetch(url: str) -> str {
         return json.dumps({"ok": False, "error": err});
     }
     try {
-        req = urllib.request.Request(target, headers={"User-Agent": SEARCH_USER_AGENT});
-        resp = urllib.request.urlopen(req, timeout=WEB_TIMEOUT_SECS);
+        resp = _open_checked(target);
         raw = resp.read(FETCH_BODY_CAP * 4);
         ctype = str(resp.headers.get("Content-Type", ""));
         resp.close();

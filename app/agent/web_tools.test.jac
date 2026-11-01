@@ -115,13 +115,103 @@ test "strip_html removes scripts styles comments and tags" {
 
 test "web_fetch renders local canned page over real http" {
     port = _start_server(_canned_page());
-    out = web_fetch(f"http://127.0.0.1:{port}/page");
-    assert "# Canned Page" in out;
-    assert "Hello" in out;
-    assert "World & friends" in out;
-    assert "<script>" not in out;
-    assert "should-not-appear" not in out;
-    assert '"ok"' not in out;
+    old = os.environ.get("JACKAL_ALLOW_PRIVATE_HOSTS");
+    os.environ["JACKAL_ALLOW_PRIVATE_HOSTS"] = "1";
+    try {
+        out = web_fetch(f"http://127.0.0.1:{port}/page");
+        assert "# Canned Page" in out;
+        assert "Hello" in out;
+        assert "World & friends" in out;
+        assert "<script>" not in out;
+        assert "should-not-appear" not in out;
+        assert '"ok"' not in out;
+    } finally {
+        if old is None {
+            os.environ.pop("JACKAL_ALLOW_PRIVATE_HOSTS", None);
+        } else {
+            os.environ["JACKAL_ALLOW_PRIVATE_HOSTS"] = old;
+        }
+    }
+}
+
+
+test "validate_web_url blocks loopback private and metadata targets" {
+    blocked = [
+        "http://127.0.0.1/",
+        "http://127.1.2.3:8080/x",
+        "http://localhost/admin",
+        "http://LOCALHOST./x",
+        "http://foo.localhost/x",
+        "https://10.0.0.5/",
+        "http://172.16.4.4/",
+        "http://192.168.1.1/",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://[::1]/",
+        "http://[fd00::1]/",
+        "http://metadata.google.internal/computeMetadata/v1/",
+        "http://instance-data/latest/",
+        "http://0.0.0.0/",
+        "http://[::]/",
+    ];
+    for target in blocked {
+        res = validate_web_url(target);
+        assert str(res[0]) == "", target;
+        assert len(str(res[1])) > 0, target;
+        assert "lock" in str(res[1]) or "Invalid" in str(res[1]), (target, res[1]);
+    }
+    # A public literal is still allowed without any DNS lookup.
+    ok = validate_web_url("https://93.184.216.34/page");
+    assert str(ok[1]) == "", ok;
+}
+
+
+test "the private-host escape hatch only relaxes the guard when set" {
+    old = os.environ.get("JACKAL_ALLOW_PRIVATE_HOSTS");
+    try {
+        os.environ["JACKAL_ALLOW_PRIVATE_HOSTS"] = "1";
+        assert private_hosts_allowed();
+        ok = validate_web_url("http://127.0.0.1:9/x");
+        assert str(ok[1]) == "", ok;
+        assert str(ok[0]) == "http://127.0.0.1:9/x", ok;
+    } finally {
+        if old is None {
+            os.environ.pop("JACKAL_ALLOW_PRIVATE_HOSTS", None);
+        } else {
+            os.environ["JACKAL_ALLOW_PRIVATE_HOSTS"] = old;
+        }
+    }
+    assert not private_hosts_allowed();
+}
+
+
+test "web_fetch refuses a blocked URL without touching the network" {
+    out = web_fetch("http://169.254.169.254/latest/meta-data/");
+    parsed = json.loads(out);
+    assert parsed.get("ok") is False, out;
+    assert "lock" in str(parsed.get("error", "")), out;
+    assert web_fetch("http://127.0.0.1:1/") != "";
+    parsed2 = json.loads(web_fetch("http://127.0.0.1:1/"));
+    assert parsed2.get("ok") is False, parsed2;
+}
+
+
+test "resolved-address guard rejects loopback names and unresolvable hosts" {
+    try {
+        assert_host_resolves_public("localhost");
+        assert False, "localhost must be rejected";
+    } except ValueError as exc {
+        assert "blocked" in str(exc).lower(), exc;
+    }
+    try {
+        assert_host_resolves_public("no-such-host.invalid");
+        assert False, "unresolvable host must be rejected";
+    } except ValueError as exc {
+        assert "resolve" in str(exc).lower(), exc;
+    }
+    # Public names only when egress/DNS is available (CI may be offline).
+    if _egress_available() {
+        assert_host_resolves_public("example.com");
+    }
 }
 
 

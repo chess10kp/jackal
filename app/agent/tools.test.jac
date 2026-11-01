@@ -82,3 +82,62 @@ test "jac_check and jac_format reject missing paths without spawning" {
     fmt = jac_format("/nonexistent/jackal/path.jac");
     assert fmt.startswith("ERROR:");
 }
+
+
+test "JACKAL_SANDBOX_ROOT contains tools inside the root" {
+    tmp: str = tempfile.mkdtemp();
+    sandbox: str = f"{tmp}/sandbox";
+    os.makedirs(sandbox);
+    cwd = os.getcwd();
+    old = os.environ.get("JACKAL_SANDBOX_ROOT");
+    try {
+        os.chdir(sandbox);
+        os.environ["JACKAL_SANDBOX_ROOT"] = sandbox;
+        assert resolve_path("a.txt") == f"{sandbox}/a.txt";
+        assert resolve_path(f"{sandbox}/c.txt") == f"{sandbox}/c.txt";
+        # `..` is collapsed before the check, so an in-root normalization passes.
+        assert resolve_path("sub/../b.txt") == f"{sandbox}/sub/../b.txt";
+        for bad in ["..", "../escape.txt", "../../etc/passwd", "/etc/passwd", "/tmp"] {
+            try {
+                resolve_path(bad);
+                assert False, "expected rejection: " + bad;
+            } except ValueError as exc {
+                assert "JACKAL_SANDBOX_ROOT" in str(exc), exc;
+            }
+        }
+    } finally {
+        os.chdir(cwd);
+        if old is None {
+            os.environ.pop("JACKAL_SANDBOX_ROOT", None);
+        } else {
+            os.environ["JACKAL_SANDBOX_ROOT"] = old;
+        }
+        shutil.rmtree(tmp, ignore_errors=True);
+    }
+}
+
+
+test "resolve_path keeps cwd semantics when no sandbox root is set" {
+    tmp: str = tempfile.mkdtemp();
+    cwd = os.getcwd();
+    old = os.environ.get("JACKAL_SANDBOX_ROOT");
+    try {
+        os.chdir(tmp);
+        os.environ.pop("JACKAL_SANDBOX_ROOT", None);
+        assert resolve_path("a.txt") == f"{tmp}/a.txt";
+        assert resolve_path("../x.txt") == f"{tmp}/../x.txt";
+        assert resolve_path("/abs/x.txt") == "/abs/x.txt";
+        try {
+            resolve_path("");
+            assert False, "empty path must raise";
+        } except ValueError as exc {
+            assert "empty" in str(exc), exc;
+        }
+    } finally {
+        os.chdir(cwd);
+        if old is not None {
+            os.environ["JACKAL_SANDBOX_ROOT"] = old;
+        }
+        shutil.rmtree(tmp, ignore_errors=True);
+    }
+}
