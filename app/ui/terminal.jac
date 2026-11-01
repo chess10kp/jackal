@@ -24,7 +24,6 @@ stdin readiness (`select.select`).
 
 import sys;
 import os;
-import codecs;
 import signal;
 import select;
 import termios;
