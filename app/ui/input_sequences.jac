@@ -257,6 +257,13 @@ def decode_sequence(seq: str) -> HostEvent {
     if seq == "\x17" {
         return KeyEvent(key="ctrl+w");
     }
+    # Alt+Ctrl+J/K often arrive as ESC + the control byte for J/K.
+    if seq == ESC + "\x0a" {
+        return KeyEvent(key="alt+ctrl+j");
+    }
+    if seq == ESC + "\x0b" {
+        return KeyEvent(key="alt+ctrl+k");
+    }
     # Alt+key often arrives as ESC + char.
     if len(seq) == 2 and seq[0] == ESC and seq[1] != "[" and seq[1] != "O" {
         return KeyEvent(key="alt+" + seq[1]);

@@ -2,8 +2,8 @@
 import from tui.state { LiveShell }
 import from tui.window { WindowSpec, WindowState }
 import from tui.windows { _open_window, _close_top_window, _picker_state, _ui_modal_state }
-"""Open a generic list-picker on the shared overlay node (one at a time).
-rows are display labels; ids map 1:1 onto action payloads. When
+"""Open a generic list-picker in the prompt-anchored drop-up (one at a time).
+Rows are display labels; ids map 1:1 onto action payloads. When
 extra_last_input is set, a trailing "type name…" row flips the picker into
 free-text input mode on enter."""
 def _open_picker(
@@ -58,14 +58,12 @@ def _close_picker(app: LiveShell) {
     }
     _close_top_window(app);
 }
-"""Multi-select rows narrowed by the picker's type-to-filter text.
+"""Picker rows narrowed by type-to-filter text.
 
 Case-insensitive substring match over option labels; empty filter returns
-the full lists. Both paint (_picker_lines) and key handling
-(_handle_picker_key) go through this helper so the cursor index always
-refers to the same visible rows. Pure over its input — replicated in
-tui/overlays.test.jac (keep in sync)."""
-def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
+the full lists. Paint and key handling share this helper so the cursor index
+always refers to the same visible rows. Pure over its input."""
+def _picker_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
     options: list[str] = list(p.get("options", []));
     ids: list[str] = list(p.get("ids", []));
     filt: str = str(p.get("filter", "")).strip().lower();
@@ -81,4 +79,9 @@ def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
         }
     }
     return (vis_options, vis_ids);
+}
+
+
+def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
+    return _picker_filtered(p);
 }

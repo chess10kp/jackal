@@ -130,7 +130,7 @@ test "tui previews long tool results at six lines with a more-lines footer" {
         tui.type_text("read big.txt");
         tui.press("enter");
         # read_file is read-only: auto-approved in normal mode (no modal).
-        tui.wait_for("... (4 more lines)", 60.0);
+        tui.wait_for("…  +4 lines", 60.0);
         tui.wait_for("done reading", 60.0);
         tui.wait_for("fixture line 1", 10.0);
         screen = tui.screen_text();
@@ -182,21 +182,23 @@ test "tui login api-key input accepts a bracketed paste" {
     tui: TuiSession | None = None;
     try {
         tui = spawn_tui(sb);
-        # /login -> provider picker (first row: openrouter, an api_key route)
-        # -> key input overlay.
+        # /login -> searchable provider drop-up -> API-key input in that
+        # same prompt-anchored picker. DeepSeek is not the first route, so
+        # this also proves type-to-filter changes the selected options.
         tui.type_text("/login");
         tui.press("enter");
         tui.wait_for("LOGIN", 30.0);
+        tui.type_text("deepseek");
         tui.press("enter");
         tui.wait_for("paste API key", 15.0);
         # Exactly what a terminal sends on ctrl+shift+v. Regression: the
         # PasteEvent branch previously missed the stack-owned login input window
-        # while the key input overlay was open.
+        # while the API-key input drop-up was open.
         key: str = "sk-e2e-paste-1234567890";
         tui.send("\x1b[200~" + key + "\x1b[201~");
         tui.wait_for("*" * len(key), 10.0);
         tui.press("enter");
-        tui.wait_for("logged in to openrouter", 15.0);
+        tui.wait_for("logged in to deepseek", 15.0);
         # The decisive assertion: the pasted bytes landed in auth.json.
         auth_path: str = os.path.join(sb.agent_dir, "auth.json");
         fh: any = open(auth_path, "r", encoding="utf-8");
@@ -219,8 +221,8 @@ test "tui picker is owned by the window stack and closes cleanly" {
         tui.wait_for("LOGIN", 30.0);
         tui.press("esc");
         tui.wait_gone("LOGIN", 20.0);
-        # Closing a picker must release its stack entry and shared overlay,
-        # not exit the application or leave the old modal active.
+        # Closing a picker must release its stack entry and drop-up,
+        # not exit the application or leave stale choices active.
         tui.type_text("/help");
         tui.press("enter");
         tui.wait_for("/compact", 20.0);

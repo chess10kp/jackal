@@ -1,7 +1,7 @@
 """Unit tests for tui/preview.jac (same-stem annex; imports live in the stem
 — the module itself is import-free). Guards the C3 display contract: first
 TOOL_RESULT_PREVIEW_LINES lines verbatim, per-line char cap, and the exact
-'... (N more lines)' footer when the result is longer. Display-only: nothing
+'…  +N lines' footer when the result is longer. Display-only: nothing
 here may assume the full result is unavailable elsewhere."""
 
 
@@ -19,14 +19,14 @@ test "long result shows six lines plus an exact-count footer" {
         lines.append(f"line {i}");
     }
     out = tool_result_preview("\n".join(lines));
-    assert out == "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\n... (4 more lines)", out;
+    assert out == "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\n…  +4 lines", out;
 }
 
 
 test "trailing newline does not invent an extra hidden line" {
     out = tool_result_preview("a\nb\nc\nd\ne\nf\ng\n");
     # Seven logical lines: six shown, exactly one more.
-    assert out.endswith("\n... (1 more lines)"), out;
+    assert out.endswith("\n…  +1 lines"), out;
 }
 
 
@@ -53,11 +53,11 @@ test "overlong lines inside a long result are capped, footer still counts lines"
     assert parts[0].endswith("y..."), out;
     assert parts[1].endswith("z..."), out;
     assert parts[5] == "tail4", out;
-    assert parts[6] == "... (3 more lines)", out;
+    assert parts[6] == "…  +3 lines", out;
 }
 
 
 test "custom max_lines is honored" {
     out = tool_result_preview("one\ntwo\nthree", max_lines=2);
-    assert out == "one\ntwo\n... (1 more lines)", out;
+    assert out == "one\ntwo\n…  +1 lines", out;
 }

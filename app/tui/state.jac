@@ -27,7 +27,7 @@ glob _EXPLORER_SKIP_DIRS: list[str] = [
 glob _QUOTED_MENTION_PATTERN: str = r'@"([^"]+)"(?::(\d+)(?:-(\d+))?)?';
 
 # Built-in slash commands handled by _run_slash locally (name without the
-# leading "/" -> short description for the autocomplete popup).
+# leading "/" -> short description shown by /help).
 glob SLASH_BUILTINS: dict[str, str] = {
     "exit": "quit jackal",
     "quit": "quit jackal",
@@ -80,8 +80,8 @@ obj LiveShell {
         tool_msg_id: str = "",
         appr_event: any = None,
         appr_approved: bool = False,
-        # Window stack (tui/window.jac API): top entry owns keys + the
-        # shared overlay node; see tui/windows.jac.
+        # Window stack (tui/window.jac API): top entry owns keys; picker
+        # entries render above the prompt, other modal windows use overlay.
         windows: list[WindowState] = [],
         mode: str = "normal",
         cmd_q: any = None,

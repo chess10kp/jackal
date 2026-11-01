@@ -8,6 +8,7 @@ import from ui.layout { LayoutSpec, fill_axis, fixed_axis }
 import from ui.screen { configure_main_shell_layout }
 import from ui.renderer { set_node_contract }
 import from ui.width { display_width, truncate_text }
+import from tui.format { format_turn }
 
 def _rule(width: int, ch: str = "─") -> str {
     if width < 1 {
@@ -40,24 +41,6 @@ def _meter(value: float, width: int) -> str {
 }
 
 
-def _format_turn(role: str, body: str) -> str {
-    if role == "user" {
-        mark = "◆ you";
-    } elif role == "assistant" {
-        mark = "◇ jackal";
-    } elif role == "tool" {
-        mark = "▣ tool";
-    } else {
-        mark = "· system";
-    }
-    if not body {
-        return mark;
-    }
-    indented = body.replace("\n", "\n  ");
-    return mark + "\n  " + indented;
-}
-
-
 def _next_id(app: LiveShell) -> str {
     app.msg_n += 1;
     return "m" + str(app.msg_n);
@@ -76,7 +59,7 @@ def _push_turn(app: LiveShell, role: str, body: str) -> str {
     app.messages = app.messages + [
         TranscriptMessage(
             message_id=mid,
-            content=_format_turn(role, body),
+            content=format_turn(role, body),
             content_rev=1,
         )
     ];
@@ -92,7 +75,7 @@ def _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
             updated.append(
                 TranscriptMessage(
                     message_id=message_id,
-                    content=_format_turn(role, body),
+                    content=format_turn(role, body),
                     content_rev=message.content_rev + 1,
                 )
             );
@@ -101,6 +84,43 @@ def _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
         }
     }
     app.messages = updated;
+    _commit_messages(app);
+}
+
+
+"""Finish a turn: rewrite it as `body` and keep it LAST.
+
+The streaming placeholder is created before the turn's tool rows, so
+rewriting it in place leaves the reply above all the tool noise — which
+follow_tail then scrolls off the top the moment the tools print anything.
+Moving the finished turn after those rows is what keeps the answer on
+screen when the turn ends."""
+def _finish_turn(app: LiveShell, message_id: str, role: str, body: str) {
+    kept: list[TranscriptMessage] = [];
+    found: bool = False;
+    trailing: bool = False;
+    for message in app.messages {
+        if message.message_id == message_id {
+            found = True;
+        } else {
+            if found {
+                trailing = True;
+            }
+            kept.append(message);
+        }
+    }
+    if not found or not trailing {
+        _rewrite_turn(app, message_id, role, body);
+        return;
+    }
+    kept.append(
+        TranscriptMessage(
+            message_id=_next_id(app),
+            content=format_turn(role, body),
+            content_rev=1,
+        )
+    );
+    app.messages = kept;
     _commit_messages(app);
 }
 

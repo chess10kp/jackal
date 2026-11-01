@@ -39,6 +39,12 @@ def _handle_picker_key(app: LiveShell, key: str) {
     }
     title = str(p.get("title", ""));
     if key == "escape" {
+        if str(p.get("mode", "select")) != "input" and str(p.get("filter", "")) {
+            p["filter"] = "";
+            p["selected"] = 0;
+            app.dirty = True;
+            return;
+        }
         # Login cancellation is a state-machine transition, not merely an
         # overlay close; the transcript makes the outcome explicit.
         if title == "LOGIN" {
@@ -79,29 +85,26 @@ def _handle_picker_key(app: LiveShell, key: str) {
     options: list[str] = list(p.get("options", []));
     ids: list[str] = list(p.get("ids", []));
     is_multi: bool = bool(p.get("multi", False));
-    if is_multi {
-        # Type-to-filter: every printable char except space (toggle) narrows
-        # the visible rows; backspace edits. j/k are NOT reserved for
-        # movement here — arrow keys move — so filenames filter fully.
-        filt: str = str(p.get("filter", ""));
-        if key == "backspace" or key == "\x7f" {
-            if filt {
-                p["filter"] = filt[:-1];
-                p["selected"] = 0;
-                app.dirty = True;
-            }
-            return;
-        }
-        if len(key) == 1 and key >= " " and key != " " {
-            p["filter"] = filt + key;
+    # Every picker uses the same type-to-filter behavior. In multi-select,
+    # space remains the toggle key; all other printable text narrows labels.
+    filt: str = str(p.get("filter", ""));
+    if key == "backspace" or key == "\x7f" {
+        if filt {
+            p["filter"] = filt[:-1];
             p["selected"] = 0;
             app.dirty = True;
-            return;
         }
-        vis: tuple[list[str], list[str]] = _multi_filtered(p);
-        options = vis[0];
-        ids = vis[1];
+        return;
     }
+    if len(key) == 1 and key >= " " and not (is_multi and key == " ") {
+        p["filter"] = filt + key;
+        p["selected"] = 0;
+        app.dirty = True;
+        return;
+    }
+    vis: tuple[list[str], list[str]] = _multi_filtered(p);
+    options = vis[0];
+    ids = vis[1];
     sel = int(p.get("selected", 0));
     if key == " " and is_multi and len(options) > 0 {
         # Multi-select toggle (space arrives as a TextEvent char). Header/
@@ -129,7 +132,6 @@ def _handle_picker_key(app: LiveShell, key: str) {
     } elif key == "enter" and len(options) > 0 {
         idx = min(sel, len(options) - 1);
         chosen_id = str(ids[idx]) if idx < len(ids) else "";
-        chosen = str(options[idx]);
         if chosen_id == "__type__" {
             p["mode"] = "input";
             p["draft"] = "";
@@ -138,6 +140,22 @@ def _handle_picker_key(app: LiveShell, key: str) {
         }
         if title == "LOGIN" {
             _start_login_provider(app, chosen_id);
+            return;
+        }
+        if title == "LOGOUT" {
+            _close_picker(app);
+            reply = _run_slash(app, "/logout " + chosen_id);
+            if reply {
+                _push_turn(app, "tool", reply);
+            }
+            app.dirty = True;
+            return;
+        }
+        if title == "DEV MODE" {
+            _close_picker(app);
+            app.mode = set_mode(chosen_id);
+            _push_turn(app, "system", "mode → " + app.mode);
+            app.dirty = True;
             return;
         }
         if chosen_id == "__header__" {
@@ -299,10 +317,9 @@ def _handle_key(app: LiveShell, key: str) {
             app.dirty = True;
         return;
     }
-    # Slash-command autocomplete popup: owns up/down/tab/enter/escape while
-    # visible; printable chars and backspace fall through to editing below —
-    # the paint-time filter picks up the new draft automatically. j/k stay
-    # out on purpose: they must keep inserting text for live filtering.
+    # Model completion drop-up: owns up/down/tab/enter/escape while visible;
+    # printable chars and backspace fall through to prompt editing so the
+    # model candidates update from the new draft.
     popup: list[list[str]] | None = _slash_popup_state(app);
     if popup is not None {
         count = len(popup);
@@ -346,6 +363,14 @@ def _handle_key(app: LiveShell, key: str) {
             app.dirty = True;
             return;
         }
+    }
+    if key == "alt+ctrl+k" {
+        _scroll_transcript(app, -(max(1, app.proj.viewport_height) - 1));
+        return;
+    }
+    if key == "alt+ctrl+j" {
+        _scroll_transcript(app, max(1, app.proj.viewport_height) - 1);
+        return;
     }
     if key == "page_up" {
         # Scrollback works during streaming too: the frozen view just means

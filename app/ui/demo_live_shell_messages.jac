@@ -6,24 +6,7 @@ import from ui.transcript {
 }
 
 import from ui.demo_live_shell_model { LiveShell }
-
-
-def _format_turn(role: str, body: str) -> str {
-    if role == "user" {
-        mark = "◆ you";
-    } elif role == "assistant" {
-        mark = "◇ jackal";
-    } elif role == "tool" {
-        mark = "▣ tool";
-    } else {
-        mark = "· system";
-    }
-    if not body {
-        return mark;
-    }
-    indented = body.replace("\n", "\n  ");
-    return mark + "\n  " + indented;
-}
+import from tui.format { format_turn }
 
 
 def _next_id(app: LiveShell) -> str {
@@ -44,7 +27,7 @@ def _push_turn(app: LiveShell, role: str, body: str) -> str {
     app.messages = app.messages + [
         TranscriptMessage(
             message_id=mid,
-            content=_format_turn(role, body),
+            content=format_turn(role, body),
             content_rev=1,
         )
     ];
@@ -60,7 +43,7 @@ def _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
             updated.append(
                 TranscriptMessage(
                     message_id=message_id,
-                    content=_format_turn(role, body),
+                    content=format_turn(role, body),
                     content_rev=message.content_rev + 1,
                 )
             );

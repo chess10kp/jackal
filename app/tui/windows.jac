@@ -1,11 +1,10 @@
 """Window stack host: lifecycle, key routing and paint bridge for the
 tui/window.jac API.
 
-Windows are modal like pickers: the top of the stack owns keys and the
-shared overlay node (the ApprovalOverlay UiNode borrowed via
-shell_open_approval, the same seam picker_base uses). Pure chrome/viewport
-math lives in tui/window.jac; this module touches ui.screen seams and is
-covered by e2e rather than annexes.
+Windows own keys through the stack. Information and input modals use the
+shared overlay node; choice pickers keep stack ownership but render as a
+prompt-anchored drop-up. Pure chrome/viewport math lives in tui/window.jac;
+this module touches ui.screen seams and is covered by e2e rather than annexes.
 
 Precedence mirrors the existing owners: _open_window refuses while a
 picker or extension modal is up; a pending tool approval overrides a
@@ -18,11 +17,11 @@ import from tui.core { _push_turn }
 import from ui.screen { shell_open_approval, shell_close_approval }
 
 
-"""Push a window onto the stack and take over the overlay node.
+"""Push a window onto the stack.
 
-Returns False (no-op) while a picker or extension modal owns the screen.
-Stacking a window on top of a window is allowed (e.g. a confirm over a
-status list)."""
+Non-choice windows take over the overlay node; pickers use the prompt
+drop-up instead. Returns False while a picker or extension modal owns the
+screen. Stacking a window on another window is allowed."""
 def _open_window(app: LiveShell, win: WindowState, force: bool = False) -> bool {
     if not force and app.windows and (
         app.windows[len(app.windows) - 1].kind == "picker"
@@ -36,7 +35,13 @@ def _open_window(app: LiveShell, win: WindowState, force: bool = False) -> bool 
         } except Exception {
         }
     }
-    if app.shell.approval is None {
+    ui_method: str = "";
+    if win.kind == "ui_modal" and isinstance(win.payload, dict) {
+        ui_method = str(win.payload.get("method", ""));
+    }
+    inline_choice: bool = win.kind == "picker"
+        or (win.kind == "ui_modal" and ui_method == "select");
+    if app.shell.approval is None and not inline_choice {
         shell_open_approval(app.session, app.shell);
     }
     app.windows.append(win);
@@ -52,7 +57,7 @@ def _close_top_window(app: LiveShell) -> bool {
         return False;
     }
     win = app.windows.pop();
-    if not app.windows {
+    if not app.windows and app.shell.approval is not None {
         shell_close_approval(app.session, app.shell);
     }
     app.dirty = True;

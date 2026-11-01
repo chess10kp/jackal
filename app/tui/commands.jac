@@ -4,6 +4,7 @@ import threading;
 import queue;
 import from tui.state { LiveShell, SLASH_BUILTINS }
 import from tui.core { _push_turn }
+import from tui.picker_base { _open_picker }
 import from tui.picker_actions {
     _open_login_picker, _open_resume_picker,
     _open_tasks_picker, _open_checkpoints_picker, _create_checkpoint_now,
@@ -11,7 +12,7 @@ import from tui.picker_actions {
 }
 import from tui.context { _open_explorer_picker }
 import from tui.mcp { _mcp_window_state }
-import from tui.windows {  _ui_modal_state,  _close_top_window, _open_window }
+import from tui.windows {  _picker_state,  _ui_modal_state,  _close_top_window, _open_window }
 import from tui.runtime { _begin_assistant_reply }
 import from agent.session {
     clear_history, get_history, restore_history, list_commands,
@@ -107,7 +108,8 @@ def _run_slash(app: LiveShell, line: str) -> str {
     if line == "/mode" or line.startswith("/mode ") {
         want = line[len("/mode"):].strip();
         if not want {
-            return "mode: " + app.mode + " (" + " | ".join(DEV_MODES) + "; shift+tab cycles)";
+            opened = _open_picker(app, "DEV MODE", DEV_MODES, DEV_MODES);
+            return "" if opened else "mode picker unavailable (another choice is open)";
         }
         if want not in DEV_MODES {
             return "invalid mode: " + want + " (" + " | ".join(DEV_MODES) + ")";
@@ -123,7 +125,8 @@ def _run_slash(app: LiveShell, line: str) -> str {
             if not have {
                 return "no stored credentials";
             }
-            return "usage: /logout PROVIDER (stored: " + ", ".join(have) + ")";
+            opened = _open_picker(app, "LOGOUT", have, have);
+            return "" if opened else "logout picker unavailable (another choice is open)";
         }
         return logout_provider(prov);
     }
@@ -307,6 +310,7 @@ def _ui_open_modal(app: LiveShell, rec: dict[str, any]) -> bool {
     m: dict[str, any] = dict(rec);
     m["selected"] = 0;
     m["draft"] = "";
+    m["filter"] = "";
     method = str(rec.get("method", ""));
     if not _open_window(
         app,
@@ -381,22 +385,51 @@ def _handle_ui_modal_key(app: LiveShell, key: str) {
         return;
     }
     method = str(m.get("method", ""));
+    if method == "select" and key == "escape" and str(m.get("filter", "")) {
+        m["filter"] = "";
+        m["selected"] = 0;
+        app.dirty = True;
+        return;
+    }
     if key == "escape" {
         _ui_settle(app, None, use_cancel=True);
         return;
     }
     if method == "select" {
         options: list[any] = list(m.get("options", []));
+        filt = str(m.get("filter", ""));
+        if key == "backspace" or key == "\x7f" {
+            if filt {
+                m["filter"] = filt[:-1];
+                m["selected"] = 0;
+                app.dirty = True;
+            }
+            return;
+        }
+        if len(key) == 1 and key >= " " {
+            m["filter"] = filt + key;
+            m["selected"] = 0;
+            app.dirty = True;
+            return;
+        }
+        visible: list[any] = [];
+        q = filt.lower();
+        for option in options {
+            label = str(option);
+            if not q or q in label.lower() {
+                visible.append(option);
+            }
+        }
         sel = int(m.get("selected", 0));
         moved = False;
-        if (key == "up" or key == "k") and len(options) > 0 {
-            m["selected"] = (sel - 1) % len(options);
+        if (key == "up" or key == "k") and len(visible) > 0 {
+            m["selected"] = (sel - 1) % len(visible);
             moved = True;
-        } elif (key == "down" or key == "j") and len(options) > 0 {
-            m["selected"] = (sel + 1) % len(options);
+        } elif (key == "down" or key == "j") and len(visible) > 0 {
+            m["selected"] = (sel + 1) % len(visible);
             moved = True;
-        } elif key == "enter" and len(options) > 0 {
-            _ui_settle(app, options[min(sel, len(options) - 1)]);
+        } elif key == "enter" and len(visible) > 0 {
+            _ui_settle(app, visible[min(sel, len(visible) - 1)]);
             return;
         }
         if moved {
@@ -432,7 +465,8 @@ def _handle_ui_modal_key(app: LiveShell, key: str) {
 
 """Poll the bridge interaction queue; open the oldest request as a modal."""
 def _tick_ui_modal(app: LiveShell) {
-    if _ui_modal_state(app) is not None or app.shell.approval is not None {
+    if _ui_modal_state(app) is not None or _picker_state(app) is not None
+        or app.shell.approval is not None {
         return;
     }
     b = plugins.bridge;

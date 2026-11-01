@@ -2,7 +2,17 @@
 import threading;
 import queue;
 import from tui.state { LiveShell }
-import from tui.core { _push_turn, _rewrite_turn, _install_layout }
+import from tui.core {
+    _push_turn,
+    _rewrite_turn,
+    _finish_turn,
+    _install_layout,
+}
+import from tui.format {
+    format_tool_call,
+    format_tool_result,
+}
+import from tui.preview { tool_result_preview }
 import from agent.session { run_turn, cancel_active_turn }
 import from agent.modes {
     requires_approval, is_read_only_mode, read_only_mode_block_reason,
@@ -11,7 +21,6 @@ import from ui.screen {
       shell_resize,
 }
 import from ui.renderer { create_renderer }
-import from tui.preview { tool_result_preview }
 import from tui.window { WindowSpec, WindowState }
 import from tui.windows { _open_window, _close_top_window, _approval_state }
 
@@ -118,7 +127,7 @@ def _finish_stream(app: LiveShell, final_body: str) {
     if not body.strip() {
         body = "(no response)";
     }
-    _rewrite_turn(app, app.stream_msg_id, "assistant", body.rstrip());
+    _finish_turn(app, app.stream_msg_id, "assistant", body.rstrip());
     app.phase = "ready";
     app.worker = None;
     app.evq = None;
@@ -147,35 +156,38 @@ def _tick_stream(app: LiveShell) {
             chunks_pending = True;
         } elif kind == "tool_call" {
             args: any = data.get("args", {});
-            parts: list[str] = [];
-            for pair in args.items() {
-                parts.append(str(pair[0]) + "=" + str(pair[1])[:40]);
-            }
-            summary = str(data.get("tool", "")) + "(" + (", ".join(parts))[:120] + ")";
-            app.tool_msg_id = _push_turn(app, "tool", "* " + summary);
-            _rewrite_turn(app, app.tool_msg_id, "tool", "* " + summary);
+            summary = format_tool_call(str(data.get("tool", "")), args if isinstance(args, dict) else {});
+            app.tool_msg_id = _push_turn(app, "tool", summary);
+            _rewrite_turn(app, app.tool_msg_id, "tool", summary);
         } elif kind == "tool_result" {
-            # C3: six-line verbatim preview + footer; full result still
-            # reaches the LLM and the saved transcript (display-only).
             _push_turn(
-                app, "tool", "-> " + tool_result_preview(str(data.get("result", "")))
+                app,
+                "tool",
+                format_tool_result(tool_result_preview(str(data.get("result", "")))),
             );
         } elif kind == "retry" {
             note = "retry " + str(data.get("attempt", "?")) + "/" + str(data.get("max_retries", "?"));
-            _push_turn(app, "tool", "~ " + note + ": " + str(data.get("message", ""))[:80]);
+            _push_turn(app, "tool", "retry  " + note + "\n        " + str(data.get("message", ""))[:120]);
         } elif kind == "cancelled" {
             app.stream_full = app.stream_full + "\n[cancelled]";
             _finish_stream(app, app.stream_full);
             return;
         } elif kind == "loop_limit" {
-            _push_turn(app, "tool", "! iteration limit reached");
+            _push_turn(app, "tool", "stop  iteration limit reached");
         } elif kind == "extensions" {
             label = str(data.get("label", ""));
             if label {
-                _push_turn(app, "tool", "[ " + label + " ]");
+                _push_turn(app, "tool", "ext  " + label);
             }
         } elif kind == "entry" {
-            _push_turn(app, "tool", "+ " + str(data.get("type", "entry")) + " " + str(data.get("content", ""))[:100]);
+            _push_turn(
+                app,
+                "tool",
+                "log  "
+                + str(data.get("type", "entry"))
+                + "  "
+                + str(data.get("content", ""))[:100],
+            );
         } elif kind == "error" {
             msg = str(data.get("message", "unknown error"));
             _rewrite_turn(app, app.stream_msg_id, "assistant", "ERROR: " + msg[:400]);
@@ -202,7 +214,7 @@ def _tick_stream(app: LiveShell) {
                 ),
                 force=True,
             );
-            _push_turn(app, "tool", "? approve " + approval_label);
+            _push_turn(app, "tool", "await  approve\n        " + approval_label);
                     app.dirty = True;
         } elif kind == "__done__" {
             _finish_stream(app, str(data.get("answer", "")));
@@ -214,7 +226,7 @@ def _tick_stream(app: LiveShell) {
         # re-projects the whole assistant body, so a rewrite per chunk made
         # long streaming answers quadratic. This loop drains once per 40 ms
         # tick, so rewrites are bounded by tick rate, not chunk count.
-        _rewrite_turn(app, app.stream_msg_id, "assistant", app.stream_full + "█");
+        _rewrite_turn(app, app.stream_msg_id, "assistant", app.stream_full + "▍");
     }
     if drained {
         app.dirty = True;
@@ -229,7 +241,7 @@ def _accept_approval(app: LiveShell) {
     if app.appr_event is not None {
         app.appr_event.set();
     }
-    _push_turn(app, "tool", "✓ approved");
+    _push_turn(app, "tool", "ok  approved");
     app.phase = "streaming";
     app.dirty = True;
 }
@@ -245,7 +257,7 @@ def _reject_approval(app: LiveShell) {
         if app.appr_event is not None {
             app.appr_event.set();
         }
-        _push_turn(app, "tool", "✗ denied");
+        _push_turn(app, "tool", "ok  denied");
         app.phase = "streaming";
         app.dirty = True;
         return;

@@ -1,6 +1,6 @@
 """Painting and overlay rendering for the native LiveShell."""
 import os;
-import from tui.state { LiveShell, SLASH_BUILTINS }
+import from tui.state { LiveShell }
 import from tui.core {
     _rule, _pad_to, _prompt_prefix, _prompt_lines,
 }
@@ -13,9 +13,9 @@ import from ui.renderer {
     mark_semantic_dirty, mark_layout_dirty, request_cursor,
 }
 import from ui.width { display_width, truncate_text }
-import from tui.picker_base { _multi_filtered }
+import from tui.picker_base { _picker_filtered }
 import from tui.windows {  _picker_state, _window_paint_lines, _ui_modal_state, _approval_state }
-import from agent.session { list_commands, get_model, model_preferences }
+import from agent.session { get_model, model_preferences }
 import from agent.llm { PROVIDER_ROUTES, catalog_models, routed_model_id, provider_for }
 import from tui.window { WindowSpec, window_frame, window_view }
 """Unified-diff preview lines for a pending write_file/edit_file approval.
@@ -66,7 +66,7 @@ def _approval_diff_preview(name: str, args: dict[str, any]) -> list[str] {
     }
     more = len(raw) - cap;
     if more > 0 {
-        out.append("… " + str(more) + " more lines");
+        out.append("…  +" + str(more) + " lines");
     }
     return out;
 }
@@ -159,75 +159,97 @@ def _ui_modal_lines(app: LiveShell) -> list[str] {
 }
 
 
-"""Generic list-picker overlay body (model chooser / resume chooser).
-Mirrors the extension-modal box styling; select mode shows rows with a
-">" cursor, input mode shows an editable draft line."""
-def _picker_lines(app: LiveShell) -> list[str] {
+"""Prompt-anchored drop-up for every explicit picker.
+The same selection pattern handles provider login, sessions, skills, tasks,
+checkpoints, explorer, and extension select requests."""
+def _picker_popup_rows(app: LiveShell) -> list[str] {
     p: any = _picker_state(app);
-    inner = 46;
-    head = "? " + str(p.get("title", ""));
-    body: list[str] = [];
+    if p is None {
+        return [];
+    }
+    width = max(12, app.columns - 2);
+    title = str(p.get("title", "CHOICE"));
+    out: list[str] = [truncate_text("⌃ " + title, width, ellipsis="…")];
     if str(p.get("mode", "select")) == "input" {
         draft = str(p.get("draft", ""));
-        if str(p.get("title", "")) == "LOGIN" {
-            provider_id = str(p.get("providerId", ""));
-            body.append("  provider: " + provider_id[:inner - 14]);
+        if title == "LOGIN" {
             shown = ("*" * len(draft)) if draft else "(paste API key)";
+            out.append(truncate_text("  " + str(p.get("providerId", "")), width, ellipsis="…"));
         } else {
-            shown = draft if draft else "(type a model id)";
+            shown = draft if draft else "(type a value)";
         }
-        body.append("  > " + shown[:inner - 8] + "▌");
-    } elif bool(p.get("multi", False)) {
-        vis: tuple[list[str], list[str]] = _multi_filtered(p);
-        vis_options: list[str] = vis[0];
-        vis_ids: list[str] = vis[1];
-        toggled: list[str] = list(p.get("toggled", []));
-        filt: str = str(p.get("filter", ""));
-        if filt {
-            body.append("/ " + filt + "▌");
-        }
-        if not vis_options {
-            body.append("(no matches)");
-        }
-        display_rows: list[str] = [];
-        i = 0;
-        for opt in vis_options {
-            rid = str(vis_ids[i]) if i < len(vis_ids) else "";
-            box = "x" if rid in toggled else " ";
-            display_rows.append("[" + box + "] " + str(opt)[:inner - 10]);
-            i += 1;
-        }
-        view: tuple[list[str], int] = window_view(
-            display_rows, int(p.get("selected", 0)), 8
-        );
-        body.extend(view[0]);
-    } else {
-        options2: list[any] = list(p.get("options", []));
-        display_rows2: list[str] = [];
-        for opt in options2 {
-            display_rows2.append(str(opt)[:inner - 6]);
-        }
-        view2: tuple[list[str], int] = window_view(
-            display_rows2, int(p.get("selected", 0)), 8
-        );
-        body.extend(view2[0]);
+        out.append(truncate_text("> " + shown + "▌", width, ellipsis="…"));
+        out.append("Enter submit · Esc cancel");
+        return out;
     }
-    body.append("");
-    if str(p.get("mode", "select")) == "input" {
-        if str(p.get("title", "")) == "LOGIN" {
-            body.append("  paste API key · [enter] save · [esc] cancel");
-        } else {
-            body.append("  type id · [enter] submit   [esc] cancel");
+    vis: tuple[list[str], list[str]] = _picker_filtered(p);
+    labels: list[str] = [];
+    opts = vis[0];
+    ids = vis[1];
+    toggled: list[str] = list(p.get("toggled", []));
+    for i in range(len(opts)) {
+        label = str(opts[i]);
+        if bool(p.get("multi", False)) {
+            rid = str(ids[i]) if i < len(ids) else "";
+            label = ("[x] " if rid in toggled else "[ ] ") + label;
         }
-    } elif bool(p.get("multi", False)) {
-        body.append("  type filter · [space] toggle · enter insert · esc");
-    } else {
-        body.append("  [↑↓] move   [enter] choose   [esc] cancel");
+        labels.append(label);
     }
-    return window_frame(WindowSpec(title=head, width=inner), body);
+    if str(p.get("filter", "")) {
+        out.append(truncate_text("/ " + str(p.get("filter", "")), width, ellipsis="…"));
+    }
+    if labels {
+        max_rows = min(6, max(1, app.rows // 3));
+        view: tuple[list[str], int] = window_view(labels, int(p.get("selected", 0)), max_rows);
+        out.extend([truncate_text(row, width, ellipsis="…") for row in view[0]]);
+    } else {
+        out.append("(no matches)");
+    }
+    if bool(p.get("multi", False)) {
+        out.append("↑↓ move · type filter · Space toggle · Enter choose · Esc close");
+    } else {
+        out.append("↑↓ move · type filter · Enter choose · Esc close");
+    }
+    return [truncate_text(row, width, ellipsis="…") for row in out];
 }
-"""Paint lines into the shared overlay node (picker/modal/approval owner).
-The caller has already decided ownership; this just guards the optional node."""
+
+
+"""Prompt-anchored drop-up for extension select requests."""
+def _ui_select_popup_rows(app: LiveShell) -> list[str] {
+    m: any = _ui_modal_state(app);
+    if m is None {
+        return [];
+    }
+    options: list[any] = list(m.get("options", []));
+    filt = str(m.get("filter", ""));
+    q = filt.lower();
+    labels: list[str] = [];
+    for option in options {
+        label = str(option);
+        if not q or q in label.lower() {
+            labels.append(label);
+        }
+    }
+    width = max(12, app.columns - 2);
+    title = str(m.get("title", "")) or str(m.get("message", "SELECT"));
+    out: list[str] = [truncate_text("⌃ " + title, width, ellipsis="…")];
+    if filt {
+        out.append(truncate_text("/ " + filt, width, ellipsis="…"));
+    }
+    if labels {
+        max_rows = min(6, max(1, app.rows // 3));
+        view: tuple[list[str], int] = window_view(labels, int(m.get("selected", 0)), max_rows);
+        out.extend([truncate_text(row, width, ellipsis="…") for row in view[0]]);
+    } else {
+        out.append("(no matches)");
+    }
+    out.append("↑↓ move · type filter · Enter choose · Esc cancel");
+    return [truncate_text(row, width, ellipsis="…") for row in out];
+}
+
+
+"""Paint a centered modal/approval into the shared overlay node.
+The caller has already decided ownership; this guards the optional node."""
 def _paint_overlay(app: LiveShell, lines: list[str], outer_width: int = 48) {
     ov: UiNode | None = app.shell.approval;
     if ov is None {
@@ -248,50 +270,7 @@ def _paint_overlay(app: LiveShell, lines: list[str], outer_width: int = 48) {
 }
 
 
-# ==================== slash-command autocomplete ====================
-
-"""Slash-command candidates for the typed prefix: built-ins plus extension
-commands (list_commands()), deduped, alphabetical, capped at 6. Each entry
-is [name_with_slash, description]. Empty when the draft is not a bare
-command word."""
-def _slash_candidates(draft: str) -> list[list[str]] {
-    text = draft.strip();
-    if not text.startswith("/") or " " in text {
-        return [];
-    }
-    token: str = text;
-    descs: dict[str, str] = {};
-    for bname in SLASH_BUILTINS {
-        full = "/" + str(bname);
-        descs[full] = str(SLASH_BUILTINS[bname]);
-    }
-    try {
-        cmds = list_commands();
-    } except Exception {
-        cmds = {};
-    }
-    if isinstance(cmds, dict) {
-        for cname in cmds {
-            full = "/" + str(cname);
-            if full in descs {
-                continue;  # built-in shadows same-named extension command
-            }
-            meta: dict[str, any] = cmds[cname] if isinstance(cmds[cname], dict) else {};
-            descs[full] = str(meta.get("description", "") or "");
-        }
-    }
-    out: list[list[str]] = [];
-    for name in sorted(descs) {
-        if name.startswith(token) {
-            out.append([name, descs[name]]);
-            if len(out) >= 6 {
-                break;
-            }
-        }
-    }
-    return out;
-}
-
+# ==================== model completion ====================
 
 """Model candidates for the `/model <prefix>` completion window.
 
@@ -369,20 +348,14 @@ def _popup_suppressed(raw: str, dismissed: str) -> bool {
 }
 
 
-"""Popup visibility + candidates in one shot: hidden while any modal,
-picker or approval owns the screen. Serves two contexts on the same
-popup:
-  1) `/model` or `/model <prefix>` — model ids (same completion window,
-     no separate picker)
-  2) bare "/word" — slash-command candidates
-When the user dismissed this exact draft with esc the popup stays hidden
-(see _popup_suppressed). Returns the match list or None."""
+"""Model completion visibility + candidates in one shot: hidden while any
+modal, picker or approval owns the screen. The popup only appears for
+`/model` and `/model <prefix>`, not as a global command-search palette."""
 def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
     if _picker_state(app) is not None or _ui_modal_state(app) is not None or app.shell.approval is not None {
         return None;
     }
     raw = app.shell.prompt.draft;
-    stripped = raw.strip();
     if _popup_suppressed(raw, app.slash_dismissed) {
         return None;
     }
@@ -399,23 +372,13 @@ def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
             return None;
         }
     }
-    text = stripped;
-    if not text.startswith("/") or " " in text {
-        return None;
-    }
-    matches = _slash_candidates(text);
-    if not matches {
-        return None;
-    }
-    return matches;
+    return None;
 }
 
 
-"""Resolve a tab/enter press against the popup: returns (chosen, submit).
-Enter on a candidate identical to the current draft (a fully-typed command
-name) returns submit=True — "completing" /model to /model is a visual no-op
-that used to swallow the keypress and force a second Enter. Pure so the
-decision stays testable headless (LiveShell needs a TTY)."""
+"""Resolve a tab/enter press against model completion. Enter on a candidate
+identical to the current draft returns submit=True, so /model can open on
+one Enter. Pure so the decision stays testable headless."""
 def _slash_popup_pick(matches: list[list[str]], draft: str, sel: int) -> tuple[str, bool] {
     count = len(matches);
     idx = int(sel);
@@ -467,10 +430,12 @@ def _transcript_lines(app: LiveShell) -> list[str] {
     w = max(10, app.columns - 2);
     return [
         "",
-        truncate_text("  the graph is live.", w, ellipsis="…"),
-        truncate_text("  type below — jackal answers in this frame.", w, ellipsis="…"),
+        truncate_text("  Jackal — native agent harness", w, ellipsis="…"),
         "",
-        truncate_text("  try:  explain retained damage", w, ellipsis="…"),
+        truncate_text("  Type a message below, or try /help for commands.", w, ellipsis="…"),
+        "",
+        truncate_text("  Example:  explain how the transcript layout works", w, ellipsis="…"),
+        "",
     ];
 }
 
@@ -479,11 +444,16 @@ def _paint(app: LiveShell) {
     lines = _transcript_lines(app);
     prompt_lines = _prompt_lines(app);
 
-    # Slash autocomplete: extra rows painted ABOVE the prompt box inside the
-    # prompt node; its fixed contract grows/shrinks with the popup each frame.
+    # Choices and model completion render ABOVE the prompt box inside the
+    # prompt node; its fixed contract grows/shrinks with the drop-up.
     popup: list[list[str]] | None = _slash_popup_state(app);
     popup_rows: list[str] = [];
-    if popup is not None {
+    if _picker_state(app) is not None {
+        popup_rows = _picker_popup_rows(app);
+    } elif _ui_modal_state(app) is not None
+        and str(_ui_modal_state(app).get("method", "")) == "select" {
+        popup_rows = _ui_select_popup_rows(app);
+    } elif popup is not None {
         popup_rows = _slash_popup_rows(app, popup);
     }
     set_node_contract(
@@ -495,18 +465,22 @@ def _paint(app: LiveShell) {
         ),
     );
 
-    # Shared overlay node: real approvals take precedence; otherwise the
-    # active stack owner supplies the picker or extension-modal content.
+    # Shared overlay node: real approvals take precedence; non-choice
+    # extension modals use it. Pickers render in the prompt drop-up.
     overlay: list[str] | None = None;
     if app.phase == "approval" {
         overlay = _approval_lines(app);
-    } elif _picker_state(app) is not None {
-        overlay = _picker_lines(app);
-    } elif _ui_modal_state(app) is not None {
+    } elif _ui_modal_state(app) is not None
+        and str(_ui_modal_state(app).get("method", "")) != "select" {
         overlay = _ui_modal_lines(app);
     }
     win_lines: list[str] | None = None;
-    if overlay is None and app.phase != "approval" {
+    if overlay is None and _picker_state(app) is None
+        and app.phase != "approval"
+        and not (
+            _ui_modal_state(app) is not None
+            and str(_ui_modal_state(app).get("method", "")) == "select"
+        ) {
         win_lines = _window_paint_lines(app);
         if win_lines is not None {
             _paint_overlay(app, win_lines, len(win_lines[0]));

@@ -222,6 +222,15 @@ test "modified arrows decode with modifier prefixes" {
 }
 
 
+test "alt ctrl j and k decode from control bytes" {
+    norm = InputNormalizer();
+    k_up = norm.feed("\x1b\x0b")[0] as KeyEvent;
+    assert k_up.key == "alt+ctrl+k";
+    k_down = norm.feed("\x1b\x0a")[0] as KeyEvent;
+    assert k_down.key == "alt+ctrl+j";
+}
+
+
 test "modified home end and tilde keys decode" {
     norm = InputNormalizer();
     k1 = norm.feed("\x1b[1;5H")[0] as KeyEvent;

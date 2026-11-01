@@ -8,12 +8,13 @@ window chrome/viewport math lives here and side-effecting hosts stay out
 
 The API is declarative: a WindowSpec describes chrome, a WindowState carries
 data + behavior hooks, window_lines() renders. First consumer: the MCP
-status window (tui/mcp.jac). Existing pickers/modals migrate later.
+status window (tui/mcp.jac). Selection pickers use the prompt drop-up;
+modal information and approval windows use the centered overlay.
 """
 import from ui.width { display_width, truncate_text }
 
-# Anchor placement stays in
-# the host's _paint_overlay (all current windows are centered).
+# Modal anchor placement stays in _paint_overlay; picker drop-ups render
+# above the prompt in tui/overlay.jac.
 
 
 obj WindowSpec {

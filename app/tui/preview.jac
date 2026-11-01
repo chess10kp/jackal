@@ -15,7 +15,7 @@ glob TOOL_RESULT_PREVIEW_LINE_CHARS: int = 200;
 
 Shows the first TOOL_RESULT_PREVIEW_LINES lines (each capped at
 TOOL_RESULT_PREVIEW_LINE_CHARS chars) and, when the result is longer,
-a '... (N more lines)' footer. Pure: the full result still reaches the
+a '…  +N lines' footer. Pure: the full result still reaches the
 LLM and the saved transcript — only the on-screen entry shrinks.
 """
 def tool_result_preview(result: str, max_lines: int = TOOL_RESULT_PREVIEW_LINES) -> str {
@@ -34,7 +34,7 @@ def tool_result_preview(result: str, max_lines: int = TOOL_RESULT_PREVIEW_LINES)
     }
     if len(lines) > max_lines {
         rest: int = len(lines) - max_lines;
-        shown.append(f"... ({rest} more lines)");
+        shown.append(f"…  +{rest} lines");
     }
     return "\n".join(shown);
 }
