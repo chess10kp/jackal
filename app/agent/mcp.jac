@@ -52,6 +52,12 @@ obj McpClient {
         write_lock: any = None,
         reader_stop: any = None,
         reader_thread: any = None,
+        # Server-initiated request handler (stdio): fn(method, params) ->
+        # {"ok": True, "result": dict} | {"ok": False, "code": int,
+        # "message": str}. Runs on a short-lived daemon thread, NEVER on
+        # the reader thread; None keeps the legacy -32601 reply for every
+        # inbound request.
+        on_request: any = None,
         # streamable-HTTP transport state (transport: "stdio" | "http")
         transport: str = "stdio",
         url: str = "",
@@ -133,19 +139,35 @@ def _reader_loop(client: McpClient) {
         rid: any = parsed.get("id");
         method: any = parsed.get("method");
         if rid is not None and method is not None {
-            # Server->client REQUEST (sampling/roots/elicitation): answer
-            # immediately with a JSON-RPC error so servers never hang on us.
-            reply: dict[str, any] = {
-                "jsonrpc": "2.0",
-                "id": rid,
-                "error": {
-                    "code": -32601,
-                    "message": "method not supported by client: " + str(method),
-                },
-            };
-            try {
-                _write_line(client, reply);
-            } except Exception {
+            # Server->client REQUEST (sampling/elicitation/roots). With a
+            # registered handler, hand off to a short-lived daemon thread
+            # so the reader never blocks on UI/model work; the serve
+            # thread owns writing the exactly-one reply. Without one, keep
+            # the legacy bounded answer: a JSON-RPC error, never silence.
+            handler: any = client.on_request;
+            if handler is not None {
+                raw_params: any = parsed.get("params");
+                p_in: dict[str, any] = raw_params if isinstance(raw_params, dict) else {};
+                t = threading.Thread(
+                    target=_serve_inbound,
+                    args=(client, rid, str(method), p_in),
+                    daemon=True,
+                    name="mcp-inbound",
+                );
+                t.start();
+            } else {
+                reply: dict[str, any] = {
+                    "jsonrpc": "2.0",
+                    "id": rid,
+                    "error": {
+                        "code": -32601,
+                        "message": "method not supported by client: " + str(method),
+                    },
+                };
+                try {
+                    _write_line(client, reply);
+                } except Exception {
+                }
             }
             continue;
         }
@@ -503,7 +525,11 @@ def mcp_start(
     _start_reader(client);
     init_params: dict[str, any] = {
         "protocolVersion": MCP_PROTOCOL_VERSION,
-        "capabilities": {},
+        # Inbound capabilities: this client can serve sampling and
+        # elicitation requests over the stdio transport (dispatched via
+        # the registered on_request handler; see mcp_set_request_handler).
+        # HTTP stays {} — no inbound listener exists there.
+        "capabilities": {"sampling": {}, "elicitation": {}},
         "clientInfo": {"name": "jackal", "version": "0.1.0"},
     };
     try {
@@ -1067,4 +1093,77 @@ def mcp_read_resource(client: McpClient, uri: str, timeout_s: float = -1.0) -> d
         }
     }
     return {"ok": True, "uri": str(uri), "text": "\n".join(parts), "contents": contents};
+}
+
+
+"""Serve one inbound server->client request on its own daemon thread.
+
+Calls the registered handler (never the reader thread) and writes the
+exactly-one JSON-RPC reply: result on ok, the handler's error code/message
+otherwise, -32603 if the handler raised or returned a malformed verdict.
+A write failure (dead transport) drops the reply — the server's own
+request timeout is the backstop. Never raises."""
+def _serve_inbound(client: McpClient, rid: any, method: str, params: dict[str, any]) {
+    reply: dict[str, any] = {
+        "jsonrpc": "2.0",
+        "id": rid,
+        "error": {"code": -32603, "message": "client handler failed"},
+    };
+    try {
+        handler: any = client.on_request;
+        verdict: any = None;
+        if handler is not None {
+            verdict = handler(method, params);
+        }
+        code_i: int = -32000;
+        if isinstance(verdict, dict) and verdict.get("code") is not None {
+            try {
+                code_i = int(verdict.get("code"));
+            } except Exception {
+                code_i = -32000;
+            }
+        }
+        if isinstance(verdict, dict) and verdict.get("ok") is True {
+            res: any = verdict.get("result");
+            reply = {
+                "jsonrpc": "2.0",
+                "id": rid,
+                "result": res if isinstance(res, dict) else {},
+            };
+        } elif isinstance(verdict, dict) {
+            reply = {
+                "jsonrpc": "2.0",
+                "id": rid,
+                "error": {
+                    "code": code_i,
+                    "message": str(verdict.get("message", "request failed")),
+                },
+            };
+        } else {
+            reply["error"] = {
+                "code": -32603,
+                "message": "client handler returned an invalid verdict",
+            };
+        }
+    } except Exception as e {
+        reply["error"] = {"code": -32603, "message": "client handler failed: " + str(e)};
+    }
+    try {
+        _write_line(client, reply);
+    } except Exception {
+    }
+}
+
+
+"""Register the server-initiated request handler (stdio transport).
+
+Contract: fn(method, params) -> {"ok": True, "result": dict} on success,
+or {"ok": False, "code": int, "message": str} to answer with a JSON-RPC
+error (use -32601 for methods this client does not support). The handler
+runs on a dedicated daemon thread per request — it may block on UI or the
+model, but it must eventually return; the server's request timeout is the
+only backstop if it does not. HTTP clients have no inbound listener and
+ignore this seam."""
+def mcp_set_request_handler(client: McpClient, handler: any) {
+    client.on_request = handler;
 }
