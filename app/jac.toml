@@ -16,6 +16,19 @@ api_key = ""
 default = "native"
 
 [placement.pins]
+# Pin semantics (verified 2026-11-01 on macOS arm64, vendor 5103ea5cf):
+# an explicit `"x" = "native"` pin is a HARD requirement — if the unit does
+# not lower, `jac build` fails the app seal. A module left UNPINNED under
+# `default = "native"` demotes softly to server with a build note. So the
+# native pins below are the true "must stay native" set; keeping a walled
+# unit pinned documents the frontier at the cost of a red seal.
+# SEAL KEYS: markup/terminal/transcript/width/renderer cleared 2026-11-01
+# (tuple[...] ret spellings, dead `codecs` import). Remaining hard wall:
+# ui.screen (E5106 private-bridge to walker InsertText/Submit/Cancel from
+# server-pinned ui.events + E5093 event/UiSession class boundary). Marking
+# those walkers `walker:protect` clears E5106 on paper but currently trips a
+# kernel SIGABRT during prepare (jaseci-labs/jac#10485) — do not apply until
+# upstream lands the fix.
 # Current frontier: 12 explicit server pins remain (was 15; terminal/vt went
 # native 2026-08-31); N6 requires reducing this count to zero. Keep each
 # temporary pin annotated with its compiler/runtime wall.
