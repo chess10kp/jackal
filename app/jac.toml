@@ -80,6 +80,11 @@ default = "native"
 # see Rect/LayoutState layouts; unpinned it seals server and its types erase.
 # SEAL wall (2026-08-31): E5092 UnaryExpr — dev-native, seal-server.
 # ui.markup SEAL wall (2026-08-31): E5092 create_session.
+# ANNEX RULE (2026-11-01): the seal folds markup.test.jac into this native
+# unit, so its annex must not import server-placed ui.screen/ui.runtime.
+# The one cross-context case (lowered shell vs build_main_shell) moved to
+# ui/screen.test.jac. scripts/seal-pin-guard.py guards this statically.
+# Upstream: jaseci-labs/jac#10490 (annex folded into the pinned unit).
 "ui.layout_types" = "native"
 "ui.markup" = "native"
 # ui.gates: BLOCKED native (2026-08-29 re-probe) — imports InsertText from

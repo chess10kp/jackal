@@ -16,6 +16,30 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
   [jaseci-labs/jac#10485](https://github.com/jaseci-labs/jac/issues/10485).
   Tuple-union annotation collapse is
   [#10480](https://github.com/jaseci-labs/jac/issues/10480) (worked around).
+- **Test-annex pins (found 2026-11-01 on Linux x86_64, same vendor)**: the
+  seal folds `<mod>.test.jac` into `<mod>`'s native unit, so a hard-pinned
+  module whose *tests* import a server module fails the module's pin. That was
+  hiding behind the same class as the `ui.screen` wall: `ui.markup`'s annex
+  imported `ui.screen.build_main_shell` / `ui.runtime.create_session` and the
+  seal aborted with E5093 on `build_main_shell` before any `ui.screen` work.
+  Fixed app-side by moving that one cross-context case to
+  `app/ui/screen.test.jac` (server-placed owner). Upstream:
+  [jac#10490](https://github.com/jaseci-labs/jac/issues/10490) (annexes are
+  folded into the hard-pinned unit; no annex-level placement escape). `scripts/seal-pin-guard.py`
+  now checks the rule statically in CI (`seal-pins` job); see
+  [`docs/TESTING.md`](docs/TESTING.md#placement-and-test-annexes).
+- **Linux re-read (floor compiler, kernel stale)**: with the stale kernel the
+  compiler runs on its bytecode floor, and the seal stops earlier and
+  differently than on the mac: `ui/renderer` fails because `ui.layout`
+  demotes, which cascades from `ui/layout_compile_model` erasing all four
+  `NodeEdges` fields ("Native lowering failed for type 'Variable'"; `Variable`
+  is a trivial `obj` in native-pinned `constraints.algebra`). The exact
+  erasure trigger is unresolved — the floor path may itself be the difference
+  (`jac native status kernel` said `stale: na_ir_gen_pass.jac changed`), so
+  re-read the seal on the mac's built kernel before filing. #10485 did not
+  reproduce on the floor, which is consistent with it being a kernel-path
+  abort; that is not a disproof.
+
 - **Memory (measured 2026-11-01, macOS arm64, release binary)**:
   - trivial `jac run` (2-line sleep script): RSS 266 MB, 174 MB of it
     `IOAccelerator` GPU mapping — upstream jac#10487.
@@ -50,7 +74,10 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
 1. **[us] Native lowering gate.** `jac check` runs parse-only; nothing in CI
    proves `app/` seals natively (`../jac build`). Blocked on the runner
  admitting a Zig-built jac (build RAM/time on ubuntu-latest 7 GB is
-   unproven). Once feasible, add a `native-build` job that builds the
+   unproven). Shipped instead: `scripts/seal-pin-guard.py` (the `seal-pins`
+   CI job) statically rejects the native->server boundary class that is
+   decidable from source. Once the full gate is feasible, add a `native-build`
+   job that builds the
    vendored compiler, rebuilds the native kernel, and runs `app/ ../jac
    build`; expected walls: the ~15 `server` pins must stay “seals as pinned”,
    so also assert the MANIFEST placement map matches the pin intent (no

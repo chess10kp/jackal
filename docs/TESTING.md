@@ -16,6 +16,36 @@ locally.
 Every `*.test.jac` needs a same-stem `*.jac` module (the runner imports it);
 e2e suites use tiny modules that only import the harness.
 
+## Placement and test annexes
+
+`app/jac.toml` pins modules to a codespace. A pin of `"x" = "native"` is
+*hard*: `jac build` refuses to demote that module at seal time. Two rules
+follow, and both are checked without a compiler build:
+
+1. A hard-pinned module (and its `.impl.jac` / `.test.jac` annexes) must not
+   call a server-placed module with anything but C-ABI values. Native calling
+   into Python is `E5093` (`Type 'UiSession' ... cannot cross the
+   native->Python call boundary`). Python calling into native is fine — that
+   direction goes through the marshal bridge.
+2. The seal folds `<mod>.impl.jac` and `<mod>.test.jac` into `<mod>`'s unit
+   (`NativeUnitRegistry._module_files_and_imports`). So a test-only import of
+   a server module still fails the *module's* hard pin. Keep such cases in the
+   server-placed owner's annex instead — e.g. the shell/topology assertions
+   live in `app/ui/screen.test.jac`, not `app/ui/markup.test.jac`, because
+   `ui.markup` is native and `ui.screen` is server.
+
+`scripts/seal-pin-guard.py` enforces rule 1 statically (it reads the pins,
+the annexes and the import graph; `CALLED` means an imported server name has a
+call site). Reviewed exceptions live in `scripts/seal-pin-allowlist.txt`; an
+entry that stops crossing is reported XPASS so the list cannot rot. Run it
+directly or rely on the `seal-pins` CI job.
+
+```bash
+python3 scripts/seal-pin-guard.py            # fail on unlisted crossings
+python3 scripts/seal-pin-guard.py --strict   # also fail on unused imports
+```
+
+
 ## The mock provider
 
 Model id `mock` (also `mockllm`, `mock/*`) routes to `MockTransport` in
@@ -109,3 +139,27 @@ Per-suite logs land in `.testlogs/` (uploaded as CI artifacts
 They report XFAIL and don't fail CI; new failures do. A quarantined suite that
 passes is reported XPASS in the job summary — delete its line. Never
 quarantine a failure you introduced.
+
+## Native seal (placement gate)
+
+The full gate is `cd app && ../jac build`. Two things to check before believing
+a seal result:
+
+1. **The kernel is current.** `../jac native status` prints an "in use" column;
+   `floor: the bytecode compiler` with `stale: ...` in "why" means the run is
+   on the bytecode floor, not the native kernel. Wall sets differ between the
+   two. `../jac native build kernel` (a Zig 0.16.0 host with the shared LLVM
+   slice) fixes it.
+2. **Read the log, not the exit code.** The seal prints hundreds of demotions;
+   `scripts/seal-report.py` reduces them to hard walls, the source files the
+   diagnostics actually point at, erased fields, soft module demotions, and the
+   abort's E-code:
+
+   ```bash
+   (cd app && ../jac build > /tmp/seal.log 2>&1 || true)
+   python3 scripts/seal-report.py /tmp/seal.log
+   ```
+
+   A hard wall is a module pinned `native` that did not lower. Soft demotions
+   are allowed but each one is distance from N6 (the all-native goal).
+

@@ -1,0 +1,11 @@
+# Crossings a hard native pin may not take (see scripts/seal-pin-guard.py).
+# Format: <module> | <importing file> | <target module> | <reason>
+#
+# Every entry is a known native->server reference made from a module pinned
+# `"x" = "native"` in app/jac.toml (including its .impl.jac / .test.jac
+# annexes, which the seal folds into the module's native unit). A `called`
+# entry fails the seal with E5093 unless the signature is C-ABI only; an
+# imported-but-uncalled entry is a latent risk once a call site appears.
+#
+# Keep this list empty unless a crossing is genuinely unavoidable. An entry
+# that stops crossing is reported as XPASS — delete it then.

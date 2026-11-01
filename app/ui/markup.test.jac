@@ -1,20 +1,13 @@
 """Unit 12 acceptance: markup lowering, errors, and print-generated mode.
 
-Companion scope provides markup APIs. screen/runtime imported for equivalence
-checks against Unit 8.
+Companion scope provides markup APIs. This annex stays inside `ui.markup`'s
+native unit (hard pin), so it must not import the server-placed screen/runtime
+modules — the cross-context cases live in `ui/screen.test.jac` instead.
 """
 
 import from ui.model {
     MainScreen,
     ordered_child_keys,
-}
-
-import from ui.runtime {
-    create_session,
-}
-
-import from ui.screen {
-    build_main_shell,
 }
 
 
@@ -85,32 +78,4 @@ test "print_generated emits direct-construction Jac" {
     assert "MainScreen" in text;
     assert "Prompt" in text;
     assert ("append_child" in text) or ("Child" in text);
-}
-
-
-test "lowered shell matches build_main_shell child keys when Unit 8 exists" {
-    source = """
-    <MainScreen key="main">
-      <Header key="header" title="Jackal" />
-      <TranscriptView key="transcript" />
-      <Status key="status" />
-      <Prompt key="prompt" />
-    </MainScreen>
-    """;
-    lowered = lower_markup(source, default_shell_registry());
-    assert lowered.errors == [];
-    assert lowered.graph_root is not None;
-    lowered_screen = lowered.graph_root;
-    assert isinstance(lowered_screen, MainScreen);
-    handle = create_session();
-    session = handle.session;
-    matched = False;
-    try {
-        shell = build_main_shell(session);
-        assert ordered_child_keys(lowered_screen) == ordered_child_keys(shell.screen);
-        matched = True;
-    } except NotImplementedError {
-        matched = True;
-    }
-    assert matched;
 }

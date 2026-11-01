@@ -1,10 +1,17 @@
 """Unit 8 acceptance: durable Jackal shell topology and editor lifecycle.
 
 Companion scope provides screen APIs. runtime imported for session helpers.
+The last case also checks markup lowering against this shell, which is why it
+lives here rather than in `ui/markup.test.jac`: `ui.markup` is pinned native,
+its annex is folded into the native unit, and calling this server-placed
+builder from there fails the seal (E5093). See docs/TESTING.md and
+jaseci-labs/jac#10490.
 """
 
 import from ui.model {
+    MainScreen,
     node_id,
+    ordered_child_keys,
 }
 
 import from ui.layout_types {
@@ -16,6 +23,11 @@ import from ui.runtime {
     dispose_session,
     get_focus_node,
     set_focus,
+}
+
+import from ui.markup {
+    default_shell_registry,
+    lower_markup,
 }
 
 
@@ -155,4 +167,29 @@ test "configure_main_shell_layout installs legacy-parity specs" {
     assert state.specs[pid].height.preferred == 2.0;
 
     dispose_session(session);
+}
+
+
+test "lowered shell matches build_main_shell child keys" {
+    source = """
+    <MainScreen key="main">
+      <Header key="header" title="Jackal" />
+      <TranscriptView key="transcript" />
+      <Status key="status" />
+      <Prompt key="prompt" />
+    </MainScreen>
+    """;
+    lowered = lower_markup(source, default_shell_registry());
+    assert lowered.errors == [];
+    assert lowered.graph_root is not None;
+    lowered_screen = lowered.graph_root;
+    assert isinstance(lowered_screen, MainScreen);
+    handle = create_session();
+    session = handle.session;
+    try {
+        shell = build_main_shell(session);
+        assert ordered_child_keys(lowered_screen) == ordered_child_keys(shell.screen);
+    } finally {
+        dispose_session(session);
+    }
 }

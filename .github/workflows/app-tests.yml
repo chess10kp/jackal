@@ -29,6 +29,19 @@ jobs:
         working-directory: app
         run: jac check .
 
+  # Cheap static read of the native seal: a hard native pin (and the
+  # .impl.jac / .test.jac annexes the seal folds into its unit) may not call
+  # into a server-placed module — that is E5093 at seal time, and it is
+  # decidable from source. The full `jac build` gate still needs a native
+  # kernel; this job catches the boundary class on every push.
+  seal-pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native pins vs server imports
+        run: python3 scripts/seal-pin-guard.py
+
   # Memory profile of the harness process tree under the mock provider.
   # Always annotates; the strict 100 MB resident budget gates in
   # continue-with-warning mode until the native-only runtime lands
