@@ -67,6 +67,14 @@ def _is_variation_selector(cp: int) -> bool {
 }
 
 
+"""Emoji clusters whose first base character is not already W/F.
+
+Only the pictographic block carries default emoji presentation. Earlier
+Unicode symbol ranges (arrows 2190-21FF, dingbats 2600-27BF, misc
+technical 2300-23FF, 2B00-2BFF) are text presentation: terminals render
+them one column wide, so counting them as two desynchronizes every layout
+that contains one (`↑↓`, `❯`, `→`).
+"""
 def _is_emojiish(seg: str) -> bool {
     if not seg {
         return False;
@@ -76,13 +84,7 @@ def _is_emojiish(seg: str) -> bool {
         if cp == 0xFE0F or cp == 0x200D or _is_regional_indicator(cp) {
             return True;
         }
-        if (
-            (cp >= 0x1F300 and cp <= 0x1FAFF)
-            or (cp >= 0x2600 and cp <= 0x27BF)
-            or (cp >= 0x2B00 and cp <= 0x2BFF)
-            or (cp >= 0x2190 and cp <= 0x21FF)
-            or (cp >= 0x2300 and cp <= 0x23FF)
-        ) {
+        if cp >= 0x1F300 and cp <= 0x1FAFF {
             return True;
         }
     }

@@ -34,6 +34,16 @@ test "emoji grapheme clusters count as two columns" {
 }
 
 
+test "text-presentation symbols stay one column" {
+    # Terminals render these one cell wide; counting them as two shifted
+    # every span after them (stale cells in the prompt footer).
+    assert display_width("↑") == 1;
+    assert display_width("↑↓") == 2;
+    assert display_width("❯ ") == 2;
+    assert display_width("◆ ◇ ▣ ·") == 7;
+}
+
+
 test "wrap_text breaks on column width not byte length" {
     lines = wrap_text("abcdefgh", 3);
     assert lines == ["abc", "def", "gh"];
