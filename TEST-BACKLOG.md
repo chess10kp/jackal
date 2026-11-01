@@ -39,6 +39,13 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
   re-read the seal on the mac's built kernel before filing. #10485 did not
   reproduce on the floor, which is consistent with it being a kernel-path
   abort; that is not a disproof.
+- **Pin semantics are not all-or-nothing on the floor**: hard-pinned
+  `ui.layout` demoted `_place_axis`/`compute_layout` to Python-only without a
+  `FAIL (native unit did not lower)` line, while `ui/renderer` did fail once
+  `_run_layout`'s only callee was Python-only. So a module-level hard pin can
+  survive per-function demotions and still report success; the `jac.toml`
+  "hard requirement" wording is mac-kernel-verified and should be re-checked
+  on the rebuilt kernel before being relied on for CI assertions.
 
 - **Memory (measured 2026-11-01, macOS arm64, release binary)**:
   - trivial `jac run` (2-line sleep script): RSS 266 MB, 174 MB of it
