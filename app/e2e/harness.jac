@@ -176,7 +176,9 @@ def run_jackal(
     timeout_s: int = E2E_TIMEOUT_S,
 ) -> RunResult {
     env: dict[str, str] = dict(os.environ);
-    for k in ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ZAI_API_KEY", "JACKAL_MODE"] {
+    # JAC_HANDOFF names the *runner's* CLI handoff endpoint; a spawned `jac`
+    # that inherits it waits for the parent instead of booting (2026-11-01).
+    for k in ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ZAI_API_KEY", "JACKAL_MODE", "JAC_HANDOFF"] {
         env.pop(k, None);
     }
     env["JACKAL_MODEL"] = "mock";
@@ -375,7 +377,9 @@ def spawn_tui(
     (master_fd, slave_fd) = pty.openpty();
     fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0));
     env: dict[str, str] = dict(os.environ);
-    for k in ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ZAI_API_KEY", "JACKAL_MODE"] {
+    # JAC_HANDOFF names the *runner's* CLI handoff endpoint; a spawned `jac`
+    # that inherits it waits for the parent instead of booting (2026-11-01).
+    for k in ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ZAI_API_KEY", "JACKAL_MODE", "JAC_HANDOFF"] {
         env.pop(k, None);
     }
     env["JACKAL_MODEL"] = "mock";
