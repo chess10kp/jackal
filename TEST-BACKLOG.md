@@ -16,12 +16,20 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
   [jaseci-labs/jac#10485](https://github.com/jaseci-labs/jac/issues/10485).
   Tuple-union annotation collapse is
   [#10480](https://github.com/jaseci-labs/jac/issues/10480) (worked around).
-- **Memory**: sealed app `.jab` idles at ~1.25 GB RSS on macOS in a **-Ddev**
-  compiler build: `libjac_compiler.dylib` (143 MB) + `libjacllvm.dylib`
-  (122 MB) are mapped and lowering runs again at load ("native seam --
-  demoting ..." lines in the run log), 1.7 M malloc objects, plus ~500 MB
-  `IOAccelerator` GPU mapping. Release-build comparison is the next datapoint;
-  the 100 MB budget presumes neither compiler nor LLVM is resident at run.
+- **Memory (measured 2026-11-01, macOS arm64, release binary)**:
+  - trivial `jac run` (2-line sleep script): RSS 266 MB, 174 MB of it
+    `IOAccelerator` GPU mapping — upstream jac#10487.
+  - jackal sealed bundle: idle 1.29 GB; startup ~20 s CPU; maps
+    `libjac_compiler.dylib` (143 MB) + `libjacllvm.dylib` (122 MB) and
+    re-runs native lowering at load ("native seam -- demoting ..." in the
+    run log); malloc ~372-424 MB across 1.7 M allocations; IOAccelerator
+    496 MB — upstream jac#10488.
+  - The artifact was a **server-only source bundle** (verified manifest:
+    139/139 server, 221 `.jac` files, no native payload), so this is the
+    plain runtime cost, not a native artifact.
+  - The 100 MB resident budget therefore needs: (a) a native artifact
+    (blocked by #10485), (b) runtime not loading compiler/LLVM (#10488),
+    (c) the GPU mapping addressed (#10487).
 - **Test gate**: CI has no native-lowering job yet (only `jac check`);
   `mem-profile` job landed in `app-tests.yml`.
 
