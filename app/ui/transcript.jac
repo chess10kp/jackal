@@ -183,7 +183,7 @@ def _visible_message_ids(proj: TranscriptProjection) -> list[str] {
 }
 
 
-def _anchor_at_offset(proj: TranscriptProjection, offset: int) -> (str, int) {
+def _anchor_at_offset(proj: TranscriptProjection, offset: int) -> tuple[str, int] {
     if not proj.messages {
         return ("", 0);
     }

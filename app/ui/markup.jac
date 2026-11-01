@@ -92,8 +92,13 @@ def _skip_ws(text: str, i: int) -> int {
 }
 
 
-"""Read identifier codepoints starting at `i`; (name, end_idx) or None."""
-def _read_name(text: str, i: int) -> (str, int) | None {
+"""Read identifier codepoints starting at `i`: (name, end_idx) or None.
+
+NOTE: ret type is spelled tuple[...] (not parenthesized) — the seal-time
+native checker collapses `(...) | None` unions to typing.Any/_SpecialForm
+(E1002/E1020 at seal, jaseci 5103ea5cf). See upstream issue report.
+"""
+def _read_name(text: str, i: int) -> tuple[str, int] | None {
     n = len(text);
     if i >= n or not _is_name_start(text[i]) {
         return None;
@@ -290,7 +295,7 @@ def _parse_attrs(raw: str) -> dict[str, str] {
 }
 
 
-def _parse_markup(source: str) -> (list[_MarkupElem], list[MarkupError]) {
+def _parse_markup(source: str) -> tuple[list[_MarkupElem], list[MarkupError]] {
     errors: list[MarkupError] = [];
     roots: list[_MarkupElem] = [];
     stack: list[_MarkupElem] = [];
