@@ -3,6 +3,11 @@
 Covers native/js registration, invoke routing, schema export, and extension teardown.
 """
 
+import os;
+import json;
+import tempfile;
+import shutil;
+
 
 def _echo(text: str) -> str {
     return "ECHO:" + text;
@@ -132,4 +137,46 @@ test "unregister and unregister_extension" {
     assert n == 2;
     assert get_tool(reg, "a") is None;
     assert get_tool(reg, "b") is None;
+}
+
+
+test "a failing native handler is logged without changing the ERROR contract" {
+    tmp: str = tempfile.mkdtemp(prefix="jackal-registry-log-");
+    old_log = os.environ.get("JACKAL_LOG");
+    old_level = os.environ.get("JACKAL_LOG_LEVEL");
+    try {
+        sink: str = f"{tmp}/registry.jsonl";
+        os.environ["JACKAL_LOG"] = sink;
+        os.environ["JACKAL_LOG_LEVEL"] = "debug";
+        reg = create_registry();
+        register_native(
+            reg,
+            "boom",
+            "d",
+            {"type": "object", "properties": {"x": {"type": "integer"}}},
+            _tool_boom,
+        );
+        err = invoke(reg, "boom", {"x": 1});
+        assert err.startswith("ERROR:"), err;
+        fh: any = open(sink, "r");
+        lines: list[str] = fh.read().splitlines();
+        fh.close();
+        assert len(lines) == 1, lines;
+        rec: any = json.loads(lines[0]);
+        assert rec["source"] == "registry.invoke", rec;
+        assert rec["fields"]["tool"] == "boom", rec;
+        assert "ValueError" in rec["msg"], rec;
+    } finally {
+        if old_log is None {
+            os.environ.pop("JACKAL_LOG", None);
+        } else {
+            os.environ["JACKAL_LOG"] = old_log;
+        }
+        if old_level is None {
+            os.environ.pop("JACKAL_LOG_LEVEL", None);
+        } else {
+            os.environ["JACKAL_LOG_LEVEL"] = old_level;
+        }
+        shutil.rmtree(tmp, ignore_errors=True);
+    }
 }

@@ -66,7 +66,7 @@ test "jac_check happy path formats real CLI output" {
         # Assert the _run_jac_cli output FORMAT only - toolchain verdicts
         # belong to the Jac toolchain, not to this adapter layer.
         # Contract: "jac check <path> -> ok|failed (exit N)\n<body>"
-        assert out.startswith("jac check ");
+        assert out.startswith("jac check "), out;
         assert " -> " in out;
         first_line = out.split("\n")[0];
         assert "ok" in first_line or "failed" in first_line;

@@ -9,6 +9,7 @@ import from .tool_spec {
     ToolSpec,
     make_tool_spec,
 }
+import from .logging { log_exception }
 
 
 obj RegisteredTool {
@@ -187,6 +188,7 @@ def invoke(
         try {
             return str(ent.handler(args));
         } except Exception as e {
+            log_exception("registry.invoke", e, {"tool": name, "origin": "native"});
             return f"ERROR: {e}";
         }
     }
@@ -197,6 +199,7 @@ def invoke(
         try {
             return str(bridge.invoke_js_tool(name, args));
         } except Exception as e {
+            log_exception("registry.invoke", e, {"tool": name, "origin": "js"});
             return f"ERROR: {e}";
         }
     }
