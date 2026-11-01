@@ -24,12 +24,18 @@ active fiber (enforced lightly); no async/inertia - deactivation is eager.
 """An accumulator element: an inverse action plus the coeffect keys it
 retracts when run (used for dependency-notification after recovery)."""
 obj Inverse {
-    has fn: Callable,
+    # NOTE(jac#10495): a **bare** `Callable` field mis-compiles natively — the
+    # call site ICEs ("Type of #1 arg mismatch") or segfaults at run time when
+    # the stored value is a bound method. `Callable | None` lowers correctly,
+    # hence the optional type and the guard in `run`.
+    has fn: Callable | None = None,
         args: list[any] = [],
         keys: list[str] = [];
 
     def run -> None {
-        self.fn(*self.args);
+        if self.fn is not None {
+            self.fn(*self.args);
+        }
     }
 }
 

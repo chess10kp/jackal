@@ -133,6 +133,22 @@ Per-suite logs land in `.testlogs/` (uploaded as CI artifacts
 `testlogs-<shard>`; fetch with `gh run download <run-id>`). CI shards: `agent`,
 `tui`, `ui`, `e2e`, `other`, plus a `jac check` job.
 
+Three things to know before reading a run (learned 2026-11-01):
+
+- **Reported counts are not the file's test count.** `jac test <suite>` also
+  runs the tests registered by every module it imports, because importing a
+  module pulls its `.test.jac` annex (jaseci-labs/jac#10493). A suite with 5
+  tests can report 328. Read the `FAILED ...::<name>` lines, not the totals.
+- **Do not run two suites against the same tree at once.** Two concurrent
+  `jac test` processes on one checkout produced bare `rc=134` aborts with no
+  output that never reproduced serially. Treat a no-output SIGABRT as
+  contention until a solo re-run reproduces it.
+- **Timeouts are portable.** Where coreutils `timeout` is missing (stock
+  macOS) the runner puts the suite in its own process group and kills the
+  group at `TIMEOUT` (default 600 s), reporting `TIMEOUT(143)`; servers and
+  subprocesses die with it. On bash 3.2 the runner is sequential — there is no
+  `wait -n` — so a 75-suite pass takes 2-4 h there.
+
 ## Quarantine
 
 `scripts/test-quarantine.txt` lists known-failing suites, each with a reason.

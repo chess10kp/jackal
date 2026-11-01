@@ -11,9 +11,13 @@
 # kernel rebuilt without the stub (216/146/39/15/237 on 2026-11-01) and were
 # removed.)
 
-# Cordis tracked-effect assertions fail (core.jac:55/64/84/92) and the suite
-# now SIGSEGVs under jac test with no output; C0 core predates the native
-# placement switch. Re-read on a current kernel before unquarantining.
+# Cordis core: the suite aborts with no output. Root cause found 2026-11-01:
+# `Inverse.run` / `Fiber.apply` call *stored callables*, which do not lower
+# natively (jaseci-labs/jac#10495), so those methods demote; `use()` is
+# declared before `_refresh()` and demotion is order-dependent, so `use()`
+# stays native and its call lands on an abort stub (jaseci-labs/jac#10496).
+# Unquarantine when stored-callable calls lower (or when demotion is
+# order-independent and demoted callees are bridged instead of aborted).
 cordis/core
 # Harness drives the full LiveShell (pyte + native-pinned ui render stack).
 # ui.model has upstream-walled demotions (E5092/EdgeRefTrailer), so the

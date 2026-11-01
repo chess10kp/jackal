@@ -54,6 +54,23 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
   full suites). Treat concurrent `jac test` runs on one tree as unsafe, and
   do not read a bare SIGABRT-with-no-output as a suite regression without a
   clean re-run.
+- **Native callable + demotion gaps (found 2026-11-01 chasing `cordis/core`)**:
+  - [#10495](https://github.com/jaseci-labs/jac/issues/10495): a **bare
+    `Callable`** field/local mis-compiles — the call site ICEs
+    (`Type of #1 arg mismatch: i8* != ...`) or segfaults at run time; a call
+    to *any* stored callable (`Callable` or `Callable | None`) does not lower,
+    so the method demotes. `Callable | None` is the safer annotation (no ICE).
+  - [#10496](https://github.com/jaseci-labs/jac/issues/10496): **demotion is
+    order-dependent**. A function analyzed before its un-lowerable callee
+    stays native and keeps a direct call to the later-demoted function, which
+    is a runtime `abort()` stub (`SIGABRT`/`SIGSEGV`, no output). 6-line repro:
+    `caller()` declared above a `callee()` that uses 3-arg `getattr`; swapping
+    the declarations makes the same program pass.
+  - Consequence for `cordis/core`: `Inverse.run`/`Fiber.apply` call stored
+    callables → demote; `use()` is declared before `_refresh()` → stays native
+    → aborts. The quarantine entry now names both issues instead of saying
+    "segfault". `Inverse.fn` was narrowed to `Callable | None` (2 of 6 tests
+    now run; the rest still hit the demotion order).
 - **Test-annex pins (found 2026-11-01 on Linux x86_64, same vendor)**: the
   seal folds `<mod>.test.jac` into `<mod>`'s native unit, so a hard-pinned
   module whose *tests* import a server module fails the module's pin. That was
