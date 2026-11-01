@@ -151,6 +151,7 @@ def run_command(cmd: str, timeout_secs: int = 120) -> str {
         r = subprocess.run(
             cmd, shell=True, capture_output=True, text=True,
             timeout=timeout_secs if timeout_secs > 0 else 120,
+            env=_jac_child_env(),
         );
     } except subprocess.TimeoutExpired {
         return f"ERROR: command timed out after {timeout_secs}s";
@@ -167,12 +168,38 @@ sem run_command.cmd = "The shell command line to execute.";
 sem run_command.timeout_secs = "Seconds before the command is killed (default 120).";
 
 
-"""Run the jac CLI with args and format exit status plus output for the LLM."""
+"""Env vars the harness's own jac process exposes that must NOT reach a
+child process. `JAC_HANDOFF` names the parent's handoff endpoint: a child
+that sees it waits for that endpoint instead of running, which deadlocks
+every `jac check`/`jac format` tool call — and any `jac build`/`jac test`
+the agent runs through run_command — until the timeout (found 2026-11-01;
+the tui/agent suites all went red on the `jac_check` test for this)."""
+glob JAC_CHILD_ENV_DROP: list[str] = ["JAC_HANDOFF"];
+
+
+"""Environment for a child `jac` process: the harness's coordination vars
+removed, so the child is a plain CLI invocation."""
+def _jac_child_env() -> dict[str, str] {
+    env: dict[str, str] = {};
+    for pair in os.environ.items() {
+        env[str(pair[0])] = str(pair[1]);
+    }
+    for key in JAC_CHILD_ENV_DROP {
+        env.pop(key, None);
+    }
+    return env;
+}
+
+
+"""Run the jac CLI with args and format exit status plus output for the LLM.
+Spawns with a sanitized environment (see JAC_CHILD_ENV_DROP) and no stdin:
+a CLI that prompts must fail fast, never hang the agent turn."""
 def _run_jac_cli(args: list[str], timeout_secs: int = 120) -> str {
     effective = timeout_secs if timeout_secs > 0 else 120;
     try {
         r = subprocess.run(
             ["jac"] + args, capture_output=True, text=True, timeout=effective,
+            env=_jac_child_env(), stdin=subprocess.DEVNULL,
         );
     } except FileNotFoundError {
         return "ERROR: jac CLI not found on PATH";

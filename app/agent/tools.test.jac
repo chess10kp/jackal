@@ -141,3 +141,41 @@ test "resolve_path keeps cwd semantics when no sandbox root is set" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
+
+
+test "child jac processes never inherit JAC_HANDOFF" {
+    old = os.environ.get("JAC_HANDOFF");
+    try {
+        os.environ["JAC_HANDOFF"] = "tcp://127.0.0.1:1";
+        env = _jac_child_env();
+        assert "JAC_HANDOFF" not in env, env.get("JAC_HANDOFF");
+        # Unrelated env still passes through.
+        os.environ["JACKAL_PROBE_KEEP"] = "yes";
+        env2 = _jac_child_env();
+        assert env2.get("JACKAL_PROBE_KEEP") == "yes", env2.get("JACKAL_PROBE_KEEP");
+    } finally {
+        os.environ.pop("JACKAL_PROBE_KEEP", None);
+        if old is None {
+            os.environ.pop("JAC_HANDOFF", None);
+        } else {
+            os.environ["JAC_HANDOFF"] = old;
+        }
+    }
+}
+
+
+test "run_command children do not inherit JAC_HANDOFF" {
+    old = os.environ.get("JAC_HANDOFF");
+    try {
+        os.environ["JAC_HANDOFF"] = "tcp://127.0.0.1:1";
+        out = run_command("printenv JAC_HANDOFF || echo ABSENT");
+        assert "ABSENT" in out, out;
+        assert "127.0.0.1:1" not in out, out;
+    } finally {
+        if old is None {
+            os.environ.pop("JAC_HANDOFF", None);
+        } else {
+            os.environ["JAC_HANDOFF"] = old;
+        }
+    }
+}
