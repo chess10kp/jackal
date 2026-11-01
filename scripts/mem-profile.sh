@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# Memory budget gate for the Jackal harness (Linux only; uses /proc).
+# Memory budget gate for the Jackal harness.
 #
-# Runs the interactive harness under the mock provider with a short scripted
-# session, samples RSS across the whole process tree, and reports peak
-# per-process and instantaneous tree totals split at the boot banner:
+# Runs the target under scripted stdin (one mock turn, quiet idle window),
+# samples RSS across the whole process tree, and reports:
 #
-#   boot   — everything before the banner (prep/compile/seal pipeline)
-#   post   — the resident runtime (what must fit the 100 MB budget)
+#   resident  peak tree total during the idle window (the number that must
+#             fit the 100 MB budget)
+#   peak      highest instantaneous tree total anywhere in the run
+#             (boot/compile pipeline — tracked separately, not budgeted)
 #
-# Usage: scripts/mem-profile.sh [--budget-resident MB] [--budget-boot MB] [cmd...]
-# Exit 1 if a budget is exceeded (script exits nonzero on missing tooling).
+# Usage: scripts/mem-profile.sh [--budget-resident MB] [--budget-peak MB] [cmd...]
+# Default cmd: <jac> run main.jac --mode yolo (from app/).
+# For a sealed bundle: scripts/mem-profile.sh ../jac run dist/jackal.jab --mode yolo
+# Requires JACKAL_MODEL unset->mock, JAC or <repo>/jac present.
 set -u
 cd "$(dirname "$0")/.."
 REPO="$PWD"
@@ -21,12 +24,14 @@ export JACKAL_AGENT_DIR="${JACKAL_AGENT_DIR:-$REPO/pi}"
 export JACKAL_MODEL="${JACKAL_MODEL:-mock}"
 
 BUDGET_RESIDENT=""
-BUDGET_BOOT=""
+BUDGET_PEAK=""
+IDLE=8
 CMD=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --budget-resident) shift; BUDGET_RESIDENT="$1" ;;
-    --budget-boot) shift; BUDGET_BOOT="$1" ;;
+    --budget-peak) shift; BUDGET_PEAK="$1" ;;
+    --idle) shift; IDLE="$1" ;;
     --help|-h) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) CMD+=("$1") ;;
   esac
@@ -35,20 +40,20 @@ done
 [ ${#CMD[@]} -gt 0 ] || CMD=("$JAC" "run" "main.jac" "--mode" "yolo")
 
 cd "$REPO/app"
-OUT="$(python3 "$REPO/scripts/mem_profile.py" --marker "all-Jac agent harness" \
+OUT="$(python3 "$REPO/scripts/mem_profile.py" --idle-seconds "$IDLE" \
         -- "${CMD[@]}")" || { echo "mem-profile: sampler failed" >&2; exit 2; }
 cd "$REPO"
 
-python3 - "$OUT" ${BUDGET_RESIDENT:+$BUDGET_RESIDENT} ${BUDGET_BOOT:+$BUDGET_BOOT} <<'PY'
+python3 - "$OUT" ${BUDGET_RESIDENT:+$BUDGET_RESIDENT} ${BUDGET_PEAK:+$BUDGET_PEAK} <<'PY'
 import json, sys
 r = json.loads(sys.argv[1])
-res = r["post_boot_peak_total_kb"] / 1024.0
-boot = r["boot_peak_total_kb"] / 1024.0
+res = r["idle_kb"] / 1024.0
+peak = r["tree_peak_kb"] / 1024.0
 worst = r.get("worst_process") or {}
-print(f"resident (post-boot tree peak): {res:.0f} MB")
-print(f"boot     (prep pipeline peak): {boot:.0f} MB")
+print(f"resident (idle tree total): {res:.0f} MB")
+print(f"peak     (whole run):       {peak:.0f} MB")
 if worst:
-    print(f"worst process: {worst.get('exe')} {worst.get('kb', 0)//1024} MB "
+    print(f"worst process: {worst.get('exe')} {worst.get('kb', 0)/1024:.0f} MB "
           f"(pid {worst.get('pid')})")
 fail = False
 if len(sys.argv) > 2:
@@ -58,8 +63,8 @@ if len(sys.argv) > 2:
         fail = True
 if len(sys.argv) > 3:
     budget = float(sys.argv[3])
-    print(f"boot budget: {budget:.0f} MB")
-    if boot > budget:
+    print(f"peak budget: {budget:.0f} MB")
+    if peak > budget:
         fail = True
 sys.exit(1 if fail else 0)
 PY
