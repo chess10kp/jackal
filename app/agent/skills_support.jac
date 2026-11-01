@@ -19,13 +19,13 @@ glob MAX_NAME_LENGTH: int = 64,
 
 
 """str-typed shims over os.path stubs that require PathLike/LiteralString."""
-def _base_name(p: any) -> str {
-    return str(p).replace(os.sep, "/").rsplit("/", 1)[-1];
+def _base_name(p: str) -> str {
+    return p.replace(os.sep, "/").rsplit("/", 1)[-1];
 }
 
 
-def _dir_name(p: any) -> str {
-    s = str(p).replace(os.sep, "/");
+def _dir_name(p: str) -> str {
+    s = p.replace(os.sep, "/");
     idx = s.rfind("/");
     if idx == -1 {
         return s;
@@ -37,18 +37,18 @@ def _dir_name(p: any) -> str {
 }
 
 
-def _rel_path(target: any, start: any) -> str {
+def _rel_path(target: str, start: str) -> str {
     return str(os.path.relpath(target, start));
 }
 
 
-def _abs_path(p: any) -> str {
+def _abs_path(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
 
 """Realpath canonicalization with abspath fallback."""
-def _canonical(p: any) -> str {
+def _canonical(p: str) -> str {
     try {
         return str(os.path.realpath(p));
     } except OSError {
@@ -57,7 +57,7 @@ def _canonical(p: any) -> str {
 }
 
 
-def _is_abs(p: any) -> bool {
+def _is_abs(p: str) -> bool {
     return bool(os.path.isabs(p));
 }
 
