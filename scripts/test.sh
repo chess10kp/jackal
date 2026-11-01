@@ -47,17 +47,37 @@ mkdir -p "$LOGDIR"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    -j*) JOBS="${1#-j}"; [ -n "$JOBS" ] || { shift; JOBS="$1"; } ;;
+    -j*)
+      JOBS="${1#-j}"
+      if [ -z "$JOBS" ]; then
+        [ $# -ge 2 ] || { echo "test.sh: -j needs a number" >&2; exit 2; }
+        shift
+        JOBS="$1"
+      fi
+      ;;
     --fail-fast) FAIL_FAST=1 ;;
-    --exclude) shift; EXCLUDES+=("$1") ;;
-    --quarantine) shift; QUARANTINE_FILE="$1" ;;
+    --exclude) shift; [ $# -ge 1 ] || { echo "test.sh: --exclude needs a path" >&2; exit 2; }; EXCLUDES+=("$1") ;;
+    --quarantine) shift; [ $# -ge 1 ] || { echo "test.sh: --quarantine needs a file" >&2; exit 2; }; QUARANTINE_FILE="$1" ;;
     --fail-on-xpass) FAIL_ON_XPASS=1 ;;
-    -k*) KEYWORDS+=("${1#-k}"); [ -n "${KEYWORDS[-1]}" ] || { shift; KEYWORDS+=("$1"); } ;;
+    -k*)
+      # `KEYWORDS[-1]` is bash 4.3+; stock macOS 3.2 rejects any negative
+      # subscript, so compute the last index explicitly.
+      KEYWORDS+=("${1#-k}")
+      if [ -z "${KEYWORDS[$((${#KEYWORDS[@]} - 1))]}" ]; then
+        [ $# -ge 2 ] || { echo "test.sh: -k needs a keyword" >&2; exit 2; }
+        shift
+        KEYWORDS+=("$1")
+      fi
+      ;;
     --help|-h) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) FILTERS+=("$1") ;;
   esac
   shift
 done
+
+case "$JOBS" in
+  ''|*[!0-9]*) echo "test.sh: -j needs a positive number (got '$JOBS')" >&2; exit 2 ;;
+esac
 
 export JACKAL_ROOT="${JACKAL_ROOT:-$REPO}"
 export JACKAL_AGENT_DIR="${JACKAL_AGENT_DIR:-$REPO/pi}"
@@ -66,7 +86,7 @@ export JACKAL_AGENT_DIR="${JACKAL_AGENT_DIR:-$REPO/pi}"
 SUITES=()
 while IFS= read -r _suite; do
   SUITES+=("$_suite")
-done < <(find app -name '*.test.jac' | sort)
+done < <(find app -name '*.test.jac' -not -path '*/.jac/*' | sort)
 [ ${#SUITES[@]} -gt 0 ] || { echo "no suites found"; exit 2; }
 if [ "${JAC_SERIAL_ONLY:-0}" = "1" ] && [ "$JOBS" -gt 1 ]; then
   echo "test.sh: bash ${BASH_VERSION%%(*} lacks 'wait -n'; running sequentially" >&2
