@@ -1,10 +1,13 @@
 # Local Jac compiler checkout (`vendor/jac`)
 
-**Updated:** 2026-11-01 · **Source:** `jaseci-labs/jac` `main` @ `eafdb1682321f93d60c8590119e1d7e1b6e4fd38` · **Form:** local shallow clone (ignored by git)
+**Updated:** 2026-11-02 · **Source:** `jaseci-labs/jac` `main` @ `ad7d44b6ec3398cb9a0b9687277d8e2a4b07e5c0` · **Form:** local shallow clone (ignored by git), branch `jackal/local-divergence`
 
-**Local divergence (2026-11-01):** branch `fix/native-hasattr-fields` is
-upstream `eafdb1682` + `5103ea5cf` ("lower hasattr for Jac object fields") +
-`383015f8b` (kernel-safe body). The original body's literal fast path used a
+**Local divergence (2026-11-02):** branch `jackal/local-divergence` is
+upstream `ad7d44b6` + `7d8fda5` ("lower hasattr for Jac object fields",
+kernel-safe strcmp body; upstream #10485/#10492 still open — upstream
+`emit_hasattr` still returns None) + `021fb7b`
+(`JAC_IGNORE_PLACEMENT_PINS` dev-fast-path mute). Previously:
+upstream `eafdb1682` + `5103ea5cf` + `383015f8b`. The original body's literal fast path used a
 3-arg `getattr(node, "lit_value", None)`; the native backend refuses that
 `FuncCall`, so when the compiler is compiled *into the kernel* the function
 became an `abort()` stub and every build/test of a module containing `hasattr`

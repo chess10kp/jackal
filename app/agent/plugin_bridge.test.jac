@@ -44,14 +44,6 @@ def _tool_echo(args: dict[str, any]) -> str {
 }
 
 
-"""Checker shim: the Jac type checker cannot bind AnyStr when a plain str
-flows into os.path.dirname (same pattern as auth.jac / checkpoints.jac)."""
-def _path_dirname(p: str) -> str {
-    fn: any = os.path.dirname;
-    return str(fn(p));
-}
-
-
 test "ensure_host emits host_hello and is lazy" {
     bridge = create_bridge("s1");
     assert bridge.host is None;

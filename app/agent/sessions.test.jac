@@ -38,11 +38,6 @@ def _hist(*exchanges: str) -> list[dict[str, any]] {
 }
 
 
-def _sessions_dir(tmp: str) -> str {
-    return os.path.join(tmp, ".jackal", "sessions");
-}
-
-
 def _read_raw(path: str) -> any {
     fh = open(path, "r");
     try {
