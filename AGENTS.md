@@ -35,6 +35,8 @@ cd app && ../jac build               # native compile check over app/
 
 **Requirements:** build Jac with `./scripts/setup-vendor-jac.sh` (Zig 0.16.0 required); a TTY for the TUI; provider API keys via env or auth.json (see below).
 
+**macOS (Apple Silicon):** no compiler build needed — `./scripts/setup-macos.sh` installs the published `jac-<ver>-macos-aarch64` release binary as `./jac` (checksum-verified, self-contained runtime, no Python/zig). Running Jackal on macOS never requires Xcode or a source build; `--build` is only for native-lowering work.
+
 ---
 
 ## Architecture (one picture)

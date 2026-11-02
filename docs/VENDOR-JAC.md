@@ -48,6 +48,27 @@ jac --version
 
 Requirements: Zig 0.16.0 and network access for upstream source and pinned build dependencies. The `-Ddev` binary **links the local compiler source live**; run the setup script again after updating compiler sources or launcher files.
 
+## macOS lane (Apple Silicon)
+
+Running Jackal on macOS does not require this build at all:
+
+```bash
+./scripts/setup-macos.sh            # download jac-<ver>-macos-aarch64 -> ./jac
+./scripts/setup-macos.sh --build    # build vendor/jac instead (Xcode CLT + Zig)
+```
+
+The default lane fetches the published release binary, verifies its `.sha256`,
+installs it as `./jac`, then runs `jac install` in `app/` for the `[dependencies.pypi]`
+entries. The binary is self-contained (bundled runtime, no Python/pip) and
+`macos-x86_64` is not shipped by upstream (#8805), so the script refuses Intel Macs.
+
+Startup: `run.sh` launches with `jac run -b python`, which is an upstream flag, so
+the dev fast path works with a released binary. The `JAC_IGNORE_PLACEMENT_PINS`
+hook that `run.sh` also exports exists **only** in this checkout's `vendor/jac`
+(commit `6e7e4986c`); it is not on upstream `main` and not in any release, so it is
+inert with a downloaded binary. Do not make anything depend on it — an upstream
+sync (`setup-vendor-jac.sh` checks out `origin/main`) drops the local commit.
+
 ## Editing rules
 
 1. Fixes must stay **upstream-able**: conventional commits, no co-author lines, no gratuitous divergence from upstream structure.
