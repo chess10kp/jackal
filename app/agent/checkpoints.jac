@@ -32,6 +32,7 @@ import shutil;
 import subprocess;
 import datetime;
 import from .logging { log_debug, log_warn, log_exception }
+import from .json_pretty { json_pretty }
 
 glob _MAX_CHECKPOINT_FILES: int = 500,
      _DESCRIPTION_LENGTH: int = 80,
@@ -44,20 +45,17 @@ glob _MAX_CHECKPOINT_FILES: int = 500,
 values flow into some os.path signatures (abspath/relpath/dirname), so
 route those calls through any-typed aliases."""
 def _path_dirname(p: str) -> str {
-    fn: any = os.path.dirname;
-    return str(fn(p));
+    return str(os.path.dirname(p));
 }
 
 
 def _path_abspath(p: str) -> str {
-    fn: any = os.path.abspath;
-    return str(fn(p));
+    return str(os.path.abspath(p));
 }
 
 
 def _path_relpath(p: str, start: str) -> str {
-    fn: any = os.path.relpath;
-    return str(fn(p, start));
+    return str(os.path.relpath(p, start));
 }
 
 
@@ -228,7 +226,7 @@ def _write_json(path: str, data: any) -> bool {
     fh = None;
     try {
         fh = open(path, "w");
-        json.dump(data, fh, indent=2);
+        fh.write(json_pretty(json.dumps(data)));
         fh.write("\n");
     } except OSError {
         return False;

@@ -30,6 +30,7 @@ import os;
 import json;
 import uuid;
 import datetime;
+import from .json_pretty { json_pretty }
 
 glob TASKS_FILE: str = "tasks.json",
      _NO_TASKS_LINE: str = "No tasks. Use /tasks add <title> or create_task.";
@@ -102,7 +103,7 @@ def save_tasks(cwd: str, tasks: list[dict[str, any]]) -> bool {
     fh = None;
     try {
         fh = open(tasks_path(cwd), "w");
-        json.dump(tasks, fh, indent=2);
+        fh.write(json_pretty(json.dumps(tasks)));
         fh.write("\n");
     } except OSError {
         return False;

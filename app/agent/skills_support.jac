@@ -212,7 +212,7 @@ def _load_ignore_rules(root_dir: str, subdir: str) -> list[str] {
         }
         fh = None;
         try {
-            fh = open(fpath, encoding="utf-8");
+            fh = open(fpath);
             rules.extend(_gitignore_parse_rules(fh.read(), prefix));
         } except (OSError, UnicodeDecodeError) {
             # Unreadable ignore files contribute no rules.

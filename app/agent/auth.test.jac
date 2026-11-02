@@ -45,8 +45,7 @@ def _read_raw(path: str) -> any {
 
 
 def _dirname(p: str) -> str {
-    fn: any = os.path.dirname;
-    return str(fn(p));
+    return str(os.path.dirname(p));
 }
 
 

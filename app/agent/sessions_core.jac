@@ -36,6 +36,7 @@ import json;
 import time;
 import re;
 import datetime;
+import from .json_pretty { json_pretty }
 
 glob _last_id_ms: int = 0,
      _SESSION_ID_PATTERN: str = r"^sess_[0-9]+$",
@@ -52,14 +53,12 @@ glob _last_id_ms: int = 0,
 checking when plain str values flow in; route through any-typed aliases
 (same pattern as compaction.jac / extensions.jac)."""
 def _path_abspath(p: str) -> str {
-    fn: any = os.path.abspath;
-    return str(fn(p));
+    return str(os.path.abspath(p));
 }
 
 
 def _path_dirname(p: str) -> str {
-    fn: any = os.path.dirname;
-    return str(fn(p));
+    return str(os.path.dirname(p));
 }
 
 
@@ -100,9 +99,31 @@ def new_session_id() -> str {
 }
 
 
+"""ISO 8601 UTC with milliseconds (strftime has no native floor; the
+civil-from-days arithmetic is exact and lowers cleanly)."""
 def _iso_from_ms(ms: int) -> str {
     (secs, msec) = divmod(ms, 1000);
-    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(secs)) + f".{msec:03d}Z";
+    days: int = secs // 86400;
+    rem: int = secs % 86400;
+    z: int = days + 719468;
+    era: int = z // 146097;
+    doe: int = z - era * 146097;
+    yoe: int = (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365;
+    y: int = yoe + era * 400;
+    doy: int = doe - (365 * yoe + yoe // 4 - yoe // 100);
+    mp: int = (5 * doy + 2) // 153;
+    d: int = doy - (153 * mp + 2) // 5 + 1;
+    m: int = mp + 3;
+    if mp >= 10 {
+        m = mp - 9;
+    }
+    if m <= 2 {
+        y += 1;
+    }
+    hh: int = rem // 3600;
+    mi: int = (rem % 3600) // 60;
+    ss: int = rem % 60;
+    return f"{y:04d}-{m:02d}-{d:02d}T{hh:02d}:{mi:02d}:{ss:02d}.{msec:03d}Z";
 }
 
 
@@ -133,7 +154,7 @@ def _write_json(path: str, data: any) -> bool {
     fh = None;
     try {
         fh = open(path, "w");
-        json.dump(data, fh, indent=2);
+        fh.write(json_pretty(json.dumps(data)));
         fh.write("\n");
     } except OSError {
         return False;
@@ -148,26 +169,32 @@ def _write_json(path: str, data: any) -> bool {
 
 """Legacy SessionRecord shape check (mirrors isSessionRecord upstream)."""
 def _is_record(rec: any) -> bool {
+    if not isinstance(rec, dict) {
+        return False;
+    }
+    d: dict[str, any] = rec;
     return (
-        isinstance(rec, dict)
-        and isinstance(rec.get("sessionId"), str)
-        and isinstance(rec.get("sessionName"), str)
-        and isinstance(rec.get("cwd"), str)
-        and isinstance(rec.get("updatedAt"), str)
-        and isinstance(rec.get("messages"), list)
+        isinstance(d.get("sessionId"), str)
+        and isinstance(d.get("sessionName"), str)
+        and isinstance(d.get("cwd"), str)
+        and isinstance(d.get("updatedAt"), str)
+        and isinstance(d.get("messages"), list)
     );
 }
 
 
 """Legacy SessionIndexEntry shape check (mirrors isIndexEntry upstream)."""
 def _is_index_entry(item: any) -> bool {
+    if not isinstance(item, dict) {
+        return False;
+    }
+    d: dict[str, any] = item;
     return (
-        isinstance(item, dict)
-        and isinstance(item.get("id"), str)
-        and isinstance(item.get("name"), str)
-        and isinstance(item.get("cwd"), str)
-        and isinstance(item.get("updatedAt"), str)
-        and isinstance(item.get("messageCount"), (int, float))
+        isinstance(d.get("id"), str)
+        and isinstance(d.get("name"), str)
+        and isinstance(d.get("cwd"), str)
+        and isinstance(d.get("updatedAt"), str)
+        and isinstance(d.get("messageCount"), (int, float))
     );
 }
 
@@ -267,16 +294,20 @@ def _scan_directory(cwd: str) -> list[dict[str, any]] {
             continue;
         }
         rec = _read_json(os.path.join(sdir, name));
-        if not isinstance(rec, dict) or str(rec.get("sessionId", "")) != sid {
+        if not isinstance(rec, dict) {
             continue;
         }
-        messages = rec.get("messages");
+        rd: dict[str, any] = rec;
+        if str(rd.get("sessionId", "")) != sid {
+            continue;
+        }
+        messages = rd.get("messages");
         count = len(messages) if isinstance(messages, list) else 0;
-        updated = rec.get("updatedAt");
+        updated = rd.get("updatedAt");
         found.append({
             "id": sid,
-            "name": str(rec.get("sessionName", "")),
-            "cwd": str(rec.get("cwd", cwd)),
+            "name": str(rd.get("sessionName", "")),
+            "cwd": str(rd.get("cwd", cwd)),
             "updatedAt": updated if isinstance(updated, str) else "",
             "messageCount": count,
         });
@@ -314,15 +345,16 @@ def save_session(
     prior_model = "";
     existing = _read_json(path);
     if _is_record(existing) {
-        prior_created = existing.get("createdAt");
+        ed: dict[str, any] = existing;
+        prior_created = ed.get("createdAt");
         if isinstance(prior_created, str) and prior_created {
             created = prior_created;
         }
-        recorded = existing.get("sessionName");
+        recorded = ed.get("sessionName");
         if isinstance(recorded, str) {
             prior_name = recorded;
         }
-        prior_rec_model = existing.get("model");
+        prior_rec_model = ed.get("model");
         if isinstance(prior_rec_model, str) {
             prior_model = prior_rec_model;
         }
@@ -400,7 +432,8 @@ def load_session(cwd: str, session_id: str) -> list[dict[str, any]] {
     if not _is_record(rec) {
         return [];
     }
-    messages = rec.get("messages");
+    rd: dict[str, any] = rec;
+    messages = rd.get("messages");
     if not isinstance(messages, list) {
         return [];
     }
@@ -450,14 +483,18 @@ def rename_session(cwd: str, session_id: str, name: str) -> bool {
         return False;
     }
     rec = _read_json(_session_path(cwd, session_id));
-    if not _is_record(rec) or str(rec.get("sessionId", "")) != session_id {
+    if not _is_record(rec) {
         return False;
     }
-    messages = rec.get("messages");
+    rd: dict[str, any] = rec;
+    if str(rd.get("sessionId", "")) != session_id {
+        return False;
+    }
+    messages = rd.get("messages");
     count = len(messages) if isinstance(messages, list) else 0;
-    prior_cwd = rec.get("cwd");
+    prior_cwd = rd.get("cwd");
     record_cwd = prior_cwd if isinstance(prior_cwd, str) and prior_cwd else cwd;
-    prior_created = rec.get("createdAt");
+    prior_created = rd.get("createdAt");
     created = prior_created if isinstance(prior_created, str) and prior_created else _now_iso();
 
     updated = _now_iso();

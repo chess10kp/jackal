@@ -24,6 +24,7 @@ import from .mcp {
     mcp_list_resources,
     mcp_read_resource,
 }
+import from .json_pretty { json_pretty }
 import from .session_state {
     history,
     model,
@@ -521,7 +522,7 @@ def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] 
             os.makedirs(os.path.dirname(target), exist_ok=True);
             tmp_write: str = target + ".tmp";
             with open(tmp_write, "w", encoding="utf-8") as fh {
-                json.dump(user_cfg, fh, indent=2, sort_keys=True);
+                fh.write(json_pretty(json.dumps(user_cfg, sort_keys=True)));
                 fh.write("\n");
             }
             os.replace(tmp_write, target);
@@ -1317,7 +1318,7 @@ def _record_model_pref(name: str) {
         os.makedirs(prefs_dir, exist_ok=True);
         path = os.path.join(prefs_dir, "model_prefs.json");
         with open(path, "w") as fh {
-            json.dump(_model_prefs, fh, indent=2, sort_keys=True);
+            fh.write(json_pretty(json.dumps(_model_prefs, sort_keys=True)));
             fh.write("\n");
         }
     } except Exception {

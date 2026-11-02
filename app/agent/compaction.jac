@@ -25,14 +25,12 @@ import from .llm { make_transport }
 values flow into os.path abspath/dirname, so route those calls through
 any-typed aliases (same pattern as auth.jac / checkpoints.jac)."""
 def _path_abspath(p: str) -> str {
-    fn: any = os.path.abspath;
-    return str(fn(p));
+    return str(os.path.abspath(p));
 }
 
 
 def _path_dirname(p: str) -> str {
-    fn: any = os.path.dirname;
-    return str(fn(p));
+    return str(os.path.dirname(p));
 }
 
 

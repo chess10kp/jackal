@@ -13,11 +13,34 @@ def initial_auth_flow_state() -> dict[str, any] {
 }
 
 
+"""copy.deepcopy over dict[str, any] cannot dispatch on `any` values
+natively; the flow state is JSON-shaped, so an explicit recursive copy is
+identical."""
+def _deep_copy(value: any) -> any {
+    if isinstance(value, dict) {
+        od: dict[str, any] = {};
+        for (k, v) in value.items() {
+            od[k] = _deep_copy(v);
+        }
+        return od;
+    }
+    if isinstance(value, list) {
+        ol: list[any] = [];
+        for v in value {
+            ol.append(_deep_copy(v));
+        }
+        return ol;
+    }
+    return value;
+}
+
+
 """Steps that block on user input (prompt/manual_code/select/api_key_input).
 The UI layer attaches promise resolvers to these; cancel mid-flow means
 abandoning such a step and returning to idle."""
 def step_is_pending(state: dict[str, any]) -> bool {
-    kind = state.get("step", {}).get("kind", "");
+    step: dict[str, any] = state.get("step", {});
+    kind = step.get("kind", "");
     return kind in ["prompt", "manual_code", "select", "api_key_input"];
 }
 
@@ -29,7 +52,7 @@ set_error, set_idle, update_query, update_provider_filter, cancel, reset.
 Unknown actions return an unchanged copy. Never mutates current_state."""
 def transition_auth_flow(current_state: dict[str, any], action: str, payload: dict[str, any] | None = None) -> dict[str, any] {
     p = payload if payload is not None else {};
-    step = current_state.get("step", {});
+    step: dict[str, any] = current_state.get("step", {});
 
     if action == "open_provider_picker" {
         incoming: list[dict[str, any]] = p.get("providers", []);
@@ -120,21 +143,21 @@ def transition_auth_flow(current_state: dict[str, any], action: str, payload: di
         query = p.get("query", "");
         kind = step.get("kind");
         if kind == "provider_picker" or kind == "model_picker" {
-            new_step = copy.deepcopy(step);
+            new_step: dict[str, any] = _deep_copy(step);
             new_step["query"] = query;
             return {"step": new_step};
         }
-        return copy.deepcopy(current_state);
+        return _deep_copy(current_state);
     }
 
     if action == "update_provider_filter" {
         provider_filter = p.get("providerFilter");
         if step.get("kind") == "model_picker" {
-            new_step = copy.deepcopy(step);
+            new_step: dict[str, any] = _deep_copy(step);
             new_step["providerFilter"] = provider_filter;
             return {"step": new_step};
         }
-        return copy.deepcopy(current_state);
+        return _deep_copy(current_state);
     }
 
     if action == "cancel" {
@@ -145,5 +168,5 @@ def transition_auth_flow(current_state: dict[str, any], action: str, payload: di
         return initial_auth_flow_state();
     }
 
-    return copy.deepcopy(current_state);
+    return _deep_copy(current_state);
 }

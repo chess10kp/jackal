@@ -29,9 +29,7 @@ glob MAX_TOOL_OUTPUT: int = MAX_TOOL_RESULT,
 
 # os.path.dirname/relpath and fnmatch.fnmatch demand PathLike/LiteralString
 # params under native checking; any-typed aliases keep call sites str-based.
-glob _os_dirname: any = os.path.dirname,
-     _os_relpath: any = os.path.relpath,
-     _fnmatch: any = fnmatch.fnmatch;
+
 
 """Lexically normalize a path: collapse '.', '..', and duplicate separators.
 Purely textual — symlinks are NOT resolved (see `resolve_path`)."""
@@ -110,7 +108,7 @@ sem read_file.path = "Filesystem path to read, relative to the project root.";
 
 def write_file(path: str, content: str) -> str {
     full: str = resolve_path(path);
-    d: str = _os_dirname(full);
+    d: str = os.path.dirname(full);
     if d { os.makedirs(d, exist_ok=True); }
     with open(full, "w") as f { f.write(content); }
     return f"Wrote {len(content)} bytes to {path}";
@@ -261,8 +259,8 @@ def file_glob(pattern: str, base_dir: str = ".", max_results: int = MAX_SEARCH_R
         for name in files {
             if name.startswith(".") { continue; }
             full = os.path.join(current, name);
-            rel: str = str(_os_relpath(str(full), str(base_path))).replace(os.sep, "/");
-            if _fnmatch(rel, pattern) or _fnmatch(name, pattern) {
+            rel: str = str(os.path.relpath(str(full), str(base_path))).replace(os.sep, "/");
+            if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(name, pattern) {
                 matches.append(rel);
             }
         }
@@ -299,7 +297,7 @@ def content_grep(pattern: str, base_dir: str = ".", regex: bool = False, max_res
         for name in files {
             if name.startswith(".") { continue; }
             full = os.path.join(current, name);
-            rel: str = str(_os_relpath(str(full), str(base_path))).replace(os.sep, "/");
+            rel: str = str(os.path.relpath(str(full), str(base_path))).replace(os.sep, "/");
             try {
                 with open(full, "r", errors="replace") as f { lines = f.readlines(); }
             } except (OSError, UnicodeError) { continue; }

@@ -48,6 +48,9 @@ glob KNOWN_AUTH_TYPES: list[str] = ["oauth", "api_key", "env"];
 glob OAUTH_REQUIRED_KEYS: list[str] = ["refresh", "access"];
 
 
+import from c { def chmod(path: str, mode: i32) -> i32;  }
+
+
 # ── Checker shims ───────────────────────────────────────────────────────
 
 
@@ -55,26 +58,22 @@ glob OAUTH_REQUIRED_KEYS: list[str] = ["refresh", "access"];
 values flow into some os.path/stat signatures (abspath/expanduser/chmod),
 so route those calls through any-typed aliases."""
 def _path_abspath(p: str) -> str {
-    fn: any = os.path.abspath;
-    return str(fn(p));
+    return str(os.path.abspath(p));
 }
 
 
 def _path_expanduser(p: str) -> str {
-    fn: any = os.path.expanduser;
-    return str(fn(p));
+    return str(os.path.expanduser(p));
 }
 
 
 def _path_dirname(p: str) -> str {
-    fn: any = os.path.dirname;
-    return str(fn(p));
+    return str(os.path.dirname(p));
 }
 
 
 def _file_chmod(p: str, mode: int) {
-    fn: any = os.chmod;
-    fn(p, mode);
+    chmod(p, i32(mode));
 }
 
 
@@ -122,6 +121,9 @@ def load_auth_file(path: str) -> dict[str, any] {
 }
 
 
+import from .json_pretty { json_pretty }
+
+
 """Save auth data as pretty JSON (indent=2 + trailing newline), creating
 parent dirs 0700 and chmod-ing the file 0600. True on success."""
 def save_auth_file(path: str, data: dict[str, any]) -> bool {
@@ -131,11 +133,10 @@ def save_auth_file(path: str, data: dict[str, any]) -> bool {
             os.makedirs(parent, mode=0o700, exist_ok=True);
         }
         fh = open(path, "w");
-        json.dump(data, fh, indent=2);
+        fh.write(json_pretty(json.dumps(data)));
         fh.write("\n");
         fh.close();
-        owner_rw: any = stat.S_IRUSR | stat.S_IWUSR;
-        _file_chmod(path, owner_rw);
+        _file_chmod(path, stat.S_IRUSR | stat.S_IWUSR);
         return True;
     } except OSError {
         return False;

@@ -37,8 +37,7 @@ def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
     for name in entries {
         full = os.path.join(dir_path, name);
         is_dir = os.path.isdir(full);
-        rel_fn: any = os.path.relpath;
-        rel = str(rel_fn(full, base_root)).replace(os.sep, "/");
+        rel = str(os.path.relpath(full, base_root)).replace(os.sep, "/");
         # Ignore patterns match dirs with a trailing slash (skills.jac
         # convention), files bare.
         rel_cmp = rel + "/" if is_dir else rel;

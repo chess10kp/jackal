@@ -40,8 +40,7 @@ def _cp_dir(tmp: str) -> str {
 
 def _write_file(base: str, rel: str, content: str) {
     path: str = os.path.join(base, rel);
-    dn: any = os.path.dirname;
-    os.makedirs(str(dn(path)), exist_ok=True);
+    os.makedirs(str(os.path.dirname(path)), exist_ok=True);
     fh: any = open(path, "w");
     try {
         fh.write(content);

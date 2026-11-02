@@ -39,14 +39,12 @@ glob _FILE_MENTION_PATTERN: str = r"@([^\s:]+)(?::(\d+)(?:-(\d+))?)?",
 """Checker shim: os.path.abspath/normpath stubs require PathLike, so route
 plain str values through any-typed aliases (same pattern as checkpoints.jac)."""
 def _path_abspath(p: str) -> str {
-    fn: any = os.path.abspath;
-    return str(fn(p));
+    return str(os.path.abspath(p));
 }
 
 
 def _path_normpath(p: str) -> str {
-    fn: any = os.path.normpath;
-    return str(fn(p));
+    return str(os.path.normpath(p));
 }
 
 

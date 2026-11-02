@@ -50,8 +50,7 @@ def _read_raw(path: str) -> any {
 
 def _write_text(path: str, text: str) {
     # any-typed alias: native checker binds os.path.dirname to PathLike.
-    dfn: any = os.path.dirname;
-    os.makedirs(str(dfn(path)), exist_ok=True);
+    os.makedirs(str(os.path.dirname(path)), exist_ok=True);
     fh = open(path, "w");
     try {
         fh.write(text);

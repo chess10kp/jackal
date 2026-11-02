@@ -54,7 +54,7 @@ def prune_sessions(cwd: str, max_count: int = 0, retention_days: int = 0) -> int
     if not os.path.isdir(_sessions_dir(cwd)) {
         return 0;
     }
-    entries = list_sessions(cwd);
+    entries: list[dict[str, any]] = list_sessions(cwd);
     if not entries {
         return 0;
     }
@@ -92,7 +92,7 @@ def prune_sessions(cwd: str, max_count: int = 0, retention_days: int = 0) -> int
 
 """Id of the most recently updated session, or None when there are none."""
 def latest_session_id(cwd: str) -> str | None {
-    entries = list_sessions(cwd);
+    entries: list[dict[str, any]] = list_sessions(cwd);
     if not entries {
         return None;
     }
@@ -137,14 +137,16 @@ def export_session(cwd: str, session_id: str, path: str) -> bool {
             lines.append(content);
             lines.append("");
         } elif role == "assistant" {
-            calls = msg.get("tool_calls");
+            calls: any = msg.get("tool_calls");
             if isinstance(calls, list) and calls {
                 for call in calls {
                     if not isinstance(call, dict) { continue; }
-                    fn: any = call.get("function", {});
+                    cd: dict[str, any] = call;
+                    fn: any = cd.get("function", {});
                     if not isinstance(fn, dict) { continue; }
+                    fd: dict[str, any] = fn;
                     lines.append(
-                        "**tool call: " + str(fn.get("name", "")) + "**"
+                        "**tool call: " + str(fd.get("name", "")) + "**"
                     );
                     lines.append("");
                     lines.append("```json");
