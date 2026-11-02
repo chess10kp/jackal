@@ -23,11 +23,20 @@ unset JAC_HANDOFF
 
 # Dev fast path. `app/jac.toml` pins most of the ui stack to `native`, which a
 # dev `jac run` satisfies by JIT-linking the whole app on every launch: cold
-# start ~6 min, warm restore hangs (>5 min, stuck in MCJIT). Muting the pins
-# makes the run plain Python: ~3 s warm, ~2 min cold on the bytecode floor.
+# start ~6 min, warm restore hangs (>5 min, stuck in MCJIT, Linux). Running on
+# the Python codespace instead makes it plain Python: ~3 s warm, ~2 min cold.
+#
+# Two levers do that, and they differ in portability:
+#   -b python                      upstream flag; any released `jac` honors it
+#   JAC_IGNORE_PLACEMENT_PINS=1    local vendor hook (vendor/jac 6e7e4986c),
+#                                  absent from upstream main and from releases
+# The flag is the one that matters -- e.g. a downloaded macOS binary ignores
+# the env var, so without it ./run.sh would pay the full native prepare there.
 # Set JACKAL_NATIVE=1 to keep the pins (use when probing native lowering).
 if [[ "${JACKAL_NATIVE:-0}" != "1" ]]; then
   export JAC_IGNORE_PLACEMENT_PINS=1
+  cd "$REPO_ROOT/app"
+  exec "$REPO_ROOT/jac" run -b python tui/shell.jac "$@"
 fi
 
 cd "$REPO_ROOT/app"
