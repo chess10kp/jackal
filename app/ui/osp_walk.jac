@@ -22,7 +22,11 @@ def ui_jids_reachable_from_nodes(seeds: list[any], ui_jids: set[str]) -> list[st
     queue: list[OspAny] = [];
     for s_any in seeds {
         s: OspAny = s_any;
-        queue.append(s);
+        sj: str = jid(s);
+        if sj not in visited {
+            visited.add(sj);
+            queue.append(s);
+        }
     }
     while queue {
         current: OspAny = queue.pop(0);

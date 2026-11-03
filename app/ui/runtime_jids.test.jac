@@ -39,3 +39,11 @@ test "registered capability node stays unreachable" {
     assert ui_jids_reachable_from_persistent_root(session.tracked_node_ids) == [];
     dispose_session(session);
 }
+
+
+test "persistent root is included in its reachable jids" {
+    root_id: str = jid(root);
+    ui_ids: set[str] = set();
+    ui_ids.add(root_id);
+    assert ui_jids_reachable_from_persistent_root(ui_ids) == [root_id];
+}
