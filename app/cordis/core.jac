@@ -205,9 +205,7 @@ obj EffectContext {
         self.current_fiber = name;
         self.frames[name] = [];
         try {
-            # optional callables can't be invoked natively (jac#10539)
-            apply_fn: Callable = fiber.apply;
-            apply_fn(self, fiber);
+            fiber.apply(self, fiber);
             fiber.active = True;
             self._log("activated " + name);
         } finally {
