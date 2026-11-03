@@ -122,7 +122,9 @@ def export_session(cwd: str, session_id: str, path: str) -> bool {
     lines.append("- updated: " + str(rec.get("updatedAt", "")));
     rec_model = rec.get("model");
     if isinstance(rec_model, str) and rec_model {
-        lines.append("- model: " + rec_model);
+        # bind off the tagged `any` so PLUS lowers natively
+        model_str: str = rec_model;
+        lines.append("- model: " + model_str);
     }
     lines.append("");
     for msg in messages {
