@@ -23,6 +23,8 @@ import from ui.model {
 import from ui.runtime {
     create_session,
     dispose_session,
+}
+import from ui.runtime_jids {
     ui_jids_reachable_from_persistent_root,
 }
 

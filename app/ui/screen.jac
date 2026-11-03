@@ -18,7 +18,7 @@ import from ui.model {
 
 import from ui.runtime {
     UiSession,
-    SessionEventRecord,
+    make_session_event,
     OverlayOpenResult,
     OverlayCloseResult,
     OverlayBounds,
@@ -231,10 +231,7 @@ def shell_resize(
     }
     session.graph_revision += 1;
     session.event_queue.append(
-        SessionEventRecord(
-            kind="resize",
-            payload={"columns": columns, "rows": rows},
-        )
+        make_session_event("resize", {"columns": columns, "rows": rows})
     );
 }
 

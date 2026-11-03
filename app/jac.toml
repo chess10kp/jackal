@@ -59,6 +59,45 @@ default = "native"
 "ui.model" = "native"
 "ui.mutation" = "native"
 "ui.runtime" = "native"
+# ui.runtime_core: pinned native 2026-11-02 so UiSession/UiSessionHandle/
+# SessionEventRecord register a native layout — without the unit, every
+# signature taking UiSession (ui.runtime cluster) erased at the seal.
+# Residual: ui_jids_reachable_from_persistent_root demotes on OSP `root`/
+# `jid` builtins (no native lowering upstream). Server-side construction of
+# SessionEventRecord goes through make_session_event (class-boundary wall).
+"ui.runtime_core" = "native"
+# cordis.core: pinned native 2026-11-02 — the whole module lowers except
+# EffectContext._activate (optional-callable invocation, jac#10539), which
+# demotes per-function.
+"cordis.core" = "native"
+# agent.sessions_*: pinned native 2026-11-02. sessions_core's union-fh
+# demotions (jac#10536) propagate to callers instead of hard-failing;
+# pinning it keeps its lowering-capable functions native and lets
+# sessions_maintenance (fully lowers) call in without an E5093 boundary.
+"agent.json_pretty" = "native"
+"agent.sessions_core" = "native"
+"agent.sessions_maintenance" = "native"
+# agent.fake_host_types: FakePluginHost registers natively so signatures
+# taking it resolve. The bridge-touching helpers stay in agent.fake_host
+# (server — `bridge: any` receivers and the make_envelope E5093 boundary
+# cannot lower); create_fake_host is the native factory seam for server
+# callers (class-boundary wall, see agent.tool_spec).
+"agent.fake_host_types" = "native"
+# agent.plugin_bridge_traffic: stays unpinned — every function takes
+# `bridge: any` (PyObject attribute access, intentional Python boundary),
+# and pinning native hard-fails the seal on E5093 (native fns calling the
+# demoted _absorb_payload with a dict arg).
+# ui.demo_live_shell_*: LiveShell registers natively (shell/normalizer
+# fields erase — ui.screen/ui.input stay server). Server construction goes
+# through make_live_shell (class-boundary wall). Functions touching the
+# erased fields still demote; demo_complex_shell_render keeps demoting on
+# ShellScreen signatures while ui.screen is server.
+"ui.demo_live_shell_model" = "native"
+"ui.demo_live_shell_render" = "native"
+"ui.demo_live_shell_messages" = "native"
+# ui.demo_complex_shell_render: CANNOT pin — a shared native unit cannot
+# import server-only ShellScreen at all ("Python imports require the JIT
+# bridge"). Stays soft-demoted until ui.screen goes native (#10485).
 
 # Native-path pins: each module lowers natively in dev runs (dev placement
 # honors pins; `jac test` runs pre-seal and ignores them). Seal-time lowering

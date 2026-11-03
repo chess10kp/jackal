@@ -20,8 +20,8 @@ test "create_session builds detached ui_root not connected to persistent root" {
     assert session.ui_root.key == "session";
     assert handle.ui_root_id == node_id(session.ui_root);
     assert node_id(session.ui_root) in session.tracked_node_ids;
-    reachable = ui_jids_reachable_from_persistent_root(session.tracked_node_ids);
-    assert reachable == [];
+    # reachability coverage lives in runtime_jids.test.jac — importing the
+    # OSP module here would poison this unit's native dep scan (PERSIST).
     assert not session.disposed;
 }
 
@@ -91,7 +91,6 @@ test "Gate 1 lifecycle dispose releases bindings renderer and capabilities" {
     );
     register_capability(session, node_id(prompt), "input");
     session.renderer.layout[node_id(prompt)] = {"width": 80};
-    assert ui_jids_reachable_from_persistent_root(session.tracked_node_ids) == [];
     assert not is_empty(session.bindings);
     dispose_session(session);
     assert session.disposed;

@@ -1,21 +1,23 @@
 """State model shared by the live shell facade and its helper modules."""
 
 import from ui.runtime { UiSession }
-import from ui.screen { ShellScreen }
 import from ui.transcript { TranscriptMessage, TranscriptProjection }
 import from ui.renderer { Renderer }
 import from ui.terminal { ProcessTerminal }
-import from ui.input { InputNormalizer }
 import from ui.progress_bar { ProgressBar }
 
 
 obj LiveShell {
     has session: UiSession,
-        shell: ShellScreen,
+        # `shell`/`normalizer` are `any`: their real types (ShellScreen in
+        # ui.screen, InputNormalizer in ui.input) are server-pinned, and a
+        # shared native unit cannot import them at all — they erase to
+        # opaque slots in the native layout either way.
+        shell: any,
+        normalizer: any,
         proj: TranscriptProjection,
         renderer: Renderer,
         term: ProcessTerminal,
-        normalizer: InputNormalizer,
         progress: ProgressBar,
         messages: list[TranscriptMessage] = [],
         rev: int = 0,
@@ -32,4 +34,33 @@ obj LiveShell {
         columns: int = 80,
         rows: int = 24,
         status_hint: str = "enter · ↑↓ history · esc quit";
+}
+
+
+"""Native factory seam: server modules (ui.demo_live_shell) cannot construct
+a native-pinned obj class directly. `shell`/`normalizer` are `any` because
+ShellScreen (ui.screen) and InputNormalizer (ui.input) are server-pinned and
+erase to opaque slots inside the native layout."""
+def make_live_shell(
+    session: UiSession,
+    shell: any,
+    proj: TranscriptProjection,
+    renderer: Renderer,
+    term: ProcessTerminal,
+    normalizer: any,
+    progress: ProgressBar,
+    columns: int,
+    rows: int,
+) -> LiveShell {
+    return LiveShell(
+        session=session,
+        shell=shell,
+        proj=proj,
+        renderer=renderer,
+        term=term,
+        normalizer=normalizer,
+        progress=progress,
+        columns=columns,
+        rows=rows,
+    );
 }

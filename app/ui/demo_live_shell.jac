@@ -95,7 +95,7 @@ import from ui.width {
     truncate_text,
 }
 
-import from ui.demo_live_shell_model { LiveShell }
+import from ui.demo_live_shell_model { LiveShell, make_live_shell }
 
 import from ui.demo_live_shell_messages {
     _push_turn,
@@ -351,16 +351,16 @@ def create_live_shell() -> LiveShell {
     term.rows = rows;
     renderer = create_renderer(cols, rows);
     progress = ProgressBar(key="live_progress", value=0.0);
-    app = LiveShell(
-        session=session,
-        shell=shell,
-        proj=proj,
-        renderer=renderer,
-        term=term,
-        normalizer=InputNormalizer(),
-        progress=progress,
-        columns=cols,
-        rows=rows,
+    app = make_live_shell(
+        session,
+        shell,
+        proj,
+        renderer,
+        term,
+        InputNormalizer(),
+        progress,
+        cols,
+        rows,
     );
     _install_layout(app);
     _push_turn(

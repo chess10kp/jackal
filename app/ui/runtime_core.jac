@@ -60,6 +60,13 @@ obj SessionEventRecord {
 }
 
 
+"""Native factory seam: server modules (ui.screen) cannot construct a
+native-pinned obj class directly, so they build records through this call."""
+def make_session_event(kind: str, payload: dict[str, int]) -> SessionEventRecord {
+    return SessionEventRecord(kind=kind, payload=payload);
+}
+
+
 obj UiSession {
     has bindings: BindingRegistry;
     has renderer: RendererState;
@@ -205,37 +212,9 @@ def record_invalidation(
 }
 
 
-"""BFS from Jac persistent root across all edge types; return UI jids found."""
-def ui_jids_reachable_from_persistent_root(ui_jids: set[str]) -> list[str] {
-    found: list[str] = [];
-    visited: set[str] = set();
-    # Seed via append: an any-typed list literal (`= [root]`) does not lower
-    # natively, while append onto an explicitly typed list does.
-    queue: list[any] = [];
-    queue.append(root);
-    while queue {
-        current = queue.pop(0);
-        current_jid = jid(current);
-        if current_jid in ui_jids {
-            found.append(current_jid);
-        }
-        for neighbor in [current -->] {
-            nj = jid(neighbor);
-            if nj not in visited {
-                visited.add(nj);
-                queue.append(neighbor);
-            }
-        }
-        for neighbor in [current <--] {
-            nj = jid(neighbor);
-            if nj not in visited {
-                visited.add(nj);
-                queue.append(neighbor);
-            }
-        }
-    }
-    return found;
-}
+# ui_jids_reachable_from_persistent_root moved to ui/runtime_jids.jac:
+# its `root` access is a PERSIST placement blocker that would mark this
+# whole module non-native and erase UiSession as a signature type.
 
 
 def _endpoint_tracked(session: UiSession, n: UiNode) -> bool {
