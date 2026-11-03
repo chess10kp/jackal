@@ -62,10 +62,16 @@ default = "native"
 # ui.runtime_core: pinned native 2026-11-02 so UiSession/UiSessionHandle/
 # SessionEventRecord register a native layout — without the unit, every
 # signature taking UiSession (ui.runtime cluster) erased at the seal.
-# Residual: ui_jids_reachable_from_persistent_root demotes on OSP `root`/
-# `jid` builtins (no native lowering upstream). Server-side construction of
-# SessionEventRecord goes through make_session_event (class-boundary wall).
+# Server-side construction of SessionEventRecord goes through
+# make_session_event (class-boundary wall). The OSP `root` probe lives in
+# ui.runtime_jids (server) + ui.osp_walk (native BFS) — see those pins.
 "ui.runtime_core" = "native"
+# ui.osp_walk: pinned native 2026-11-02 — typed OSP BFS over the opaque
+# OspAny handle (jid + -->/<-- all lower; upstream #10545). Without the
+# pin it is only reachable from server ui.runtime_jids and never enters
+# the native unit plan. No jaclang.runtime imports, so #10548 does not
+# apply. `root` itself stays server in ui.runtime_jids.
+"ui.osp_walk" = "native"
 # cordis.core: pinned native 2026-11-02 — the whole module lowers except
 # EffectContext._activate (optional-callable invocation, jac#10539), which
 # demotes per-function.
