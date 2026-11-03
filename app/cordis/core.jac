@@ -33,8 +33,11 @@ obj Inverse {
         keys: list[str] = [];
 
     def run -> None {
-        if self.fn is not None {
-            self.fn(*self.args);
+        # optional callables can't be invoked natively (jac#10539); rebind
+        f = self.fn;
+        if f is not None {
+            g: Callable = f;
+            g(*self.args);
         }
     }
 }
@@ -202,7 +205,9 @@ obj EffectContext {
         self.current_fiber = name;
         self.frames[name] = [];
         try {
-            fiber.apply(self, fiber);
+            # optional callables can't be invoked natively (jac#10539)
+            apply_fn: Callable = fiber.apply;
+            apply_fn(self, fiber);
             fiber.active = True;
             self._log("activated " + name);
         } finally {

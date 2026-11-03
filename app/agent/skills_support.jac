@@ -210,16 +210,16 @@ def _load_ignore_rules(root_dir: str, subdir: str) -> list[str] {
         if not os.path.isfile(fpath) {
             continue;
         }
-        fh = None;
+        # fh stays non-union (jac#10536)
         try {
             fh = open(fpath);
-            rules.extend(_gitignore_parse_rules(fh.read(), prefix));
-        } except (OSError, UnicodeDecodeError) {
-            # Unreadable ignore files contribute no rules.
-        } finally {
-            if fh is not None {
+            try {
+                rules.extend(_gitignore_parse_rules(fh.read(), prefix));
+            } finally {
                 fh.close();
             }
+        } except (OSError, UnicodeDecodeError) {
+            # Unreadable ignore files contribute no rules.
         }
     }
     return rules;

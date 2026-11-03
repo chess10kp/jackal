@@ -259,12 +259,9 @@ obj Utf8StreamDecoder {
 
 
 def read_terminal_size(fallback_cols: int = 80, fallback_rows: int = 24) -> tuple[int, int] {
-    for stream in [sys.stdout, sys.stdin, sys.stderr] {
-        try {
-            fd = stream.fileno() as int;
-        } except Exception {
-            continue;
-        }
+    # literal fds: stream.fileno() is a union-method call that can't lower
+    # natively (jac#10536); ioctl on a bad fd just fails inside _ioctl_winsize
+    for fd in [1, 0, 2] {
         got = _ioctl_winsize(fd);
         if got is not None {
             return got;
@@ -292,7 +289,7 @@ obj ProcessTerminal(Terminal) {
         _old_sigint: any = None,
         _old_sigterm: any = None,
         _old_sighup: any = None,
-        _utf8: any = None,
+        _utf8: Utf8StreamDecoder = Utf8StreamDecoder(),
         _stdin_buf: str = "",
         on_resize: any = None,
         on_input: any = None,
@@ -305,7 +302,8 @@ obj ProcessTerminal(Terminal) {
         on_interrupt: any = None,
         on_terminate: any = None,
     ) {
-        super.init();
+        # super.init() can't lower natively (jac#10538); Terminal's fields
+        # are all `has` defaults so there is no custom parent init to run
         self.on_input = on_input;
         self.on_resize = on_resize;
         self.on_interrupt = on_interrupt;
@@ -348,7 +346,8 @@ obj ProcessTerminal(Terminal) {
     def _on_terminate_signal(signum: int, frame: any) {
         self.restore();
         if self.on_terminate is not None {
-            self.on_terminate();
+            on_terminate: Callable = self.on_terminate;
+            on_terminate();
         } else {
             raise SystemExit(128 + signum);
         }
@@ -357,7 +356,8 @@ obj ProcessTerminal(Terminal) {
     def _on_sigint(signum: int, frame: any) {
         self.restore();
         if self.on_interrupt is not None {
-            self.on_interrupt();
+            on_interrupt: Callable = self.on_interrupt;
+            on_interrupt();
         } else {
             raise KeyboardInterrupt();
         }
@@ -367,10 +367,12 @@ obj ProcessTerminal(Terminal) {
         if self.started {
             return;
         }
-        if not sys.stdin.isatty() {
+        # sys.stdin is Any|TextIO — union methods can't lower (jac#10536);
+        # stdin is fd 0 by definition
+        if not os.isatty(0) {
             raise RuntimeError("ProcessTerminal requires a TTY stdin");
         }
-        self._fd = sys.stdin.fileno() as int;
+        self._fd = 0;
         self._old_attrs = termios.tcgetattr(self._fd);
         tty.setraw(self._fd);
         # Mark active before anything fallible so stop() can unwind a partial start.
@@ -479,7 +481,8 @@ obj ProcessTerminal(Terminal) {
         }
         text = self._utf8.feed(data);
         if self.on_input is not None {
-            self.on_input(text);
+            on_input: Callable = self.on_input;
+            on_input(text);
         }
         return text;
     }

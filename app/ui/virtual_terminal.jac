@@ -46,7 +46,8 @@ obj VirtualTerminal(Terminal) {
         on_resize: any = None,
         on_interrupt: any = None,
     ) {
-        super.init();
+        # super.init() can't lower natively (jac#10538); Terminal's fields
+        # are all `has` defaults so there is no custom parent init to run
         self.columns = columns;
         self.rows = rows;
         self.on_input = on_input;
@@ -133,7 +134,8 @@ obj VirtualTerminal(Terminal) {
     def inject(data: str) {
         self.input_queue.append(data);
         if self.on_input is not None {
-            self.on_input(data);
+            on_input: Callable = self.on_input;
+            on_input(data);
         }
     }
 
@@ -153,7 +155,8 @@ obj VirtualTerminal(Terminal) {
         self.interrupt_count += 1;
         self.restore();
         if self.on_interrupt is not None {
-            self.on_interrupt();
+            on_interrupt: Callable = self.on_interrupt;
+            on_interrupt();
         }
     }
 

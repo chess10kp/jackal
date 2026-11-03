@@ -488,7 +488,9 @@ def _instantiate_tracked(
     archetype = registry.tags[elem.tag];
     key = elem.attrs.get("key", "");
     try {
-        ui_node = archetype(key=key) as UiNode;
+        # any -> Callable: native call-through needs a typed callee (jac#10541)
+        ctor: Callable = archetype;
+        ui_node = ctor(key=key) as UiNode;
     } except Exception as exc {
         errors.append(
             MarkupError(

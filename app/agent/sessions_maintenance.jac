@@ -150,7 +150,7 @@ def export_session(cwd: str, session_id: str, path: str) -> bool {
                     );
                     lines.append("");
                     lines.append("```json");
-                    lines.append(str(fn.get("arguments", "{}")));
+                    lines.append(str(fd.get("arguments", "{}")));
                     lines.append("```");
                     lines.append("");
                 }

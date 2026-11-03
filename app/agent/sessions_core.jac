@@ -134,36 +134,34 @@ def _now_iso() -> str {
 
 """Parse a JSON file; None when missing or corrupt."""
 def _read_json(path: str) -> any {
-    fh = None;
+    # fh stays non-union (jac#10536); json.loads+read, not json.load (jac#10537)
     try {
         fh = open(path, "r");
-        raw = json.load(fh);
-    } except (OSError, ValueError) {
-        return None;
-    } finally {
-        if fh is not None {
+        try {
+            return json.loads(fh.read());
+        } finally {
             fh.close();
         }
+    } except (OSError, ValueError) {
+        return None;
     }
-    return raw;
 }
 
 
 """Write pretty JSON (indent=2 + trailing newline); False on I/O failure."""
 def _write_json(path: str, data: any) -> bool {
-    fh = None;
     try {
         fh = open(path, "w");
-        fh.write(json_pretty(json.dumps(data)));
-        fh.write("\n");
-    } except OSError {
-        return False;
-    } finally {
-        if fh is not None {
+        try {
+            fh.write(json_pretty(json.dumps(data)));
+            fh.write("\n");
+            return True;
+        } finally {
             fh.close();
         }
+    } except OSError {
+        return False;
     }
-    return True;
 }
 
 
