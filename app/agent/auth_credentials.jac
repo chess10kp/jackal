@@ -35,20 +35,19 @@ detected via step_is_pending so the UI layer can wire resolvers itself.
 
 import os;
 import json;
-import stat;
 import time;
-import copy;
-
-glob AUTH_FILE_NAME: str = "auth.json";
-
-glob DEFAULT_AGENT_DIR_NAME: str = ".jackal";
-
-glob KNOWN_AUTH_TYPES: list[str] = ["oauth", "api_key", "env"];
-
-glob OAUTH_REQUIRED_KEYS: list[str] = ["refresh", "access"];
-
 
 import from c { def chmod(path: str, mode: i32) -> i32;  }
+
+glob:pub AUTH_FILE_NAME: str = "auth.json";
+
+glob:pub DEFAULT_AGENT_DIR_NAME: str = ".jackal";
+
+glob:pub KNOWN_AUTH_TYPES: list[str] = ["oauth", "api_key", "env"];
+
+glob:pub OAUTH_REQUIRED_KEYS: list[str] = ["refresh", "access"];
+
+
 
 
 # ── Checker shims ───────────────────────────────────────────────────────
@@ -72,17 +71,12 @@ def _path_dirname(p: str) -> str {
 }
 
 
-def _file_chmod(p: str, mode: int) {
-    chmod(p, i32(mode));
-}
-
-
 # ── Path resolution ─────────────────────────────────────────────────────
 
 
 """Resolve the auth.json path: explicit agent_dir > JACKAL_AGENT_DIR env
 > ~/.jackal/. Mirrors the TS resolveAuthPath."""
-def resolve_auth_path(agent_dir: str = "") -> str {
+def:pub resolve_auth_path(agent_dir: str = "") -> str {
     base = agent_dir;
     if not base {
         base = os.environ.get("JACKAL_AGENT_DIR") or "";
@@ -99,7 +93,7 @@ def resolve_auth_path(agent_dir: str = "") -> str {
 
 """Load and parse auth.json. Missing file, corrupt JSON, or a non-object
 root all yield {} (legacy behaviour: auth failures never crash boot)."""
-def load_auth_file(path: str) -> dict[str, any] {
+def:pub load_auth_file(path: str) -> dict[str, any] {
     if not os.path.isfile(path) {
         return {};
     }
@@ -126,7 +120,7 @@ import from .json_pretty { json_pretty }
 
 """Save auth data as pretty JSON (indent=2 + trailing newline), creating
 parent dirs 0700 and chmod-ing the file 0600. True on success."""
-def save_auth_file(path: str, data: dict[str, any]) -> bool {
+def:pub save_auth_file(path: str, data: dict[str, any]) -> bool {
     parent = _path_dirname(_path_abspath(path));
     try {
         if not os.path.isdir(parent) {
@@ -136,7 +130,7 @@ def save_auth_file(path: str, data: dict[str, any]) -> bool {
         fh.write(json_pretty(json.dumps(data)));
         fh.write("\n");
         fh.close();
-        _file_chmod(path, stat.S_IRUSR | stat.S_IWUSR);
+        chmod(path, i32(0o600));
         return True;
     } except OSError {
         return False;
@@ -149,7 +143,7 @@ def save_auth_file(path: str, data: dict[str, any]) -> bool {
 Returns a fresh dict on success, None when the record cannot be an auth
 credential (wrong container, unknown/missing type, missing required OAuth
 fields). Mirrors the ApiKeyCredential | OAuthCredential union."""
-def validate_credential(cred: any) -> dict[str, any] | None {
+def:pub validate_credential(cred: any) -> dict[str, any] | None {
     if not isinstance(cred, dict) {
         return None;
     }
@@ -187,7 +181,7 @@ def validate_credential(cred: any) -> dict[str, any] | None {
 
 """Stored credential for one provider, validated; None when absent or
 malformed (malformed entries are skipped rather than trusted)."""
-def credential_get(data: dict[str, any], provider: str) -> dict[str, any] | None {
+def:pub credential_get(data: dict[str, any], provider: str) -> dict[str, any] | None {
     if provider not in data {
         return None;
     }
@@ -197,7 +191,7 @@ def credential_get(data: dict[str, any], provider: str) -> dict[str, any] | None
 
 """Return a NEW data dict with `provider` bound to `cred`; the input dict
 is never mutated (store snapshots stay immutable like the TS spreads)."""
-def credential_set(data: dict[str, any], provider: str, cred: dict[str, any]) -> dict[str, any] {
+def:pub credential_set(data: dict[str, any], provider: str, cred: dict[str, any]) -> dict[str, any] {
     nxt = dict(data);
     nxt[provider] = cred;
     return nxt;
@@ -205,7 +199,7 @@ def credential_set(data: dict[str, any], provider: str, cred: dict[str, any]) ->
 
 
 """Return a NEW data dict without `provider` (no-op when absent)."""
-def credential_remove(data: dict[str, any], provider: str) -> dict[str, any] {
+def:pub credential_remove(data: dict[str, any], provider: str) -> dict[str, any] {
     nxt: dict[str, any] = {};
     for (k, v) in data.items() {
         if k != provider {
@@ -217,7 +211,7 @@ def credential_remove(data: dict[str, any], provider: str) -> dict[str, any] {
 
 
 """True when a well-formed credential exists for the provider."""
-def has_credential(data: dict[str, any], provider: str) -> bool {
+def:pub has_credential(data: dict[str, any], provider: str) -> bool {
     return credential_get(data, provider) is not None;
 }
 
@@ -226,7 +220,7 @@ def has_credential(data: dict[str, any], provider: str) -> bool {
 
 
 """Epoch milliseconds (pi-ai stores OAuth expiry in ms, not seconds)."""
-def now_ms() -> int {
+def:pub now_ms() -> int {
     return int(time.time() * 1000);
 }
 
@@ -238,7 +232,7 @@ API keys never expire. OAuth credentials expire when the stored ``expires``
 ``Date.now() >= creds.expires`` refresh trigger -- or when ``expires`` is
 missing/garbage (fail safe toward refresh). Non-oauth/non-api_key records
 count as expired so they never satisfy live-key lookups."""
-def is_expired(cred: any, at_ms: int = -1) -> bool {
+def:pub is_expired(cred: any, at_ms: int = -1) -> bool {
     if not isinstance(cred, dict) {
         return True;
     }
@@ -263,7 +257,7 @@ api_key -> the key. oauth -> the access token ONLY while unexpired; an
 expired token returns None because refresh requires the network seam
 (oauth_refresh_credentials) which the runtime loop must fill. Anything
 else -> None."""
-def stored_api_key(data: dict[str, any], provider: str, at_ms: int = -1) -> str | None {
+def:pub stored_api_key(data: dict[str, any], provider: str, at_ms: int = -1) -> str | None {
     cred = credential_get(data, provider);
     if cred is None or is_expired(cred, at_ms) {
         return None;
@@ -277,7 +271,7 @@ def stored_api_key(data: dict[str, any], provider: str, at_ms: int = -1) -> str 
 
 """Auth status summary mirroring the TS getAuthStatus: runtime overrides
 win, then stored credentials, then a caller-supplied env key."""
-def get_auth_status(
+def:pub get_auth_status(
     provider: str,
     stored_providers: dict[str, any],
     runtime_keys: list[str] | None = None,
