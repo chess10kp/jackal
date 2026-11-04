@@ -291,16 +291,16 @@ obj ProcessTerminal(Terminal) {
         _old_sighup: any = None,
         _utf8: Utf8StreamDecoder = Utf8StreamDecoder(),
         _stdin_buf: str = "",
-        on_resize: any = None,
-        on_input: any = None,
-        on_interrupt: any = None,
-        on_terminate: any = None;
+        on_resize: Callable[[int, int], None] | None = None,
+        on_input: Callable[[str], None] | None = None,
+        on_interrupt: Callable[[], None] | None = None,
+        on_terminate: Callable[[], None] | None = None;
 
     def init(
-        on_input: any = None,
-        on_resize: any = None,
-        on_interrupt: any = None,
-        on_terminate: any = None,
+        on_input: Callable[[str], None] | None = None,
+        on_resize: Callable[[int, int], None] | None = None,
+        on_interrupt: Callable[[], None] | None = None,
+        on_terminate: Callable[[], None] | None = None,
     ) {
         # super.init() can't lower natively (jac#10538); Terminal's fields
         # are all `has` defaults so there is no custom parent init to run

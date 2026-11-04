@@ -6,28 +6,10 @@ import from ui.transcript {
 
 import from ui.demo_live_shell_model { LiveShell }
 
-import from ui.layout_types {
-    LayoutSpec,
-    fill_axis,
-    fixed_axis,
-    grow_axis,
-}
-
-import from ui.renderer {
-    render_frame,
-    set_node_content,
-    set_node_contract,
-    mark_semantic_dirty,
-    mark_layout_dirty,
-    request_cursor,
-}
-
 import from ui.width {
     display_width,
     truncate_text,
 }
-
-
 glob SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 
@@ -59,37 +41,6 @@ def _meter(value: float, width: int) -> str {
         filled = inner;
     }
     return "▐" + ("█" * filled) + ("░" * (inner - filled)) + "▌";
-}
-
-
-def _install_layout(app: LiveShell) {
-    # Mirror screen.jac configure_main_shell_layout (M6 LayoutSpec specs);
-    # app.renderer's layout state carries the app.columns x app.rows viewport.
-    set_node_contract(
-        app.renderer,
-        app.shell.screen,
-        LayoutSpec(width=fill_axis(), height=fill_axis()),
-    );
-    set_node_contract(
-        app.renderer,
-        app.shell.header,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(2)),
-    );
-    set_node_contract(
-        app.renderer,
-        app.shell.transcript,
-        LayoutSpec(width=fill_axis(), height=grow_axis(1.0), scroll_vertical=True),
-    );
-    set_node_contract(
-        app.renderer,
-        app.shell.status,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(1)),
-    );
-    set_node_contract(
-        app.renderer,
-        app.shell.prompt,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(3)),
-    );
 }
 
 
@@ -133,29 +84,6 @@ def _status_line(app: LiveShell) -> str {
 }
 
 
-def _prompt_lines(app: LiveShell) -> list[str] {
-    draft = app.shell.prompt.draft;
-    w = app.columns;
-    top = "╭" + _rule(max(0, w - 2), "─") + "╮";
-    body_inner = "❯ " + draft;
-    body = "│" + _pad_to(body_inner, max(0, w - 2)) + "│";
-    if app.phase == "streaming" {
-        hint = "streaming — wait for jackal";
-    } elif app.shell.approval is not None {
-        hint = "modal — a accept · r reject";
-    } else {
-        hint = "enter send · ↑↓ history · ctrl+u clear";
-    }
-    hint = truncate_text(hint, max(0, w - 4), ellipsis="…");
-    hint_w = display_width(hint);
-    fill = max(0, w - 2 - hint_w);
-    left = fill // 2;
-    right = fill - left;
-    foot = "╰" + ("─" * left) + hint + ("─" * right) + "╯";
-    return [top, body, foot];
-}
-
-
 def _approval_lines(app: LiveShell) -> list[str] {
     _ = app;
     inner = 46;
@@ -186,58 +114,4 @@ def _transcript_lines(app: LiveShell) -> list[str] {
         "",
         truncate_text("  try:  explain retained damage", w, ellipsis="…"),
     ];
-}
-
-
-def _paint(app: LiveShell) {
-    header = _header_lines(app);
-    lines = _transcript_lines(app);
-    status = _status_line(app);
-    prompt_lines = _prompt_lines(app);
-
-    if app.shell.approval is not None {
-        overlay = _approval_lines(app);
-        set_node_contract(
-            app.renderer,
-            app.shell.approval,
-            LayoutSpec(width=fixed_axis(48), height=fixed_axis(len(overlay))),
-        );
-        set_node_content(app.renderer, app.shell.approval, overlay);
-        mark_semantic_dirty(app.renderer, app.shell.approval);
-        mark_layout_dirty(app.renderer, app.shell.approval);
-    }
-
-    set_node_content(app.renderer, app.shell.header, header);
-    set_node_content(app.renderer, app.shell.transcript, lines);
-    set_node_content(app.renderer, app.shell.status, [status]);
-    set_node_content(app.renderer, app.shell.prompt, prompt_lines);
-    mark_semantic_dirty(app.renderer, app.shell.header);
-    mark_semantic_dirty(app.renderer, app.shell.transcript);
-    mark_semantic_dirty(app.renderer, app.shell.status);
-    mark_semantic_dirty(app.renderer, app.shell.prompt);
-    mark_layout_dirty(app.renderer, app.shell.screen);
-
-    # Caret sits after ❯ + space + draft inside the box (col 1 is │).
-    draft_w = display_width(app.shell.prompt.draft);
-    cursor_col = 1 + 2 + draft_w;  # │ + ❯␠ + draft
-    max_col = app.columns - 2;
-    if cursor_col > max_col {
-        cursor_col = max_col;
-    }
-    request_cursor(app.renderer, app.shell.prompt, row_offset=1, col_offset=cursor_col);
-}
-
-
-def _render(app: LiveShell) {
-    if not app.dirty {
-        return;
-    }
-    _paint(app);
-    frame = render_frame(app.renderer, app.shell.screen, app.term);
-    if frame.cursor_row >= 0 {
-        app.term.show_cursor();
-    } else {
-        app.term.hide_cursor();
-    }
-    app.dirty = False;
 }

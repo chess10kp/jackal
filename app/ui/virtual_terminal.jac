@@ -35,16 +35,16 @@ obj VirtualTerminal(Terminal) {
         cells: list[list[Cell]] = [],
         cursor_row: int = 0,
         cursor_col: int = 0,
-        on_input: any = None,
-        on_resize: any = None,
-        on_interrupt: any = None;
+        on_input: Callable[[str], None] | None = None,
+        on_resize: Callable[[int, int], None] | None = None,
+        on_interrupt: Callable[[], None] | None = None;
 
     def init(
         columns: int = 80,
         rows: int = 24,
-        on_input: any = None,
-        on_resize: any = None,
-        on_interrupt: any = None,
+        on_input: Callable[[str], None] | None = None,
+        on_resize: Callable[[int, int], None] | None = None,
+        on_interrupt: Callable[[], None] | None = None,
     ) {
         # super.init() can't lower natively (jac#10538); Terminal's fields
         # are all `has` defaults so there is no custom parent init to run
@@ -161,7 +161,7 @@ obj VirtualTerminal(Terminal) {
     }
 
     """Simulate an exception exit path: restore must still run."""
-    def run_with_exception_guard(body: any) {
+    def run_with_exception_guard(body: Callable[[VirtualTerminal], None]) {
         self.start();
         try {
             body(self);

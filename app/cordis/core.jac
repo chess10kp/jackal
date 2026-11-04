@@ -53,7 +53,7 @@ obj Fiber {
     has name: str,
         inject: list[str] = [],
         provide: list[str] = [],
-        apply: Callable | None = None,
+        apply: Callable[[EffectContext, Fiber], None] | None = None,
         active: bool = False,
         parent: str = "root";
 

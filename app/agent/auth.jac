@@ -6,10 +6,6 @@ preserve the historical agent.auth API.
 """
 
 import from .auth_credentials {
-    AUTH_FILE_NAME,
-    DEFAULT_AGENT_DIR_NAME,
-    KNOWN_AUTH_TYPES,
-    OAUTH_REQUIRED_KEYS,
     _path_abspath,
     _path_expanduser,
     _path_dirname,
@@ -27,6 +23,16 @@ import from .auth_credentials {
     stored_api_key,
     get_auth_status,
 }
+
+# These constants are intentionally redeclared at the server-facing facade.
+# `auth_credentials` is a native unit, whose compiled module does not expose
+# its `glob` values as Python module attributes. Keep the historical
+# `agent.auth` import surface available to server-side callers.
+glob AUTH_FILE_NAME: str = "auth.json";
+glob DEFAULT_AGENT_DIR_NAME: str = ".jackal";
+glob KNOWN_AUTH_TYPES: list[str] = ["oauth", "api_key", "env"];
+glob OAUTH_REQUIRED_KEYS: list[str] = ["refresh", "access"];
+
 import from .auth_display {
     redact_secret,
     redact_credential,
