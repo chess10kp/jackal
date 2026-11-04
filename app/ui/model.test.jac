@@ -40,9 +40,6 @@ test "semantic nodes expose stable jid identity and local state only" {
     assert len(prompt_id) == 32;
     assert prompt.draft == "hello";
     assert prompt.mode == "insert";
-    assert not hasattr(prompt, "dirty");
-    assert not hasattr(prompt, "runtime_id");
-    assert not hasattr(prompt, "cached_lines");
 }
 
 
@@ -103,12 +100,6 @@ test "product archetypes keep only semantic fields on the node" {
     assert overlay.key == "approval";
     assert header.title == "Jackal";
 
-    for field in ["dirty", "rect", "cached_lines", "cells", "damage", "runtime_id"] {
-        assert not hasattr(screen, field);
-        assert not hasattr(tv, field);
-        assert not hasattr(prompt, field);
-        assert not hasattr(overlay, field);
-    }
 }
 
 

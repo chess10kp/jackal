@@ -434,15 +434,6 @@ def _apply_attrs(
             continue;
         }
         field = _field_name(name);
-        if not hasattr(ui_node, field) {
-            errors.append(
-                MarkupError(
-                    path=path,
-                    message="unknown property '" + name + "' on " + tag,
-                )
-            );
-            continue;
-        }
         setattr(ui_node, field, _coerce_value(raw, field));
     }
 }

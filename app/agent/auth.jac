@@ -6,10 +6,6 @@ preserve the historical agent.auth API.
 """
 
 import from .auth_credentials {
-    _path_abspath,
-    _path_expanduser,
-    _path_dirname,
-    _file_chmod,
     resolve_auth_path,
     load_auth_file,
     save_auth_file,

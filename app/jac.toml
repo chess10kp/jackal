@@ -86,6 +86,9 @@ default = "native"
 "agent.json_pretty" = "native"
 "agent.sessions_core" = "native"
 "agent.sessions_maintenance" = "native"
+# Credential storage is imported as a Python module by the server auth
+# facade; filesystem access and the C chmod shim stay server-side.
+"agent.auth_credentials" = "server"
 # agent.fake_host_types: FakePluginHost registers natively so signatures
 # taking it resolve. The bridge-touching helpers stay in agent.fake_host
 # (server — `bridge: any` receivers and the make_envelope E5093 boundary
