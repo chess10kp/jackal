@@ -302,11 +302,14 @@ with the server pins temporarily promoted together cleared the previous
 `E5093` object-boundary errors, then stopped at `E5090` for Python `queue` in
 `tui/shell.jac`. The native standard library has no `queue` or `threading`
 surface; Jackal needs a native worker/channel/lock/event API for streaming,
-MCP/plugin readers, approvals, and cancellation. The checked-in native
-`subprocess` floor has a Linux implementation; a Darwin variant in the
-working tree still needs a macOS native link/runtime probe before it counts as
-available. Jackal needs it for shell tools, MCP, and the Node sidecar. These
-are Jac native-runtime gaps, tracked upstream in
+MCP/plugin readers, approvals, and cancellation. The native `subprocess`
+floor now has Linux and Darwin variants (vendored commit `221918f8`). A macOS
+arm64 native executable probe successfully spawned `/usr/bin/true` and captured
+`/bin/echo` output through a pipe. This validates basic Darwin spawn/wait and
+capture, not the full timeout, cwd, env, or kill surface. Jackal needs it for
+shell tools, MCP,
+and the Node sidecar. Remaining Jac native-runtime gaps are tracked upstream
+in
 [jac#10585](https://github.com/jaseci-labs/jac/issues/10585).
 The separate `main.jac --native --lib` probe currently stops at `E5090` on
 `agent.session`, which is explicitly server-pinned. It also analyzes
@@ -357,14 +360,15 @@ TUI loop are product paths.
 
 | Boundary | Current app surface | Work to close |
 |---|---|---|
-| Native OS services | `queue`/`threading` in `tui.runtime`, `tui.shell`, `tui.input`, `tui.commands`, `agent.interactions`, `agent.session_config`, `agent.mcp`, `agent.web_tools`, and `agent.plugin_bridge_io`; `subprocess` in tools, checkpoints, context input, MCP, plugin host, and launcher; `urllib` in model catalog, web tools, and MCP. | Specify native worker/channel, lock, event, cancellation, and child-process contracts. The shell native probe currently stops at `queue`. Port product HTTP callers to the existing socket/TLS stream path while preserving redirects, SSRF checks, catalog fallback, and MCP session correlation. The Darwin subprocess files in the working tree are unvalidated probes. |
+| Native OS services | `queue`/`threading` in `tui.runtime`, `tui.shell`, `tui.input`, `tui.commands`, `agent.interactions`, `agent.session_config`, `agent.mcp`, `agent.web_tools`, and `agent.plugin_bridge_io`; `subprocess` in tools, checkpoints, context input, MCP, plugin host, and launcher; `urllib` in model catalog, web tools, and MCP. | Specify native worker/channel, lock, event, and cancellation contracts. The shell native probe currently stops at `queue`. Port product HTTP callers to the existing socket/TLS stream path while preserving redirects, SSRF checks, catalog fallback, and MCP session correlation. The Darwin subprocess variant passes basic spawn/wait and captured-output probes; exercise timeout, cwd, env, and kill before closing the full floor. |
 | UI object and compiler graph | `ui.screen` is blocked by event/session crossings and the jac#10485 walker-protection prepare crash. `ui.input` has a separate native runtime memory fault. Prior lowering walls include cross-module object layouts, `jid()` identity, bound endpoints, unary expressions, callback fields, and walker dispatch. | Resolve compiler/runtime walls in vendor Jac with minimal repros and upstream issue links. Promote screen/input only after native build and execution probes; keep root-reachable consumers in the same native graph. |
 | Agent graph | Five server pins: `agent.session`, `protocol`, `registry`, `plugin_bridge`, and `extensions`. Known walls include dynamic kwargs, list append/type erasure, class construction across placement, optional callbacks, module state, and JSON/path support. Bridge APIs currently accept Python-shaped `any` host values. | Define typed native host capabilities and factories. Lower registry/extensions before session composition; keep the Node sidecar as a child process behind a native Jac protocol boundary. |
 | Test/runtime contamination | Same-stem annexes make product modules import unused `shutil`/`tempfile` names for tests; the `main` native probe includes `main.test.jac` and reports `tempfile`. `tui.harness` and `e2e` use tempfile/process/thread helpers. `ui.emulated_terminal` imports `pyte`. | Separate test helpers from product module namespaces. Replace pyte with the Jac `VirtualTerminal` or a native emulator, and provide native test temp/process/server helpers. App tests stay in scope for the no-CPython target. |
 | Artifact and launch | The current seal is tagged `cpython-314` and has 138 server-only placements. A native payload present in the artifact does not prove it executed. | Seal product roots independently of test annexes, then run the artifact with CPython and Python packages unavailable. Capture loader/runtime evidence that the native payload handled launch and verify no server placements remain. |
 
 Recommended order: (1) closure and annex accounting; (2) native OS contracts
-and macOS subprocess validation; (3) remove urllib and threading/queue imports
+and complete macOS subprocess validation; (3) remove urllib and threading/queue
+imports
 from product modules; (4) close UI object/compiler walls; (5) lower the agent
 graph and TUI loop; (6) move test helpers and terminal emulation to native Jac;
 then (7) seal and prove execution without CPython. Rebuild the placement ledger
