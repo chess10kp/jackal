@@ -528,7 +528,6 @@ def mcp_start(
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
-            bufsize=1,
             env=popen_env,
             cwd=popen_cwd,
         );

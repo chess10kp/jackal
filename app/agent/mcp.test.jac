@@ -521,7 +521,7 @@ def _start_fake_http_server(tmp: str) -> tuple[any, str] {
     err_fh: any = open(err_path, "w");
     proc = subprocess.Popen(
         [sys.executable, path], stdout=subprocess.PIPE,
-        stderr=err_fh, text=True, bufsize=1,
+        stderr=err_fh, text=True,
     );
     out_pipe: any = proc.stdout;
     ready: str = out_pipe.readline().strip();

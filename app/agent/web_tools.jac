@@ -188,7 +188,13 @@ Location header before issuing the next request (urllib would otherwise
 fetch a private/metadata target given a public redirector)."""
 obj _NoRedirectHandler(urllib.request.HTTPRedirectHandler) {
     def redirect_request(req: any, fp: any, code: any, msg: any, headers: any, newurl: any) -> any {
-        raise urllib.error.HTTPError(str(newurl), int(code), "redirect", headers, fp);
+        raise urllib.error.HTTPError(
+            url=str(newurl),
+            code=int(code),
+            msg="redirect",
+            hdrs=headers,
+            fp=fp,
+        );
     }
 }
 
