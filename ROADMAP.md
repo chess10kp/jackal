@@ -285,25 +285,29 @@ Python packages, or server-codespace product modules. Every product module under
 fallback, never a product placement. Development scripts and test fixtures may
 use host tools, but the sealed product dependency closure may not.
 
-**Current state:** `app/jac.toml` has 30 explicit `"server"` pins. The latest
-local seal has 146 entries (7 native-only, 138 server-only, 1 dual-placed) and
-is tagged `cpython-314`. The product still has server placements throughout
-the UI/TUI and agent dependency graphs. Chat streaming no longer depends on
-`httpx`; its socket/TLS/SSE implementation is present, while product call-path
-placement is still open. `pyte` is used by the test terminal adapter. Product
-modules also depend on host filesystem, environment, subprocess, threading,
-queue, HTTP, and terminal APIs. A successful `.jab` build alone does not
-establish native execution or a Python-free runtime.
+**Current state:** `app/jac.toml` has 30 explicit `"server"` pins: 7 UI
+entries (including the test-only emulated terminal), 5 agent, and 18 TUI. The
+latest local seal has 146 entries (7 native-only, 138 server-only, 1
+dual-placed) and is tagged `cpython-314`. The product still has server
+placements throughout the UI/TUI and agent dependency graphs. Chat streaming
+no longer depends on `httpx`; its socket/TLS/SSE implementation is present,
+while product call-path placement is still open. Product code still imports
+Python `queue`, `threading`, `urllib`, and `subprocess`; `pyte` and most
+`tempfile` imports belong to test harnesses or merged test annexes. A
+successful `.jab` build alone does not establish native execution or a
+Python-free runtime.
 
 **Latest native probe:** `cd app && ../jac build tui/shell.jac --native --lib`
 with the server pins temporarily promoted together cleared the previous
 `E5093` object-boundary errors, then stopped at `E5090` for Python `queue` in
 `tui/shell.jac`. The native standard library has no `queue` or `threading`
 surface; Jackal needs a native worker/channel/lock/event API for streaming,
-MCP/plugin readers, approvals, and cancellation. The bundled native
-`subprocess` implementation is Linux-only, while Jackal's supported macOS
-product path needs it for shell tools, MCP, and the Node sidecar. These are
-Jac native-runtime gaps, tracked upstream in [jac#10585](https://github.com/jaseci-labs/jac/issues/10585).
+MCP/plugin readers, approvals, and cancellation. The checked-in native
+`subprocess` floor has a Linux implementation; a Darwin variant in the
+working tree still needs a macOS native link/runtime probe before it counts as
+available. Jackal needs it for shell tools, MCP, and the Node sidecar. These
+are Jac native-runtime gaps, tracked upstream in
+[jac#10585](https://github.com/jaseci-labs/jac/issues/10585).
 The separate `main.jac --native --lib` probe currently stops at `E5090` on
 `agent.session`, which is explicitly server-pinned. It also analyzes
 `main.test.jac` and reports missing native `tempfile` imports. This confirms
@@ -320,6 +324,13 @@ criteria 2–3.
 
 **Seam scope and order:**
 
+The target is no CPython in Jackal's product or app test runtime. Python may
+remain a development tool used to build/debug the Jac compiler, but it is not
+an acceptable host for app modules, native services, test execution, or the
+sealed launcher. Keep Python-shaped imports only as temporary compatibility
+edges while replacing them with Jac APIs/native floors; a server pin or Python
+adapter does not close a seam.
+
 | # | Seam | Concrete scope / current boundary | Exit evidence |
 |---|---|---|---|
 | 0 | Product graph and placement ledger | Seal `main.jac` and `tui/shell.jac` separately. Keep `run.jac`, `tui/harness.jac`, `e2e/`, demos, and `ui.emulated_terminal` classified as dev/test unless a product import reaches them. Current direct native probes also pull `main.test.jac` into `main` and stop on test-only `tempfile`; record test annexes separately instead of letting them obscure the product frontier. Track dual placements as open. | Per-root import closure and manifest show every product module native-only; no product module has a server copy. The test closure is separately accounted for and does not require Python. |
@@ -334,6 +345,30 @@ Compiler bugs discovered en route are logged in the local native-lowering notes;
 fixes land in `vendor/jac/**` and are reported upstream. Native lowering work must
 preserve the no-Python runtime acceptance: moving a product seam into Python or
 mirroring native types into Python does not close an item.
+
+### Concrete seam inventory
+
+The 30 server pins split into 7 UI modules (including the test-only
+emulated-terminal adapter), 5 agent modules, and 18 TUI modules. The server
+list is not itself the product frontier: first classify each pin by whether
+`main.jac` or `tui/shell.jac` reaches it. Gates, inspect, demos, and harnesses
+may be dev/test-only; `ui.input`, `ui.screen`, agent session services, and the
+TUI loop are product paths.
+
+| Boundary | Current app surface | Work to close |
+|---|---|---|
+| Native OS services | `queue`/`threading` in `tui.runtime`, `tui.shell`, `tui.input`, `tui.commands`, `agent.interactions`, `agent.session_config`, `agent.mcp`, `agent.web_tools`, and `agent.plugin_bridge_io`; `subprocess` in tools, checkpoints, context input, MCP, plugin host, and launcher; `urllib` in model catalog, web tools, and MCP. | Specify native worker/channel, lock, event, cancellation, and child-process contracts. The shell native probe currently stops at `queue`. Port product HTTP callers to the existing socket/TLS stream path while preserving redirects, SSRF checks, catalog fallback, and MCP session correlation. The Darwin subprocess files in the working tree are unvalidated probes. |
+| UI object and compiler graph | `ui.screen` is blocked by event/session crossings and the jac#10485 walker-protection prepare crash. `ui.input` has a separate native runtime memory fault. Prior lowering walls include cross-module object layouts, `jid()` identity, bound endpoints, unary expressions, callback fields, and walker dispatch. | Resolve compiler/runtime walls in vendor Jac with minimal repros and upstream issue links. Promote screen/input only after native build and execution probes; keep root-reachable consumers in the same native graph. |
+| Agent graph | Five server pins: `agent.session`, `protocol`, `registry`, `plugin_bridge`, and `extensions`. Known walls include dynamic kwargs, list append/type erasure, class construction across placement, optional callbacks, module state, and JSON/path support. Bridge APIs currently accept Python-shaped `any` host values. | Define typed native host capabilities and factories. Lower registry/extensions before session composition; keep the Node sidecar as a child process behind a native Jac protocol boundary. |
+| Test/runtime contamination | Same-stem annexes make product modules import unused `shutil`/`tempfile` names for tests; the `main` native probe includes `main.test.jac` and reports `tempfile`. `tui.harness` and `e2e` use tempfile/process/thread helpers. `ui.emulated_terminal` imports `pyte`. | Separate test helpers from product module namespaces. Replace pyte with the Jac `VirtualTerminal` or a native emulator, and provide native test temp/process/server helpers. App tests stay in scope for the no-CPython target. |
+| Artifact and launch | The current seal is tagged `cpython-314` and has 138 server-only placements. A native payload present in the artifact does not prove it executed. | Seal product roots independently of test annexes, then run the artifact with CPython and Python packages unavailable. Capture loader/runtime evidence that the native payload handled launch and verify no server placements remain. |
+
+Recommended order: (1) closure and annex accounting; (2) native OS contracts
+and macOS subprocess validation; (3) remove urllib and threading/queue imports
+from product modules; (4) close UI object/compiler walls; (5) lower the agent
+graph and TUI loop; (6) move test helpers and terminal emulation to native Jac;
+then (7) seal and prove execution without CPython. Rebuild the placement ledger
+after each stage so a lowered leaf is not mistaken for a closed product path.
 
 ## 9. Immediate next milestone
 
