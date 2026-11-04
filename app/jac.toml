@@ -31,11 +31,12 @@ default = "native"
 # SEAL KEYS: markup/terminal/transcript/width/renderer cleared 2026-11-01
 # (tuple[...] ret spellings, dead `codecs` import). ui.screen stays an
 # explicit server pin: its walker handlers bridge InsertText/Submit/Cancel
-# from server-pinned ui.events and its API moves UiSession/ShellScreen, i.e.
-# it is the next N6 target, not a seal blocker (a server pin seals as pinned).
+# from ui.events and its API moves UiSession/ShellScreen. The manifest still
+# reports ui.events server despite its native pin; reconcile that first, then
+# lower screen and its importers as one graph.
 # Marking those walkers `walker:protect` is the documented route to native;
 # it is gated on the kernel-side issue above, not on the app.
-# Current frontier: 31 explicit server pins remain. N6 requires reducing
+# Current frontier: 30 explicit server pins remain. N6 requires reducing
 # this count to zero and proving the sealed app executes without CPython or
 # Python package dependencies. Keep each temporary pin annotated with its
 # compiler/runtime wall.
@@ -205,10 +206,10 @@ default = "native"
 "ui.screen" = "server"
 # ui.layout_compile: test 51/51; the seal-time demote is NOT contained (the
 # old note was wrong) — seals server on E5092 _shell_state (2026-08-31).
-# ui.events: lowers in dev (test annex passes 69/69) BUT seal-time demotes due
-# to cross-unit create_session from ui.runtime (UiSession boundary).
-# Until that lands natively, events stays server.
-"ui.events" = "server"
+# ui.events is the native event and walker dispatch surface consumed by
+# ui.screen and the TUI. Keep the native requirement; the current manifest
+# still reports server placement, so verify seal enforcement before proceeding.
+"ui.events" = "native"
 # inspect/demos: hold for the events frontier above (walker dispatch +
 # annex walls); demos additionally spawn walkers (SetProgress).
 "ui.inspect" = "server"
