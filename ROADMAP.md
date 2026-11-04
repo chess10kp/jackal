@@ -142,9 +142,14 @@ The TUI targets the native codespace end to end; terminal support comes from `na
 - [x] Headless native term/JSONL launch (`jac run main.jac` / `main.jac -- --json`); broader CLI parity remains pending
 ### Current native frontier
 
-`app/jac.toml` currently contains 12 server pins; N6 requires reducing that count to
-zero. The immediate residual UI compiler wall is bound-endpoint `EdgeRefTrailer`
-lowering; lower-priority native compiler gaps and Cordis integration remain deferred.
+`app/jac.toml` currently contains 33 server pins. The seal passes, but pins are
+not evidence of native execution: N6 requires removing every server pin and
+proving that the sealed app executes its native payload. Separately, the product
+must have no CPython runtime or Python package dependency. A native Jac module
+that imports `httpx`, `pyte`, or Python-only stdlib APIs does not meet that bar.
+The blocking work includes native lowering of the OSP/UI graph, replacement
+floors for Python runtime services, and a sealed artifact that actually invokes
+its native payload.
 
 
 ## 5. Delivery phases
@@ -268,26 +273,41 @@ Do not mix unrelated legacy edits into `app/` feature commits.
 - Full IDE/LSP replacement
 - Desktop UI before terminal daily-driver parity
 
-### N6 — All-na codespace (zero sv) — active
+### N6 — Native-only product runtime — active
 
-**Goal:** no module under `app/` compiles to (or is placed in) the server codespace. The `server` tier remains a compiler-internal fallback only, never a product placement.
+**Goal:** Jackal’s product runtime does not require CPython, Python bytecode,
+Python packages, or server-codespace product modules. Every product module under
+`app/` executes in native codespace. The `server` tier remains a compiler-only
+fallback, never a product placement. Development scripts and test fixtures may
+use host tools, but the sealed product dependency closure may not.
 
-**Current state:** `app/jac.toml` has 12 explicit `"server"` pins. They are temporary compiler/runtime frontiers, not an accepted steady state.
+**Current state:** `app/jac.toml` has 33 explicit `"server"` pins. It also
+declares `httpx` and `pyte`; product modules use Python networking and terminal
+APIs. The current `.jab` build does not establish native execution merely by
+sealing successfully.
 
-**Acceptance criterion:** `app/jac.toml` contains zero `"server"` pins, every `[placement.pins]` entry is `"native"`, and the seal records every app module native. Old assumptions retired by this milestone: "session host = server placement", the constraints layout engine's §3 server policy pin, and kernel-only nativity (binding decision 5 supersedes).
+**Acceptance criteria:** (1) zero `"server"` pins and a seal placement manifest
+showing every product module native; (2) a clean install/run of the sealed
+artifact succeeds with CPython unavailable and no Python package installation;
+(3) native execution evidence proves the placed native payload is used, not just
+present alongside Python bytecode. Tests and build checks alone do not prove
+criteria 2–3.
 
 **Work queue (re-scoped against this criterion):**
 
 | # | Item | Unblocks |
 |---|---|---|
-| 1 | `jid()` native lowering/object identity (edge-object and walker lowering are landed) | ui.model/mutation/events → runtime/inspect/demos cascade |
-| 2 | B7: mirror native obj classes into Python (or lower all consumers) | tool_spec/registry/protocol/extensions + session/llm/mcp/plugin_bridge/tools |
-| 3 | na_stdlib floors: `json.load`, `os.path`, `unicodedata`; terminal set (`codecs/signal/select/termios/tty/fcntl`) | width, terminal, extensions, mcp |
-| 4 | B2 landing: bound-method `Callable` fields in na codegen (patch + analysis preserved in `~/notes/na-callable-wip.patch`, `~/notes/vendor-callable-bug-analysis.md`) | cordis, callback-holding runtime objs |
-| 5 | Per-module AOT at seal time + native branch in sealed import hook — today a `.jab` ships only CPython bytecode and nothing consumes the placement map (`~/notes/seal-native-execution.md`); alternative: whole-program `kind = "cli-native"` once everything lowers | actual native EXECUTION of the sealed app |
-| 6 | Delete constraints.* §3 server policy pin; audit remaining pins to zero | acceptance |
+| 1 | Fix the Jac/native boundary so Jac modules import and construct native Jac objects directly; lower every consumer. Python object mirrors and server interop shims are not an end state. | agent protocol/registry/extensions/session/LLM/MCP/plugin host and UI graph |
+| 2 | Close native lowering/runtime walls in the TUI and OSP graph, starting with `jid()` identity, walkers, bound-edge references, unary expressions, and cross-module object layouts. | 18 TUI pins, 9 UI pins, and UI/agent call graph |
+| 3 | Implement native service floors and migrate product code off Python packages/APIs: HTTP(S)/streaming, JSON file loading, path handling, Unicode, terminal control, process/thread/queue needs. Remove `httpx`/`pyte` dependencies when their native replacements are complete. | LLM/catalog, MCP/web/auth, terminal/emulator, extensions |
+| 4 | Finish native lowering gaps for callback fields and callable invocation, then remove the remaining agent pins. | Cordis, registry, session, extensions, protocol |
+| 5 | Make the sealed artifact execute its native payload and verify the dependency closure with CPython and Python packages absent. | native-only installed product |
+| 6 | Remove all 33 server pins, including `constraints.oracle_driver` and `ui.emulated_terminal`, then audit the seal and runtime. | placement acceptance |
 
-Compiler bugs discovered en route are logged in `~/notes/jackal-native-lowering.md` (B1–B8); fixes land in `vendor/jac/**` first and sync upstream. Lower-priority compiler gaps and Cordis integration remain deferred.
+Compiler bugs discovered en route are logged in the local native-lowering notes;
+fixes land in `vendor/jac/**` and are reported upstream. Native lowering work must
+preserve the no-Python runtime acceptance: moving a product seam into Python or
+mirroring native types into Python does not close an item.
 
 ## 9. Immediate next milestone
 
@@ -300,7 +320,8 @@ native --mode/JACKAL_MODE consumption + mode-specific prompt appendices
         ↓
 packaging/install story + session-data policy
         ↓
-N6 compiler frontier: jid() lowering/object identity, then zero server pins
+N6 native-only runtime: close native lowering + Python-service floors, then
+prove sealed native execution with zero server pins and no CPython dependency
         ↓
 N3 deletion commit (legacy trees removed)
 ```

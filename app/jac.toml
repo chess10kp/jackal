@@ -35,9 +35,10 @@ default = "native"
 # it is the next N6 target, not a seal blocker (a server pin seals as pinned).
 # Marking those walkers `walker:protect` is the documented route to native;
 # it is gated on the kernel-side issue above, not on the app.
-# Current frontier: 12 explicit server pins remain (was 15; terminal/vt went
-# native 2026-08-31); N6 requires reducing this count to zero. Keep each
-# temporary pin annotated with its compiler/runtime wall.
+# Current frontier: 33 explicit server pins remain. N6 requires reducing
+# this count to zero and proving the sealed app executes without CPython or
+# Python package dependencies. Keep each temporary pin annotated with its
+# compiler/runtime wall.
 # Constraint layout engine: algebra, layout_relations and solver all lower
 # natively (N6 retires the §3 server pin — see how-to-lower-all-native).
 # Suites green: layout_relations 7/7, roundtrip 36/36, solver 26/26.
