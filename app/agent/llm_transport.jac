@@ -15,6 +15,7 @@ import os;
 import json;
 import time;
 import from collections.abc { Generator }
+import from .llm_http_stream { post_json_stream }
 import from .tool_spec { ToolSpec, MAX_TOOL_RESULT }
 import from .provider_routes { PROVIDER_ROUTES }
 import from .registry {
@@ -73,7 +74,6 @@ obj Transport {
     }
 
     def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
-        import httpx;
         body = self._build_body(messages, tool_defs);
         headers: dict[str, str] = {};
         if self.api_key { headers["Authorization"] = "Bearer " + self.api_key; }
@@ -103,57 +103,60 @@ obj Transport {
     """POST `body` to `url` and yield normalized chunks (shared by native
     and P10 provider transports)."""
     def _open_stream(url: str, headers: dict[str, str], body: dict[str, any]) -> Generator[dict[str, any], None, None] {
-        import httpx;
         calls: dict[int, dict[str, any]] = {};
-        client_obj: any = httpx.Client(timeout=300.0);
+        request_headers: dict[str, str] = dict(headers);
+        request_headers["Content-Type"] = "application/json";
+        request_headers["Accept"] = "text/event-stream";
         r: any = None;
         try {
-            ctx: any = client_obj.stream("POST", url, json=body, headers=headers);
-            r = ctx.__enter__();
+            r = post_json_stream(url, request_headers, body);
             # Fire strictly before the first line is read so handlers observe
             # "provider answered" ahead of any content event downstream.
-            self._notify_response(r.status_code, dict(r.headers));
-            if r.status_code != 200 {
+            self._notify_response(r.status, r.headers);
+            if r.status != 200 {
                 detail = r.read().decode("utf-8", "replace")[:400];
-                yield {"error": f"HTTP {r.status_code}: {detail}"};
+                yield {"error": f"HTTP {r.status}: {detail}"};
                 return;
             }
-                for raw_line in r.iter_lines() {
-                    line: any = raw_line;
-                    if not line.startswith("data: ") { continue; }
-                    payload: any = line[len("data: "):];
-                    if payload == "[DONE]" { break; }
-                    chunk: any = json.loads(payload);
-                    delta: any = chunk["choices"][0].get("delta", {});
-                    piece: any = delta.get("content");
-                    if piece {
-                        yield {"content": str(piece)};
+            while True {
+                raw_line: str = r.readline();
+                if not raw_line {
+                    break;
+                }
+                line: str = raw_line.rstrip("\r\n");
+                if not line.startswith("data: ") { continue; }
+                payload: str = line[len("data: "):];
+                if payload == "[DONE]" { break; }
+                chunk: any = json.loads(payload);
+                delta: any = chunk["choices"][0].get("delta", {});
+                piece: any = delta.get("content");
+                if piece {
+                    yield {"content": str(piece)};
+                }
+                for raw_tc in delta.get("tool_calls", []) {
+                    tc: any = raw_tc;
+                    idx = int(tc.get("index", 0));
+                    acc = calls.get(idx);
+                    if acc is None {
+                        acc = {
+                            "id": tc.get("id", ""),
+                            "type": "function",
+                            "function": {"name": "", "arguments": ""},
+                        };
+                        calls[idx] = acc;
                     }
-                    for raw_tc in delta.get("tool_calls", []) {
-                        tc: any = raw_tc;
-                        idx = int(tc.get("index", 0));
-                        acc = calls.get(idx);
-                        if acc is None {
-                            acc = {
-                                "id": tc.get("id", ""),
-                                "type": "function",
-                                "function": {"name": "", "arguments": ""},
-                            };
-                            calls[idx] = acc;
-                        }
-                        fn: any = tc.get("function", {});
-                        if fn.get("id") { acc["id"] = fn["id"]; }
-                        if fn.get("name") {
-                            acc["function"]["name"] = str(acc["function"]["name"]) + str(fn["name"]);
-                        }
-                        if fn.get("arguments") {
-                            acc["function"]["arguments"] = str(acc["function"]["arguments"]) + str(fn["arguments"]);
-                        }
+                    fn: any = tc.get("function", {});
+                    if fn.get("id") { acc["id"] = fn["id"]; }
+                    if fn.get("name") {
+                        acc["function"]["name"] = str(acc["function"]["name"]) + str(fn["name"]);
+                    }
+                    if fn.get("arguments") {
+                        acc["function"]["arguments"] = str(acc["function"]["arguments"]) + str(fn["arguments"]);
                     }
                 }
+            }
         } finally {
             if r is not None { r.close(); }
-            client_obj.close();
         }
         if calls {
             ordered: list[dict[str, any]] = [];

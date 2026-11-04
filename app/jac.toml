@@ -31,9 +31,9 @@ default = "native"
 # SEAL KEYS: markup/terminal/transcript/width/renderer cleared 2026-11-01
 # (tuple[...] ret spellings, dead `codecs` import). ui.screen stays an
 # explicit server pin: its walker handlers bridge InsertText/Submit/Cancel
-# from ui.events and its API moves UiSession/ShellScreen. The manifest still
-# reports ui.events server despite its native pin; reconcile that first, then
-# lower screen and its importers as one graph.
+# from ui.events and its API moves UiSession/ShellScreen. ui.events now lowers
+# into the native payload, but screen and its importers still create a server
+# placement of that module. Lower this graph together.
 # Marking those walkers `walker:protect` is the documented route to native;
 # it is gated on the kernel-side issue above, not on the app.
 # Current frontier: 30 explicit server pins remain. N6 requires reducing
@@ -90,6 +90,7 @@ default = "native"
 "agent.auth_credentials" = "native"
 "agent.provider_routes" = "native"
 "agent.model_catalog" = "native"
+"agent.llm_http_stream" = "native"
 "agent.json_pretty" = "native"
 "agent.sessions_core" = "native"
 "agent.sessions_maintenance" = "native"
@@ -99,9 +100,8 @@ default = "native"
 # cannot lower); create_fake_host is the native factory seam for server
 # callers (class-boundary wall, see agent.tool_spec).
 "agent.fake_host_types" = "native"
-# Provider metadata and live catalog refresh now use the native urllib/socket/
-# TLS floor. The streaming chat transport still depends on httpx and remains
-# a separate native HTTP streaming seam.
+# Provider metadata, catalog GET, and streaming chat now use the native
+# urllib/socket/TLS floor.
 # agent.plugin_bridge_traffic: stays unpinned — every function takes
 # `bridge: any` (PyObject attribute access, intentional Python boundary),
 # and pinning native hard-fails the seal on E5093 (native fns calling the
@@ -138,8 +138,9 @@ default = "native"
 # Upstream: jaseci-labs/jac#10490 (annex folded into the pinned unit).
 "ui.layout_types" = "native"
 "ui.markup" = "native"
-# ui.gates: BLOCKED native (2026-08-29 re-probe) — imports InsertText from
-# server-pinned ui.events (E5093 boundary); suite passes server-placed.
+# ui.gates is an architecture-validation harness, not on the product runtime
+# path. It invokes server-pinned screen/inspect APIs; keep it outside N6 product
+# placement acceptance until those product APIs move native.
 "ui.gates" = "server"
 "ui.progress_bar" = "native"
 "ui.focus" = "native"
@@ -207,8 +208,8 @@ default = "native"
 # ui.layout_compile: test 51/51; the seal-time demote is NOT contained (the
 # old note was wrong) — seals server on E5092 _shell_state (2026-08-31).
 # ui.events is the native event and walker dispatch surface consumed by
-# ui.screen and the TUI. Keep the native requirement; the current manifest
-# still reports server placement, so verify seal enforcement before proceeding.
+# ui.screen and the TUI. It lowers into the native payload; the server copy in
+# the manifest comes from callers that are still server-placed.
 "ui.events" = "native"
 # inspect/demos: hold for the events frontier above (walker dispatch +
 # annex walls); demos additionally spawn walkers (SetProgress).
@@ -295,6 +296,5 @@ default = "native"
 harness = "jac test tui/harness.test.jac"
 
 [dependencies.pypi]
-httpx = "~=0.28"
 # Terminal emulator for TUI tests (ui/emulated_terminal.jac).
 pyte = "~=0.8"

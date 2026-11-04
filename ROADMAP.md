@@ -143,16 +143,17 @@ The TUI targets the native codespace end to end; terminal support comes from `na
 ### Current native frontier
 
 `app/jac.toml` currently contains 30 explicit server pins (18 TUI, 6 UI, 5
-agent, and `ui.emulated_terminal`). The latest sealed manifest snapshot at
-`app/.jac/seal-cache/image-26b9ce4a17ff41cac7336093/jackal/_precompiled/MANIFEST.json`
-reports 7 native placements and 137 server placements across the app tree;
-that inventory includes test and E2E modules, so it is not itself the product
-runtime closure. It does show that counting source pins is not a useful proxy
-for native coverage. For example, `ui.events` is configured native but appears
-server in that manifest snapshot. N6 starts by making the seal report and enforce
-the source placement intent, then closes the product dependency graph. The
-product must also run with no CPython runtime or Python package dependencies:
-`httpx`, `pyte`, and Python-only stdlib APIs are open runtime seams.
+agent, and `ui.emulated_terminal`). The latest local seal snapshot reports 146
+entries: 7 native-only, 138 server-only, and 1 dual-placed. It is tagged
+`cpython-314`, so the current artifact does not meet the target. A source pin
+and native-unit lowering do not prove that the product import path executes
+natively: the sealed placement graph is the evidence to use. The supported
+product roots are `main.jac` (line/JSONL/print modes) and `tui/shell.jac`;
+`run.jac`, `tui/harness.jac`, `e2e/`, and test annexes are development or test
+roots and must not inflate the product closure. The product must run with no
+CPython runtime or Python package dependencies. Chat streaming now has a
+Jac-native socket/TLS/SSE implementation, but its importer graph is still
+server-placed. `pyte` and Python-only host APIs remain open seams.
 
 
 ## 5. Delivery phases
@@ -285,13 +286,14 @@ fallback, never a product placement. Development scripts and test fixtures may
 use host tools, but the sealed product dependency closure may not.
 
 **Current state:** `app/jac.toml` has 30 explicit `"server"` pins. The latest
-seal snapshot reports 7 native and 137 server placements across production,
-tests, and E2E modules. `constraints.oracle_driver` and `ui.focus` are native in
-that snapshot. `ui.events` is configured native but is still reported server,
-so placement reconciliation is an open compiler/seal seam. The app declares
-`httpx` for chat streaming and `pyte` for the terminal emulator; product modules
-also use host networking, filesystem, subprocess, threading, and queue APIs.
-The `.jab` build succeeding does not establish native execution by itself.
+local seal has 146 entries (7 native-only, 138 server-only, 1 dual-placed) and
+is tagged `cpython-314`. The product still has server placements throughout
+the UI/TUI and agent dependency graphs. Chat streaming no longer depends on
+`httpx`; its socket/TLS/SSE implementation is present, while product call-path
+placement is still open. `pyte` is used by the test terminal adapter. Product
+modules also depend on host filesystem, environment, subprocess, threading,
+queue, HTTP, and terminal APIs. A successful `.jab` build alone does not
+establish native execution or a Python-free runtime.
 
 **Acceptance criteria:** (1) zero `"server"` pins and a seal placement manifest
 showing every product module native; (2) a clean install/run of the sealed
@@ -302,15 +304,15 @@ criteria 2–3.
 
 **Seam scope and order:**
 
-| # | Seam | Scope and exit condition |
-|---|---|---|
-| 0 | Placement truth | Rebuild from current source and make the seal fail when a hard native pin demotes. Reconcile the `ui.events` source pin with the manifest. Classify manifest entries into product modules, test annexes, and tooling. Exit: every product module has an explicit, verified native placement in the manifest. |
-| 1 | Native runtime floors | Replace Python package and host-runtime dependencies in product code: `httpx` streaming transport, `pyte` emulator, HTTP(S)/TLS, JSON file loading, path/Unicode operations, terminal control, process creation, threads, and queues. Keep subprocess support for user-configured MCP/extension processes as an OS capability implemented by the native runtime. Exit: product dependency closure has no CPython or Python package imports. |
-| 2 | UI / OSP object graph | Resolve cross-module Jac object construction/layout and references, `jid()` identity, walker dispatch/protection, bound-edge references, unary expressions, callable fields, and event/session boundaries. Start from `ui.events`, `ui.runtime*`, `ui.model`/`mutation`, `ui.screen`, and `ui.gates`; then lower input, inspect, demos, and emulator consumers. Exit: UI product modules all lower and execute native together. |
-| 3 | TUI loop and terminal | Lower the 18 pinned `tui.*` modules against the native UI graph. Remove Python `threading`/`queue` seams from the product loop and resolve terminal inheritance/FFI lowering. Keep the test harness outside the shipped product closure. Exit: `tui.shell` launches and handles input, rendering, cancellation, and resize in native codespace. |
-| 4 | Agent and integration graph | Lower the 5 pinned agent modules (`protocol`, `registry`, `plugin_bridge`, `session`, `extensions`) and their currently server-placed consumers. Resolve native object construction across module boundaries, callback fields/callable invocation, kwargs, JSON/path floors, provider streaming, MCP, and plugin host process/queue lifecycle. Exit: an authenticated tool turn, MCP, and configured extensions work with native agent modules. |
-| 5 | Native artifact proof | Produce a clean sealed install, run it with CPython and Python packages unavailable, and capture evidence that the native payload handled the product path. Exit: startup plus a mocked multi-turn tool interaction succeeds without server placement or Python runtime loading. |
-| 6 | Close remaining pins and audit | Remove all 30 explicit server pins, including `ui.emulated_terminal`, only as their owning seams close. Audit the full executable dependency graph and manifest; test/E2E fixtures may use host tools but cannot be imported by the product. Exit: zero server product placements and no Python runtime dependency. |
+| # | Seam | Concrete scope / current boundary | Exit evidence |
+|---|---|---|---|
+| 0 | Product graph and placement ledger | Seal `main.jac` and `tui/shell.jac` separately. Keep `run.jac`, `tui/harness.jac`, `e2e/`, tests, demos, and `ui.emulated_terminal` classified as dev/test unless a product import reaches them. Track dual placements as open. | Per-root import closure and manifest show every product module native-only; no product module has a server copy. |
+| 1 | Jac/native runtime contract | Define the shipped runtime boundary: Jac code and native floors may use OS services, but product launch must not load CPython or Python packages. Audit the artifact runner, manifest, imports, and transitive native runtime before claiming Python-free operation. | Clean artifact starts with CPython and Python packages unavailable; loader trace shows no Python runtime load. |
+| 2 | OS and standard-library floors | Provide native APIs for filesystem/path/env, JSON, time/random/UUID, Unicode/stream decoding, HTTP(S)/TLS, child processes, threads/queues/locks/events, terminal raw mode/signals/resize/readiness. Migrate `model_catalog` and `web_tools`/MCP away from `urllib`; preserve MCP and Node sidecar as native OS-process capabilities. Keep `pyte` confined to a test adapter or replace it with the Jac `VirtualTerminal` for tests. | Product imports resolve only to Jac modules or documented native floors; representative floor calls execute with no Python interpreter. |
+| 3 | UI / OSP object graph | Move the product graph rooted at `ui.runtime*`, `ui.model`/`mutation`, `ui.events`, `ui.screen`, `ui.input`, renderer, and transcript together. Resolve cross-module object construction/layout, `jid()` identity, walker dispatch/protection, bound-edge references, unary expressions, callable fields, and event/session boundaries. `ui.gates` and `ui.inspect` are validation/debug consumers unless entry-point tracing proves otherwise. | Shell construction, event handling, mutation, render, and disposal all execute in native placement. |
+| 4 | TUI loop and terminal | Lower the product modules imported by `tui.shell` (currently 18 explicit TUI pins) after the UI graph. Replace Python `threading`/`queue` usage in `tui.runtime`, `tui.shell`, `tui.input`, and command flows with native concurrency primitives; connect native terminal floors to input, resize, cancellation, and restoration. | TUI starts from a clean artifact and handles streamed output, approval, cancellation, resize, and terminal restoration natively. |
+| 5 | Agent and integration graph | Lower `agent.session`, `protocol`, `registry`, `plugin_bridge`, `extensions` and the modules they import. Resolve native object/callback boundaries, kwargs, module state, auth/config/session JSON and paths, provider streaming, web fetch, MCP stdio/HTTP, and plugin-host process/queue lifecycle. | Authenticated mocked tool turn plus MCP and configured-extension lifecycle run with native placements. |
+| 6 | Artifact proof and pin retirement | Build a clean sealed artifact, verify `main.jac` and `tui/shell.jac` closures, then remove temporary pins only as each boundary closes. Exclude test-only roots from product acceptance but keep their own tests runnable. | Both product roots run from the sealed artifact with zero server placements, no CPython/Python-package dependency, and recorded native execution evidence. |
 
 Compiler bugs discovered en route are logged in the local native-lowering notes;
 fixes land in `vendor/jac/**` and are reported upstream. Native lowering work must
