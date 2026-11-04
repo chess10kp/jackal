@@ -35,7 +35,7 @@ default = "native"
 # it is the next N6 target, not a seal blocker (a server pin seals as pinned).
 # Marking those walkers `walker:protect` is the documented route to native;
 # it is gated on the kernel-side issue above, not on the app.
-# Current frontier: 32 explicit server pins remain. N6 requires reducing
+# Current frontier: 31 explicit server pins remain. N6 requires reducing
 # this count to zero and proving the sealed app executes without CPython or
 # Python package dependencies. Keep each temporary pin annotated with its
 # compiler/runtime wall.
@@ -139,11 +139,9 @@ default = "native"
 "ui.markup" = "native"
 # ui.gates: BLOCKED native (2026-08-29 re-probe) — imports InsertText from
 # server-pinned ui.events (E5093 boundary); suite passes server-placed.
-# ui.focus: BLOCKED native — its test annex calls create_session (ui.runtime)
-# whose cross-unit native layout is not visible at focus's seal position.
 "ui.gates" = "server"
 "ui.progress_bar" = "native"
-"ui.focus" = "server"
+"ui.focus" = "native"
  # ui.terminal / ui.virtual_terminal: native in dev (6/6, 15/15 in a
  # no-server sandbox; `jac test` ignores placement pins). SEAL walls
  # re-read 2026-08-31 after the vendor floor-cast fix (vendor 2be42fa04:

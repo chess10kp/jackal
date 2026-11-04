@@ -142,7 +142,7 @@ The TUI targets the native codespace end to end; terminal support comes from `na
 - [x] Headless native term/JSONL launch (`jac run main.jac` / `main.jac -- --json`); broader CLI parity remains pending
 ### Current native frontier
 
-`app/jac.toml` currently contains 32 server pins. The seal passes, but pins are
+`app/jac.toml` currently contains 31 server pins. The seal passes, but pins are
 not evidence of native execution: N6 requires removing every server pin and
 proving that the sealed app executes its native payload. Separately, the product
 must have no CPython runtime or Python package dependency. A native Jac module
@@ -281,9 +281,10 @@ Python packages, or server-codespace product modules. Every product module under
 fallback, never a product placement. Development scripts and test fixtures may
 use host tools, but the sealed product dependency closure may not.
 
-**Current state:** `app/jac.toml` has 32 explicit `"server"` pins. The
-test-only `constraints.oracle_driver` now lowers native after replacing
-Python TextIO with native stdin/libc output. The app also
+**Current state:** `app/jac.toml` has 31 explicit `"server"` pins.
+`constraints.oracle_driver` now lowers native after replacing Python TextIO
+with native stdin/libc output, and `ui.focus` lowers native with its test
+annex. The app also
 declares `httpx` and `pyte`; product modules use Python networking and terminal
 APIs. The current `.jab` build does not establish native execution merely by
 sealing successfully.
@@ -304,7 +305,7 @@ criteria 2–3.
 | 3 | Implement native service floors and migrate product code off Python packages/APIs: HTTP(S)/streaming, JSON file loading, path handling, Unicode, terminal control, process/thread/queue needs. Model catalog GET now lowers through native `urllib.request` with request headers; LLM streaming still uses `httpx`. Remove `httpx`/`pyte` dependencies when their native replacements are complete. | LLM/catalog, MCP/web/auth, terminal/emulator, extensions |
 | 4 | Finish native lowering gaps for callback fields and callable invocation, then remove the remaining agent pins. | Cordis, registry, session, extensions, protocol |
 | 5 | Make the sealed artifact execute its native payload and verify the dependency closure with CPython and Python packages absent. | native-only installed product |
-| 6 | Remove all 32 remaining server pins, including `ui.emulated_terminal`, then audit the seal and runtime. | placement acceptance |
+| 6 | Remove all 31 remaining server pins, including `ui.emulated_terminal`, then audit the seal and runtime. | placement acceptance |
 
 Compiler bugs discovered en route are logged in the local native-lowering notes;
 fixes land in `vendor/jac/**` and are reported upstream. Native lowering work must
