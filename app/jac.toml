@@ -253,15 +253,13 @@ default = "native"
 # resolve through native floors. The TUI/session importer graph still stays
 # server-placed; N6 closes that crossing when the agent and TUI roots move.
 "agent.extensions" = "native"
-# TUI layer pinned server for SEAM CONSISTENCY under jac test (#10213):
-# the harness graph (LiveShell + pyte EmulatedTerminal + agent.session)
-# cannot lower native (pyte is a Python module), and per-function demotions
-# in a native-preferred graph crash the test process at the seam. Server
-# pins make the tui layer fully Python with only designed seams into the
-# native-pinned ui render stack (ui.screen/transcript/renderer/terminal),
-# the same shape as server agent.session calling native core.edit.
-# PRODUCTION COST: tui/* runs Python under jac run (the ui render stack
-# stays native). Revisit when upstream fixes jac-test seam dispatch.
+# TUI modules remain temporary server pins while jac-test seam dispatch and
+# the combined LiveShell/UI/agent graph are being untangled (#10213). The
+# harness also imports the Python-backed ui.emulated_terminal/pyte adapter.
+# These pins force the product TUI to run through Python under jac run, which
+# violates N6; retire them as the product graph and native test runner close.
+# The native typed tui.message_queue is an isolated first leaf, not evidence
+# that the TUI loop itself is native.
 "tui.message_queue" = "native"
 "tui.commands" = "server"
 "tui.context" = "server"
