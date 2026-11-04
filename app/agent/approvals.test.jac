@@ -111,7 +111,9 @@ test "multiple pending requests come out FIFO by id order" {
     assert r2["decision"] == "pending";
     assert r3["decision"] == "pending";
     ids = [r1["id"], r2["id"], r3["id"]];
-    assert len(set(ids)) == 3;
+    assert ids[0] != ids[1];
+    assert ids[0] != ids[2];
+    assert ids[1] != ids[2];
     head1 = pending(q);
     assert head1 is not None;
     assert head1.id == ids[0];
@@ -147,14 +149,15 @@ test "expire_older_than drops only entries past the age window" {
     q = create_queue();
     r_old = request_approval(q, "write_file", "", "normal", 1000.0);
     r_new = request_approval(q, "edit_file", "", "normal", 5000.0);
-    old_rec = q.items[0];
-    new_rec = q.items[1];
+    old_rec: PendingApproval = q.items[0];
+    new_rec: PendingApproval = q.items[1];
     old_rec.created_at = 1000.0;
     new_rec.created_at = 5000.0;
     # now=6000, window=2000: cutoff 4000 keeps only the newer record.
     assert expire_older_than(q, 6000.0, 2000.0) == 1;
-    survivor: any = pending(q);
-    assert survivor is not None and survivor.id == r_new["id"];
+    survivor: PendingApproval | None = pending(q);
+    assert survivor is not None;
+    assert survivor.id == r_new["id"];
     assert resolve(q, r_old["id"], True)["error"] == "unknown_approval_id";
     # Boundary: created_at equal to the cutoff survives.
     assert expire_older_than(q, 7000.0, 2000.0) == 0;

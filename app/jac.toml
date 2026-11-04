@@ -47,6 +47,9 @@ default = "native"
 "constraints.algebra" = "native"
 "constraints.solver" = "native"
 "constraints.layout_relations" = "native"
+# oracle_driver is the test-only JSONL subprocess bridge over stdin/stdout;
+# keep that host-I/O boundary server-side while the solver remains native.
+"constraints.oracle_driver" = "server"
 "core.edit" = "native"
 
 # 2026-08-30 vendor sync: graph-shaped edge traversals and walkers now lower
@@ -95,15 +98,12 @@ default = "native"
 # demoted _absorb_payload with a dict arg).
 # ui.demo_live_shell_*: LiveShell registers natively (shell/normalizer
 # fields erase — ui.screen/ui.input stay server). Server construction goes
-# through make_live_shell (class-boundary wall). Functions touching the
-# erased fields still demote; demo_complex_shell_render keeps demoting on
-# ShellScreen signatures while ui.screen is server.
+# through make_live_shell (class-boundary wall). ShellScreen-touching demo
+# helpers stay in their server-facing module; native render helpers operate
+# only on the native model fields.
 "ui.demo_live_shell_model" = "native"
 "ui.demo_live_shell_render" = "native"
 "ui.demo_live_shell_messages" = "native"
-# ui.demo_complex_shell_render: CANNOT pin — a shared native unit cannot
-# import server-only ShellScreen at all ("Python imports require the JIT
-# bridge"). Stays soft-demoted until ui.screen goes native (#10485).
 
 # Native-path pins: each module lowers natively in dev runs (dev placement
 # honors pins; `jac test` runs pre-seal and ignores them). Seal-time lowering
@@ -113,8 +113,7 @@ default = "native"
 # records the demoted truth, so the artifact is self-describing. Per-module
 # seal walls annotated below; unpinned preferred-native modules also demote
 # at seal (2026-08-31: ui.cells E5092 UnaryExpr, cordis/core comprehension
-# over an element-erased collection, constraints/oracle_driver E5092
-# for-loop iterable Name).
+# over an element-erased collection).
 # ui.width: lowers natively now that codepoint-oriented string ops from
 # 6fc6807bd landed (len/ord/index/slice return codepoints). Test 10/10.
 "ui.width" = "native"

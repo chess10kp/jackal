@@ -35,11 +35,16 @@ test "double dash ends flag parsing" {
 
 
 test "invalid values and unknown flags set error" {
-    assert parse_cli(["--bogus"])["error"].startswith("unknown option");
-    assert parse_cli(["--model"])["error"].startswith("missing value");
-    assert parse_cli(["--mode", "turbo"])["error"].startswith("invalid --mode");
-    assert parse_cli(["--output-format", "xml"])["error"].startswith("invalid --output-format");
-    assert parse_cli(["--max-turns", "0"])["error"].startswith("invalid --max-turns");
+    unknown_error: str = parse_cli(["--bogus"])["error"];
+    missing_error: str = parse_cli(["--model"])["error"];
+    mode_error: str = parse_cli(["--mode", "turbo"])["error"];
+    format_error: str = parse_cli(["--output-format", "xml"])["error"];
+    turns_error: str = parse_cli(["--max-turns", "0"])["error"];
+    assert unknown_error.startswith("unknown option");
+    assert missing_error.startswith("missing value");
+    assert mode_error.startswith("invalid --mode");
+    assert format_error.startswith("invalid --output-format");
+    assert turns_error.startswith("invalid --max-turns");
     assert parse_cli(["-c", "-r", "x"])["error"] != "";
     assert parse_cli(["-p", "--json"])["error"] != "";
 }
