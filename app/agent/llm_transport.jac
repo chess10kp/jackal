@@ -16,6 +16,7 @@ import json;
 import time;
 import from collections.abc { Generator }
 import from .tool_spec { ToolSpec, MAX_TOOL_RESULT }
+import from .provider_routes { PROVIDER_ROUTES }
 import from .registry {
     ToolRegistry,
     as_tool_specs,
@@ -274,63 +275,6 @@ obj MockTransport (Transport) {
         }
     }
 }
-
-
-"""fx-style provider-first routing (see ~/notes/fx-model-routing.md).
-
-One table owns every provider fact — endpoint, credential env var, catalog —
-and both routing (`provider_for`) and credential validation
-(`credential_error`) dispatch through it. Prefix matching is CASE-SENSITIVE
-on purpose: it preserves the exact `startswith` semantics make_transport had
-before the table existed ("OpenRouter/..." was never a routed id).
-
-Route fields:
-  description   human-facing provider blurb (/model UI)
-  base_url      default chat-completions endpoint
-  base_url_env  optional env var overriding base_url (openai_compat only)
-  key_env       bearer-token env var; "" = provider needs no credential
-  models        static catalog hints (informational)
-"""
-glob PROVIDER_ROUTES: dict[str, dict[str, any]] = {
-    "openrouter": {
-        "description": "OpenRouter multi-provider gateway",
-        "base_url": "https://openrouter.ai/api/v1",
-        "base_url_env": "",
-        "key_env": "OPENROUTER_API_KEY",
-        "models": ["anthropic/claude-sonnet-5", "openai/gpt-5"],
-    },
-    "deepseek": {
-        "description": "DeepSeek API",
-        "base_url": "https://api.deepseek.com/v1",
-        "base_url_env": "",
-        "key_env": "DEEPSEEK_API_KEY",
-        "models": ["deepseek-chat", "deepseek-reasoner"],
-    },
-    "zai": {
-        "description": "Z.ai GLM models (OpenAI-compatible)",
-        "base_url": "https://api.z.ai/api/paas/v4",
-        "base_url_env": "",
-        "key_env": "ZAI_API_KEY",
-        # Fallback hints; GET /models is not officially documented but
-        # works (auth-gated), so a live catalog replaces these when a
-        # ZAI_API_KEY is present.
-        "models": ["glm-4.6", "glm-4.5", "glm-4.5-air"],
-    },
-    "openai_compat": {
-        "description": "Any OpenAI-compatible chat-completions endpoint",
-        "base_url": "https://api.openai.com/v1",
-        "base_url_env": "OPENAI_COMPAT_BASE",
-        "key_env": "OPENAI_API_KEY",
-        "models": ["gpt-4o", "gpt-4o-mini"],
-    },
-    "mock": {
-        "description": "Local mockllm (no network, no credential)",
-        "base_url": "local://mockllm",
-        "base_url_env": "",
-        "key_env": "",
-        "models": ["mock"],
-    },
-};
 
 
 """Map a model id to its provider id (pure function — reads nothing).

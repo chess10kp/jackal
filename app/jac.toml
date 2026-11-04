@@ -87,6 +87,8 @@ default = "native"
 # Auth credentials store: filesystem and JSON operations are implemented by
 # the native standard library; keep the credential API in the native unit.
 "agent.auth_credentials" = "native"
+"agent.provider_routes" = "native"
+"agent.model_catalog" = "native"
 "agent.json_pretty" = "native"
 "agent.sessions_core" = "native"
 "agent.sessions_maintenance" = "native"
@@ -96,6 +98,9 @@ default = "native"
 # cannot lower); create_fake_host is the native factory seam for server
 # callers (class-boundary wall, see agent.tool_spec).
 "agent.fake_host_types" = "native"
+# Provider metadata and live catalog refresh now use the native urllib/socket/
+# TLS floor. The streaming chat transport still depends on httpx and remains
+# a separate native HTTP streaming seam.
 # agent.plugin_bridge_traffic: stays unpinned — every function takes
 # `bridge: any` (PyObject attribute access, intentional Python boundary),
 # and pinning native hard-fails the seal on E5093 (native fns calling the
