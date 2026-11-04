@@ -38,10 +38,12 @@ import from json {
     dumps,
     loads,
 }
-import from sys {
-    stderr,
-    stdin,
-    stdout,
+import from c { def write(fd: i32, buf: bytes, n: u64) -> i64; }
+
+
+def _write_fd(fd: int, text: str) {
+    raw: bytes = text.encode("utf-8");
+    _ = write(i32(fd), raw, u64(len(raw)));
 }
 
 
@@ -115,25 +117,25 @@ def _run_batch(batch: dict[str, any]) -> dict[str, any] {
 
 
 with entry {
-    for line in stdin {
+    line: str = input();
+    while line != "" {
         line = line.strip();
-        if line == "" {
-            continue;
+        if line != "" {
+            try {
+                batch = loads(line);
+                out = _run_batch(batch);
+            } except Exception as e {
+                _write_fd(2, "driver error: " + str(e) + "\n");
+                out = {
+                    "schema_version": 1,
+                    "seed": -1,
+                    "ok": False,
+                    "error": "driver_exception",
+                    "values": {},
+                };
+            }
+            _write_fd(1, dumps(out) + "\n");
         }
-        try {
-            batch = loads(line);
-            out = _run_batch(batch);
-        } except Exception as e {
-            print("driver error:", e, file=stderr);
-            out = {
-                "schema_version": 1,
-                "seed": -1,
-                "ok": False,
-                "error": "driver_exception",
-                "values": {},
-            };
-        }
-        stdout.write(dumps(out) + "\n");
+        line = input();
     }
-    stdout.flush();
 }

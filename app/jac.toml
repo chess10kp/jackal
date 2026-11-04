@@ -35,7 +35,7 @@ default = "native"
 # it is the next N6 target, not a seal blocker (a server pin seals as pinned).
 # Marking those walkers `walker:protect` is the documented route to native;
 # it is gated on the kernel-side issue above, not on the app.
-# Current frontier: 33 explicit server pins remain. N6 requires reducing
+# Current frontier: 32 explicit server pins remain. N6 requires reducing
 # this count to zero and proving the sealed app executes without CPython or
 # Python package dependencies. Keep each temporary pin annotated with its
 # compiler/runtime wall.
@@ -48,9 +48,9 @@ default = "native"
 "constraints.algebra" = "native"
 "constraints.solver" = "native"
 "constraints.layout_relations" = "native"
-# oracle_driver is the test-only JSONL subprocess bridge over stdin/stdout;
-# keep that host-I/O boundary server-side while the solver remains native.
-"constraints.oracle_driver" = "server"
+# oracle_driver is the test-only JSONL process boundary. Keep even its
+# stdin/stdout adapter native so app/ has no server placement exceptions.
+"constraints.oracle_driver" = "native"
 "core.edit" = "native"
 
 # 2026-08-30 vendor sync: graph-shaped edge traversals and walkers now lower
