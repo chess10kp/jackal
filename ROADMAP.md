@@ -335,8 +335,17 @@ shell tools, MCP,
 and the Node sidecar. Remaining Jac native-runtime gaps are tracked upstream
 in
 [jac#10585](https://github.com/jaseci-labs/jac/issues/10585).
-The separate `main.jac --native --lib` probe now stops at `E5090` on
-`agent.session`, which is explicitly server-pinned. Its merged
+The separate `main.jac --native --lib` probe previously stopped at `E5090`
+on `agent.session`. Promoting the four agent pins for a focused native probe
+confirms the next concrete session seam: `set_model`, `set_thinking_level`,
+`get_model`, `restore_model`, and `get_thinking_level` demote through the
+session state/configuration accessors; `model` and `thinking_level` globals
+then fail with E5092 on `get_model_state` and `get_thinking_level_state`.
+The probe also reaches an E9003 callable-ABI compiler ICE in the merged
+`sessions.test.jac` annex (`dump` argument mismatch). That test-annex ICE is a
+separate compiler/test-graph seam and currently prevents this combined build
+from serving as a clean product-only signal. Re-run focused product builds
+with annexes isolated after fixing or reporting the ICE. The merged
 `main.test.jac` annex no longer fails to resolve `tempfile`: vendored
 `tempfile.mkdtemp` now builds and runs in a native arm64 macOS executable.
 This confirms entry-root probes include test annex code; the placement ledger
@@ -366,7 +375,7 @@ adapter does not close a seam.
 | 2 | OS and standard-library floors | Provide native APIs for filesystem/path/env, JSON, time/random/UUID, Unicode/stream decoding, HTTP(S)/TLS, cross-platform child processes, and worker/channel/lock/event lifecycle. Native `threading` plus typed Jac `tui.message_queue` pass a macOS compiled handoff probe; MCP and plugin-host workers use closure targets. All MCP product functions now lower in its native library build using native subprocess descriptors, typed waiters, and native environment enumeration. The merged MCP test annex still contains Python fake servers. Web tools need Jac URL parsing and IP classification or native equivalents; merged web-tools tests currently use socket-server APIs missing from the native socket floor. Replace Python test servers with native Jac fixtures, then validate cancellation, lock contention, redirect/SSRF behavior, and Linux behavior. Preserve MCP and Node sidecar as OS-process capabilities. | Product and test imports resolve only to Jac modules or documented native floors; representative floor calls execute with no Python interpreter on macOS and Linux. |
 | 3 | UI / OSP object graph | Move the product graph rooted at `ui.runtime*`, `ui.model`/`mutation`, `ui.events`, `ui.screen`, `ui.input`, renderer, and transcript together. Resolve cross-module object construction/layout, `jid()` identity, walker dispatch/protection, bound-edge references, unary expressions, callable fields, and event/session boundaries. `ui.gates` and `ui.inspect` are validation/debug consumers unless entry-point tracing proves otherwise. | Shell construction, event handling, mutation, render, and disposal all execute in native placement. |
 | 4 | TUI loop and terminal | Lower the product modules imported by `tui.shell` (currently 18 explicit TUI pins) after the UI graph. The `queue` and TTY-detection walls are cleared; now lower the shell dependencies on `agent.session`, `ui.runtime`/`screen`, renderer, input, resize, and TUI composition modules. Keep the in-process worker/channel contract native through streamed output and approval. | TUI starts from a clean artifact and handles streamed output, approval, cancellation, resize, and terminal restoration natively. |
-| 5 | Agent and integration graph | `agent.extensions` now lowers and seals native. `agent.registry` builds as a native library after typing a test annex value; verify function-level placement and remove its remaining logging/bridge dynamic boundaries. The first agent root wall is `agent.session`; advancing MCP now exposes missing native `urlopen(timeout=...)`; advancing plugin bridge I/O exposes server-placed `agent.protocol` envelope construction. A grouped native probe also demotes model setters/getters through session configuration hooks and hits an E9003 callable ABI ICE in the merged `sessions.test.jac` annex (reported on jac#10542). Then lower session composition and the plugin bridge; resolve auth/config/session JSON and paths, provider streaming, web fetch, MCP stdio/HTTP, and sidecar process/channel lifecycle. | Authenticated mocked tool turn plus MCP and configured-extension lifecycle run in native placement. |
+| 5 | Agent and integration graph | `agent.extensions` seals native; `agent.registry` emits a native library, but still needs function-level placement proof and closure of logging/bridge dynamic boundaries. The current session probe isolates five demotions in model/thinking state accessors, with E5092 at the corresponding globals. Fix or upstream the separate E9003 callable-ABI ICE in merged `sessions.test.jac`, then lower session composition and the plugin bridge. Audit auth/config/session JSON and path APIs, provider streaming, web fetch, MCP stdio/HTTP, and sidecar process/channel lifecycle. The earlier missing `urlopen(timeout=...)` and protocol placement walls are cleared by native urllib support and agent graph targeting. | Authenticated mocked tool turn plus MCP and configured-extension lifecycle run in native placement. |
 | 6 | Python-backed test/support removal | Port `agent/sse_test_server.py` and `app/e2e/fixtures/*.py` to Jac/native fixtures; remove `pyte` through the Jac `VirtualTerminal` or a native emulator. Move same-stem test-only imports/helpers out of product modules where annex merging pollutes product lowering. Convert the app test runner from server dispatch to native execution. | Every app test and fixture is Jac/native and can execute without CPython or Python packages. |
 | 7 | Artifact proof and pin retirement | Build clean artifacts for both product roots and the native app test runner; remove temporary pins only as each boundary closes. Keep validation/debug-only modules out of product closure only after import tracing confirms they are unreachable. | Product and test closures run with zero server placements, no CPython/Python-package dependency, and recorded native execution evidence. |
 
@@ -393,29 +402,35 @@ TUI loop are product paths.
 | Artifact and launch | The latest app build seals 147 modules with a `cpython-314` tag and 138 server-only placements. A native payload is present, but the launcher still requires the Python-tagged runtime and a native payload present in the artifact does not prove it handled execution. | Seal product roots independently of test annexes, then run the artifact with CPython and Python packages unavailable. Capture loader/runtime evidence that the native payload handled launch and verify no server placements remain. |
 
 Recommended order: (1) generate the root/test closure ledger and isolate annex
-imports; (2) finish native thread call compatibility and floor coverage; (3)
-close the headless `main.jac` vertical slice beginning with `agent.session`,
-registry invocation, and provider/tools; (4) close the shared UI object/compiler
-graph, then the TUI loop and terminal; (5) port Python-backed fixtures and
-replace `pyte`, then move `jac test` execution to native; (6) seal product roots
-and tests separately and prove both run without CPython.
+imports so compiler crashes in merged fixtures cannot mask product progress;
+(2) close the session state accessor seam and its native dependencies, then
+prove registry invocation, provider streaming, tools, auth, and web fetch at
+`main.jac`; (3) finish OS-floor behavior and Linux parity, including URL/IP
+handling, process lifecycle, and native HTTP fixtures; (4) close the shared UI
+object/compiler graph, then the TUI loop and terminal; (5) port Python-backed
+fixtures and replace `pyte`, then move `jac test` execution to native; (6) seal
+product roots and tests separately and prove both run without CPython.
 Verify each slice at the importing root so a native leaf is not mistaken for a
 closed product or test path.
 
 ## 9. Immediate next milestone
 
-Advance N6 in dependency order. Native threading, the typed TUI queue, and
-native TTY detection are underway. The current product-root blockers are
-`agent.session` for the headless entry and its agent composition, then the
+Advance N6 in dependency order. Native threading, the typed TUI queue, native
+TTY detection, and MCP product lowering are already established macOS slices.
+The next implementation slice is the five `agent.session` model/thinking
+accessor demotions. Separate the merged session-test compiler ICE from the
+product lowering signal, then close the headless entry before starting the
 shared UI/OSP and TUI graph. Maintain a generated closure ledger alongside
 these implementation slices:
 
 ```text
 main.jac / tui/shell.jac / *.test.jac import-closure ledger
         ↓
-finish native worker call sites + channel + lock + event + cancellation proof
+isolate test annexes; fix/report sessions.test.jac callable ABI ICE
         ↓
-headless main.jac vertical slice (session → registry → provider/tools)
+agent.session state/config accessors → registry → provider/tools/auth/web
+        ↓
+native OS floor gaps + cross-platform behavior proof
         ↓
 native UI/OSP graph → TUI loop and terminal
         ↓
