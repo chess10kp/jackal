@@ -36,7 +36,7 @@ default = "native"
 # placement of that module. Lower this graph together.
 # Marking those walkers `walker:protect` is the documented route to native;
 # it is gated on the kernel-side issue above, not on the app.
-# Current frontier: 30 explicit server pins remain. N6 requires reducing
+# Current frontier: 29 explicit server pins remain. N6 requires reducing
 # this count to zero and proving the sealed app executes without CPython or
 # Python package dependencies. Keep each temporary pin annotated with its
 # compiler/runtime wall.
@@ -250,14 +250,10 @@ default = "native"
 "agent.registry" = "server"
 "agent.plugin_bridge" = "server"
 "agent.session" = "server"
-# agent.extensions: BLOCKED native, two independent walls (probed 2026-08-25):
-# (a) no native json.load/loads in jaclang -> load_extension_decls demotes to
-#     Python-only, which forces the whole module server;
-# (b) os.path.abspath / os.path.isabs unsupported natively (dirname/join/
-#     isfile/getcwd ARE supported); ExtensionStatus/ExtensionDecl are
-#     constructed server-side in session.jac anyway (class-boundary wall,
-#     see agent.tool_spec above).
-"agent.extensions" = "server"
+# agent.extensions is native now that json.load plus os.path.abspath/isabs
+# resolve through native floors. The TUI/session importer graph still stays
+# server-placed; N6 closes that crossing when the agent and TUI roots move.
+"agent.extensions" = "native"
 # TUI layer pinned server for SEAM CONSISTENCY under jac test (#10213):
 # the harness graph (LiveShell + pyte EmulatedTerminal + agent.session)
 # cannot lower native (pyte is a Python module), and per-function demotions

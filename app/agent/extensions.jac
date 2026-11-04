@@ -117,8 +117,11 @@ def load_extension_decls(cwd: str = "") -> list[ExtensionDecl] {
                 with open(jackal_path, "r") as fh {
                     data = json.load(fh);
                 }
-                if isinstance(data, dict) and "extensions" in data {
-                    return decls_from_json(data);
+                if isinstance(data, dict) {
+                    data_dict: dict[str, any] = data as dict[str, any];
+                    if "extensions" in data_dict {
+                        return decls_from_json(data_dict);
+                    }
                 }
             } except (OSError, ValueError) {
             }
