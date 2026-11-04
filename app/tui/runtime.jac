@@ -1,6 +1,6 @@
 """Streaming worker and approval lifecycle."""
 import threading;
-import queue;
+import from tui.message_queue { Message, MessageQueue, QueueEmpty }
 import from tui.state { LiveShell }
 import from tui.core {
     _push_turn,
@@ -61,7 +61,7 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
     app.stream_tick = 0;
     # Capture the queue LOCALLY: _finish_stream nulls app.evq when the turn
     # ends, and late worker events must never dereference that field.
-    q = queue.Queue();
+    q = MessageQueue();
     app.evq = q;
     app.stream_msg_id = _push_turn(app, "assistant", "▍");
     def collector(kind: str, data: dict[str, any]) {
@@ -144,8 +144,8 @@ def _tick_stream(app: LiveShell) {
     chunks_pending: bool = False;
     while True {
         try {
-            item: any = app.evq.get_nowait();
-        } except queue.Empty {
+            item: Message = app.evq.get_nowait();
+        } except QueueEmpty {
             break;
         }
         kind = str(item[0]);

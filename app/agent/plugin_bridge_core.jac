@@ -25,7 +25,6 @@ obj PluginBridge {
         status_phase: str = "idle",
         idle_timeout_s: float = 300.0,
         pending: dict[str, any] = {},
-        reply_q: any = None,
         reader_stop: any = None,
         reader_thread: any = None,
         write_lock: any = None,

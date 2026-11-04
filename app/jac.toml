@@ -240,13 +240,12 @@ default = "native"
 # server<->native; seals native with no demotion.
 # `jac test` does NOT honor [placement.pins] — suites always run pre-seal/
 # server-side, so a pin flip MUST be validated by `jac build` + running the
-# agent.registry: BLOCKED native (2026-08-31 seal probe; pin flipped and
-# reverted after one honest round-trip). Its own constructions (create_registry
-# /register_native/register_js) never hit the class-boundary wall — the seal
-# refuses the module on three narrower walls: invoke's `ent.handler(**args)`
-# call-argument unpacking (E5092, unsupported natively); openai_tools' list
-# append; `any` unbox to JacStr. Fix those and re-flip; the manifest
-# placement map (vendor fix 2026-08-31) reports the demotion either way.
+# agent.registry still needs root-level proof before this pin can be retired.
+# `jac build agent/registry.jac --native --lib` now emits a native library,
+# after a typed assertion in its merged test annex; this does not establish
+# function-level placement for invoke() or its use from the agent loop. Check
+# logging, optional bridge dispatch, and model-tool shaping under the native
+# root before changing the pin.
 "agent.registry" = "server"
 "agent.plugin_bridge" = "server"
 "agent.session" = "server"
@@ -263,6 +262,7 @@ default = "native"
 # the same shape as server agent.session calling native core.edit.
 # PRODUCTION COST: tui/* runs Python under jac run (the ui render stack
 # stays native). Revisit when upstream fixes jac-test seam dispatch.
+"tui.message_queue" = "native"
 "tui.commands" = "server"
 "tui.context" = "server"
 "tui.core" = "server"

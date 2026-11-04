@@ -1,9 +1,8 @@
 """Jackal TUI coordinator. Behavior lives in responsibility modules."""
 
-import sys;
 import os;
-import queue;
 import from tui.state { LiveShell }
+import from tui.message_queue { MessageQueue }
 import from tui.picker_actions { _hydrate_auth_environment }
 import from tui.core { _push_turn, _install_layout }
 import from tui.overlay { _render }
@@ -87,7 +86,7 @@ def boot_tui(term: Terminal | None = None) -> LiveShell {
     } except Exception {
     }
     app = create_live_shell(term);
-    app.cmd_q = queue.Queue();
+    app.cmd_q = MessageQueue();
     app.term.start();
     app.term.set_title("Jackal — " + get_model());
     app.dirty = True;
@@ -155,7 +154,7 @@ def run_tui() {
 
 
 with entry:__main__ {
-    if not sys.stdin.isatty() or not sys.stdout.isatty() {
+    if not os.isatty(0) or not os.isatty(1) {
         print("jackal tui needs a real TTY.");
         raise SystemExit(1);
     }

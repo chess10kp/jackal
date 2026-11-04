@@ -1,7 +1,6 @@
 """Plugin bridge stdio correlation and interactive UI transport."""
 
 import json;
-import queue;
 import threading;
 import time;
 import from .protocol { Envelope, make_envelope, is_plugin_kind }
@@ -57,7 +56,7 @@ def _dispatch_inbound(bridge: any, env: Envelope) {
     }
     bridge.inbox.append(env);
     corr = env.correlation_id;
-    pending = bridge.pending;
+    pending: dict[str, any] = bridge.pending;
     if corr and corr in pending {
         waiter: any = pending[corr];
         expect: any = waiter.get("expect", "");
@@ -116,9 +115,6 @@ def _reader_loop(bridge: any) {
 
 
 def _ensure_io(bridge: any) {
-    if bridge.reply_q is None {
-        bridge.reply_q = queue.Queue();
-    }
     if bridge.write_lock is None {
         bridge.write_lock = threading.Lock();
     }
@@ -137,8 +133,11 @@ def _start_reader(bridge: any) {
         return;
     }
     bridge.reader_stop.clear();
+    def read_bridge() {
+        _reader_loop(bridge);
+    }
     t = threading.Thread(
-        target=_reader_loop, args=(bridge,), daemon=True, name="plugin-host-reader"
+        target=read_bridge, daemon=True, name="plugin-host-reader"
     );
     bridge.reader_thread = t;
     t.start();
@@ -163,7 +162,8 @@ def _prepare_corr(
     bridge: any, correlation_id: str, expect_kind: str = ""
 ) {
     _ensure_io(bridge);
-    if correlation_id and correlation_id not in bridge.pending {
+    pending: dict[str, any] = bridge.pending;
+    if correlation_id and correlation_id not in pending {
         # expect_kind: only an envelope of this kind may complete the waiter.
         # Guards against sibling traffic (e.g. tool_update sharing the parent
         # correlation with tool_result) waking the wrong waiter.

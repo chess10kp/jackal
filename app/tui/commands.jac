@@ -1,8 +1,8 @@
 """Slash commands and extension UI handling."""
 import os;
 import threading;
-import queue;
 import from tui.state { LiveShell, SLASH_BUILTINS }
+import from tui.message_queue { MessageQueue }
 import from tui.core { _push_turn }
 import from tui.picker_base { _open_picker }
 import from tui.picker_actions {
@@ -359,7 +359,7 @@ def _ui_settle(app: LiveShell, value: any, use_cancel: bool = False) {
 app.cmd_q and is rendered by _tick_cmd. Returns "" (output is async)."""
 def _run_ext_command_async(app: LiveShell, name: str, args: str) -> str {
     if app.cmd_q is None {
-        app.cmd_q = queue.Queue();
+        app.cmd_q = MessageQueue();
     }
     q = app.cmd_q;
 

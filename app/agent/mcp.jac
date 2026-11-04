@@ -108,6 +108,24 @@ def _ensure_io(client: McpClient) {
 }
 
 
+def _start_inbound_worker(
+    client: McpClient,
+    rid: any,
+    method: str,
+    params: dict[str, any],
+) {
+    def serve_inbound() {
+        _serve_inbound(client, rid, method, params);
+    }
+    t = threading.Thread(
+        target=serve_inbound,
+        daemon=True,
+        name="mcp-inbound",
+    );
+    t.start();
+}
+
+
 """Background stdout reader — routes responses by id, buffers notifications."""
 def _reader_loop(client: McpClient) {
     stop = client.reader_stop;
@@ -148,13 +166,7 @@ def _reader_loop(client: McpClient) {
             if handler is not None {
                 raw_params: any = parsed.get("params");
                 p_in: dict[str, any] = raw_params if isinstance(raw_params, dict) else {};
-                t = threading.Thread(
-                    target=_serve_inbound,
-                    args=(client, rid, str(method), p_in),
-                    daemon=True,
-                    name="mcp-inbound",
-                );
-                t.start();
+                _start_inbound_worker(client, rid, str(method), p_in);
             } else {
                 reply: dict[str, any] = {
                     "jsonrpc": "2.0",
@@ -334,8 +346,11 @@ def _start_reader(client: McpClient) {
         return;
     }
     client.reader_stop.clear();
+    def read_client() {
+        _reader_loop(client);
+    }
     t = threading.Thread(
-        target=_reader_loop, args=(client,), daemon=True, name="mcp-reader"
+        target=read_client, daemon=True, name="mcp-reader"
     );
     client.reader_thread = t;
     t.start();

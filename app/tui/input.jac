@@ -1,6 +1,6 @@
 """Keyboard, host-event, and per-frame dispatch for LiveShell."""
 import os;
-import queue;
+import from tui.message_queue { Message, QueueEmpty }
 import from tui.state { LiveShell }
 import from tui.core { _push_turn, _scroll_transcript }
 import from tui.overlay { _slash_popup_state, _slash_popup_pick }
@@ -220,8 +220,8 @@ def _tick_cmd(app: LiveShell) {
     drained = False;
     while True {
         try {
-            item: any = app.cmd_q.get_nowait();
-        } except queue.Empty {
+            item: Message = app.cmd_q.get_nowait();
+        } except QueueEmpty {
             break;
         }
         drained = True;

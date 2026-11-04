@@ -1,5 +1,7 @@
 """Shared state and pure shell values for the native Jackal TUI."""
 
+import threading;
+import from tui.message_queue { MessageQueue }
 import from ui.runtime { UiSession }
 import from ui.screen { ShellScreen }
 import from ui.transcript { TranscriptProjection, TranscriptMessage }
@@ -75,16 +77,16 @@ obj LiveShell {
         dirty: bool = True,
         columns: int = 80,
         rows: int = 24,
-        evq: any = None,
-        worker: any = None,
+        evq: (MessageQueue | None) = None,
+        worker: (threading.Thread | None) = None,
         tool_msg_id: str = "",
-        appr_event: any = None,
+        appr_event: (threading.Event | None) = None,
         appr_approved: bool = False,
         # Window stack (tui/window.jac API): top entry owns keys; picker
         # entries render above the prompt, other modal windows use overlay.
         windows: list[WindowState] = [],
         mode: str = "normal",
-        cmd_q: any = None,
+        cmd_q: (MessageQueue | None) = None,
         auth_flow: dict[str, any] = {},
         auth_data: dict[str, any] = {},
         slash_sel: int = 0,
