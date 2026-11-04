@@ -26,8 +26,10 @@ import sys;
 import tempfile;
 import threading;
 import time;
-import urllib.error;
+import from http.client { HTTPResponse }
+import from _subprocess_native { sp_close, sp_env_strings, sp_read, sp_write }
 import urllib.request;
+import from urllib.request { Request }
 
 glob DEFAULT_TIMEOUT_S: float = 15.0,
      MAX_NOTIFICATIONS: int = 1000,
@@ -37,27 +39,35 @@ glob DEFAULT_TIMEOUT_S: float = 15.0,
 glob MCP_PROTOCOL_VERSION: str = "2025-06-18";
 
 
+obj McpPending {
+    has event: threading.Event = threading.Event(),
+        msg: dict[str, any] | None = None,
+        eof: bool = False;
+}
+
+
 obj McpClient {
     """State holder for one MCP server subprocess."""
     has dead: bool = False,
-        proc: any = None,
+        proc: subprocess.Popen | None = None,
         server_cmd: list[str] = [],
         next_id: int = 1,
         timeout_s: float = DEFAULT_TIMEOUT_S,
         initialized: bool = False,
         protocol_version: str = "",
         server_info: dict[str, any] = {},
-        pending: dict[str, any] = {},
+        pending: dict[str, McpPending] = {},
         notifications: list[dict[str, any]] = [],
-        write_lock: any = None,
-        reader_stop: any = None,
-        reader_thread: any = None,
+        reader_buffer: bytes = b"",
+        write_lock: threading.Lock | None = None,
+        reader_stop: threading.Event | None = None,
+        reader_thread: threading.Thread | None = None,
         # Server-initiated request handler (stdio): fn(method, params) ->
         # {"ok": True, "result": dict} | {"ok": False, "code": int,
         # "message": str}. Runs on a short-lived daemon thread, NEVER on
         # the reader thread; None keeps the legacy -32601 reply for every
         # inbound request.
-        on_request: any = None,
+        on_request: Callable[[str, dict[str, any]], dict[str, any]] | None = None,
         # streamable-HTTP transport state (transport: "stdio" | "http")
         transport: str = "stdio",
         url: str = "",
@@ -91,14 +101,15 @@ def _alive(client: McpClient) -> bool {
     if client.transport == "http" {
         return client.initialized and not client.dead;
     }
-    if client.proc is None {
+    proc: subprocess.Popen | None = client.proc;
+    if proc is None {
         return False;
     }
-    return client.proc.poll() is None;
+    return proc.poll() is None;
 }
 
 
-def _ensure_io(client: McpClient) {
+def _ensure_io(client: McpClient) -> None {
     if client.write_lock is None {
         client.write_lock = threading.Lock();
     }
@@ -129,13 +140,13 @@ def _start_inbound_worker(
 """Background stdout reader — routes responses by id, buffers notifications."""
 def _reader_loop(client: McpClient) {
     stop = client.reader_stop;
-    proc = client.proc;
-    if proc is None or proc.stdout is None {
+    proc: subprocess.Popen | None = client.proc;
+    if proc is None or proc._stdout_r < 0 {
         return;
     }
     while stop is None or not stop.is_set() {
         try {
-            line_raw: any = proc.stdout.readline();
+            line_raw: bytes = _read_process_line(client, proc._stdout_r);
         } except Exception {
             break;
         }
@@ -154,17 +165,18 @@ def _reader_loop(client: McpClient) {
         if not isinstance(parsed, dict) {
             continue;
         }
-        rid: any = parsed.get("id");
-        method: any = parsed.get("method");
+        parsed_msg: dict[str, any] = parsed as dict[str, any];
+        rid: any = parsed_msg.get("id");
+        method: any = parsed_msg.get("method");
         if rid is not None and method is not None {
             # Server->client REQUEST (sampling/elicitation/roots). With a
             # registered handler, hand off to a short-lived daemon thread
             # so the reader never blocks on UI/model work; the serve
             # thread owns writing the exactly-one reply. Without one, keep
             # the legacy bounded answer: a JSON-RPC error, never silence.
-            handler: any = client.on_request;
+            handler: Callable[[str, dict[str, any]], dict[str, any]] | None = client.on_request;
             if handler is not None {
-                raw_params: any = parsed.get("params");
+                raw_params: any = parsed_msg.get("params");
                 p_in: dict[str, any] = raw_params if isinstance(raw_params, dict) else {};
                 _start_inbound_worker(client, rid, str(method), p_in);
             } else {
@@ -186,13 +198,10 @@ def _reader_loop(client: McpClient) {
         if rid is not None and method is None {
             # Response to one of ours: correlate by id.
             key = str(rid);
-            waiter: any = client.pending.get(key);
+            waiter: McpPending | None = client.pending.get(key);
             if waiter is not None {
-                waiter["msg"] = parsed;
-                ev: any = waiter.get("event");
-                if ev is not None {
-                    ev.set();
-                }
+                waiter.msg = parsed_msg;
+                waiter.event.set();
             }
             continue;
         }
@@ -207,39 +216,30 @@ def _reader_loop(client: McpClient) {
         client.dead = True;
     }
     for leftover in list(client.pending.values()) {
-        if isinstance(leftover, dict) and leftover.get("msg") is None {
-            leftover["eof"] = True;
-            ev2: any = leftover.get("event");
-            if ev2 is not None {
-                ev2.set();
-            }
+        if leftover.msg is None {
+            leftover.eof = True;
+            leftover.event.set();
         }
     }
 }
 
 
-"""Map an HTTPError to a response: a JSON-RPC error/result body in the
-error payload surfaces as a normal response dict; otherwise 404/5xx mark
-the client dead (session gone / server error) and a RuntimeError carries
-the status."""
-def _http_error_response(client: McpClient, he: any) -> dict[str, any] {
-    raw: bytes = b"";
-    try {
-        raw = he.read();
-    } except Exception {
+def _read_process_line(client: McpClient, fd: int) -> bytes {
+    newline: int = client.reader_buffer.find(b"\n");
+    while newline < 0 {
+        chunk: bytes = sp_read(fd, 4096);
+        if not chunk {
+            line: bytes = client.reader_buffer;
+            client.reader_buffer = b"";
+            return line;
+        }
+        client.reader_buffer += chunk;
+        newline = client.reader_buffer.find(b"\n");
     }
-    parsed: any = None;
-    try {
-        parsed = json.loads(raw.decode("utf-8", "replace"));
-    } except Exception {
-    }
-    if isinstance(parsed, dict) and ("error" in parsed or "result" in parsed) {
-        return parsed;
-    }
-    if he.code == 404 or he.code >= 500 {
-        client.dead = True;
-    }
-    raise RuntimeError(f"http {he.code} from mcp server");
+    end: int = newline + 1;
+    line2: bytes = client.reader_buffer[:end];
+    client.reader_buffer = client.reader_buffer[end:];
+    return line2;
 }
 
 
@@ -250,7 +250,12 @@ on the stream are buffered, bounded); 202 / expect_body=False returns None.
 HTTP 4xx with a JSON-RPC error body surfaces as a normal response; 404 and
 5xx mark the client dead (session gone / server error) so health and revive
 machinery see it. Raises RuntimeError/TimeoutError."""
-def _http_exchange(client: McpClient, msg: dict[str, any], timeout_s: float, expect_body: bool) -> any {
+def _http_exchange(
+    client: McpClient,
+    msg: dict[str, any],
+    timeout_s: float,
+    expect_body: bool,
+) -> (dict[str, any] | None) {
     hdrs: dict[str, str] = {
         "Content-Type": "application/json",
         "Accept": "application/json, text/event-stream",
@@ -262,22 +267,23 @@ def _http_exchange(client: McpClient, msg: dict[str, any], timeout_s: float, exp
         hdrs["Mcp-Session-Id"] = client.session_id;
     }
     body: bytes = json.dumps(msg).encode("utf-8");
-    req = urllib.request.Request(client.url, data=body, headers=hdrs, method="POST");
-    resp: any = None;
+    req: Request = urllib.request.Request(
+        client.url, data=body, headers=hdrs, method="POST"
+    );
+    resp: HTTPResponse | None = None;
     try {
-        resp = urllib.request.urlopen(req, timeout=timeout_s);
-    } except urllib.error.HTTPError as he {
-        return _http_error_response(client, he);
-    } except urllib.error.URLError as ue {
-        rsn: any = getattr(ue, "reason", ue);
-        if isinstance(rsn, TimeoutError) or "timed out" in str(rsn).lower() {
-            raise TimeoutError(f"http request timed out after {timeout_s}s");
-        }
+        resp = urllib.request.urlopen(req, timeout=timeout_s) as HTTPResponse;
+    } except TimeoutError {
+        raise TimeoutError(f"http request timed out after {timeout_s}s");
+    } except OSError as ue {
         client.dead = True;
         raise RuntimeError(f"http transport failed: {ue}");
     }
+    if resp is None {
+        raise RuntimeError("mcp HTTP transport returned no response");
+    }
     try {
-        sid: any = resp.headers.get("Mcp-Session-Id", "");
+        sid: str = str(resp.headers.get("mcp-session-id", "") or "");
         if sid and not client.session_id {
             client.session_id = str(sid);
         }
@@ -285,20 +291,19 @@ def _http_exchange(client: McpClient, msg: dict[str, any], timeout_s: float, exp
         if status == 202 or not expect_body {
             return None;
         }
-        ctype: str = str(resp.headers.get("Content-Type", "") or "");
+        ctype: str = str(resp.headers.get("content-type", "") or "");
         if ctype.startswith("text/event-stream") {
             # Streamable HTTP: the response may ride as SSE events; parse
             # until the correlated response arrives, buffering anything
             # else (notifications, server requests) bounded like stdio.
             while True {
-                line_raw: any = resp.readline();
+                line_raw: str = resp.readline();
                 if not line_raw {
                     break;
                 }
-                if isinstance(line_raw, bytes) {
-                    line_s: str = line_raw.decode("utf-8", "replace").strip();
-                } else {
-                    line_s: str = str(line_raw).strip();
+                line_s: str = line_raw.strip();
+                if not line_s {
+                    continue;
                 }
                 if not line_s.startswith("data:") {
                     continue;
@@ -312,11 +317,14 @@ def _http_exchange(client: McpClient, msg: dict[str, any], timeout_s: float, exp
                 } except Exception {
                     continue;
                 }
-                if isinstance(got, dict) and got.get("id") == msg.get("id") and "method" not in got {
-                    return got;
-                }
-                if isinstance(got, dict) and len(client.notifications) < MAX_NOTIFICATIONS {
-                    client.notifications.append(got);
+                if isinstance(got, dict) {
+                    got_obj: dict[str, any] = got as dict[str, any];
+                    if got_obj.get("id") == msg.get("id") and "method" not in got_obj {
+                        return got_obj;
+                    }
+                    if len(client.notifications) < MAX_NOTIFICATIONS {
+                        client.notifications.append(got_obj);
+                    }
                 }
             }
             return {
@@ -326,9 +334,22 @@ def _http_exchange(client: McpClient, msg: dict[str, any], timeout_s: float, exp
             };
         }
         raw2: bytes = resp.read();
-        parsed2: any = json.loads(raw2.decode("utf-8", "replace"));
+        parsed2: any = None;
+        try {
+            parsed2 = json.loads(raw2.decode("utf-8", "replace"));
+        } except Exception {
+            if status == 404 or status >= 500 {
+                client.dead = True;
+                raise RuntimeError(f"http {status} from mcp server");
+            }
+            raise;
+        }
         if isinstance(parsed2, dict) {
-            return parsed2;
+            return parsed2 as dict[str, any];
+        }
+        if status == 404 or status >= 500 {
+            client.dead = True;
+            raise RuntimeError(f"http {status} from mcp server");
         }
         raise RuntimeError("mcp server returned a non-object response");
     } finally {
@@ -340,16 +361,19 @@ def _http_exchange(client: McpClient, msg: dict[str, any], timeout_s: float, exp
 }
 
 
-def _start_reader(client: McpClient) {
+def _start_reader(client: McpClient) -> None {
     _ensure_io(client);
     if client.reader_thread is not None and client.reader_thread.is_alive() {
         return;
     }
-    client.reader_stop.clear();
+    reader_stop: threading.Event | None = client.reader_stop;
+    if reader_stop is not None {
+        reader_stop.clear();
+    }
     def read_client() {
         _reader_loop(client);
     }
-    t = threading.Thread(
+    t: threading.Thread = threading.Thread(
         target=read_client, daemon=True, name="mcp-reader"
     );
     client.reader_thread = t;
@@ -357,7 +381,7 @@ def _start_reader(client: McpClient) {
 }
 
 
-def _stop_reader(client: McpClient) {
+def _stop_reader(client: McpClient) -> None {
     if client.reader_stop is not None {
         client.reader_stop.set();
     }
@@ -372,22 +396,33 @@ def _write_line(client: McpClient, msg: dict[str, any]) {
         _http_exchange(client, msg, client.timeout_s, False);
         return;
     }
-    if not _alive(client) or client.proc.stdin is None {
+    proc: subprocess.Popen | None = client.proc;
+    if not _alive(client) or proc is None or proc._stdin_w < 0 {
         raise RuntimeError("mcp server not running");
     }
-    line = json.dumps(msg) + "\n";
-    lock: any = client.write_lock;
+    line: bytes = (json.dumps(msg) + "\n").encode("utf-8");
+    lock: threading.Lock | None = client.write_lock;
     if lock is not None {
         lock.acquire();
         try {
-            client.proc.stdin.write(line);
-            client.proc.stdin.flush();
+            _write_process_bytes(proc._stdin_w, line);
         } finally {
             lock.release();
         }
     } else {
-        client.proc.stdin.write(line);
-        client.proc.stdin.flush();
+        _write_process_bytes(proc._stdin_w, line);
+    }
+}
+
+
+def _write_process_bytes(fd: int, data: bytes) -> None {
+    off: int = 0;
+    while off < len(data) {
+        wrote: int = sp_write(fd, data[off:]);
+        if wrote <= 0 {
+            raise RuntimeError("mcp process pipe write failed");
+        }
+        off += wrote;
     }
 }
 
@@ -424,7 +459,7 @@ def _request(client: McpClient, method: str, params: dict[str, any], timeout_s: 
     rid = client.next_id;
     client.next_id += 1;
     key = str(rid);
-    client.pending[key] = {"event": threading.Event(), "msg": None};
+    client.pending[key] = McpPending();
     req: dict[str, any] = {
         "jsonrpc": "2.0",
         "id": rid,
@@ -440,21 +475,20 @@ def _request(client: McpClient, method: str, params: dict[str, any], timeout_s: 
     deadline = time.monotonic() + timeout_s;
     while True {
         remaining = max(0.01, deadline - time.monotonic());
-        waiter: any = client.pending.get(key);
+        waiter: McpPending | None = client.pending.get(key);
         if waiter is None {
             raise RuntimeError("mcp response waiter vanished");
         }
-        if waiter.get("msg") is not None {
+        if waiter.msg is not None {
             client.pending.pop(key, None);
-            got: any = waiter["msg"];
-            return got as dict;
+            return waiter.msg;
         }
-        if waiter.get("eof") {
+        if waiter.eof {
             # Reader hit EOF: the server is gone — fail fast, honestly.
             client.pending.pop(key, None);
             raise RuntimeError("mcp server closed connection");
         }
-        ok = waiter["event"].wait(timeout=remaining);
+        ok = waiter.event.wait(timeout=remaining);
         if not ok and time.monotonic() >= deadline {
             client.pending.pop(key, None);
             raise TimeoutError(f"timed out waiting for {method}");
@@ -509,15 +543,22 @@ def mcp_start(
     _ensure_io(client);
     # env_extra merges over the inherited environment (Popen env=None would
     # mean "inherit everything, change nothing"); cwd="" keeps inheritance.
-    popen_env: any = None;
+    popen_env: dict[str, str] | None = None;
     if env_extra {
-        base_env: dict[str, str] = dict(os.environ);
+        base_env: dict[str, str] = {};
+        for env_line in sp_env_strings() {
+            sep: int = env_line.find("=");
+            if sep > 0 {
+                env_key: str = env_line[:sep];
+                base_env[env_key] = env_line[sep + 1:];
+            }
+        }
         for (env_k, env_v) in env_extra.items() {
             base_env[str(env_k)] = str(env_v);
         }
         popen_env = base_env;
     }
-    popen_cwd: any = None;
+    popen_cwd: str | None = None;
     if cwd {
         popen_cwd = str(cwd);
     }
@@ -552,13 +593,13 @@ def mcp_start(
         mcp_stop(client);
         return {"ok": False, "error": f"initialize failed: {e}"};
     }
-    payload = _response_payload(resp);
+    payload: dict[str, any] = _response_payload(resp);
     if not payload["ok"] {
         mcp_stop(client);
         return payload;
     }
-    result: any = payload["result"];
-    pv = str(result.get("protocolVersion", ""));
+    result: dict[str, any] = payload["result"] as dict[str, any];
+    pv: str = str(result.get("protocolVersion", ""));
     if pv {
         client.protocol_version = pv;
     }
@@ -628,12 +669,12 @@ def mcp_start_http(
     } except Exception as e {
         return {"ok": False, "error": f"initialize failed: {e}"};
     }
-    payload = _response_payload(resp);
+    payload: dict[str, any] = _response_payload(resp);
     if not payload["ok"] {
         return payload;
     }
-    result: any = payload["result"];
-    pv = str(result.get("protocolVersion", ""));
+    result: dict[str, any] = payload["result"] as dict[str, any];
+    pv: str = str(result.get("protocolVersion", ""));
     if pv {
         client.protocol_version = pv;
     }
@@ -686,11 +727,16 @@ def mcp_list_tools(client: McpClient, timeout_s: float = -1.0) -> dict[str, any]
         if not payload["ok"] {
             return payload;
         }
-        result: any = payload["result"];
+        result: dict[str, any] = payload["result"] as dict[str, any];
         raw_tools: any = result.get("tools", []);
         if isinstance(raw_tools, list) {
-            for t in raw_tools {
-                if isinstance(t, dict) and t.get("name") {
+            tool_values: list[any] = raw_tools as list[any];
+            for raw_tool in tool_values {
+                if isinstance(raw_tool, dict) {
+                    t: dict[str, any] = raw_tool as dict[str, any];
+                    if not t.get("name") {
+                        continue;
+                    }
                     schema: any = t.get("inputSchema");
                     tools.append({
                         "name": str(t.get("name")),
@@ -743,7 +789,7 @@ def mcp_call_tool(
     if not payload["ok"] {
         return payload;
     }
-    result: any = payload["result"];
+    result: dict[str, any] = payload["result"] as dict[str, any];
     # Flatten content blocks: text joins directly; non-text blocks become
     # honest text stubs (never dropped silently) and the raw blocks ride
     # along under "content" for richer plumbing later.
@@ -751,10 +797,12 @@ def mcp_call_tool(
     raw_content: any = result.get("content", []);
     blocks: list[dict[str, any]] = [];
     if isinstance(raw_content, list) {
-        for block in raw_content {
-            if not isinstance(block, dict) {
+        content_values: list[any] = raw_content as list[any];
+        for raw_block in content_values {
+            if not isinstance(raw_block, dict) {
                 continue;
             }
+            block: dict[str, any] = raw_block as dict[str, any];
             blocks.append(block);
             btype: str = str(block.get("type", ""));
             if btype == "text" {
@@ -770,8 +818,9 @@ def mcp_call_tool(
                     + ", " + str(len(str(block.get("data", "")))) + " b64 chars]"
                 );
             } elif btype == "resource" {
-                res: any = block.get("resource");
-                if isinstance(res, dict) {
+                raw_resource: any = block.get("resource");
+                if isinstance(raw_resource, dict) {
+                    res: dict[str, any] = raw_resource as dict[str, any];
                     stub: str = "[resource: " + str(res.get("uri", "unknown"));
                     if res.get("mimeType") {
                         stub += " " + str(res.get("mimeType"));
@@ -816,10 +865,12 @@ def mcp_stop(client: McpClient) -> dict[str, any] {
             try {
                 hdrs: dict[str, str] = dict(client.headers);
                 hdrs["Mcp-Session-Id"] = client.session_id;
-                req = urllib.request.Request(
+                req: Request = urllib.request.Request(
                     client.url, data=b"", headers=hdrs, method="DELETE"
                 );
-                resp: any = urllib.request.urlopen(req, timeout=2.0);
+                resp: HTTPResponse = urllib.request.urlopen(
+                    req, timeout=2.0
+                ) as HTTPResponse;
                 try {
                     resp.close();
                 } except Exception {
@@ -832,16 +883,14 @@ def mcp_stop(client: McpClient) -> dict[str, any] {
         client.pending = {};
         return {"ok": True};
     }
-    proc = client.proc;
+    proc: subprocess.Popen | None = client.proc;
     if proc is not None {
         try {
+            if proc._stdin_w >= 0 {
+                sp_close(proc._stdin_w);
+                proc._stdin_w = -1;
+            }
             if proc.poll() is None {
-                if proc.stdin is not None {
-                    try {
-                        proc.stdin.close();
-                    } except Exception {
-                    }
-                }
                 proc.terminate();
                 try {
                     proc.wait(timeout=2.0);
@@ -854,6 +903,10 @@ def mcp_stop(client: McpClient) -> dict[str, any] {
                 }
             }
         } except Exception {
+        }
+        if proc._stdout_r >= 0 {
+            sp_close(proc._stdout_r);
+            proc._stdout_r = -1;
         }
     }
     _stop_reader(client);
@@ -876,11 +929,16 @@ def mcp_tool_specs(client: McpClient, prefix: str = "", timeout_s: float = -1.0)
     if not res["ok"] {
         return specs;
     }
-    tools: any = res.get("tools", []);
-    for t in tools {
-        if not isinstance(t, dict) {
+    raw_tools: any = res.get("tools", []);
+    if not isinstance(raw_tools, list) {
+        return specs;
+    }
+    tools: list[any] = raw_tools as list[any];
+    for raw_tool in tools {
+        if not isinstance(raw_tool, dict) {
             continue;
         }
+        t: dict[str, any] = raw_tool as dict[str, any];
         name = str(t.get("name", ""));
         if not name {
             continue;
@@ -941,11 +999,16 @@ def mcp_list_prompts(client: McpClient, timeout_s: float = -1.0) -> dict[str, an
         if not payload["ok"] {
             return payload;
         }
-        result: any = payload["result"];
+        result: dict[str, any] = payload["result"] as dict[str, any];
         raw_prompts: any = result.get("prompts", []);
         if isinstance(raw_prompts, list) {
-            for pr in raw_prompts {
-                if isinstance(pr, dict) and pr.get("name") {
+            prompt_values: list[any] = raw_prompts as list[any];
+            for raw_prompt in prompt_values {
+                if isinstance(raw_prompt, dict) {
+                    pr: dict[str, any] = raw_prompt as dict[str, any];
+                    if not pr.get("name") {
+                        continue;
+                    }
                     args_out: list[any] = [];
                     raw_args: any = pr.get("arguments", []);
                     if isinstance(raw_args, list) {
@@ -997,13 +1060,14 @@ def mcp_get_prompt(
     if not payload["ok"] {
         return payload;
     }
-    result: any = payload["result"];
+    result: dict[str, any] = payload["result"] as dict[str, any];
     messages: list[dict[str, any]] = [];
     raw_msgs: any = result.get("messages", []);
     if isinstance(raw_msgs, list) {
-        for m in raw_msgs {
-            if isinstance(m, dict) {
-                messages.append(m);
+        message_values: list[any] = raw_msgs as list[any];
+        for raw_message in message_values {
+            if isinstance(raw_message, dict) {
+                messages.append(raw_message as dict[str, any]);
             }
         }
     }
@@ -1038,11 +1102,16 @@ def mcp_list_resources(client: McpClient, timeout_s: float = -1.0) -> dict[str, 
         if not payload["ok"] {
             return payload;
         }
-        result: any = payload["result"];
+        result: dict[str, any] = payload["result"] as dict[str, any];
         raw_res: any = result.get("resources", []);
         if isinstance(raw_res, list) {
-            for r in raw_res {
-                if isinstance(r, dict) and r.get("uri") {
+            resource_values: list[any] = raw_res as list[any];
+            for raw_resource in resource_values {
+                if isinstance(raw_resource, dict) {
+                    r: dict[str, any] = raw_resource as dict[str, any];
+                    if not r.get("uri") {
+                        continue;
+                    }
                     resources.append({
                         "uri": str(r.get("uri")),
                         "name": str(r.get("name", "")),
@@ -1085,15 +1154,17 @@ def mcp_read_resource(client: McpClient, uri: str, timeout_s: float = -1.0) -> d
     if not payload["ok"] {
         return payload;
     }
-    result: any = payload["result"];
+    result: dict[str, any] = payload["result"] as dict[str, any];
     parts: list[str] = [];
     contents: list[dict[str, any]] = [];
     raw_contents: any = result.get("contents", []);
     if isinstance(raw_contents, list) {
-        for c in raw_contents {
-            if not isinstance(c, dict) {
+        content_values: list[any] = raw_contents as list[any];
+        for raw_content in content_values {
+            if not isinstance(raw_content, dict) {
                 continue;
             }
+            c: dict[str, any] = raw_content as dict[str, any];
             contents.append(c);
             if c.get("text") is not None {
                 parts.append(str(c.get("text", "")));
@@ -1124,27 +1195,27 @@ def _serve_inbound(client: McpClient, rid: any, method: str, params: dict[str, a
         "error": {"code": -32603, "message": "client handler failed"},
     };
     try {
-        handler: any = client.on_request;
-        verdict: any = None;
+        handler: Callable[[str, dict[str, any]], dict[str, any]] | None = client.on_request;
+        verdict: dict[str, any] | None = None;
         if handler is not None {
             verdict = handler(method, params);
         }
         code_i: int = -32000;
-        if isinstance(verdict, dict) and verdict.get("code") is not None {
+        if verdict is not None {
             try {
-                code_i = int(verdict.get("code"));
+                code_i = int(verdict.get("code", -32000));
             } except Exception {
                 code_i = -32000;
             }
         }
-        if isinstance(verdict, dict) and verdict.get("ok") is True {
+        if verdict is not None and bool(verdict.get("ok", False)) {
             res: any = verdict.get("result");
             reply = {
                 "jsonrpc": "2.0",
                 "id": rid,
                 "result": res if isinstance(res, dict) else {},
             };
-        } elif isinstance(verdict, dict) {
+        } elif verdict is not None {
             reply = {
                 "jsonrpc": "2.0",
                 "id": rid,
@@ -1178,6 +1249,9 @@ runs on a dedicated daemon thread per request — it may block on UI or the
 model, but it must eventually return; the server's request timeout is the
 only backstop if it does not. HTTP clients have no inbound listener and
 ignore this seam."""
-def mcp_set_request_handler(client: McpClient, handler: any) {
+def mcp_set_request_handler(
+    client: McpClient,
+    handler: Callable[[str, dict[str, any]], dict[str, any]] | None,
+) -> None {
     client.on_request = handler;
 }
