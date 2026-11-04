@@ -311,10 +311,11 @@ shell tools, MCP,
 and the Node sidecar. Remaining Jac native-runtime gaps are tracked upstream
 in
 [jac#10585](https://github.com/jaseci-labs/jac/issues/10585).
-The separate `main.jac --native --lib` probe currently stops at `E5090` on
-`agent.session`, which is explicitly server-pinned. It also analyzes
-`main.test.jac` and reports missing native `tempfile` imports. This confirms
-that entry-root probes currently include test annex code; the placement ledger
+The separate `main.jac --native --lib` probe now stops at `E5090` on
+`agent.session`, which is explicitly server-pinned. Its merged
+`main.test.jac` annex no longer fails to resolve `tempfile`: vendored
+`tempfile.mkdtemp` now builds and runs in a native arm64 macOS executable.
+This confirms entry-root probes include test annex code; the placement ledger
 must report product and test closures separately, while the no-Python audit
 must still account for the test closure.
 
@@ -363,7 +364,7 @@ TUI loop are product paths.
 | Native OS services | `queue`/`threading` in `tui.runtime`, `tui.shell`, `tui.input`, `tui.commands`, `agent.interactions`, `agent.session_config`, `agent.mcp`, `agent.web_tools`, and `agent.plugin_bridge_io`; `subprocess` in tools, checkpoints, context input, MCP, plugin host, and launcher; `urllib` in model catalog, web tools, and MCP. | Specify native worker/channel, lock, event, and cancellation contracts. The shell native probe currently stops at `queue`. Port product HTTP callers to the existing socket/TLS stream path while preserving redirects, SSRF checks, catalog fallback, and MCP session correlation. The Darwin subprocess variant passes basic spawn/wait and captured-output probes; exercise timeout, cwd, env, and kill before closing the full floor. The optional `run.jac` launcher probe independently hits `os.access`, `dict(os.environ)`, and unresolved `returncode` lowering walls. |
 | UI object and compiler graph | `ui.screen` is blocked by event/session crossings and the jac#10485 walker-protection prepare crash. `ui.input` has a separate native runtime memory fault. Prior lowering walls include cross-module object layouts, `jid()` identity, bound endpoints, unary expressions, callback fields, and walker dispatch. | Resolve compiler/runtime walls in vendor Jac with minimal repros and upstream issue links. Promote screen/input only after native build and execution probes; keep root-reachable consumers in the same native graph. |
 | Agent graph | Five server pins: `agent.session`, `protocol`, `registry`, `plugin_bridge`, and `extensions`. Known walls include dynamic kwargs, list append/type erasure, class construction across placement, optional callbacks, module state, and JSON/path support. Bridge APIs currently accept Python-shaped `any` host values. | Define typed native host capabilities and factories. Lower registry/extensions before session composition; keep the Node sidecar as a child process behind a native Jac protocol boundary. |
-| Test/runtime contamination | Same-stem annexes make product modules import unused `shutil`/`tempfile` names for tests; the `main` native probe includes `main.test.jac` and reports `tempfile`. `tui.harness` and `e2e` use tempfile/process/thread helpers. `ui.emulated_terminal` imports `pyte`. | Separate test helpers from product module namespaces. Replace pyte with the Jac `VirtualTerminal` or a native emulator, and provide native test temp/process/server helpers. App tests stay in scope for the no-CPython target. |
+| Test/runtime contamination | Same-stem annexes make product modules import unused `shutil`/`tempfile` names for tests. `tui.harness` and `e2e` use temp/process/thread helpers. `ui.emulated_terminal` imports `pyte`. | Separate test helpers from product module namespaces. Native `tempfile.mkdtemp` now covers all current app calls and executes without Python; replace pyte with the Jac `VirtualTerminal` or a native emulator, and provide native process/server helpers. App tests stay in scope for the no-CPython target. |
 | Artifact and launch | The current seal is tagged `cpython-314` and has 138 server-only placements. A native payload present in the artifact does not prove it executed. | Seal product roots independently of test annexes, then run the artifact with CPython and Python packages unavailable. Capture loader/runtime evidence that the native payload handled launch and verify no server placements remain. |
 
 Recommended order: (1) closure and annex accounting; (2) native OS contracts
