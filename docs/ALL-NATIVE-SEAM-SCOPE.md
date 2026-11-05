@@ -18,7 +18,12 @@ native Jac test path.
 
 These gates are ordered by dependency. Work on later app seams can continue as
 focused source/lowering work, but cannot count as end-to-end closure until gates
-0 and 1 produce trustworthy compiler and graph evidence.
+0 and 1 produce trustworthy compiler and graph evidence. Gate 0 exceeds the
+current upstream kernel-only plan ([jac#10471](https://github.com/jaseci-labs/jac/issues/10471)),
+which still relies on JacPython; the Python-free compiler end state is tracked
+at [jac#10601](https://github.com/jaseci-labs/jac/issues/10601). The specific
+native lowering gap in the compiler's statically known pass-class schedule is
+tracked at [jac#10600](https://github.com/jaseci-labs/jac/issues/10600).
 
 | Gate | Scope | Current seam | Closure evidence |
 |---|---|---|---|
