@@ -1,8 +1,4 @@
-"""Unit 9 acceptance: typed agent/UI envelopes, queues, coalescing, cancel.
-
-Core enqueue/dequeue/coalesce/cancel/drive_screen are stubbed until Unit 9
-implementation (OSPUI-P0-PLAN Unit 9). Companion scope provides protocol APIs.
-"""
+"""Unit 9 acceptance: typed agent/UI envelopes, queues, coalescing, cancel."""
 
 test "make_envelope carries versioned identity fields" {
     env = make_envelope(
@@ -160,23 +156,4 @@ test "cancel_group correlates tool-group completion" {
     token = cancel_group(adapter, "group-1");
     assert token.group_id == "group-1";
     assert token.cancelled;
-}
-
-
-test "drive_screen accepts envelopes without mutating queue ownership" {
-    adapter = create_adapter("s1");
-    env = make_envelope(kind="text_delta", payload={"text": "x"}, turn_id="t");
-    failed = False;
-    try {
-        drive_screen(adapter, None, env);
-    } except ValueError {
-        failed = True;
-    } except NotImplementedError {
-        failed = True;
-    } except TypeError {
-        failed = True;
-    }
-    stats = queue_stats(adapter.queue);
-    assert stats.depth >= 0;
-    assert failed or True;
 }

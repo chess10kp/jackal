@@ -93,10 +93,10 @@ import from agent.protocol {
     make_envelope,
     enqueue,
     dequeue,
-    drive_screen,
     cancel_turn,
     queue_stats,
 }
+import from ui.screen_protocol { drive_screen }
 
 
 def _install_shell_layout(renderer: Renderer, shell: ShellScreen, columns: int, rows: int) {

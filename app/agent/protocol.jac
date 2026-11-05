@@ -5,11 +5,6 @@ turn/subprocess-group cancellation. External workers enqueue immutable events;
 they never mutate the UI graph.
 """
 
-import from ui.screen {
-    ShellScreen,
-}
-
-
 obj:pub Envelope {
     has version: int = 1,
         session_id: str = "",
@@ -210,94 +205,7 @@ def cancel_group(adapter: InProcessAdapter, group_id: str) -> CancelToken {
 }
 
 
-"""Drive one envelope into the product TUI shell (in-process adapter)."""
-def:pub drive_screen(adapter: InProcessAdapter, shell: any, envelope: Envelope) {
-    if shell is None {
-        raise ValueError("drive_screen requires a shell");
-    }
-    if not isinstance(shell, ShellScreen) {
-        raise TypeError("drive_screen expects a ShellScreen");
-    }
-    kind = envelope.kind;
-    if kind == "text_delta" {
-        text = str(envelope.payload.get("text", ""));
-        if text {
-            adapter.stream_buf = adapter.stream_buf + text;
-            shell.transcript.observed_revision += 1;
-            if not shell.transcript.source_id {
-                shell.transcript.source_id = envelope.turn_id;
-            }
-            adapter.busy = True;
-        }
-    } elif kind == "status" {
-        phase = str(envelope.payload.get("phase", ""));
-        if phase {
-            shell.status.phase = phase;
-            if phase == "streaming" or phase == "tool" {
-                adapter.busy = True;
-            } elif phase == "ready" or phase == "cancelled" {
-                adapter.busy = False;
-            }
-        }
-    } elif kind == "insert_text" {
-        text = str(envelope.payload.get("text", ""));
-        shell.prompt.draft = shell.prompt.draft + text;
-    } elif kind == "tool_start" {
-        tool = str(envelope.payload.get("tool", envelope.tool_id));
-        adapter.last_tool = tool;
-        shell.status.phase = "tool";
-        adapter.busy = True;
-    } elif kind == "tool_end" {
-        shell.status.phase = "streaming";
-        adapter.last_tool = "";
-    } elif kind == "approval_request" {
-        cid = envelope.correlation_id;
-        if not cid {
-            cid = str(envelope.payload.get("id", envelope.tool_id));
-        }
-        adapter.pending_approval_id = cid;
-        shell.status.phase = "approval";
-    } elif kind == "approval_decision" {
-        adapter.pending_approval_id = "";
-        approved = bool(envelope.payload.get("approved", False));
-        shell.status.phase = "streaming" if approved else "ready";
-    } elif kind == "turn_cancelled" or kind == "group_cancelled" {
-        shell.status.phase = "cancelled";
-        adapter.busy = False;
-        adapter.pending_approval_id = "";
-        if envelope.turn_id {
-            adapter.cancelled_turns.add(envelope.turn_id);
-        }
-    } elif kind == "turn_end" {
-        shell.status.phase = "ready";
-        adapter.busy = False;
-    } elif kind == "turn_start" {
-        shell.status.phase = "streaming";
-        adapter.stream_buf = "";
-        adapter.busy = True;
-        if envelope.turn_id {
-            shell.transcript.source_id = envelope.turn_id;
-        }
-    }
-}
-
-
-"""Drain the adapter queue and drive each envelope into the shell."""
-def:pub drain_and_drive(adapter: InProcessAdapter, shell: any) -> int {
-    count = 0;
-    while True {
-        env = dequeue(adapter.queue);
-        if env is None {
-            break;
-        }
-        drive_screen(adapter, shell, env);
-        count += 1;
-    }
-    return count;
-}
-
-
-# -- Plugin-channel kinds (brain <-> JS host). drive_screen ignores these. --
+# -- Plugin-channel kinds (brain <-> JS host). UI adapters ignore these. --
 
 glob UI_KINDS: set[str] = {
     "turn_start",
@@ -350,7 +258,7 @@ def is_plugin_kind(kind: str) -> bool {
 }
 
 
-"""Build a plugin-channel envelope (same Envelope type; not for drive_screen)."""
+"""Build a plugin-channel envelope (same Envelope type; not for UI shell adapters)."""
 def make_plugin_envelope(
     kind: str,
     payload: dict[str, any] | None = None,

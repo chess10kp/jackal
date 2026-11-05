@@ -58,8 +58,8 @@ import from agent.protocol {
     create_adapter,
     make_envelope,
     enqueue,
-    drain_and_drive,
 }
+import from ui.screen_protocol { drain_and_drive }
 
 
 obj N1Result {
