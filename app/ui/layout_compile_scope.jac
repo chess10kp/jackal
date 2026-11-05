@@ -129,7 +129,7 @@ def _walk_children(
 }
 
 
-def _collect_scope(layout_root: UiNode) -> _Scope {
+def:pub _collect_scope(layout_root: UiNode) -> _Scope {
     scope = _Scope();
     seen: dict[str, bool] = {};
     overlay_ids: dict[str, bool] = {};

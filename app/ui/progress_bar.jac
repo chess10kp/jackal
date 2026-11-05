@@ -5,13 +5,13 @@ metadata, and markup registration without editing framework source.
 """
 
 
-walker SetProgress {
+walker:pub SetProgress {
     has value: float = 0.0;
     has handled: bool = False;
 }
 
 
-node ProgressBar {
+node:pub ProgressBar {
     has key: str = "";
     has value: float = 0.0;
 
@@ -29,7 +29,7 @@ node ProgressBar {
 
 
 """Render a one-line progress bar for the given width (helper, fully implemented)."""
-def render_progress(value: float, width: int) -> str {
+def:pub render_progress(value: float, width: int) -> str {
     if width <= 2 {
         return "#" * max(0, width);
     }
@@ -59,6 +59,6 @@ def progress_paint_line(bar: ProgressBar, width: int) -> str {
 
 Avoids importing ui.markup so the widget package stays free of framework cycles.
 """
-def register_progress_markup(tags: dict[str, object]) {
+def:pub register_progress_markup(tags: dict[str, object]) {
     tags["ProgressBar"] = ProgressBar;
 }

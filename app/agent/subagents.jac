@@ -60,7 +60,7 @@ glob SUBAGENT_TOOL_ALIASES: dict[str, str] = {
 
 
 """str-typed shim over os.path.abspath, which demands PathLike here."""
-def _abs_path(p: any) -> str {
+def:pub _abs_path(p: any) -> str {
     return str(os.path.abspath(p));
 }
 
@@ -101,7 +101,7 @@ def _parse_scalar(value: str) -> any {
 Mirrors orchestration/_frontmatter_toolchain.parse_frontmatter: CRLF
 normalized, missing terminator keeps the whole text as body, dash-block
 lists collect under the preceding bare key."""
-def parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
+def:pub parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
     fm: dict[str, any] = {};
     normalized = content.replace("\r\n", "\n");
     if not normalized.startswith("---") {
@@ -149,7 +149,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
 
 
 """Coerce a frontmatter value to display text (lists join with ', ')."""
-def frontmatter_string(value: any) -> str | None {
+def:pub frontmatter_string(value: any) -> str | None {
     if value is None {
         return None;
     }
@@ -194,7 +194,7 @@ def frontmatter_string_list(value: any) -> list[str] {
 
 
 """Resolve JACKAL_AGENT_DIR, else JACKAL_ROOT, else cwd (see docstring)."""
-def resolve_jackal_root(agent_dir: str = "") -> str {
+def:pub resolve_jackal_root(agent_dir: str = "") -> str {
     if agent_dir {
         return _abs_path(agent_dir);
     }

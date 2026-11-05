@@ -34,7 +34,7 @@ import from ui.layout_compile_model {
 
 
 """Unwrap a semantically required size value."""
-def _req(v: float | None) -> float {
+def:pub _req(v: float | None) -> float {
     if v is None {
         return 0.0;
     }
@@ -42,12 +42,12 @@ def _req(v: float | None) -> float {
 }
 
 
-def _t(v: Variable, coefficient: float = 1.0) -> Term {
+def:pub _t(v: Variable, coefficient: float = 1.0) -> Term {
     return Term(variable=v, coefficient=coefficient);
 }
 
 
-def _expr(terms: list[Term], constant: float = 0.0) -> Expression {
+def:pub _expr(terms: list[Term], constant: float = 0.0) -> Expression {
     return normalize_expression(Expression(terms=terms, constant=constant));
 }
 
@@ -57,7 +57,7 @@ key when known), axis, parent jid + rank when relevant, the declaring
 source (spec / relation handle), and any extra facts (grow weight and
 continuous target). Deterministic; consumed by UNSATISFIABLE witness
 diagnostics so failures point back to the registration site."""
-def _prov(
+def:pub _prov(
     template: str,
     id_str: str,
     axis_label: str,
@@ -87,7 +87,7 @@ def _prov(
 
 """Emit one constraint; on rejection attach a diagnostic with provenance
 and flip the result to failed. Returns True only on success."""
-def _emit(
+def:pub _emit(
     result: CompileResult,
     expr: Expression,
     relation: Relation,
@@ -126,12 +126,12 @@ def _emit(
 # Templates.
 # ----------------------------------------------------------------------
 
-def _axis_start(edges: NodeEdges, horizontal: bool) -> Variable {
+def:pub _axis_start(edges: NodeEdges, horizontal: bool) -> Variable {
     return edges.left if horizontal else edges.top;
 }
 
 
-def _axis_end(edges: NodeEdges, horizontal: bool) -> Variable {
+def:pub _axis_end(edges: NodeEdges, horizontal: bool) -> Variable {
     return edges.right if horizontal else edges.bottom;
 }
 
@@ -154,7 +154,7 @@ def _emit_pin_edge(
 
 
 """Required viewport pinning of the root's four edges (plan §6.1)."""
-def _emit_root(
+def:pub _emit_root(
     result: CompileResult,
     edges: NodeEdges,
     viewport: Viewport,
@@ -185,7 +185,7 @@ def _emit_root(
 }
 
 
-def _emit_invariants(
+def:pub _emit_invariants(
     result: CompileResult,
     edges: NodeEdges,
     phase: str,
@@ -216,7 +216,7 @@ def _emit_invariants(
 
 
 """FIXED / INTRINSIC / BOUNDED sizing on one axis (plan §6.1)."""
-def _emit_sized_axis(
+def:pub _emit_sized_axis(
     result: CompileResult,
     size: AxisSize,
     start: Variable,
@@ -365,7 +365,7 @@ def _emit_cross_align(
 
 
 
-def _emit_cross_axis(
+def:pub _emit_cross_axis(
     result: CompileResult,
     kid: _Entry,
     parent: _Entry,

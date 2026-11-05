@@ -63,7 +63,7 @@ def create_queue(capacity: int = 256) -> BoundedEventQueue {
 }
 
 
-def create_adapter(session_id: str, capacity: int = 256) -> InProcessAdapter {
+def:pub create_adapter(session_id: str, capacity: int = 256) -> InProcessAdapter {
     return InProcessAdapter(
         session_id=session_id,
         queue=create_queue(capacity),
@@ -71,7 +71,7 @@ def create_adapter(session_id: str, capacity: int = 256) -> InProcessAdapter {
 }
 
 
-def make_envelope(
+def:pub make_envelope(
     kind: str,
     payload: dict[str, any] | None = None,
     session_id: str = "",
@@ -100,7 +100,7 @@ def make_envelope(
 }
 
 
-def queue_stats(queue: BoundedEventQueue) -> QueueStats {
+def:pub queue_stats(queue: BoundedEventQueue) -> QueueStats {
     return QueueStats(
         depth=len(queue.items),
         dropped=queue.dropped,
@@ -144,7 +144,7 @@ def coalesce_text_deltas(a: Envelope, b: Envelope) -> Envelope {
 
 
 """Enqueue an envelope, coalescing compatible text deltas when possible."""
-def enqueue(queue: BoundedEventQueue, envelope: Envelope) -> bool {
+def:pub enqueue(queue: BoundedEventQueue, envelope: Envelope) -> bool {
     if queue.items {
         last = queue.items[len(queue.items) - 1];
         if can_coalesce(last, envelope) {
@@ -166,7 +166,7 @@ def enqueue(queue: BoundedEventQueue, envelope: Envelope) -> bool {
 
 
 """Dequeue the next envelope in structural order, or None if empty."""
-def dequeue(queue: BoundedEventQueue) -> Envelope | None {
+def:pub dequeue(queue: BoundedEventQueue) -> Envelope | None {
     if not queue.items {
         return None;
     }
@@ -175,7 +175,7 @@ def dequeue(queue: BoundedEventQueue) -> Envelope | None {
 
 
 """Cancel a turn; subsequent completion events must carry correlation."""
-def cancel_turn(adapter: InProcessAdapter, turn_id: str) -> CancelToken {
+def:pub cancel_turn(adapter: InProcessAdapter, turn_id: str) -> CancelToken {
     token = CancelToken(turn_id=turn_id, cancelled=True);
     adapter.cancelled_turns.add(turn_id);
     enqueue(
@@ -211,7 +211,7 @@ def cancel_group(adapter: InProcessAdapter, group_id: str) -> CancelToken {
 
 
 """Drive one envelope into the product TUI shell (in-process adapter)."""
-def drive_screen(adapter: InProcessAdapter, shell: any, envelope: Envelope) {
+def:pub drive_screen(adapter: InProcessAdapter, shell: any, envelope: Envelope) {
     if shell is None {
         raise ValueError("drive_screen requires a shell");
     }
@@ -283,7 +283,7 @@ def drive_screen(adapter: InProcessAdapter, shell: any, envelope: Envelope) {
 
 
 """Drain the adapter queue and drive each envelope into the shell."""
-def drain_and_drive(adapter: InProcessAdapter, shell: any) -> int {
+def:pub drain_and_drive(adapter: InProcessAdapter, shell: any) -> int {
     count = 0;
     while True {
         env = dequeue(adapter.queue);

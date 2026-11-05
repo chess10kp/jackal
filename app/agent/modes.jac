@@ -24,7 +24,7 @@ registry is plain module state.
 
 import re;
 
-glob DEV_MODES: list[str] = ["normal", "auto-accept", "yolo", "plan", "ask"];
+glob:pub DEV_MODES: list[str] = ["normal", "auto-accept", "yolo", "plan", "ask"];
 
 glob READ_ONLY_MODES: list[str] = ["plan", "ask"];
 
@@ -99,7 +99,7 @@ glob DESTRUCTIVE_BASH_PATTERNS: list[str] = [
 
 
 """True when the mode restricts the session to read-only behavior."""
-def is_read_only_mode(mode: str) -> bool {
+def:pub is_read_only_mode(mode: str) -> bool {
     return mode in READ_ONLY_MODES;
 }
 
@@ -139,7 +139,7 @@ def unregister_mcp_read_only_tools(names: list[str]) {
 
 
 """Human-facing reason string for a blocked tool in a read-only mode."""
-def read_only_mode_block_reason(tool_name: str, mode: str) -> str {
+def:pub read_only_mode_block_reason(tool_name: str, mode: str) -> str {
     if is_mcp_tool(tool_name) {
         return (
             'MCP tool "' + tool_name + '" is not marked read-only, so it is blocked in '
@@ -154,7 +154,7 @@ def read_only_mode_block_reason(tool_name: str, mode: str) -> str {
 
 
 """Advance the Shift+Tab mode cycle; unknown modes reset to normal."""
-def cycle_mode(current: str) -> str {
+def:pub cycle_mode(current: str) -> str {
     idx = -1;
     for i in range(len(DEV_MODES)) {
         if DEV_MODES[i] == current {
@@ -232,7 +232,7 @@ Returns one of:
   "confirm" — require explicit user approval.
 Unknown modes fall back to normal-mode semantics (always confirm).
 """
-def requires_approval(mode: str, tool_name: str, cmd: str) -> str {
+def:pub requires_approval(mode: str, tool_name: str, cmd: str) -> str {
     if is_tool_blocked(mode, tool_name) {
         return "blocked";
     }

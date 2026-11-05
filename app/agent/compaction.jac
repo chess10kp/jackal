@@ -82,7 +82,7 @@ def estimate_messages_tokens(messages: list[dict[str, any]]) -> int {
 }
 
 
-def compute_context_usage(messages: list[dict[str, any]], context_max_override: any = None) -> dict[str, int] {
+def:pub compute_context_usage(messages: list[dict[str, any]], context_max_override: any = None) -> dict[str, int] {
     used = estimate_messages_tokens(messages);
     max_tokens: int = DEFAULT_CONTEXT_MAX;
     if isinstance(context_max_override, int) and context_max_override > 0 {

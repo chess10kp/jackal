@@ -1,7 +1,7 @@
 """Transcript block formatting for the LiveShell harness (display-only)."""
 
 
-def format_turn(role: str, body: str) -> str {
+def:pub format_turn(role: str, body: str) -> str {
     if role == "user" {
         mark = "◆ You";
     } elif role == "assistant" {
@@ -29,7 +29,7 @@ def format_turn(role: str, body: str) -> str {
 
 
 """Compact tool-invocation block for the transcript (args on their own lines)."""
-def format_tool_call(tool: str, args: dict[str, any]) -> str {
+def:pub format_tool_call(tool: str, args: dict[str, any]) -> str {
     name = str(tool);
     if not isinstance(args, dict) or not args {
         return "call  " + name + "()";
@@ -48,7 +48,7 @@ def format_tool_call(tool: str, args: dict[str, any]) -> str {
 
 
 """Wrap a display-only result preview (from tool_result_preview)."""
-def format_tool_result(result_preview: str) -> str {
+def:pub format_tool_result(result_preview: str) -> str {
     if result_preview == "(no output)" {
         return "result  — empty";
     }

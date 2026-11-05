@@ -47,7 +47,7 @@ import from constraints.solver_types {
 
 def _new_solver() -> Solver { return Solver(); }
 
-obj Solver {
+obj:pub Solver {
     has rows: dict[int, Row] = {},
         kinds: dict[int, SymbolKind] = {},
         var_symbols: dict[int, int] = {},

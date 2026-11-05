@@ -10,7 +10,7 @@ import from ui.renderer { set_node_contract }
 import from ui.width { display_width, truncate_text }
 import from tui.format { format_turn }
 
-def _rule(width: int, ch: str = "─") -> str {
+def:pub _rule(width: int, ch: str = "─") -> str {
     if width < 1 {
         return "";
     }
@@ -18,7 +18,7 @@ def _rule(width: int, ch: str = "─") -> str {
 }
 
 
-def _pad_to(text: str, width: int) -> str {
+def:pub _pad_to(text: str, width: int) -> str {
     w = display_width(text);
     if w >= width {
         return truncate_text(text, width, ellipsis="…");
@@ -28,7 +28,7 @@ def _pad_to(text: str, width: int) -> str {
 
 
 """Block progress meter — denser than ASCII #/-."""
-def _meter(value: float, width: int) -> str {
+def:pub _meter(value: float, width: int) -> str {
     if width < 3 {
         return "▪" * max(0, width);
     }
@@ -54,7 +54,7 @@ def _commit_messages(app: LiveShell) {
 }
 
 
-def _push_turn(app: LiveShell, role: str, body: str) -> str {
+def:pub _push_turn(app: LiveShell, role: str, body: str) -> str {
     mid = _next_id(app);
     app.messages = app.messages + [
         TranscriptMessage(
@@ -68,7 +68,7 @@ def _push_turn(app: LiveShell, role: str, body: str) -> str {
 }
 
 
-def _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
+def:pub _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
     updated: list[TranscriptMessage] = [];
     for message in app.messages {
         if message.message_id == message_id {
@@ -95,7 +95,7 @@ rewriting it in place leaves the reply above all the tool noise — which
 follow_tail then scrolls off the top the moment the tools print anything.
 Moving the finished turn after those rows is what keeps the answer on
 screen when the turn ends."""
-def _finish_turn(app: LiveShell, message_id: str, role: str, body: str) {
+def:pub _finish_turn(app: LiveShell, message_id: str, role: str, body: str) {
     kept: list[TranscriptMessage] = [];
     found: bool = False;
     trailing: bool = False;
@@ -125,7 +125,7 @@ def _finish_turn(app: LiveShell, message_id: str, role: str, body: str) {
 }
 
 
-def _install_layout(app: LiveShell) {
+def:pub _install_layout(app: LiveShell) {
     # Permanent shell specs first (screen fill/fill, transcript grow+scroll,
     # status/prompt legacy heights), then this shell's parity override:
     # hide the framework header and status row, keep the prompt at three rows.
@@ -149,7 +149,7 @@ def _install_layout(app: LiveShell) {
 
 
 """Prompt-box draft prefix — read-only modes get an unmistakable marker."""
-def _prompt_prefix(mode: str) -> str {
+def:pub _prompt_prefix(mode: str) -> str {
     if mode == "plan" {
         return "[plan] ❯ ";
     }
@@ -160,7 +160,7 @@ def _prompt_prefix(mode: str) -> str {
 }
 
 
-def _prompt_lines(app: LiveShell) -> list[str] {
+def:pub _prompt_lines(app: LiveShell) -> list[str] {
     draft = app.shell.prompt.draft;
     w = app.columns;
     top = "╭" + _rule(max(0, w - 2), "─") + "╮";
@@ -206,7 +206,7 @@ def _transcript_total_height(app: LiveShell) -> int {
 Leaves follow_tail on the first upward scroll so streaming chunks append
 offscreen while the view is frozen; re-enters tail automatically once the
 bottom is reached (End behaves the same via set_follow_tail(True))."""
-def _scroll_transcript(app: LiveShell, delta: int) {
+def:pub _scroll_transcript(app: LiveShell, delta: int) {
     proj = app.proj;
     if delta == 0 {
         return;

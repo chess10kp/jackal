@@ -72,7 +72,7 @@ def mcp_window_rows(
 
 
 """Build the MCP STATUS window state over live data."""
-def _mcp_window_state(
+def:pub _mcp_window_state(
     specs: dict[str, list[str]], status: dict[str, dict[str, any]]
 ) -> WindowState {
     entries = mcp_window_rows(specs, status);

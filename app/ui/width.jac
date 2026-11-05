@@ -115,7 +115,7 @@ def _is_zero_width_segment(seg: str) -> bool {
 
 
 """UAX-29-lite grapheme segmentation sufficient for width/wrap/truncate."""
-def segment_graphemes(text: str) -> list[Grapheme] {
+def:pub segment_graphemes(text: str) -> list[Grapheme] {
     out: list[Grapheme] = [];
     n = len(text);
     i = 0;
@@ -151,7 +151,7 @@ def segment_graphemes(text: str) -> list[Grapheme] {
 }
 
 
-def grapheme_width(seg: str) -> int {
+def:pub grapheme_width(seg: str) -> int {
     if not seg {
         return 0;
     }
@@ -271,7 +271,7 @@ def _is_printable_ascii(text: str) -> bool {
 
 
 """Column width of `text` as rendered by a typical terminal."""
-def display_width(text: str) -> int {
+def:pub display_width(text: str) -> int {
     if not text {
         return 0;
     }
@@ -345,7 +345,7 @@ def _truncate_plain(text: str, max_width: int) -> TruncatedSpan {
 
 
 """Truncate to at most `max_width` columns, optionally appending an ellipsis."""
-def truncate_text(
+def:pub truncate_text(
     text: str,
     max_width: int,
     ellipsis: str = "...",
@@ -384,7 +384,7 @@ def truncate_text(
 
 
 """Wrap `text` to `width` columns. Newlines force breaks. ANSI is preserved."""
-def wrap_text(text: str, width: int) -> list[str] {
+def:pub wrap_text(text: str, width: int) -> list[str] {
     if width <= 0 {
         return [""];
     }
@@ -444,6 +444,6 @@ that need the list of lines can split on '\n'; callers that only need the
 count can count '\n' occurrences plus one (the trailing element is always
 present, even when empty, to match `wrap_text`'s minimum one-element
 contract)."""
-def wrap_text_joined(text: str, width: int) -> str {
+def:pub wrap_text_joined(text: str, width: int) -> str {
     return "\n".join(wrap_text(text, width));
 }

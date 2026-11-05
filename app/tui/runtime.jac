@@ -24,7 +24,7 @@ import from ui.renderer { create_renderer }
 import from tui.window { WindowSpec, WindowState }
 import from tui.windows { _open_window, _close_top_window, _approval_state }
 
-def _apply_resize(app: LiveShell, columns: int, rows: int) {
+def:pub _apply_resize(app: LiveShell, columns: int, rows: int) {
     if columns < 40 {
         columns = 40;
     }
@@ -49,7 +49,7 @@ def _apply_resize(app: LiveShell, columns: int, rows: int) {
 
 Events flow through app.evq as (kind, data) pairs consumed by _tick_stream;
 the worker is a daemon so esc/quit never hangs on a stuck transport."""
-def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "") {
+def:pub _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "") {
     # Transcript shows the RAW user line (mirrors the legacy shells);
     # model_text — when different — is the context-expanded payload
     # (@file blocks / !cmd output) actually sent downstream.
@@ -122,7 +122,7 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
 }
 
 
-def _finish_stream(app: LiveShell, final_body: str) {
+def:pub _finish_stream(app: LiveShell, final_body: str) {
     body = final_body if final_body else app.stream_full;
     if not body.strip() {
         body = "(no response)";
@@ -135,7 +135,7 @@ def _finish_stream(app: LiveShell, final_body: str) {
 }
 
 
-def _tick_stream(app: LiveShell) {
+def:pub _tick_stream(app: LiveShell) {
     if app.phase != "streaming" or app.evq is None {
         return;
     }
@@ -232,7 +232,7 @@ def _tick_stream(app: LiveShell) {
         app.dirty = True;
     }
 }
-def _accept_approval(app: LiveShell) {
+def:pub _accept_approval(app: LiveShell) {
     if app.phase != "approval" or _approval_state(app) is None {
         return;
     }
@@ -247,7 +247,7 @@ def _accept_approval(app: LiveShell) {
 }
 
 
-def _reject_approval(app: LiveShell) {
+def:pub _reject_approval(app: LiveShell) {
     if app.phase == "approval" {
         if _approval_state(app) is None {
             return;

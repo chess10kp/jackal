@@ -26,7 +26,7 @@ The ids are base_id, base_id+1, base_id+2, and base_id+3 for left, top,
 width, and height. Right and bottom are affine expressions, not variables.
 Callers must choose non-overlapping base-id ranges for distinct nodes.
 """
-def node_vars(base_id: int) -> dict[str, Variable] {
+def:pub node_vars(base_id: int) -> dict[str, Variable] {
     return {
         "left": Variable(id=base_id),
         "top": Variable(id=base_id + 1),
@@ -58,7 +58,7 @@ def _constraint(
 
 
 """Raw affine escape hatch. The expression is normalized on construction."""
-def affine_constraint(
+def:pub affine_constraint(
     expression: Expression,
     relation: Relation = Relation.EQ,
     strength: StrengthTier = StrengthTier.REQUIRED,
@@ -173,7 +173,7 @@ def align_top(
 
 
 """source bottom == target bottom; alignment is STRONG by default."""
-def align_bottom(
+def:pub align_bottom(
     source: dict[str, Variable],
     target: dict[str, Variable],
     strength: StrengthTier = StrengthTier.STRONG,
@@ -270,7 +270,7 @@ def same_height(
 
 
 """width >= 0 is a REQUIRED geometric invariant."""
-def width_nonnegative(
+def:pub width_nonnegative(
     layout_node: dict[str, Variable],
     strength: StrengthTier = StrengthTier.REQUIRED,
 ) -> list[Constraint] {
@@ -283,7 +283,7 @@ def width_nonnegative(
 
 
 """height >= 0 is a REQUIRED geometric invariant."""
-def height_nonnegative(
+def:pub height_nonnegative(
     layout_node: dict[str, Variable],
     strength: StrengthTier = StrengthTier.REQUIRED,
 ) -> list[Constraint] {
@@ -310,7 +310,7 @@ def preferred_width(
 
 
 """Preferred height is a WEAK size preference, not a hard geometry fact."""
-def preferred_height(
+def:pub preferred_height(
     layout_node: dict[str, Variable],
     preferred: float,
     strength: StrengthTier = StrengthTier.WEAK,
@@ -330,7 +330,7 @@ its predecessor by gap. With fill=true every child also fills the parent's
 width. Expansion consists solely of ordinary constraints in deterministic
 order: anchor, inter-child edges, then optional fill constraints.
 """
-def vertical_flow(
+def:pub vertical_flow(
     parent: dict[str, Variable],
     children: list[dict[str, Variable]],
     gap: float = 0.0,

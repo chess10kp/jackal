@@ -14,7 +14,7 @@ import from ui.model { UiNode }
 """Axis-phase gate: does this phase emit constraints on the horizontal
 axis? Phase full emits both; h only left/right facts; v only
 top/bottom."""
-def _wants(phase: str, horizontal: bool) -> bool {
+def:pub _wants(phase: str, horizontal: bool) -> bool {
     if phase == "h" {
         return horizontal;
     }
@@ -26,7 +26,7 @@ def _wants(phase: str, horizontal: bool) -> bool {
 
 
 """The four edge variables for one laid-out node (plan §6)."""
-obj NodeEdges {
+obj:pub NodeEdges {
     has id_str: str,
         key: str,
         left: Variable,
@@ -37,7 +37,7 @@ obj NodeEdges {
 
 
 """Compilation outcome. On ok=False the solver is absent (atomic abort)."""
-obj CompileResult {
+obj:pub CompileResult {
     has ok: bool = True,
         solver: Solver | None = None,
         nodes: dict[str, NodeEdges] = {},
@@ -48,7 +48,7 @@ obj CompileResult {
 
 """One container flow partition recorded for largest-remainder
 quantization by the layout engine."""
-obj PartitionInfo {
+obj:pub PartitionInfo {
     has parent_id: str,
         horizontal: bool,
         span: float,
@@ -60,7 +60,7 @@ obj PartitionInfo {
 }
 
 
-obj _ScopedNode {
+obj:pub _ScopedNode {
     has target: UiNode,
         id_str: str = "",
         key: str = "",
@@ -71,28 +71,28 @@ obj _ScopedNode {
 }
 
 
-obj _Scope {
+obj:pub _Scope {
     has order: list[_ScopedNode] = [],
         parent_of: dict[str, str] = {},
         error: LayoutDiagnostic | None = None;
 }
 
 
-obj _Entry {
+obj:pub _Entry {
     has scoped: _ScopedNode,
         edges: NodeEdges,
         spec: LayoutSpec;
 }
 
 
-obj _FlowChild {
+obj:pub _FlowChild {
     has ent: _Entry,
         size: AxisSize,
         natural: float | None = None;
 }
 
 
-obj _Allocation {
+obj:pub _Allocation {
     has targets: list[float] = [],
         overflow: bool = False,
         hard_overflow: bool = False;

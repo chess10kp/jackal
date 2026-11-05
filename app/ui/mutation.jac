@@ -33,7 +33,7 @@ glob RANK_GAP: int = 1024;
 glob MIN_RANK: int = 0;
 
 
-obj MutationResult {
+obj:pub MutationResult {
     has graph_revision: int,
         layout_root_id: str = "";
 }
@@ -125,7 +125,7 @@ def _connect_child(parent: UiContainer, child: UiNode, rank: int) -> MutationRes
 }
 
 
-def append_child(parent: UiContainer, child: UiNode) -> MutationResult {
+def:pub append_child(parent: UiContainer, child: UiNode) -> MutationResult {
     rank = _next_rank_after(parent, None);
     return _connect_child(parent, child, rank);
 }
@@ -200,7 +200,7 @@ def move_after(child: UiNode, sibling: UiNode) -> MutationResult {
 }
 
 
-def detach(child: UiNode) -> MutationResult {
+def:pub detach(child: UiNode) -> MutationResult {
     parent = child_parent(child);
     if parent is None {
         return MutationResult(graph_revision=0, layout_root_id="");
@@ -294,7 +294,7 @@ def clear_ui_edges(n: UiNode) {
 
 
 """Post-order teardown: clear edges for subtree then delete nodes."""
-def dispose_subtree(n: UiNode) {
+def:pub dispose_subtree(n: UiNode) {
     if isinstance(n, UiContainer) {
         for child in list(ordered_children(n)) {
             dispose_subtree(child);

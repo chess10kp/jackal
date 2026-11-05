@@ -262,7 +262,7 @@ def log_exception(
 sem log_exception = "Log a swallowed exception (type, message, traceback) at error level.";
 
 
-def log_debug(source: str, message: str, fields: dict[str, any] | None = None) -> bool {
+def:pub log_debug(source: str, message: str, fields: dict[str, any] | None = None) -> bool {
     return log_event("debug", source, message, fields);
 }
 
@@ -270,7 +270,7 @@ def log_info(source: str, message: str, fields: dict[str, any] | None = None) ->
     return log_event("info", source, message, fields);
 }
 
-def log_warn(source: str, message: str, fields: dict[str, any] | None = None) -> bool {
+def:pub log_warn(source: str, message: str, fields: dict[str, any] | None = None) -> bool {
     return log_event("warn", source, message, fields);
 }
 

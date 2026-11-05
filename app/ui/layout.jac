@@ -306,7 +306,7 @@ def _structural_naturals(
 
 
 """Full pipeline: registry + topology -> published LayoutFrame."""
-def compute_layout(
+def:pub compute_layout(
     state: LayoutState,
     layout_root: UiNode,
     viewport: Viewport,

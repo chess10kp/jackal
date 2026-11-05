@@ -33,7 +33,7 @@ import from ui.width {
 
 Empty or missing content measures 0 — callers decide their own fallback
 for INTRINSIC nodes without content."""
-def natural_width(lines: list[str]) -> int {
+def:pub natural_width(lines: list[str]) -> int {
     best = 0;
     for line in lines {
         w = display_width(line);
@@ -81,7 +81,7 @@ Native callers must supply the per-node `content_lines`, `content_revision`,
 and `style_revision` from LayoutState.content (server->native reads are
 free; this module's signature deliberately avoids LayoutState because the
 obj's measurement_cache field type can't be lowered natively)."""
-def wrapped_lines_at(
+def:pub wrapped_lines_at(
     content_lines: list[str],
     content_revision: int,
     style_revision: int,
@@ -143,7 +143,7 @@ Called from `layout_types.set_content` / `clear_node` so cache invalidation
 on content replacement or node removal works for the parallel-dict cache
 that this module owns (state.measurement_cache.pop is preserved for
 backward compatibility but is now a no-op for this module)."""
-def invalidate_measurement_cache(id_str: str) {
+def:pub invalidate_measurement_cache(id_str: str) {
     _CACHE_WIDTH.pop(id_str, None);
     _CACHE_CONTENT_REV.pop(id_str, None);
     _CACHE_STYLE_REV.pop(id_str, None);

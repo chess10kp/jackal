@@ -20,7 +20,7 @@ import from ui.markdown_proj {
 }
 
 
-obj TranscriptMessage {
+obj:pub TranscriptMessage {
     has message_id: str,
         content: str = "",
         content_rev: int = 0,
@@ -47,7 +47,7 @@ obj VisibleWindow {
 }
 
 
-obj TranscriptProjection {
+obj:pub TranscriptProjection {
     has view: TranscriptView,
         measure_cache: MeasureCache,
         messages: list[TranscriptMessage] = [],
@@ -255,7 +255,7 @@ def _compute_damage(
 
 
 """Bind a TranscriptView to a domain source and empty projection."""
-def bind_transcript(
+def:pub bind_transcript(
     view: TranscriptView,
     source_id: str,
     width: int = 40,
@@ -272,7 +272,7 @@ def bind_transcript(
 
 
 """Replace projection messages for a new observed revision."""
-def apply_transcript_revision(
+def:pub apply_transcript_revision(
     proj: TranscriptProjection,
     revision: int,
     messages: list[TranscriptMessage],
@@ -321,7 +321,7 @@ def apply_transcript_revision(
 
 
 """Return wrapped line height for one message, using the measurement cache."""
-def measure_message_height(
+def:pub measure_message_height(
     proj: TranscriptProjection,
     message: TranscriptMessage,
     width: int,
@@ -413,7 +413,7 @@ def project_visible_spans(proj: TranscriptProjection) -> list[dict[str, any]] {
 
 
 """Materialize visible + overscan lines for the current scroll window."""
-def materialize_visible(proj: TranscriptProjection) -> VisibleWindow {
+def:pub materialize_visible(proj: TranscriptProjection) -> VisibleWindow {
     win = VisibleWindow();
     if not proj.messages {
         return win;
@@ -492,7 +492,7 @@ def transcript_needs_damage(
 
 
 """Set follow_tail and optionally pin scroll to newest content."""
-def set_follow_tail(proj: TranscriptProjection, follow: bool) {
+def:pub set_follow_tail(proj: TranscriptProjection, follow: bool) {
     proj.view.follow_tail = follow;
     if follow {
         total = _total_height(proj);

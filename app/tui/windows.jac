@@ -22,7 +22,7 @@ import from ui.screen { shell_open_approval, shell_close_approval }
 Non-choice windows take over the overlay node; pickers use the prompt
 drop-up instead. Returns False while a picker or extension modal owns the
 screen. Stacking a window on another window is allowed."""
-def _open_window(app: LiveShell, win: WindowState, force: bool = False) -> bool {
+def:pub _open_window(app: LiveShell, win: WindowState, force: bool = False) -> bool {
     if not force and app.windows and (
         app.windows[len(app.windows) - 1].kind == "picker"
         or app.windows[len(app.windows) - 1].kind == "ui_modal"
@@ -52,7 +52,7 @@ def _open_window(app: LiveShell, win: WindowState, force: bool = False) -> bool 
 
 """Pop the top window. Releases the overlay node only when the stack
 empties."""
-def _close_top_window(app: LiveShell) -> bool {
+def:pub _close_top_window(app: LiveShell) -> bool {
     if not app.windows {
         return False;
     }
@@ -68,7 +68,7 @@ def _close_top_window(app: LiveShell) -> bool {
 """Route one key to the top window. Consumes EVERY key while a window is
 up (windows are modal) except that an active tool approval keeps
 precedence — the caller gates on app.phase. Returns True when consumed."""
-def _handle_window_key(app: LiveShell, key: str) -> bool {
+def:pub _handle_window_key(app: LiveShell, key: str) -> bool {
     if not app.windows {
         return False;
     }
@@ -116,7 +116,7 @@ def _handle_window_key(app: LiveShell, key: str) -> bool {
 
 """Paint rows for the top window (caller resolved precedence). Refreshes
 live data first so status windows never show a stale snapshot."""
-def _window_paint_lines(app: LiveShell) -> list[str] | None {
+def:pub _window_paint_lines(app: LiveShell) -> list[str] | None {
     if not app.windows {
         return None;
     }
@@ -130,21 +130,21 @@ def _window_paint_lines(app: LiveShell) -> list[str] | None {
     return window_lines(win);
 }
 
-def _picker_state(app: LiveShell) -> any {
+def:pub _picker_state(app: LiveShell) -> any {
     if app.windows and app.windows[len(app.windows) - 1].kind == "picker" {
         return app.windows[len(app.windows) - 1].payload;
     }
     return None;
 }
 
-def _ui_modal_state(app: LiveShell) -> any {
+def:pub _ui_modal_state(app: LiveShell) -> any {
     if app.windows and app.windows[len(app.windows) - 1].kind == "ui_modal" {
         return app.windows[len(app.windows) - 1].payload;
     }
     return None;
 }
 
-def _approval_state(app: LiveShell) -> any {
+def:pub _approval_state(app: LiveShell) -> any {
     if app.windows and app.windows[len(app.windows) - 1].kind == "approval" {
         return app.windows[len(app.windows) - 1].payload;
     }

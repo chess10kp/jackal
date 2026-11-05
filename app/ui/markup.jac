@@ -224,13 +224,13 @@ def _iter_attrs(text: str, end: int) -> list[_MarkupMatch] {
 
 
 
-def create_tag_registry() -> TagRegistry {
+def:pub create_tag_registry() -> TagRegistry {
     return TagRegistry();
 }
 
 
 """Register a markup tag name to a node archetype constructor."""
-def register_tag(registry: TagRegistry, tag: str, archetype: any) {
+def:pub register_tag(registry: TagRegistry, tag: str, archetype: any) {
     if tag == "" {
         raise ValueError("tag must not be empty");
     }
@@ -238,7 +238,7 @@ def register_tag(registry: TagRegistry, tag: str, archetype: any) {
 }
 
 
-def default_shell_registry() -> TagRegistry {
+def:pub default_shell_registry() -> TagRegistry {
     reg = create_tag_registry();
     register_tag(reg, "MainScreen", MainScreen);
     register_tag(reg, "Header", Header);
@@ -524,7 +524,7 @@ def _instantiate_tracked(
 
 
 """Lower markup source into a detached graph (one-time initialization)."""
-def lower_markup(
+def:pub lower_markup(
     source: str,
     registry: TagRegistry | None = None,
     print_generated: bool = False,

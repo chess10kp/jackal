@@ -44,22 +44,22 @@ import from ui.layout_measure {
 
 
 
-def fill_axis() -> AxisSize {
+def:pub fill_axis() -> AxisSize {
     return AxisSize(mode=SizeMode.FILL);
 }
 
 
-def fixed_axis(n: float) -> AxisSize {
+def:pub fixed_axis(n: float) -> AxisSize {
     return AxisSize(mode=SizeMode.FIXED, preferred=n);
 }
 
 
-def grow_axis(weight: float) -> AxisSize {
+def:pub grow_axis(weight: float) -> AxisSize {
     return AxisSize(mode=SizeMode.GROW, grow_weight=weight);
 }
 
 
-def intrinsic_axis() -> AxisSize {
+def:pub intrinsic_axis() -> AxisSize {
     return AxisSize(mode=SizeMode.INTRINSIC);
 }
 
@@ -87,7 +87,7 @@ def _ok() -> MutationResult {
 
 
 """Create an empty layout registry bounded by the initial viewport."""
-def create_layout_state(columns: int = 80, rows: int = 24) -> LayoutState {
+def:pub create_layout_state(columns: int = 80, rows: int = 24) -> LayoutState {
     return LayoutState(viewport=Viewport(columns=columns, rows=rows));
 }
 
@@ -167,7 +167,7 @@ def _axis_label(axis: Axis) -> str {
 
 """Validate one spec against the §4.1 rules; returns ERROR diagnostics
 (empty when the spec is well formed)."""
-def validate_spec(spec: LayoutSpec, node_id_str: str = "") -> list[LayoutDiagnostic] {
+def:pub validate_spec(spec: LayoutSpec, node_id_str: str = "") -> list[LayoutDiagnostic] {
     diags = _validate_axis_size("width", spec.width, node_id_str);
     for d in _validate_axis_size("height", spec.height, node_id_str) {
         diags.append(d);
@@ -181,7 +181,7 @@ def validate_spec(spec: LayoutSpec, node_id_str: str = "") -> list[LayoutDiagnos
 # ----------------------------------------------------------------------
 
 """Install or replace the permanent spec for a live node."""
-def set_spec(state: LayoutState, target: UiNode, spec: LayoutSpec) -> MutationResult {
+def:pub set_spec(state: LayoutState, target: UiNode, spec: LayoutSpec) -> MutationResult {
     id_str = node_id(target);
     diags = validate_spec(spec, id_str);
     if diags {
@@ -241,7 +241,7 @@ def _validate_relation_shape(rel: LayoutRelation) -> LayoutDiagnostic | None {
 
 """Register a spatial relation; validates liveness, shape, owner, and
 duplicate policy (plan §4.1)."""
-def add_relation(state: LayoutState, relation: LayoutRelation) -> MutationResult {
+def:pub add_relation(state: LayoutState, relation: LayoutRelation) -> MutationResult {
     diag = _validate_relation_shape(relation);
     if diag is not None {
         return MutationResult(ok=False, diagnostics=[diag]);
@@ -314,7 +314,7 @@ def add_relation(state: LayoutState, relation: LayoutRelation) -> MutationResult
 
 
 """Remove one relation by handle."""
-def remove_relation(state: LayoutState, handle: RelationHandle) -> MutationResult {
+def:pub remove_relation(state: LayoutState, handle: RelationHandle) -> MutationResult {
     if handle.id not in state.relations {
         return _error(LayoutError.INVALID_RELATION, "unknown relation handle");
     }
@@ -329,7 +329,7 @@ def remove_relation(state: LayoutState, handle: RelationHandle) -> MutationResul
 
 """Attach wrapped-source content with monotonic revisions (plan §4
 invariant 6)."""
-def set_content(
+def:pub set_content(
     state: LayoutState,
     target: UiNode,
     lines: list[str],
@@ -363,7 +363,7 @@ def set_content(
 
 
 """Record a requested scroll offset (clamping happens at publication)."""
-def set_scroll_offset(state: LayoutState, target: UiNode, requested_offset: int) -> MutationResult {
+def:pub set_scroll_offset(state: LayoutState, target: UiNode, requested_offset: int) -> MutationResult {
     id_str = node_id(target);
     if id_str not in state.specs {
         return _error(LayoutError.STALE_NODE, "scroll for unregistered node", [id_str]);
@@ -384,7 +384,7 @@ def set_scroll_offset(state: LayoutState, target: UiNode, requested_offset: int)
 
 """Remove everything known about a node: spec, content, cache, and every
 relation it owns or touches (plan §4 invariant 5)."""
-def clear_node(state: LayoutState, target: UiNode) -> MutationResult {
+def:pub clear_node(state: LayoutState, target: UiNode) -> MutationResult {
     id_str = node_id(target);
     doomed: list[int] = [];
     for rid in sorted(state.relations.keys()) {
@@ -410,7 +410,7 @@ def clear_node(state: LayoutState, target: UiNode) -> MutationResult {
 
 """Deep-copy accessors over the last published frame (plan §4 invariant 2).
 Both return None before the first successful compute_layout."""
-def frame_entry_of(state: LayoutState, target: UiNode) -> FrameEntry | None {
+def:pub frame_entry_of(state: LayoutState, target: UiNode) -> FrameEntry | None {
     if state.last_frame is None {
         return None;
     }
@@ -430,7 +430,7 @@ def frame_entry_of(state: LayoutState, target: UiNode) -> FrameEntry | None {
 }
 
 
-def rect_of(state: LayoutState, target: UiNode) -> Rect | None {
+def:pub rect_of(state: LayoutState, target: UiNode) -> Rect | None {
     ent = frame_entry_of(state, target);
     if ent is None {
         return None;
@@ -439,6 +439,6 @@ def rect_of(state: LayoutState, target: UiNode) -> Rect | None {
 }
 
 
-def _copy_rect(r: Rect) -> Rect {
+def:pub _copy_rect(r: Rect) -> Rect {
     return Rect(x=r.x, y=r.y, width=r.width, height=r.height);
 }

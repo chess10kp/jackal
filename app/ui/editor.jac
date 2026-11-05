@@ -29,7 +29,7 @@ import from ui.events {
 
 
 """Prompt with node abilities — drop-in for build_main_shell."""
-node AblePrompt(Prompt) {
+node:pub AblePrompt(Prompt) {
     can on_insert with InsertText entry {
         editor_insert(self, visitor.text);
         visitor.handled = True;
@@ -90,7 +90,7 @@ def _delete_selection(prompt: Prompt) {
 }
 
 
-def editor_insert(prompt: Prompt, text: str) {
+def:pub editor_insert(prompt: Prompt, text: str) {
     if not text {
         return;
     }
@@ -104,7 +104,7 @@ def editor_insert(prompt: Prompt, text: str) {
 }
 
 
-def editor_backspace(prompt: Prompt) {
+def:pub editor_backspace(prompt: Prompt) {
     if editor_has_selection(prompt) {
         _delete_selection(prompt);
         return;
@@ -244,7 +244,7 @@ def editor_caret_display_col(prompt: Prompt) -> int {
 }
 
 
-def editor_history_prev(prompt: Prompt) {
+def:pub editor_history_prev(prompt: Prompt) {
     if not prompt.history {
         return;
     }
@@ -259,7 +259,7 @@ def editor_history_prev(prompt: Prompt) {
 }
 
 
-def editor_history_next(prompt: Prompt) {
+def:pub editor_history_next(prompt: Prompt) {
     if prompt.history_index < 0 {
         return;
     }
@@ -278,7 +278,7 @@ def editor_history_next(prompt: Prompt) {
 
 
 """Push draft to history, clear prompt, return submitted text."""
-def editor_submit(prompt: Prompt) -> str {
+def:pub editor_submit(prompt: Prompt) -> str {
     text = prompt.draft;
     if text {
         prompt.history = prompt.history + [text];

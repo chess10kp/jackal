@@ -17,7 +17,7 @@ import from ui.width { display_width, truncate_text }
 # above the prompt in tui/overlay.jac.
 
 
-obj WindowSpec {
+obj:pub WindowSpec {
     has title: str = "",
         width: int = 46,
         hint: str = "",
@@ -25,7 +25,7 @@ obj WindowSpec {
 }
 
 
-obj WindowState {
+obj:pub WindowState {
     has spec: WindowSpec,
         # Owner tag lets the stack host specialized interaction state.
         kind: str = "window",
@@ -58,7 +58,7 @@ def _wpad(text: str, width: int) -> str {
 
 Body lines longer than spec.width are truncated with an ellipsis. The hint
 footer (plus its blank separator) is emitted only when spec.hint is set."""
-def window_frame(spec: WindowSpec, body: list[str]) -> list[str] {
+def:pub window_frame(spec: WindowSpec, body: list[str]) -> list[str] {
     lines: list[str] = [
         "╭" + ("─" * spec.width) + "╮",
         "│" + _wpad("  " + spec.title, spec.width) + "│",
@@ -82,7 +82,7 @@ cursor row is kept visible: the window scrolls only when the cursor leaves
 the viewport (selection-stable, like the existing pickers), '… N more'
 markers mark truncated tails, and the cursor gets a '> ' mark. Returns
 (display rows, scroll offset)."""
-def window_view(
+def:pub window_view(
     rows: list[str], selected: int, max_rows: int
 ) -> tuple[list[str], int] {
     count = len(rows);
@@ -133,7 +133,7 @@ def window_view(
 
 
 """Render a WindowState: viewport + frame in one call."""
-def window_lines(state: WindowState) -> list[str] {
+def:pub window_lines(state: WindowState) -> list[str] {
     body: list[str] = [];
     if state.selected >= 0 {
         pair: tuple[list[str], int] = window_view(

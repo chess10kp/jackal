@@ -104,6 +104,7 @@ or runtime closure.
 
 | Order | Seam | Owning area | Work to close it | Depends on / proof |
 |---|---|---|---|---|
+| 0 | Imported symbols are not consistently exported across Jac compilation units | `app/agent`, `app/ui`, `app/tui`, `app/constraints`, and compiler module ABI | Jac modules use explicit public declarations for definitions imported by another compilation unit. A static import/declaration scan found 311 private function/global declarations and 416 private type declarations in the app import graph; these were promoted in the current source work. A follow-up scan found 25 additional private declarations in skills, logging, tool-spec, and subagent imports; those are now promoted too. Keep this as an interface invariant and make the compiler report missing exports at the importing edge, rather than discovering them as runtime `cannot import name` errors. | Gate 1. Fresh native lowering and root execution must resolve every imported symbol with the same exported name and type layout; import-graph scan reports zero private imported declarations. |
 | 1 | Kernel build is not reproducible from current sources | `vendor/jac` compiler kernel, build/cache tooling | Free enough local disk for a full kernel build; rebuild from the current source; capture each demotion with module, function, expression, and whether it is a hard error or a soft fallback. Current storage pressure is a workstation constraint, not a compiler fix. Do not treat the older 196-unit link as current evidence. | Gate 0. Current source type-checks for the touched driver/project/backend files, but the full rebuild after the latest edits stopped during cache writes with `ENOSPC`. Repeat only when there is working space; record clean kernel commit and source revision. |
 | 2 | Pass schedule stores compiler classes as runtime values | `compiler/driver/pipeline.jac`, pass contracts and native dispatcher | Decide one representation and use it consistently: an explicit `PassKind` registry with static contract/factory/run dispatch, or first-class native class references with `.has`, `.__name__`, `contract_of`, and `run_pass` support. Convert the schedule and all consumers together; avoid a partial list-literal workaround. | Gate 0. Native kernel compile and pipeline parity over the complete compiler pass order, including option-gated passes and diagnostics. |
 | 3 | Compiler helper and product paths still depend on unsupported dynamic shapes | `compiler/backends/native`, `compiler/driver/unit_products`, placement/cache/report, frontend | Use the fresh demotion report to group remaining failures by shared missing operation. Initial known groups are LLVM type inspection/C-entry selection, product/cache serialization, placement reporting, frontend deep-copy/repr, and ES entry generation. Add native implementations or replace reflection with typed dispatch at the owning API. | Gate 0. Each helper lowers in the kernel and is exercised through a compiler command; source `jac check` alone does not close it. |
@@ -115,15 +116,18 @@ or runtime closure.
 
 ### Immediate next steps
 
-1. Rebuild the compiler kernel from the current nested-checkout revision when
+1. Preserve the explicit cross-unit export invariant and include imported
+   symbol visibility in the native graph ledger; the source declarations have
+   been promoted, but the compiler must still prove this on fresh native roots.
+2. Rebuild the compiler kernel from the current nested-checkout revision when
    local build capacity permits; record the exact revision and capture a fresh
    demotion report. Do not use an old kernel or cached seal as current evidence.
-2. Close the compiler's class-valued pass-schedule seam as a complete contract:
+3. Close the compiler's class-valued pass-schedule seam as a complete contract:
    representation, metadata lookup, execution dispatch, and order parity.
-3. Define and generate the root/annex ledger for `main.jac`, `tui/shell.jac`,
+4. Define and generate the root/annex ledger for `main.jac`, `tui/shell.jac`,
    and every test root. Keep requested placement, actual placement, and demotion
    reason separately visible.
-4. Use that ledger to drive runtime-floor probes and close product roots in this
+5. Use that ledger to drive runtime-floor probes and close product roots in this
    order: headless agent, shared UI, TUI. Track Python-free compiler/bootstrap
    replacement as its own deliverable throughout; no app milestone closes the
    overall goal without it.

@@ -7,7 +7,7 @@ import from ui.terminal { ProcessTerminal }
 import from ui.progress_bar { ProgressBar }
 
 
-obj LiveShell {
+obj:pub LiveShell {
     has session: UiSession,
         # `shell`/`normalizer` are `any`: their real types (ShellScreen in
         # ui.screen, InputNormalizer in ui.input) are server-pinned, and a
@@ -41,7 +41,7 @@ obj LiveShell {
 a native-pinned obj class directly. `shell`/`normalizer` are `any` because
 ShellScreen (ui.screen) and InputNormalizer (ui.input) are server-pinned and
 erase to opaque slots inside the native layout."""
-def make_live_shell(
+def:pub make_live_shell(
     session: UiSession,
     shell: any,
     proj: TranscriptProjection,

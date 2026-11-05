@@ -67,7 +67,7 @@ def _is_task(value: any) -> bool {
 
 """All valid tasks from tasks.json; [] when missing, corrupt, or not a
 list (invalid entries are filtered out rather than failing the load)."""
-def load_tasks(cwd: str) -> list[dict[str, any]] {
+def:pub load_tasks(cwd: str) -> list[dict[str, any]] {
     fh = None;
     try {
         fh = open(tasks_path(cwd), "r");
@@ -124,7 +124,7 @@ def clear_tasks(cwd: str) -> bool {
 
 """Append a new pending task; title is stripped, a blank description
 becomes null. Returns the created task dict."""
-def add_task(cwd: str, title: str, description: str = "") -> dict[str, any] {
+def:pub add_task(cwd: str, title: str, description: str = "") -> dict[str, any] {
     tasks = load_tasks(cwd);
     now = _now_iso();
     trimmed_desc = (description or "").strip();
@@ -224,7 +224,7 @@ def update_tasks(cwd: str, updates: list[dict[str, any]]) -> list[dict[str, any]
 
 
 """Counts keyed by legacy snake_case status names."""
-def task_counts(tasks: list[dict[str, any]]) -> dict[str, int] {
+def:pub task_counts(tasks: list[dict[str, any]]) -> dict[str, int] {
     pending: int = 0;
     in_progress: int = 0;
     completed: int = 0;
@@ -262,7 +262,7 @@ def format_task_line(task: dict[str, any]) -> str {
 
 """Rendered board: counts header, divider, numbered rows (or a hint when
 the list is empty)."""
-def format_tasks_list(tasks: list[dict[str, any]], title: str = "Tasks") -> str {
+def:pub format_tasks_list(tasks: list[dict[str, any]], title: str = "Tasks") -> str {
     if not tasks {
         return _NO_TASKS_LINE;
     }

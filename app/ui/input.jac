@@ -40,7 +40,7 @@ import from ui.input_sequences {
 Lone ESC stays incomplete until a follow-up byte arrives or
 `flush_esc_timeout(now_ms)` fires after `esc_timeout_ms` (default 50ms).
 """
-obj InputNormalizer {
+obj:pub InputNormalizer {
     has buffer: str = "",
         paste_mode: bool = False,
         paste_buffer: str = "",
@@ -214,7 +214,7 @@ obj InputNormalizer {
 
 
 """Merge a list of already-produced events (resize/mouse/stream coalescing)."""
-def coalesce_events(events: list[HostEvent]) -> list[HostEvent] {
+def:pub coalesce_events(events: list[HostEvent]) -> list[HostEvent] {
     out: list[HostEvent] = [];
     last_resize: ResizeEvent | None = None;
     last_mouse: MouseEvent | None = None;

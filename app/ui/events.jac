@@ -29,7 +29,7 @@ import from ui.runtime {
 obj Effect {}
 
 
-obj SendPrompt(Effect) {
+obj:pub SendPrompt(Effect) {
     has text: str;
 }
 
@@ -48,7 +48,7 @@ obj Quit(Effect) {}
 
 
 """Base archetype for normalized semantic events."""
-walker UiEvent {
+walker:pub UiEvent {
     has handled: bool = False,
         propagation_stopped: bool = False,
         default_prevented: bool = False,
@@ -56,15 +56,15 @@ walker UiEvent {
 }
 
 
-walker InsertText(UiEvent) {
+walker:pub InsertText(UiEvent) {
     has text: str = "";
 }
 
 
-walker Submit(UiEvent) {}
+walker:pub Submit(UiEvent) {}
 
 
-walker Cancel(UiEvent) {}
+walker:pub Cancel(UiEvent) {}
 
 
 walker MoveFocus(UiEvent) {
@@ -133,7 +133,7 @@ def _set_focus(session: UiSession, n: UiNode | None) {
 
 """Return the unique containment path from target up to and including
 the nearest Screen ancestor (or the top of the detached graph)."""
-def containment_path(target: UiNode) -> list[UiNode] {
+def:pub containment_path(target: UiNode) -> list[UiNode] {
     path: list[UiNode] = [target];
     current: UiNode = target;
     while True {
@@ -190,7 +190,7 @@ def resolve_input_target(session: UiSession) -> UiNode | None {
 
 
 """Resolve the dispatch target. An explicit target bypasses the input chain."""
-def resolve_target(session: UiSession, explicit_target: UiNode | None = None) -> UiNode | None {
+def:pub resolve_target(session: UiSession, explicit_target: UiNode | None = None) -> UiNode | None {
     if explicit_target is not None {
         return explicit_target;
     }
@@ -238,7 +238,7 @@ def _default_move_focus(session: UiSession, event: MoveFocus) {
 
 
 """Deliver one event along the containment path, then run default actions."""
-def dispatch_event(session: UiSession, event: UiEvent, target: UiNode | None = None) -> UiEvent {
+def:pub dispatch_event(session: UiSession, event: UiEvent, target: UiNode | None = None) -> UiEvent {
     if session.disposed {
         raise ValueError("UiSession is disposed");
     }

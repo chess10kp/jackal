@@ -89,7 +89,7 @@ def _walk_nodes(session: UiSession) -> list[UiNode] {
 
 
 """Deterministic dump of semantic UI nodes and typed edges."""
-def dump_graph(session: UiSession) -> str {
+def:pub dump_graph(session: UiSession) -> str {
     lines: list[str] = [];
     nodes = _walk_nodes(session);
     nodes.sort(key=_node_sort_key);
@@ -139,7 +139,7 @@ def dump_graph(session: UiSession) -> str {
 
 
 """Dump domain source → UI target bindings."""
-def dump_bindings(session: UiSession) -> str {
+def:pub dump_bindings(session: UiSession) -> str {
     lines: list[str] = [];
     sources = sorted(session.bindings.by_source.keys());
     for source_id in sources {
@@ -253,7 +253,7 @@ def dump_damage(session: UiSession, frame: any = None) -> str {
 
 
 """Dump containment, ownership, bindings, and capabilities for a node."""
-def dump_lifetimes(session: UiSession, n: UiNode) -> str {
+def:pub dump_lifetimes(session: UiSession, n: UiNode) -> str {
     nid = node_id(n);
     lines: list[str] = ["node=" + _node_label(n)];
     parents = [n <-:Child:<-];
@@ -388,7 +388,7 @@ def _detect_invalid_ranks(session: UiSession) -> list[InspectFinding] {
 
 
 """Validate cycles, duplicate keys, invalid ranks, stale edges, invalid focus."""
-def validate_invariants(session: UiSession) -> list[InspectFinding] {
+def:pub validate_invariants(session: UiSession) -> list[InspectFinding] {
     findings: list[InspectFinding] = [];
     for leak in validate_session(session) {
         findings.append(InspectFinding(kind=leak.kind, detail=leak.detail));

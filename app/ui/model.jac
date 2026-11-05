@@ -7,36 +7,36 @@ runtime side tables (layout.jac, renderer.jac, runtime.jac), not on nodes.
 """
 
 
-node UiNode {
+node:pub UiNode {
     has key: str = "";
 }
 
 
-node UiContainer(UiNode) {}
+node:pub UiContainer(UiNode) {}
 
 
-node UiRegion(UiNode) {}
+node:pub UiRegion(UiNode) {}
 
 
-node UiSessionRoot(UiContainer) {}
+node:pub UiSessionRoot(UiContainer) {}
 
 
-node Screen(UiContainer) {}
+node:pub Screen(UiContainer) {}
 
 
-node Overlay(UiContainer) {}
+node:pub Overlay(UiContainer) {}
 
 
 """Jackal shell and shared semantic region archetypes."""
-node MainScreen(Screen) {}
+node:pub MainScreen(Screen) {}
 
 
-node Header(UiRegion) {
+node:pub Header(UiRegion) {
     has title: str = "";
 }
 
 
-node TranscriptView(UiRegion) {
+node:pub TranscriptView(UiRegion) {
     has scroll_offset: int = 0;
     has follow_tail: bool = True;
     has source_id: str = "";
@@ -44,7 +44,7 @@ node TranscriptView(UiRegion) {
 }
 
 
-node Prompt(UiRegion) {
+node:pub Prompt(UiRegion) {
     has draft: str = "";
     has mode: str = "insert";
     has caret: int = 0;
@@ -55,34 +55,34 @@ node Prompt(UiRegion) {
 }
 
 
-node Status(UiRegion) {
+node:pub Status(UiRegion) {
     has phase: str = "";
 }
 
 
-node ApprovalOverlay(Overlay) {}
+node:pub ApprovalOverlay(Overlay) {}
 
 
 """Visual containment with deterministic sibling order."""
-edge Child: UiContainer --> UiNode {
+edge:pub Child: UiContainer --> UiNode {
     has rank: int;
 }
 
 
 """UI-local disposal responsibility."""
-edge Owns: UiNode --> UiNode {}
+edge:pub Owns: UiNode --> UiNode {}
 
 
 """UI-local invalidation dependency within the detached graph."""
-edge Feeds: UiNode --> UiNode {}
+edge:pub Feeds: UiNode --> UiNode {}
 
 
 """Explicit focus order override."""
-edge FocusNext: UiNode --> UiNode {}
+edge:pub FocusNext: UiNode --> UiNode {}
 
 
 """Overlay layering outside normal-flow containment."""
-edge Layer: Screen --> Overlay {
+edge:pub Layer: Screen --> Overlay {
     has z_index: int;
     has modal: bool = False;
 }
@@ -95,7 +95,7 @@ obj RankedChild {
 
 
 """Return the stable 32-char node identifier for side-table keys."""
-def node_id(n: UiNode) -> str {
+def:pub node_id(n: UiNode) -> str {
     return jid(n);
 }
 
@@ -106,7 +106,7 @@ def _ranked_child_key(pair: RankedChild) -> int {
 
 
 """Return direct Child descendants of parent in ascending rank order."""
-def ordered_children(parent: UiContainer) -> list[UiNode] {
+def:pub ordered_children(parent: UiContainer) -> list[UiNode] {
     pairs: list[RankedChild] = [];
     for child in [parent ->:Child:->] {
         for e in [edge parent ->:Child:-> child] {
@@ -119,13 +119,13 @@ def ordered_children(parent: UiContainer) -> list[UiNode] {
 
 
 """Return ordered keys for direct Child descendants."""
-def ordered_child_keys(parent: UiContainer) -> list[str] {
+def:pub ordered_child_keys(parent: UiContainer) -> list[str] {
     return [child.key for child in ordered_children(parent)];
 }
 
 
 """Return the Child rank for one mounted child, or -1 when absent."""
-def child_rank(parent: UiContainer, child: UiNode) -> int {
+def:pub child_rank(parent: UiContainer, child: UiNode) -> int {
     for e in [edge parent ->:Child:-> child] {
         return e.rank;
     }
@@ -134,7 +134,7 @@ def child_rank(parent: UiContainer, child: UiNode) -> int {
 
 
 """Return the single Child parent when mounted, else None."""
-def child_parent(child: UiNode) -> UiContainer | None {
+def:pub child_parent(child: UiNode) -> UiContainer | None {
     parents = [child <-:Child:<-];
     if len(parents) == 0 {
         return None;
@@ -161,7 +161,7 @@ def enclosing_screen(n: UiNode) -> Screen | None {
 
 
 """Collect duplicate sibling keys under one parent."""
-def duplicate_sibling_keys(parent: UiContainer) -> list[str] {
+def:pub duplicate_sibling_keys(parent: UiContainer) -> list[str] {
     seen: dict[str, int] = {};
     dups: list[str] = [];
     for child in ordered_children(parent) {
@@ -179,7 +179,7 @@ def duplicate_sibling_keys(parent: UiContainer) -> list[str] {
 
 
 """True when ancestor is reachable upward from child via Child edges."""
-def is_child_ancestor(ancestor: UiNode, child: UiNode) -> bool {
+def:pub is_child_ancestor(ancestor: UiNode, child: UiNode) -> bool {
     current: UiNode | None = child;
     while current is not None {
         if current is ancestor {

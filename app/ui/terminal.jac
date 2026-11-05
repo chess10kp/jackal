@@ -33,19 +33,19 @@ import struct;
 
 
 glob ESC = "\x1b";
-glob ENABLE_BRACKETED_PASTE = "\x1b[?2004h";
-glob DISABLE_BRACKETED_PASTE = "\x1b[?2004l";
-glob ENTER_ALT_SCREEN = "\x1b[?1049h";
-glob LEAVE_ALT_SCREEN = "\x1b[?1049l";
-glob SYNC_BEGIN = "\x1b[?2026h";
-glob SYNC_END = "\x1b[?2026l";
-glob HIDE_CURSOR = "\x1b[?25l";
-glob SHOW_CURSOR = "\x1b[?25h";
-glob CLEAR_SCREEN = "\x1b[2J\x1b[H";
+glob:pub ENABLE_BRACKETED_PASTE = "\x1b[?2004h";
+glob:pub DISABLE_BRACKETED_PASTE = "\x1b[?2004l";
+glob:pub ENTER_ALT_SCREEN = "\x1b[?1049h";
+glob:pub LEAVE_ALT_SCREEN = "\x1b[?1049l";
+glob:pub SYNC_BEGIN = "\x1b[?2026h";
+glob:pub SYNC_END = "\x1b[?2026l";
+glob:pub HIDE_CURSOR = "\x1b[?25l";
+glob:pub SHOW_CURSOR = "\x1b[?25h";
+glob:pub CLEAR_SCREEN = "\x1b[2J\x1b[H";
 
 
 """Minimal terminal capability surface used by the renderer and host loop."""
-obj Terminal {
+obj:pub Terminal {
     has columns: int = 80,
         rows: int = 24,
         started: bool = False,
@@ -258,7 +258,7 @@ obj Utf8StreamDecoder {
 }
 
 
-def read_terminal_size(fallback_cols: int = 80, fallback_rows: int = 24) -> tuple[int, int] {
+def:pub read_terminal_size(fallback_cols: int = 80, fallback_rows: int = 24) -> tuple[int, int] {
     # literal fds: stream.fileno() is a union-method call that can't lower
     # natively (jac#10536); ioctl on a bad fd just fails inside _ioctl_winsize
     for fd in [1, 0, 2] {
@@ -282,7 +282,7 @@ def read_terminal_size(fallback_cols: int = 80, fallback_rows: int = 24) -> tupl
 
 
 """POSIX process terminal using termios raw mode and signal-driven resize."""
-obj ProcessTerminal(Terminal) {
+obj:pub ProcessTerminal(Terminal) {
     has _fd: int = -1,
         _old_attrs: any = None,
         _old_handler: any = None,
@@ -490,7 +490,7 @@ obj ProcessTerminal(Terminal) {
 
 
 """Emit one synchronized write: begin sync, body, end sync."""
-def synchronized_write(term: Terminal, data: str) {
+def:pub synchronized_write(term: Terminal, data: str) {
     term.begin_synchronized_update();
     try {
         term.write(data);

@@ -26,7 +26,7 @@ obj Cell {
 }
 
 
-obj VirtualTerminal(Terminal) {
+obj:pub VirtualTerminal(Terminal) {
     has writes: list[str] = [],
         input_queue: list[str] = [],
         resize_events: list[tuple[int, int]] = [],

@@ -351,7 +351,7 @@ def _popup_suppressed(raw: str, dismissed: str) -> bool {
 """Model completion visibility + candidates in one shot: hidden while any
 modal, picker or approval owns the screen. The popup only appears for
 `/model` and `/model <prefix>`, not as a global command-search palette."""
-def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
+def:pub _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
     if _picker_state(app) is not None or _ui_modal_state(app) is not None or app.shell.approval is not None {
         return None;
     }
@@ -379,7 +379,7 @@ def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
 """Resolve a tab/enter press against model completion. Enter on a candidate
 identical to the current draft returns submit=True, so /model can open on
 one Enter. Pure so the decision stays testable headless."""
-def _slash_popup_pick(matches: list[list[str]], draft: str, sel: int) -> tuple[str, bool] {
+def:pub _slash_popup_pick(matches: list[list[str]], draft: str, sel: int) -> tuple[str, bool] {
     count = len(matches);
     idx = int(sel);
     if idx >= count {
@@ -513,7 +513,7 @@ def _paint(app: LiveShell) {
 }
 
 
-def _render(app: LiveShell) {
+def:pub _render(app: LiveShell) {
     if not app.dirty {
         return;
     }

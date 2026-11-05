@@ -71,21 +71,21 @@ import from ui.renderer_damage {
 }
 
 
-def create_renderer(columns: int = 80, rows: int = 24) -> Renderer {
+def:pub create_renderer(columns: int = 80, rows: int = 24) -> Renderer {
     return Renderer(layout=create_layout_state(columns, rows));
 }
 
 
 # The permanent seam has no contracts: callers install a LayoutSpec via
 # set_spec (see screen.jac configure_main_shell_layout for the idiom).
-def set_node_contract(renderer: Renderer, n: UiNode, spec: LayoutSpec) {
+def:pub set_node_contract(renderer: Renderer, n: UiNode, spec: LayoutSpec) {
     set_spec(renderer.layout, n, spec);
 }
 
 
 # set_content requires monotonic revisions; keep the legacy three-arg
 # surface by minting a per-node revision counter here.
-def set_node_content(renderer: Renderer, n: UiNode, lines: list[str]) {
+def:pub set_node_content(renderer: Renderer, n: UiNode, lines: list[str]) {
     nid = node_id(n);
     rev = renderer.content_revisions.get(nid, 0) + 1;
     renderer.content_revisions[nid] = rev;
@@ -95,17 +95,17 @@ def set_node_content(renderer: Renderer, n: UiNode, lines: list[str]) {
 
 # No dirty tracking exists anymore — frames recompute wholesale; the
 # pending sets only steer same-bounds semantic damage attribution.
-def mark_semantic_dirty(renderer: Renderer, n: UiNode) {
+def:pub mark_semantic_dirty(renderer: Renderer, n: UiNode) {
     renderer.pending_semantic.add(node_id(n));
 }
 
 
-def mark_layout_dirty(renderer: Renderer, n: UiNode) {
+def:pub mark_layout_dirty(renderer: Renderer, n: UiNode) {
     renderer.pending_layout.add(node_id(n));
 }
 
 
-def request_cursor(
+def:pub request_cursor(
     renderer: Renderer,
     n: UiNode,
     row_offset: int = 0,
@@ -154,7 +154,7 @@ def desired_cells(renderer: Renderer, layout_root: UiNode) -> list[str] {
 
 
 """Layout, damage, paint, and cursor for one frame."""
-def render_frame(
+def:pub render_frame(
     renderer: Renderer,
     layout_root: UiNode,
     term: Terminal,
@@ -238,7 +238,7 @@ def render_frame(
 
 
 """True if any emitted write contains a full-screen clear sequence."""
-def frame_used_full_clear(writes: list[str]) -> bool {
+def:pub frame_used_full_clear(writes: list[str]) -> bool {
     joined = "".join(writes);
     return "\x1b[2J" in joined or "\x1b[3J" in joined;
 }

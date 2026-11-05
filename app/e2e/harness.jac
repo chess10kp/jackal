@@ -110,7 +110,7 @@ obj Sandbox {
 }
 
 
-def make_sandbox(files: dict[str, str] | None = None) -> Sandbox {
+def:pub make_sandbox(files: dict[str, str] | None = None) -> Sandbox {
     base: str = tempfile.mkdtemp(prefix="jackal-e2e-");
     sb = Sandbox(
         base_dir=base,
@@ -135,7 +135,7 @@ def make_sandbox(files: dict[str, str] | None = None) -> Sandbox {
 
 
 """Result of one jackal process run."""
-obj RunResult {
+obj:pub RunResult {
     has code: int = 0,
         stdout: str = "",
         stderr: str = "";
@@ -168,7 +168,7 @@ obj RunResult {
 
 """Run `jac run app/main.jac -- ARGS` inside the sandbox project with the mock
 model. `stdin_text` is fed to the process (closed afterwards)."""
-def run_jackal(
+def:pub run_jackal(
     sb: Sandbox,
     args: list[str],
     stdin_text: str = "",
@@ -206,7 +206,7 @@ def run_jackal(
 
 
 """JSONL request line for the --json protocol."""
-def jsonl(kind: str, text: str = "", extra: dict[str, any] | None = None) -> str {
+def:pub jsonl(kind: str, text: str = "", extra: dict[str, any] | None = None) -> str {
     req: dict[str, any] = {"type": kind, "text": text};
     if extra is not None {
         for (k, v) in extra.items() { req[k] = v; }
@@ -228,7 +228,7 @@ glob KEYS: dict[str, str] = {
 """A live `jac run tui/shell.jac` under a pseudo-terminal, with its output
 replayed into a Screen. Drive it with type_text/press, assert with
 wait_for/screen_text, and always close()."""
-obj TuiSession {
+obj:pub TuiSession {
     has proc: any = None,
         master_fd: int = -1,
         screen: EmulatedTerminal | None = None,
@@ -363,7 +363,7 @@ obj TuiSession {
 
 """Launch the native TUI in `sb.project` under a cols x rows PTY with the
 mock model. Waits until the first frame is painted."""
-def spawn_tui(
+def:pub spawn_tui(
     sb: Sandbox,
     cols: int = 100,
     rows: int = 30,
@@ -412,13 +412,13 @@ def spawn_tui(
 
 
 """Absolute path of an e2e fixture file."""
-def fixture_path(name: str) -> str {
+def:pub fixture_path(name: str) -> str {
     return os.path.join(app_dir(), "e2e", "fixtures", name);
 }
 
 
 """Write the project config as .jackal/config.json (directory form, so
 sessions and tasks can live alongside it) — e.g. MCP servers."""
-def write_project_config(sb: Sandbox, cfg: dict[str, any]) {
+def:pub write_project_config(sb: Sandbox, cfg: dict[str, any]) {
     sb.write(".jackal/config.json", json.dumps(cfg));
 }

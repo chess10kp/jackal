@@ -68,7 +68,7 @@ def create_live_shell(term: Terminal | None = None) -> LiveShell {
 
 """Boot session + shell on `term` and paint the first frame. Raises
 ValueError for an invalid JACKAL_MODE."""
-def boot_tui(term: Terminal | None = None) -> LiveShell {
+def:pub boot_tui(term: Terminal | None = None) -> LiveShell {
     requested_mode: str = os.environ.get("JACKAL_MODE", "");
     if requested_mode {
         set_mode(requested_mode);
@@ -97,7 +97,7 @@ def boot_tui(term: Terminal | None = None) -> LiveShell {
 
 """One host-loop iteration: resize check, input, tick, notices, paint.
 Returns False once the shell should exit."""
-def tui_step(app: LiveShell, poll_timeout_s: float = 0.04) -> bool {
+def:pub tui_step(app: LiveShell, poll_timeout_s: float = 0.04) -> bool {
     (cols, rows) = app.term.size();
     if cols != app.columns or rows != app.rows {
         _apply_resize(app, cols, rows);
@@ -125,7 +125,7 @@ def tui_step(app: LiveShell, poll_timeout_s: float = 0.04) -> bool {
 
 
 """Restore the terminal and dispose the UI session (idempotent)."""
-def shutdown_tui(app: LiveShell) {
+def:pub shutdown_tui(app: LiveShell) {
     try {
         app.term.hide_cursor();
         app.term.stop();

@@ -15,7 +15,7 @@ import from ui.model {
 
 
 """Axis-aligned terminal rectangle in cell coordinates (origin top-left)."""
-obj Rect {
+obj:pub Rect {
     has x: int = 0,
         y: int = 0,
         width: int = 0,
@@ -65,13 +65,13 @@ obj Rect {
 }
 
 
-obj Size {
+obj:pub Size {
     has width: int = 0,
         height: int = 0;
 }
 
 
-def rect_union(a: Rect, b: Rect) -> Rect {
+def:pub rect_union(a: Rect, b: Rect) -> Rect {
     if a.is_empty() {
         return b.copy();
     }
@@ -86,14 +86,14 @@ def rect_union(a: Rect, b: Rect) -> Rect {
 }
 
 
-enum Axis { HORIZONTAL = "horizontal", VERTICAL = "vertical" }
-enum SizeMode { FIXED = "fixed", INTRINSIC = "intrinsic", BOUNDED = "bounded", FILL = "fill", GROW = "grow" }
-enum Align { START = "start", CENTER = "center", END = "end", STRETCH = "stretch" }
-enum OverlayAnchor { CENTER = "center", TOP = "top", BOTTOM = "bottom", LEFT = "left", RIGHT = "right" }
+enum:pub Axis { HORIZONTAL = "horizontal", VERTICAL = "vertical" }
+enum:pub SizeMode { FIXED = "fixed", INTRINSIC = "intrinsic", BOUNDED = "bounded", FILL = "fill", GROW = "grow" }
+enum:pub Align { START = "start", CENTER = "center", END = "end", STRETCH = "stretch" }
+enum:pub OverlayAnchor { CENTER = "center", TOP = "top", BOTTOM = "bottom", LEFT = "left", RIGHT = "right" }
 
 
 """Per-axis sizing policy (plan §4.1)."""
-obj AxisSize {
+obj:pub AxisSize {
     has mode: SizeMode,
         minimum: float = 0.0,
         preferred: float | None = None,
@@ -106,7 +106,7 @@ obj AxisSize {
 
 Field order puts the required axis sizes first because Jac objects follow
 dataclass default rules (a plan-sanctioned spelling change)."""
-obj LayoutSpec {
+obj:pub LayoutSpec {
     has width: AxisSize,
         height: AxisSize,
         flow_axis: Axis = Axis.VERTICAL,
@@ -116,8 +116,8 @@ obj LayoutSpec {
 }
 
 
-enum LayoutSeverity { WARNING = "warning", ERROR = "error" }
-enum LayoutError {
+enum:pub LayoutSeverity { WARNING = "warning", ERROR = "error" }
+enum:pub LayoutError {
     INVALID_SPEC = "invalid_spec",
     INVALID_RELATION = "invalid_relation",
     STALE_NODE = "stale_node",
@@ -130,18 +130,18 @@ enum LayoutError {
 }
 
 
-obj Viewport {
+obj:pub Viewport {
     has columns: int,
         rows: int;
 }
 
 
-obj RelationHandle {
+obj:pub RelationHandle {
     has id: int;
 }
 
 
-obj LayoutDiagnostic {
+obj:pub LayoutDiagnostic {
     has code: LayoutError,
         severity: LayoutSeverity,
         message: str,
@@ -150,7 +150,7 @@ obj LayoutDiagnostic {
 }
 
 
-obj FrameEntry {
+obj:pub FrameEntry {
     has measured: Size,
         rect: Rect,
         clip: Rect,
@@ -161,7 +161,7 @@ obj FrameEntry {
 }
 
 
-obj LayoutFrame {
+obj:pub LayoutFrame {
     has generation: int,
         viewport: Viewport,
         entries: dict[str, FrameEntry],
@@ -169,21 +169,21 @@ obj LayoutFrame {
 }
 
 
-obj MutationResult {
+obj:pub MutationResult {
     has ok: bool,
         relation_handle: RelationHandle | None = None,
         diagnostics: list[LayoutDiagnostic] = [];
 }
 
 
-obj LayoutResult {
+obj:pub LayoutResult {
     has ok: bool,
         frame: LayoutFrame | None = None,
         diagnostics: list[LayoutDiagnostic] = [];
 }
 
 
-enum LayoutRelationKind {
+enum:pub LayoutRelationKind {
     LEFT_OF = "left_of", RIGHT_OF = "right_of",
     ABOVE = "above", BELOW = "below",
     ALIGN_START = "align_start", ALIGN_END = "align_end",
@@ -195,7 +195,7 @@ enum LayoutRelationKind {
 
 Not an OSP edge: relations are registry data keyed by stable node ids so
 a replaced node (new jid) never inherits geometry declarations."""
-obj LayoutRelation {
+obj:pub LayoutRelation {
     has owner_id: str,
         source_id: str,
         target_id: str,
@@ -208,7 +208,7 @@ obj LayoutRelation {
 
 
 """Registered content for one node (plan §4 invariant 6)."""
-obj ContentEntry {
+obj:pub ContentEntry {
     has lines: list[str],
         content_revision: int,
         style_revision: int;
@@ -218,7 +218,7 @@ obj ContentEntry {
 """Cached wrapped lines for one node at one integer width (plan §7.1
 step 4). One entry per node — revisions are monotonic, so older wraps
 are never reusable and keeping only the newest bounds memory."""
-obj MeasureEntry {
+obj:pub MeasureEntry {
     has width: int,
         content_revision: int,
         style_revision: int,
@@ -230,7 +230,7 @@ obj MeasureEntry {
 
 `solver` and `last_frame` carry solver state and the last published
 frame. Frames are immutable by ownership convention."""
-obj LayoutState {
+obj:pub LayoutState {
     has viewport: Viewport = Viewport(columns=80, rows=24),
         specs: dict[str, LayoutSpec] = {},
         content: dict[str, ContentEntry] = {},

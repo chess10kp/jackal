@@ -6,14 +6,14 @@ UiSession (runtime.jac) and updated explicitly on subscribe/unsubscribe/dispose.
 """
 
 
-obj Binding {
+obj:pub Binding {
     has source_id: str,
         target_id: str,
         event_type: str;
 }
 
 
-obj BindingRegistry {
+obj:pub BindingRegistry {
     has by_source: dict[str, list[Binding]] = {},
         by_target: dict[str, list[Binding]] = {};
 }
@@ -145,7 +145,7 @@ def _sort_bindings_in_place(items: list[Binding]) {
 
 
 """Register one domain source -> UI target delivery route. Idempotent."""
-def subscribe(
+def:pub subscribe(
     registry: BindingRegistry,
     source_id: str,
     target_id: str,
@@ -202,7 +202,7 @@ def unsubscribe_target(registry: BindingRegistry, target_id: str) -> int {
 }
 
 
-def clear_bindings(registry: BindingRegistry) {
+def:pub clear_bindings(registry: BindingRegistry) {
     registry.by_source.clear();
     registry.by_target.clear();
 }
@@ -217,7 +217,7 @@ def binding_count(registry: BindingRegistry) -> int {
 }
 
 
-def is_empty(registry: BindingRegistry) -> bool {
+def:pub is_empty(registry: BindingRegistry) -> bool {
     return binding_count(registry) == 0;
 }
 
@@ -279,7 +279,7 @@ def deliver(
 
 
 """Return bindings whose UI target jid is absent from the live target set."""
-def find_orphan_bindings(
+def:pub find_orphan_bindings(
     registry: BindingRegistry,
     live_target_ids: set[str],
 ) -> list[Binding] {

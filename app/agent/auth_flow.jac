@@ -8,7 +8,7 @@ import from .auth_display { validate_provider_entry, validate_model_entry }
 
 
 """Initial flow state: the idle step."""
-def initial_auth_flow_state() -> dict[str, any] {
+def:pub initial_auth_flow_state() -> dict[str, any] {
     return {"step": {"kind": "idle"}};
 }
 
@@ -50,7 +50,7 @@ open_provider_picker, open_model_picker, set_logging_in, set_browser_auth,
 set_prompt, set_manual_code, set_select, set_api_key_input, set_logged_in,
 set_error, set_idle, update_query, update_provider_filter, cancel, reset.
 Unknown actions return an unchanged copy. Never mutates current_state."""
-def transition_auth_flow(current_state: dict[str, any], action: str, payload: dict[str, any] | None = None) -> dict[str, any] {
+def:pub transition_auth_flow(current_state: dict[str, any], action: str, payload: dict[str, any] | None = None) -> dict[str, any] {
     p = payload if payload is not None else {};
     step: dict[str, any] = current_state.get("step", {});
 

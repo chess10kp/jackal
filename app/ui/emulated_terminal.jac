@@ -42,7 +42,7 @@ obj TerminalCell {
 }
 
 
-obj EmulatedTerminal(Terminal) {
+obj:pub EmulatedTerminal(Terminal) {
     has cells: list[list[TerminalCell]] = [],
         input_queue: list[str] = [],
         history: list[str] = [],

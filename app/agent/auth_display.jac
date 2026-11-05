@@ -146,7 +146,7 @@ def filter_models_by_query(models: list[dict[str, any]], query: str, provider_fi
 
 
 """Human-readable picker row, e.g. "[✓] Anthropic (OAuth, 12 models)"."""
-def format_provider_label(item: dict[str, any]) -> str {
+def:pub format_provider_label(item: dict[str, any]) -> str {
     name = item.get("displayName", item.get("id", "unknown"));
     auth_type = item.get("authType", "");
     configured = "✓" if item.get("configured") else " ";

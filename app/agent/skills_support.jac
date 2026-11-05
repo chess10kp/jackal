@@ -10,7 +10,7 @@ import re;
 import fnmatch;
 
 
-glob MAX_NAME_LENGTH: int = 64,
+glob:pub MAX_NAME_LENGTH: int = 64,
      MAX_DESCRIPTION_LENGTH: int = 1024,
      IGNORE_FILE_NAMES: list[str] = [".gitignore", ".ignore", ".fdignore"];
 
@@ -19,12 +19,12 @@ glob MAX_NAME_LENGTH: int = 64,
 
 
 """str-typed shims over os.path stubs that require PathLike/LiteralString."""
-def _base_name(p: str) -> str {
+def:pub _base_name(p: str) -> str {
     return p.replace(os.sep, "/").rsplit("/", 1)[-1];
 }
 
 
-def _dir_name(p: str) -> str {
+def:pub _dir_name(p: str) -> str {
     s = p.replace(os.sep, "/");
     idx = s.rfind("/");
     if idx == -1 {
@@ -37,18 +37,18 @@ def _dir_name(p: str) -> str {
 }
 
 
-def _rel_path(target: str, start: str) -> str {
+def:pub _rel_path(target: str, start: str) -> str {
     return str(os.path.relpath(target, start));
 }
 
 
-def _abs_path(p: str) -> str {
+def:pub _abs_path(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
 
 """Realpath canonicalization with abspath fallback."""
-def _canonical(p: str) -> str {
+def:pub _canonical(p: str) -> str {
     try {
         return str(os.path.realpath(p));
     } except OSError {
@@ -57,12 +57,12 @@ def _canonical(p: str) -> str {
 }
 
 
-def _is_abs(p: str) -> bool {
+def:pub _is_abs(p: str) -> bool {
     return bool(os.path.isabs(p));
 }
 
 
-def _user_home() -> str {
+def:pub _user_home() -> str {
     tilde: any = "~";
     return str(os.path.expanduser(tilde));
 }
@@ -71,7 +71,7 @@ def _user_home() -> str {
 # ============================== frontmatter ==============================
 
 
-def _parse_scalar(value: str) -> any {
+def:pub _parse_scalar(value: str) -> any {
     trimmed = value.strip();
     if not trimmed {
         return "";
@@ -104,7 +104,7 @@ def _parse_scalar(value: str) -> any {
 Mirrors orchestration/_frontmatter_toolchain.parse_frontmatter: CRLF
 normalized, missing terminator keeps the whole text as body, dash-block
 lists collect under the preceding bare key."""
-def parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
+def:pub parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
     fm: dict[str, any] = {};
     normalized = content.replace("\r\n", "\n");
     if not normalized.startswith("---") {
@@ -152,7 +152,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
 
 
 """Coerce a frontmatter value to display text (lists join with ', ')."""
-def frontmatter_string(value: any) -> str | None {
+def:pub frontmatter_string(value: any) -> str | None {
     if value is None {
         return None;
     }
@@ -171,7 +171,7 @@ def frontmatter_string(value: any) -> str | None {
 
 
 """Parse gitignore content, prefixing with *prefix* for sub-dir rules."""
-def _gitignore_parse_rules(content: str, prefix: str) -> list[str] {
+def:pub _gitignore_parse_rules(content: str, prefix: str) -> list[str] {
     rules: list[str] = [];
     for line in content.splitlines() {
         trimmed = line.strip();
@@ -201,7 +201,7 @@ def _gitignore_parse_rules(content: str, prefix: str) -> list[str] {
 
 
 """Load ignore rules from *subdir* relative to *root_dir*."""
-def _load_ignore_rules(root_dir: str, subdir: str) -> list[str] {
+def:pub _load_ignore_rules(root_dir: str, subdir: str) -> list[str] {
     rel = _rel_path(subdir, root_dir).replace(os.sep, "/");
     prefix = rel + "/" if rel != "." else "";
     rules: list[str] = [];
@@ -227,7 +227,7 @@ def _load_ignore_rules(root_dir: str, subdir: str) -> list[str] {
 
 
 """Minimal gitignore-style match; True when *path* should be ignored."""
-def _match_ignore_pattern(path: str, rules: list[str]) -> bool {
+def:pub _match_ignore_pattern(path: str, rules: list[str]) -> bool {
     result = False;
     for rule in rules {
         rule_str = str(rule);
@@ -261,7 +261,7 @@ def _match_ignore_pattern(path: str, rules: list[str]) -> bool {
 # ============================== validation ===============================
 
 
-def _validate_name(name: str) -> list[str] {
+def:pub _validate_name(name: str) -> list[str] {
     errors: list[str] = [];
     if len(name) > MAX_NAME_LENGTH {
         errors.append(f"name exceeds {MAX_NAME_LENGTH} characters ({len(name)})");
@@ -279,7 +279,7 @@ def _validate_name(name: str) -> list[str] {
 }
 
 
-def _validate_description(description: str | None) -> list[str] {
+def:pub _validate_description(description: str | None) -> list[str] {
     errors: list[str] = [];
     if not description or description.strip() == "" {
         errors.append("description is required");
@@ -295,7 +295,7 @@ def _validate_description(description: str | None) -> list[str] {
 # =========================== single skill load ===========================
 
 
-def _warning(message: str, path: str) -> dict[str, any] {
+def:pub _warning(message: str, path: str) -> dict[str, any] {
     return {"type": "warning", "message": message, "path": path, "collision": None};
 }
 
@@ -304,7 +304,7 @@ def _warning(message: str, path: str) -> dict[str, any] {
 
 Missing descriptions exclude the skill (after recording the warning);
 bad names warn but keep the skill, mirroring the legacy loader."""
-def _load_skill_from_file(file_path: str, source: str) -> tuple[dict[str, any] | None, list[dict[str, any]]] {
+def:pub _load_skill_from_file(file_path: str, source: str) -> tuple[dict[str, any] | None, list[dict[str, any]]] {
     diagnostics: list[dict[str, any]] = [];
     result: dict[str, any] | None = None;
     try {

@@ -25,7 +25,7 @@ def _key_env(provider_id: str) -> str {
 
 """Export stored API keys for providers whose env var is unset. Explicit
 environment values always win. Returns the providers hydrated."""
-def hydrate_auth_environment() -> list[str] {
+def:pub hydrate_auth_environment() -> list[str] {
     stored: dict[str, any] = load_auth_file(resolve_auth_path());
     done: list[str] = [];
     for provider_id in PROVIDER_IDS {
@@ -45,7 +45,7 @@ def hydrate_auth_environment() -> list[str] {
 
 
 """Remember that `key_env` now carries a stored credential (set by /login)."""
-def note_hydrated(key_env: str) {
+def:pub note_hydrated(key_env: str) {
     if key_env { _hydrated_envs.add(key_env); }
 }
 
@@ -53,7 +53,7 @@ def note_hydrated(key_env: str) {
 """Remove a provider's stored credential. The env var is cleared only when it
 came from auth.json; a key exported by the user's shell is left alone and
 reported. Returns a status line."""
-def logout_provider(provider_id: str) -> str {
+def:pub logout_provider(provider_id: str) -> str {
     if provider_id not in PROVIDER_IDS {
         return "unknown provider: " + provider_id;
     }
@@ -78,7 +78,7 @@ def logout_provider(provider_id: str) -> str {
 
 
 """Providers with a stored credential (for /logout completion and listing)."""
-def stored_providers() -> list[str] {
+def:pub stored_providers() -> list[str] {
     data: dict[str, any] = load_auth_file(resolve_auth_path());
     out: list[str] = [];
     for provider_id in PROVIDER_IDS {

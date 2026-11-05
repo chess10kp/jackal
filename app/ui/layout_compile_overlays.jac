@@ -25,7 +25,7 @@ import from ui.layout_compile_emit {
 }
 
 
-def _emit_overlay(
+def:pub _emit_overlay(
     result: CompileResult,
     owner: _Entry,
     root_edges: NodeEdges,

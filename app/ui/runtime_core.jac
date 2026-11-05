@@ -34,19 +34,19 @@ import from ui.bindings {
 }
 
 
-obj RendererState {
+obj:pub RendererState {
     has layout: dict[str, dict[str, int]] = {};
     has damage: list[dict[str, int]] = [];
     has cursor_holder_id: str = "";
 }
 
 
-obj CapabilityRegistry {
+obj:pub CapabilityRegistry {
     has by_node: dict[str, list[str]] = {};
 }
 
 
-obj InvalidationRecord {
+obj:pub InvalidationRecord {
     has node_id: str,
         layout_root_id: str,
         reason: str;
@@ -54,7 +54,7 @@ obj InvalidationRecord {
 
 
 """Queued UI session event (resize, ...) for consumers to drain."""
-obj SessionEventRecord {
+obj:pub SessionEventRecord {
     has kind: str = "";
     has payload: dict[str, int] = {};
 }
@@ -62,12 +62,12 @@ obj SessionEventRecord {
 
 """Native factory seam: server modules (ui.screen) cannot construct a
 native-pinned obj class directly, so they build records through this call."""
-def make_session_event(kind: str, payload: dict[str, int]) -> SessionEventRecord {
+def:pub make_session_event(kind: str, payload: dict[str, int]) -> SessionEventRecord {
     return SessionEventRecord(kind=kind, payload=payload);
 }
 
 
-obj UiSession {
+obj:pub UiSession {
     has bindings: BindingRegistry;
     has renderer: RendererState;
     has capabilities: CapabilityRegistry;
@@ -83,19 +83,19 @@ obj UiSession {
 }
 
 
-obj SessionLeak {
+obj:pub SessionLeak {
     has kind: str,
         detail: str;
 }
 
 
-obj UiSessionHandle {
+obj:pub UiSessionHandle {
     has session: UiSession;
     has ui_root_id: str;
 }
 
 
-def create_session() -> UiSessionHandle {
+def:pub create_session() -> UiSessionHandle {
     ui_root = UiSessionRoot(key="session");
     session = UiSession(
         ui_root=ui_root,
@@ -108,12 +108,12 @@ def create_session() -> UiSessionHandle {
 }
 
 
-def track_node(session: UiSession, n: UiNode) {
+def:pub track_node(session: UiSession, n: UiNode) {
     session.tracked_node_ids.add(node_id(n));
 }
 
 
-def is_reachable_from_root(session: UiSession, n: UiNode) -> bool {
+def:pub is_reachable_from_root(session: UiSession, n: UiNode) -> bool {
     if session.disposed or session.ui_root is None {
         return False;
     }
@@ -132,7 +132,7 @@ def is_reachable_from_root(session: UiSession, n: UiNode) -> bool {
 }
 
 
-def assert_mutation_parent(session: UiSession, parent: UiContainer) {
+def:pub assert_mutation_parent(session: UiSession, parent: UiContainer) {
     if session.disposed {
         raise ValueError("UiSession is disposed");
     }
@@ -145,7 +145,7 @@ def assert_mutation_parent(session: UiSession, parent: UiContainer) {
 }
 
 
-def append_child_session(
+def:pub append_child_session(
     session: UiSession,
     parent: UiContainer,
     child: UiNode,
@@ -166,13 +166,13 @@ def append_child_session(
 }
 
 
-def set_current_screen(session: UiSession, screen: Screen) {
+def:pub set_current_screen(session: UiSession, screen: Screen) {
     session.current_screen = screen;
     track_node(session, screen);
 }
 
 
-def set_focus(session: UiSession, n: UiNode | None) {
+def:pub set_focus(session: UiSession, n: UiNode | None) {
     if n is None {
         session.focus_id = "";
         return;
@@ -181,7 +181,7 @@ def set_focus(session: UiSession, n: UiNode | None) {
 }
 
 
-def register_capability(session: UiSession, node_id_str: str, cap_name: str) {
+def:pub register_capability(session: UiSession, node_id_str: str, cap_name: str) {
     if node_id_str not in session.capabilities.by_node {
         session.capabilities.by_node[node_id_str] = [];
     }
@@ -189,14 +189,14 @@ def register_capability(session: UiSession, node_id_str: str, cap_name: str) {
 }
 
 
-def release_capabilities(session: UiSession, node_id_str: str) {
+def:pub release_capabilities(session: UiSession, node_id_str: str) {
     if node_id_str in session.capabilities.by_node {
         del session.capabilities.by_node[node_id_str];
     }
 }
 
 
-def record_invalidation(
+def:pub record_invalidation(
     session: UiSession,
     node_id_str: str,
     layout_root_id: str,
@@ -286,7 +286,7 @@ def _find_node_by_jid(n: UiNode, target_jid: str) -> UiNode | None {
 }
 
 
-def validate_session(session: UiSession) -> list[SessionLeak] {
+def:pub validate_session(session: UiSession) -> list[SessionLeak] {
     if session.disposed {
         return [];
     }
@@ -342,7 +342,7 @@ def validate_session(session: UiSession) -> list[SessionLeak] {
 }
 
 
-def dispose_session(session: UiSession) {
+def:pub dispose_session(session: UiSession) {
     if session.disposed {
         return;
     }
@@ -365,7 +365,7 @@ def dispose_session(session: UiSession) {
 }
 
 
-def get_focus_node(session: UiSession) -> UiNode | None {
+def:pub get_focus_node(session: UiSession) -> UiNode | None {
     if session.disposed or session.ui_root is None or not session.focus_id {
         return None;
     }

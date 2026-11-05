@@ -21,7 +21,7 @@ import from ui.model {
 }
 
 
-obj _ScopedNode {
+obj:pub _ScopedNode {
     has target: UiNode,
         id_str: str = "",
         key: str = "",
@@ -32,7 +32,7 @@ obj _ScopedNode {
 }
 
 
-obj _Scope {
+obj:pub _Scope {
     has order: list[_ScopedNode] = [],
         parent_of: dict[str, str] = {},
         error: LayoutDiagnostic | None = None;
@@ -150,7 +150,7 @@ def _walk_children(
 }
 
 
-def _collect_scope(layout_root: UiNode) -> _Scope {
+def:pub _collect_scope(layout_root: UiNode) -> _Scope {
     scope = _Scope();
     seen: dict[str, bool] = {};
     overlay_ids: dict[str, bool] = {};

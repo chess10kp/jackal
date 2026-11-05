@@ -12,15 +12,15 @@ Structure follows the Kiwi simplex kernel (nucleic/kiwi, BSD-2) — our
 differential oracle — adapted to Jac data objects.
 """
 
-glob EPSILON: float = 1e-8;
+glob:pub EPSILON: float = 1e-8;
 
 
-def near_zero(value: float) -> bool {
+def:pub near_zero(value: float) -> bool {
     return abs(value) < EPSILON;
 }
 
 
-def is_finite(x: float) -> bool {
+def:pub is_finite(x: float) -> bool {
     # No math import: NaN is the only value not equal to itself, and the
     # magnitude checks catch infinity without a module dependency.
     return x == x and x < 1e308 and x > -1e308;
@@ -34,14 +34,14 @@ def require_finite(x: float) -> None {
 }
 
 
-enum Relation {
+enum:pub Relation {
     LEQ = "leq",
     EQ = "eq",
     GEQ = "geq"
 }
 
 
-enum StrengthTier {
+enum:pub StrengthTier {
     REQUIRED = "required",
     STRONG = "strong",
     MEDIUM = "medium",
@@ -53,17 +53,17 @@ enum StrengthTier {
 # Kiwi's scalar 1e6/1e3/1 encoding.  A higher tier always dominates every
 # finite amount of lower-tier error.  REQUIRED constraints remain hard and
 # therefore have no objective coefficient.
-obj LexWeight {
+obj:pub LexWeight {
     has tiers: list[float] = [0.0, 0.0, 0.0];
 }
 
 
-def lex_zero() -> LexWeight {
+def:pub lex_zero() -> LexWeight {
     return LexWeight(tiers=[0.0, 0.0, 0.0]);
 }
 
 
-def lex_add(a: LexWeight, b: LexWeight) -> LexWeight {
+def:pub lex_add(a: LexWeight, b: LexWeight) -> LexWeight {
     return LexWeight(tiers=[
         a.tiers[0] + b.tiers[0],
         a.tiers[1] + b.tiers[1],
@@ -72,12 +72,12 @@ def lex_add(a: LexWeight, b: LexWeight) -> LexWeight {
 }
 
 
-def lex_neg(a: LexWeight) -> LexWeight {
+def:pub lex_neg(a: LexWeight) -> LexWeight {
     return LexWeight(tiers=[-a.tiers[0], -a.tiers[1], -a.tiers[2]]);
 }
 
 
-def lex_scale(a: LexWeight, factor: float) -> LexWeight {
+def:pub lex_scale(a: LexWeight, factor: float) -> LexWeight {
     require_finite(factor);
     return LexWeight(tiers=[
         a.tiers[0] * factor,
@@ -88,7 +88,7 @@ def lex_scale(a: LexWeight, factor: float) -> LexWeight {
 
 
 # Return -1, 0, or 1 by the first differing tier (strong, medium, weak).
-def lex_compare(a: LexWeight, b: LexWeight) -> int {
+def:pub lex_compare(a: LexWeight, b: LexWeight) -> int {
     for i in range(3) {
         delta = a.tiers[i] - b.tiers[i];
         if not near_zero(delta) {
@@ -99,18 +99,18 @@ def lex_compare(a: LexWeight, b: LexWeight) -> int {
 }
 
 
-def lex_is_zero(a: LexWeight) -> bool {
+def:pub lex_is_zero(a: LexWeight) -> bool {
     return lex_compare(a, lex_zero()) == 0;
 }
 
 
-def lex_is_negative(a: LexWeight) -> bool {
+def:pub lex_is_negative(a: LexWeight) -> bool {
     return lex_compare(a, lex_zero()) < 0;
 }
 
 
 # REQUIRED is deliberately absent: hard constraints never enter the cost row.
-def strength_weight(strength: StrengthTier) -> LexWeight {
+def:pub strength_weight(strength: StrengthTier) -> LexWeight {
     if strength == StrengthTier.STRONG {
         return LexWeight(tiers=[1.0, 0.0, 0.0]);
     }
@@ -124,24 +124,24 @@ def strength_weight(strength: StrengthTier) -> LexWeight {
 }
 
 
-obj Variable {
+obj:pub Variable {
     has id: int;
 }
 
 
-obj Term {
+obj:pub Term {
     has variable: Variable,
         coefficient: float;
 }
 
 
-obj Expression {
+obj:pub Expression {
     has terms: list[Term] = [],
         constant: float = 0.0;
 }
 
 
-obj Constraint {
+obj:pub Constraint {
     has expression: Expression,
         relation: Relation,
         strength: StrengthTier;
@@ -149,7 +149,7 @@ obj Constraint {
 
 
 """Combine duplicate variables, drop near-zero coefficients, order by id."""
-def normalize_expression(e: Expression) -> Expression {
+def:pub normalize_expression(e: Expression) -> Expression {
     require_finite(e.constant);
     merged: dict[int, float] = {};
     for t in e.terms {
@@ -171,13 +171,13 @@ def normalize_expression(e: Expression) -> Expression {
 }
 
 
-def term(v: Variable, coefficient: float = 1.0) -> Expression {
+def:pub term(v: Variable, coefficient: float = 1.0) -> Expression {
     return Expression(terms=[Term(variable=v, coefficient=coefficient)]);
 }
 
 
 """Combine two expressions; Jac objects do not overload `+`."""
-def add_expressions(a: Expression, b: Expression) -> Expression {
+def:pub add_expressions(a: Expression, b: Expression) -> Expression {
     return normalize_expression(
         Expression(
             terms=a.terms + b.terms,
@@ -192,7 +192,7 @@ def add_expressions(a: Expression, b: Expression) -> Expression {
 Two constraints with the same normalized expression, relation, and
 strength produce the same key. Floats render via repr so the key is
 stable within and across processes for identical inputs."""
-def constraint_key(c: Constraint) -> str {
+def:pub constraint_key(c: Constraint) -> str {
     e = normalize_expression(c.expression);
     parts: list[str] = [];
     parts.append(c.relation.value);
@@ -205,7 +205,7 @@ def constraint_key(c: Constraint) -> str {
 }
 
 
-def eq(expr: Expression) -> Constraint {
+def:pub eq(expr: Expression) -> Constraint {
     return Constraint(
         expression=normalize_expression(expr),
         relation=Relation.EQ,

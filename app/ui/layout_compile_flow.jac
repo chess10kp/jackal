@@ -184,7 +184,7 @@ def _allocate_span(children: list[_FlowChild], span: float) -> _Allocation {
 allocation over the declared span, adjacency chain, per-child size facts,
 cross-axis resolution, partition-closing edge when flexible, and
 recursion into child containers with their allocated spans."""
-def _emit_partition(
+def:pub _emit_partition(
     result: CompileResult,
     owner: _Entry,
     entries_by_id: dict[str, _Entry],

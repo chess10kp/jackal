@@ -4,9 +4,9 @@ import threading;
 
 type Message = tuple[str, dict[str, any]];
 
-obj QueueEmpty(Exception) {}
+obj:pub QueueEmpty(Exception) {}
 
-obj MessageQueue {
+obj:pub MessageQueue {
     has _items: list[Message] = [],
         _lock: threading.Lock = threading.Lock();
 

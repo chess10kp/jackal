@@ -60,7 +60,7 @@ import from ui.runtime_core {
 """Unit 7 — focus order, layer z-order, and modal overlay lifecycle."""
 
 
-obj OverlayBounds {
+obj:pub OverlayBounds {
     has x: int = 0,
         y: int = 0,
         width: int = 0,
@@ -72,14 +72,14 @@ obj OverlayBounds {
 }
 
 
-obj OverlayOpenResult {
+obj:pub OverlayOpenResult {
     has overlay_id: str,
         saved_focus_id: str,
         initial_focus_id: str;
 }
 
 
-obj OverlayCloseResult {
+obj:pub OverlayCloseResult {
     has restored_focus_id: str,
         damage: OverlayBounds,
         overlay_id: str;
@@ -127,7 +127,7 @@ def _layer_pairs(screen: Screen) -> list[RankedOverlay] {
 
 
 """Paint order: ascending z_index (OSPUI.md §17)."""
-def layers_paint_order(screen: Screen) -> list[Overlay] {
+def:pub layers_paint_order(screen: Screen) -> list[Overlay] {
     pairs = _layer_pairs(screen);
     pairs.sort(key=_ranked_overlay_asc);
     return [p.overlay for p in pairs];
@@ -135,7 +135,7 @@ def layers_paint_order(screen: Screen) -> list[Overlay] {
 
 
 """Input targeting order: descending z_index (OSPUI.md §17)."""
-def layers_input_order(screen: Screen) -> list[Overlay] {
+def:pub layers_input_order(screen: Screen) -> list[Overlay] {
     pairs = _layer_pairs(screen);
     pairs.sort(key=_ranked_overlay_desc);
     return [p.overlay for p in pairs];
@@ -175,7 +175,7 @@ def _collect_subtree_ids(n: UiNode) -> list[str] {
 
 
 """Ordered focusable nodes under screen: containment walk + FocusNext overrides."""
-def focus_order(session: UiSession, screen: Screen) -> list[UiNode] {
+def:pub focus_order(session: UiSession, screen: Screen) -> list[UiNode] {
     _ = session;
     structural = _collect_focusable(screen);
     if not structural {
@@ -208,7 +208,7 @@ def focus_order(session: UiSession, screen: Screen) -> list[UiNode] {
 
 
 """Advance focus along focus_order, honoring FocusNext overrides."""
-def advance_focus(
+def:pub advance_focus(
     session: UiSession,
     direction: str = "next",
 ) -> UiNode | None {
@@ -248,7 +248,7 @@ def advance_focus(
 
 
 """Open a modal overlay: Layer edge, save focus, trap input, focus initial."""
-def open_modal_overlay(
+def:pub open_modal_overlay(
     session: UiSession,
     screen: Screen,
     overlay: Overlay,
@@ -287,7 +287,7 @@ def open_modal_overlay(
 
 
 """Close overlay: dispose subtree, restore focus, report damage bounds."""
-def close_overlay(
+def:pub close_overlay(
     session: UiSession,
     overlay: Overlay,
 ) -> OverlayCloseResult {

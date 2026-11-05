@@ -5,7 +5,7 @@ A failed result carries ok=False, a non-OK error, no handle, and leaves
 solver generation/state unchanged (plan §5.4).
 """
 
-enum SolveError {
+enum:pub SolveError {
     OK = "ok",
     UNSATISFIABLE = "unsatisfiable",
     DUPLICATE_CONSTRAINT = "duplicate_constraint",
@@ -21,7 +21,7 @@ enum SolveError {
 
 
 """Opaque reference to one accepted constraint in one Solver."""
-obj ConstraintHandle {
+obj:pub ConstraintHandle {
     has id: int;
 }
 
@@ -31,14 +31,14 @@ obj ConstraintHandle {
 Generation is state-local monotonic: incremented on each successful
 solver mutation, unchanged on failure. values() is a fresh deep copy;
 solver rows/tags/objective are never exposed."""
-obj SolverSnapshot {
+obj:pub SolverSnapshot {
     has generation: int,
         # variable id -> value
         values: dict[int, float] = {};
 }
 
 
-obj SolveResult {
+obj:pub SolveResult {
     has ok: bool = True,
         error: SolveError = SolveError.OK,
         message: str = "",

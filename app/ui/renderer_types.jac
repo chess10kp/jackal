@@ -14,13 +14,13 @@ import from ui.cells {
 }
 
 
-obj DamageRect {
+obj:pub DamageRect {
     has rect: Rect = Rect(),
         reason: str = "";
 }
 
 
-obj FrameResult {
+obj:pub FrameResult {
     has damage: list[DamageRect] = [],
         cells_written: int = 0,
         used_full_clear: bool = False,
@@ -32,26 +32,26 @@ obj FrameResult {
 }
 
 
-obj AnsiDiff {
+obj:pub AnsiDiff {
     has text: str = "",
         cells_written: int = 0;
 }
 
 
-obj _OverlayHit {
+obj:pub _OverlayHit {
     has nd: UiNode,
         z: int = 0,
         id_str: str = "";
 }
 
 
-obj CursorPos {
+obj:pub CursorPos {
     has row: int = -1,
         col: int = -1;
 }
 
 
-obj Renderer {
+obj:pub Renderer {
     has layout: LayoutState,
         # Retained previous frame as styled cells (OSPUI §15.1).
         previous: CellBuffer | None = None,

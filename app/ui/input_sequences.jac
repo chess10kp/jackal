@@ -47,7 +47,7 @@ def _is_complete_osc(data: str) -> str {
 }
 
 
-def sequence_status(data: str) -> str {
+def:pub sequence_status(data: str) -> str {
     if not data.startswith(ESC) {
         return "not-escape";
     }
@@ -81,7 +81,7 @@ def sequence_status(data: str) -> str {
 
 
 """Split a buffer into complete sequences and an incomplete remainder."""
-def extract_sequences(buffer: str) -> dict[str, list[str] | str] {
+def:pub extract_sequences(buffer: str) -> dict[str, list[str] | str] {
     sequences: list[str] = [];
     pos = 0;
     while pos < len(buffer) {
@@ -115,7 +115,7 @@ def extract_sequences(buffer: str) -> dict[str, list[str] | str] {
 }
 
 
-glob LEGACY_KEYS: dict[str, str] = {
+glob:pub LEGACY_KEYS: dict[str, str] = {
     "\x1b[A": "up",
     "\x1bOA": "up",
     "\x1b[B": "down",
@@ -152,7 +152,7 @@ def _parse_sgr_mouse(seq: str) -> MouseEvent | None {
 }
 
 
-glob MODIFIER_NAMES: dict[int, str] = {
+glob:pub MODIFIER_NAMES: dict[int, str] = {
     2: "shift",
     3: "alt",
     4: "alt+shift",
@@ -170,7 +170,7 @@ def _modified_key(modifier: int, base: str) -> str | None {
 }
 
 
-glob CSI_LETTER_KEYS: dict[str, str] = {
+glob:pub CSI_LETTER_KEYS: dict[str, str] = {
     "A": "up",
     "B": "down",
     "C": "right",
@@ -206,7 +206,7 @@ def _parse_modified_csi(seq: str) -> KeyEvent | None {
 }
 
 
-def decode_sequence(seq: str) -> HostEvent {
+def:pub decode_sequence(seq: str) -> HostEvent {
     if not seq {
         return TextEvent(text="");
     }

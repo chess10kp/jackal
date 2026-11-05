@@ -6,7 +6,7 @@ import from tui.windows { _open_window, _close_top_window, _picker_state, _ui_mo
 Rows are display labels; ids map 1:1 onto action payloads. When
 extra_last_input is set, a trailing "type name…" row flips the picker into
 free-text input mode on enter."""
-def _open_picker(
+def:pub _open_picker(
     app: LiveShell,
     title: str,
     rows: list[str],
@@ -52,7 +52,7 @@ def _open_picker(
 
 
 """Dismiss the picker and restore the pre-open status hint."""
-def _close_picker(app: LiveShell) {
+def:pub _close_picker(app: LiveShell) {
     if _picker_state(app) is None {
         return;
     }
@@ -63,7 +63,7 @@ def _close_picker(app: LiveShell) {
 Case-insensitive substring match over option labels; empty filter returns
 the full lists. Paint and key handling share this helper so the cursor index
 always refers to the same visible rows. Pure over its input."""
-def _picker_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
+def:pub _picker_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
     options: list[str] = list(p.get("options", []));
     ids: list[str] = list(p.get("ids", []));
     filt: str = str(p.get("filter", "")).strip().lower();
@@ -82,6 +82,6 @@ def _picker_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
 }
 
 
-def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
+def:pub _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
     return _picker_filtered(p);
 }

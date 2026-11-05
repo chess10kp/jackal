@@ -18,7 +18,7 @@ TOOL_RESULT_PREVIEW_LINE_CHARS chars) and, when the result is longer,
 a '…  +N lines' footer. Pure: the full result still reaches the
 LLM and the saved transcript — only the on-screen entry shrinks.
 """
-def tool_result_preview(result: str, max_lines: int = TOOL_RESULT_PREVIEW_LINES) -> str {
+def:pub tool_result_preview(result: str, max_lines: int = TOOL_RESULT_PREVIEW_LINES) -> str {
     text = result.rstrip("\n");
     if not text {
         return "(no output)";

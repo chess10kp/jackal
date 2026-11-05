@@ -44,7 +44,7 @@ def _meter(value: float, width: int) -> str {
 }
 
 
-def _header_lines(app: LiveShell) -> list[str] {
+def:pub _header_lines(app: LiveShell) -> list[str] {
     brand = " JACKAL ";
     tag = " osp live ";
     right = (
@@ -63,7 +63,7 @@ def _header_lines(app: LiveShell) -> list[str] {
 }
 
 
-def _status_line(app: LiveShell) -> str {
+def:pub _status_line(app: LiveShell) -> str {
     spin = SPINNER[app.spin_i % len(SPINNER)];
     phase: str = app.phase;
     if app.phase == "streaming" {
@@ -84,7 +84,7 @@ def _status_line(app: LiveShell) -> str {
 }
 
 
-def _approval_lines(app: LiveShell) -> list[str] {
+def:pub _approval_lines(app: LiveShell) -> list[str] {
     _ = app;
     inner = 46;
     return [
@@ -100,7 +100,7 @@ def _approval_lines(app: LiveShell) -> list[str] {
 }
 
 
-def _transcript_lines(app: LiveShell) -> list[str] {
+def:pub _transcript_lines(app: LiveShell) -> list[str] {
     win = materialize_visible(app.proj);
     if win.lines {
         return win.lines;

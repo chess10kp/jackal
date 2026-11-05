@@ -110,7 +110,7 @@ def append_skills_to_prompt(system_prompt: str, skills: list[dict[str, any]]) ->
 
 Unchanged text when the input is not a /skill: command, the name is
 unknown, or the backing file became unreadable."""
-def expand_skill_command(text: str, skills: list[dict[str, any]]) -> str {
+def:pub expand_skill_command(text: str, skills: list[dict[str, any]]) -> str {
     if not text.startswith("/skill:") {
         return text;
     }

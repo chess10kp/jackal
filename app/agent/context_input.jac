@@ -49,7 +49,7 @@ def _path_normpath(p: str) -> str {
 
 
 """Reject absolute, drive-letter, traversal, and NUL paths."""
-def is_valid_file_path(file_path: str) -> bool {
+def:pub is_valid_file_path(file_path: str) -> bool {
     if not isinstance(file_path, str) or not file_path.strip() {
         return False;
     }
@@ -72,7 +72,7 @@ def is_valid_file_path(file_path: str) -> bool {
 
 """{"start"} or {"start", "end"} for a `10` / `10-20` string; None when
 malformed, zero, negative, or reversed."""
-def parse_line_range(range_str: str) -> dict[str, any] | None {
+def:pub parse_line_range(range_str: str) -> dict[str, any] | None {
     if not range_str {
         return None;
     }
@@ -229,7 +229,7 @@ def _safe_resolve(cwd: str, input_path: str) -> str {
 `mention` is a token without the leading `@`; `line_range` (when given)
 overrides any range embedded in the token. Returns (block, char_count).
 Raises OSError/ValueError for unreadable or escaping paths."""
-def _load_file_slice(cwd: str, mention: str, line_range: any = None) -> tuple[str, int] {
+def:pub _load_file_slice(cwd: str, mention: str, line_range: any = None) -> tuple[str, int] {
     token_start: any = None;
     token_end: any = None;
     if line_range is not None {
@@ -314,7 +314,7 @@ mention are returned verbatim. Mention results are appended under an
 "Attached context:" header (deduped by raw token, error-tolerant per
 file); large attachments add an approximate-token warning above the
 original text."""
-def expand_context_input(cwd: str, text: str) -> str {
+def:pub expand_context_input(cwd: str, text: str) -> str {
     trimmed = text.strip();
     if not trimmed {
         return text;

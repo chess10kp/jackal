@@ -98,7 +98,7 @@ def _overlay_jid_key(hit: _OverlayHit) -> str {
 }
 
 
-def _layered_overlays(layout_root: UiNode) -> list[UiNode] {
+def:pub _layered_overlays(layout_root: UiNode) -> list[UiNode] {
     found: list[_OverlayHit] = [];
     if isinstance(layout_root, Screen) {
         for ov in [layout_root ->:Layer:->] {
@@ -151,7 +151,7 @@ def _paint_tree(state: LayoutState, n: UiNode, buf: CellBuffer) {
 }
 
 
-def _paint_frame_buffer(renderer: Renderer, layout_root: UiNode) -> CellBuffer {
+def:pub _paint_frame_buffer(renderer: Renderer, layout_root: UiNode) -> CellBuffer {
     state = renderer.layout;
     buf = _blank_buffer(state.viewport.columns, state.viewport.rows);
     _paint_tree(state, layout_root, buf);

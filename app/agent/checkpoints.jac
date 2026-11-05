@@ -256,7 +256,7 @@ checkpoint directory. modified_files=None triggers git detection.
 Returns the metadata dict that was persisted to metadata.json.
 Raises ValueError for invalid names (including generated ones failing
 validation) and for duplicate checkpoint names."""
-def create_checkpoint(
+def:pub create_checkpoint(
     cwd: str, messages: list[dict[str, any]], provider: str, model: str,
     name: str = "", modified_files: list[str] | None = None,
 ) -> dict[str, any] {
@@ -321,7 +321,7 @@ def create_checkpoint(
 Snapshot files missing from disk are skipped silently. Raises ValueError
 when the checkpoint does not exist, and lets OSError/ValueError from the
 underlying JSON reads propagate (corrupt stores surface here)."""
-def load_checkpoint(cwd: str, name: str) -> dict[str, any] {
+def:pub load_checkpoint(cwd: str, name: str) -> dict[str, any] {
     dir_path = _checkpoint_path(cwd, name);
     if not os.path.exists(dir_path) {
         raise ValueError("Checkpoint '" + name + "' does not exist");
@@ -369,7 +369,7 @@ def _timestamp_key(item: dict[str, any]) -> str {
 """All checkpoints for a project, newest-timestamped first. Entries are
 {name, metadata, sizeBytes}; directories without readable metadata.json
 are skipped."""
-def list_checkpoints(cwd: str) -> list[dict[str, any]] {
+def:pub list_checkpoints(cwd: str) -> list[dict[str, any]] {
     cp_dir = checkpoints_dir(cwd);
     try {
         os.makedirs(cp_dir, exist_ok=True);
@@ -426,7 +426,7 @@ def delete_checkpoint(cwd: str, name: str) -> None {
 """Write snapshot contents back under cwd, creating parent directories.
 Collects per-file failures and raises one aggregated RuntimeError when
 anything failed (partial writes are left in place, like the toolchain)."""
-def restore_checkpoint_files(cwd: str, snapshots: dict[str, str]) -> None {
+def:pub restore_checkpoint_files(cwd: str, snapshots: dict[str, str]) -> None {
     errors: list[str] = [];
     for rel_path in snapshots {
         try {
@@ -496,7 +496,7 @@ def _size_label(size_bytes: any) -> str {
 
 
 """One overlay line: <name> — <N> msgs, <N> files — <when> (<size>)."""
-def format_checkpoint_overlay_row(item: dict[str, any]) -> str {
+def:pub format_checkpoint_overlay_row(item: dict[str, any]) -> str {
     m = item["metadata"];
     when = format_relative_time(str(m["timestamp"]));
     size_kb = _size_label(item.get("sizeBytes"));

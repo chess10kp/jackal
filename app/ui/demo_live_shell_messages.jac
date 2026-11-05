@@ -22,7 +22,7 @@ def _commit_messages(app: LiveShell) {
 }
 
 
-def _push_turn(app: LiveShell, role: str, body: str) -> str {
+def:pub _push_turn(app: LiveShell, role: str, body: str) -> str {
     mid = _next_id(app);
     app.messages = app.messages + [
         TranscriptMessage(
@@ -36,7 +36,7 @@ def _push_turn(app: LiveShell, role: str, body: str) -> str {
 }
 
 
-def _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
+def:pub _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
     updated: list[TranscriptMessage] = [];
     for message in app.messages {
         if message.message_id == message_id {

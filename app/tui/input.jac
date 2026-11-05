@@ -244,7 +244,7 @@ def _tick_cmd(app: LiveShell) {
 
 
 """Unified per-frame tick: UI modals + command workers + stream events."""
-def _tick_app(app: LiveShell) {
+def:pub _tick_app(app: LiveShell) {
     _tick_cmd(app);
     _tick_ui_modal(app);
     if app.phase == "streaming" {
@@ -473,7 +473,7 @@ def _handle_key(app: LiveShell, key: str) {
 }
 
 
-def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
+def:pub _handle_host_events(app: LiveShell, events: list[HostEvent]) {
     for event in coalesce_events(events) {
         if isinstance(event, TextEvent) {
             if app.phase == "approval" {

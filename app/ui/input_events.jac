@@ -1,17 +1,17 @@
 """Host-event value objects shared by the input decoder and normalizer."""
 
 
-glob ESC = "\x1b";
-glob BRACKETED_PASTE_START = "\x1b[200~";
-glob BRACKETED_PASTE_END = "\x1b[201~";
+glob:pub ESC = "\x1b";
+glob:pub BRACKETED_PASTE_START = "\x1b[200~";
+glob:pub BRACKETED_PASTE_END = "\x1b[201~";
 
 
-obj HostEvent {
+obj:pub HostEvent {
     has kind: str = "";
 }
 
 
-obj TextEvent(HostEvent) {
+obj:pub TextEvent(HostEvent) {
     has text: str = "";
 
     def init(text: str = "") {
@@ -21,7 +21,7 @@ obj TextEvent(HostEvent) {
 }
 
 
-obj KeyEvent(HostEvent) {
+obj:pub KeyEvent(HostEvent) {
     has key: str = "";
 
     def init(key: str = "") {
@@ -31,7 +31,7 @@ obj KeyEvent(HostEvent) {
 }
 
 
-obj PasteEvent(HostEvent) {
+obj:pub PasteEvent(HostEvent) {
     has text: str = "";
 
     def init(text: str = "") {
@@ -41,7 +41,7 @@ obj PasteEvent(HostEvent) {
 }
 
 
-obj ResizeEvent(HostEvent) {
+obj:pub ResizeEvent(HostEvent) {
     has width: int = 0,
         height: int = 0;
 
@@ -53,7 +53,7 @@ obj ResizeEvent(HostEvent) {
 }
 
 
-obj MouseEvent(HostEvent) {
+obj:pub MouseEvent(HostEvent) {
     has button: int = 0,
         x: int = 0,
         y: int = 0,
@@ -77,7 +77,7 @@ obj MouseEvent(HostEvent) {
 }
 
 
-obj StreamChunkEvent(HostEvent) {
+obj:pub StreamChunkEvent(HostEvent) {
     has text: str = "";
 
     def init(text: str = "") {
@@ -86,14 +86,14 @@ obj StreamChunkEvent(HostEvent) {
     }
 }
 
-obj EofEvent(HostEvent) {
+obj:pub EofEvent(HostEvent) {
     def init() {
         self.kind = "eof";
     }
 }
 
 
-obj InterruptEvent(HostEvent) {
+obj:pub InterruptEvent(HostEvent) {
     def init() {
         self.kind = "interrupt";
     }

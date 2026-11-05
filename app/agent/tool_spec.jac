@@ -29,7 +29,7 @@ native function call - args in, obj out - is. All production constructions
 go through this seam; direct ToolSpec(...) calls survive only in test
 annexes, which run pre-seal.
 """
-def make_tool_spec(
+def:pub make_tool_spec(
     name: str,
     description: str = "",
     parameters: dict[str, any] = {},

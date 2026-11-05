@@ -28,14 +28,14 @@ obj HostLoop {
 }
 
 
-def create_host_loop(esc_timeout_ms: int = 50) -> HostLoop {
+def:pub create_host_loop(esc_timeout_ms: int = 50) -> HostLoop {
     norm = InputNormalizer();
     norm.esc_timeout_ms = esc_timeout_ms;
     return HostLoop(normalizer=norm);
 }
 
 
-def note_interrupt(loop: HostLoop) {
+def:pub note_interrupt(loop: HostLoop) {
     loop.interrupt_pending = True;
 }
 
@@ -46,7 +46,7 @@ def note_resize(loop: HostLoop, width: int, height: int) {
 
 
 """One host tick: poll terminal, decode, apply ESC timeout, coalesce."""
-def run_host_tick(
+def:pub run_host_tick(
     loop: HostLoop,
     term: Terminal,
     timeout_s: float = 0.0,
@@ -97,7 +97,7 @@ def run_host_tick(
 
 
 """Thin mapping of common host keys to effect-like dicts for demos/tests."""
-def host_events_to_effects(events: list[HostEvent]) -> list[dict[str, any]] {
+def:pub host_events_to_effects(events: list[HostEvent]) -> list[dict[str, any]] {
     effects: list[dict[str, any]] = [];
     for event in events {
         if isinstance(event, InterruptEvent) {

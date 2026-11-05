@@ -35,7 +35,7 @@ import from tui.window { WindowSpec, WindowState }
 
 """Restore a saved session by id and repaint the transcript from it.
 Shared by /resume NAME and the resume picker's enter action."""
-def _resume_session(app: LiveShell, sid: str) -> str {
+def:pub _resume_session(app: LiveShell, sid: str) -> str {
     cwd = os.getcwd();
     rec = get_session_record(cwd, sid);
     if rec is None {
@@ -62,7 +62,7 @@ def _resume_session(app: LiveShell, sid: str) -> str {
 
 """Slash commands handled locally by the TUI (same set as the line REPL).
 Returns a display string; "" when the command produced no output."""
-def _run_slash(app: LiveShell, line: str) -> str {
+def:pub _run_slash(app: LiveShell, line: str) -> str {
     cwd = os.getcwd();
     if line in ("/exit", "/quit") {
         app.running = False;
@@ -379,7 +379,7 @@ def _run_ext_command_async(app: LiveShell, name: str, args: str) -> str {
 }
 
 
-def _handle_ui_modal_key(app: LiveShell, key: str) {
+def:pub _handle_ui_modal_key(app: LiveShell, key: str) {
     m: any = _ui_modal_state(app);
     if m is None {
         return;
@@ -464,7 +464,7 @@ def _handle_ui_modal_key(app: LiveShell, key: str) {
 
 
 """Poll the bridge interaction queue; open the oldest request as a modal."""
-def _tick_ui_modal(app: LiveShell) {
+def:pub _tick_ui_modal(app: LiveShell) {
     if _ui_modal_state(app) is not None or _picker_state(app) is not None
         or app.shell.approval is not None {
         return;

@@ -5,11 +5,11 @@ Pure string work so it lowers natively and is testable without a session.
 
 import from .modes { DEV_MODES }
 
-glob CLI_VERSION: str = "0.1.0";
+glob:pub CLI_VERSION: str = "0.1.0";
 
 glob OUTPUT_FORMATS: list[str] = ["text", "json", "stream-json"];
 
-glob CLI_USAGE: str = (
+glob:pub CLI_USAGE: str = (
     "usage: jackal [options] [prompt...]\n"
     "\n"
     "Interactive line REPL by default; pass -p for a one-shot run.\n"
@@ -44,7 +44,7 @@ glob _VALUE_FLAGS: dict[str, str] = {
 
 """User arguments from a raw sys.argv under `jac run main.jac -- ARGS`:
 everything after the entry script, minus one leading "--" separator."""
-def user_argv(raw: list[str]) -> list[str] {
+def:pub user_argv(raw: list[str]) -> list[str] {
     start: int = 1;
     for i in range(len(raw)) {
         a: str = raw[i];
@@ -83,7 +83,7 @@ def default_cli_options() -> dict[str, any] {
 
 """Parse argv (without the program name). Unknown flags and bad values set
 `error`; positional words join into `prompt`. `--` ends flag parsing."""
-def parse_cli(argv: list[str]) -> dict[str, any] {
+def:pub parse_cli(argv: list[str]) -> dict[str, any] {
     opts: dict[str, any] = default_cli_options();
     words: list[str] = [];
     i: int = 0;
@@ -173,7 +173,7 @@ def _validate(opts: dict[str, any]) -> dict[str, any] {
 
 """Combine the argv prompt with piped stdin text (stdin appended after a
 blank line, matching `cat file | jackal -p "summarize"`)."""
-def combine_prompt(arg_prompt: str, stdin_text: str) -> str {
+def:pub combine_prompt(arg_prompt: str, stdin_text: str) -> str {
     piped: str = stdin_text.strip();
     if arg_prompt and piped {
         return arg_prompt + "\n\n" + piped;

@@ -60,7 +60,7 @@ import from ui.layout_types {
 }
 
 
-obj ShellScreen {
+obj:pub ShellScreen {
     has screen: MainScreen,
         header: Header,
         transcript: TranscriptView,
@@ -83,7 +83,7 @@ glob _SHELL_BY_SESSION: dict[str, ShellScreen] = {};
 
 
 """Build MainScreen(Header, TranscriptView, Status, Prompt) under ui_root once."""
-def build_main_shell(session: UiSession) -> ShellScreen {
+def:pub build_main_shell(session: UiSession) -> ShellScreen {
     if session.disposed or session.ui_root is None {
         raise ValueError("UiSession is disposed or missing ui_root");
     }
@@ -122,7 +122,7 @@ def build_main_shell(session: UiSession) -> ShellScreen {
 
 
 """Wire default shell contracts: transcript binding + prompt cursor capability."""
-def install_shell_contracts(session: UiSession, shell: ShellScreen, binding_name: str) {
+def:pub install_shell_contracts(session: UiSession, shell: ShellScreen, binding_name: str) {
     subscribe(
         session.bindings,
         binding_name,
@@ -134,7 +134,7 @@ def install_shell_contracts(session: UiSession, shell: ShellScreen, binding_name
 
 
 """Snapshot stable jids for shell regions (for stability assertions)."""
-def shell_ids(shell: ShellScreen) -> ShellIdSnapshot {
+def:pub shell_ids(shell: ShellScreen) -> ShellIdSnapshot {
     return ShellIdSnapshot(
         screen_id=node_id(shell.screen),
         header_id=node_id(shell.header),
@@ -146,7 +146,7 @@ def shell_ids(shell: ShellScreen) -> ShellIdSnapshot {
 
 
 """Insert text into the focused prompt draft (walker ability path)."""
-def shell_insert_text(session: UiSession, shell: ShellScreen, text: str) {
+def:pub shell_insert_text(session: UiSession, shell: ShellScreen, text: str) {
     event = InsertText(text=text);
     dispatch_event(session, event, shell.prompt);
     if not event.handled {
@@ -156,7 +156,7 @@ def shell_insert_text(session: UiSession, shell: ShellScreen, text: str) {
 
 
 """Submit the prompt draft; returns host effects (e.g. SendPrompt)."""
-def shell_submit(session: UiSession, shell: ShellScreen) -> list[any] {
+def:pub shell_submit(session: UiSession, shell: ShellScreen) -> list[any] {
     event = Submit();
     dispatch_event(session, event, shell.prompt);
     if event.effects {
@@ -168,7 +168,7 @@ def shell_submit(session: UiSession, shell: ShellScreen) -> list[any] {
 
 
 """Cancel in-progress edit / turn from the shell."""
-def shell_cancel(session: UiSession, shell: ShellScreen) {
+def:pub shell_cancel(session: UiSession, shell: ShellScreen) {
     event = Cancel();
     dispatch_event(session, event, shell.prompt);
     if not event.handled {
@@ -181,7 +181,7 @@ def shell_cancel(session: UiSession, shell: ShellScreen) {
 
 
 """Open the modal ApprovalOverlay for the shell."""
-def shell_open_approval(
+def:pub shell_open_approval(
     session: UiSession,
     shell: ShellScreen,
 ) -> OverlayOpenResult {
@@ -201,7 +201,7 @@ def shell_open_approval(
 
 
 """Close the approval overlay and restore shell focus."""
-def shell_close_approval(
+def:pub shell_close_approval(
     session: UiSession,
     shell: ShellScreen,
 ) -> OverlayCloseResult {
@@ -219,7 +219,7 @@ def shell_close_approval(
 
 
 """Apply a terminal resize to shell layout contracts / content wrap."""
-def shell_resize(
+def:pub shell_resize(
     session: UiSession,
     shell: ShellScreen,
     columns: int,
@@ -267,7 +267,7 @@ Mirrors the contracts gates.jac sets on the legacy engine so parity is
 testable at the M6 cutover.
 
 Returns the diagnostics of every failed set_spec; empty means success."""
-def configure_main_shell_layout(
+def:pub configure_main_shell_layout(
     state: LayoutState,
     shell: ShellScreen,
 ) -> list[LayoutDiagnostic] {

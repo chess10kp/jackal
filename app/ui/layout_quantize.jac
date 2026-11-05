@@ -55,7 +55,7 @@ glob _NO_MAX: float = 1e308;
 
 
 """Largest-remainder request for one flow partition along one axis."""
-obj PartitionRequest {
+obj:pub PartitionRequest {
     has span: int,
         # Continuous target per child, in rank/jid order.
         targets: list[float],
@@ -98,7 +98,7 @@ def _ceil(value: float) -> int {
 
 """§7.2 edge snap: EPSILON-close integers win; otherwise nearest
 integer with exact halves toward the smaller coordinate."""
-def snap_edge(value: float) -> int {
+def:pub snap_edge(value: float) -> int {
     fl = _floor(value);
     frac = value - float(fl);
     if frac < EPSILON {
@@ -155,7 +155,7 @@ def _bounds_ok_shape(req: PartitionRequest) -> bool {
 `req.targets` must be in rank/jid order — ties in the remainder race
 resolve by ascending index, which is exactly the plan's rank-then-jid
 rule under that precondition."""
-def quantize_partition(req: PartitionRequest) -> QuantizeResult {
+def:pub quantize_partition(req: PartitionRequest) -> QuantizeResult {
     if not _bounds_ok_shape(req) or req.span < 0 {
         return _quant_fail("malformed partition request", -1);
     }

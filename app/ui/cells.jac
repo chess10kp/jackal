@@ -14,7 +14,7 @@ import from ui.width {
 
 
 """SGR / display attributes for one terminal cell."""
-obj StyleAttrs {
+obj:pub StyleAttrs {
     has fg: int | None = None,
         bg: int | None = None,
         bold: bool = False,
@@ -26,7 +26,7 @@ obj StyleAttrs {
 
 
 """One display cell: a single column char plus style."""
-obj StyledCell {
+obj:pub StyledCell {
     has ch: str = " ",
         attrs: StyleAttrs = StyleAttrs(),
         # True on the trailing column of a wide grapheme (not painted).
@@ -34,7 +34,7 @@ obj StyledCell {
 }
 
 
-obj CellBuffer {
+obj:pub CellBuffer {
     has columns: int = 80,
         rows: int = 24,
         cells: list[list[StyledCell]] = [];
@@ -145,7 +145,7 @@ def sgr_for(attrs: StyleAttrs) -> str {
 }
 
 
-def create_buffer(columns: int, rows: int) -> CellBuffer {
+def:pub create_buffer(columns: int, rows: int) -> CellBuffer {
     cols = max(1, columns);
     rows_n = max(1, rows);
     grid: list[list[StyledCell]] = [];
@@ -168,7 +168,7 @@ def buffer_get(buf: CellBuffer, row: int, col: int) -> StyledCell {
 }
 
 
-def buffer_clear_rect(
+def:pub buffer_clear_rect(
     buf: CellBuffer,
     x: int,
     y: int,
@@ -190,7 +190,7 @@ def buffer_clear_rect(
 
 
 """Blit text by display columns: wide graphemes occupy N cells (wide_cont trail)."""
-def buffer_blit_text(
+def:pub buffer_blit_text(
     buf: CellBuffer,
     row: int,
     col: int,
@@ -284,7 +284,7 @@ def buffer_blit_spans(
 }
 
 
-def buffer_to_plain_rows(buf: CellBuffer) -> list[str] {
+def:pub buffer_to_plain_rows(buf: CellBuffer) -> list[str] {
     out: list[str] = [];
     for r in range(buf.rows) {
         chars: list[str] = [];
@@ -330,7 +330,7 @@ def _rect_bounds(
 
 
 """Diff previous vs desired within patch rects; emit moves + SGR + chars."""
-def diff_buffers_ansi(
+def:pub diff_buffers_ansi(
     previous: CellBuffer | None,
     desired: CellBuffer,
     patch_rects: list[Rect],

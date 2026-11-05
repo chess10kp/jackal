@@ -89,7 +89,7 @@ def _walk_damage(
 
 
 """Compute damage rectangles from prev/current layout without painting."""
-def compute_damage(renderer: Renderer, layout_root: UiNode) -> list[DamageRect] {
+def:pub compute_damage(renderer: Renderer, layout_root: UiNode) -> list[DamageRect] {
     out: list[DamageRect] = [];
     for d in renderer.damage {
         out.append(d);
@@ -117,7 +117,7 @@ def compute_damage(renderer: Renderer, layout_root: UiNode) -> list[DamageRect] 
 Far-apart damage stays separate so patch scope reflects where cells
 actually changed instead of one screen-spanning bounding box.
 """
-def _merge_damage(damage: list[DamageRect]) -> list[Rect] {
+def:pub _merge_damage(damage: list[DamageRect]) -> list[Rect] {
     rects: list[Rect] = [];
     for d in damage {
         if not d.rect.is_empty() {
@@ -149,7 +149,7 @@ def _merge_damage(damage: list[DamageRect]) -> list[Rect] {
 }
 
 
-def _diff_ansi(
+def:pub _diff_ansi(
     previous: CellBuffer | None,
     desired: CellBuffer,
     patch_rects: list[Rect],
@@ -163,7 +163,7 @@ def _diff_ansi(
 }
 
 
-def _resolve_cursor(renderer: Renderer) -> CursorPos {
+def:pub _resolve_cursor(renderer: Renderer) -> CursorPos {
     if not renderer.cursor_node_id {
         return CursorPos();
     }
@@ -185,7 +185,7 @@ def _resolve_cursor(renderer: Renderer) -> CursorPos {
 
 
 """Run the compute pipeline at the renderer's current viewport."""
-def _run_layout(renderer: Renderer, layout_root: UiNode) -> LayoutResult {
+def:pub _run_layout(renderer: Renderer, layout_root: UiNode) -> LayoutResult {
     state = renderer.layout;
     vp = state.viewport;
     return compute_layout(
@@ -198,7 +198,7 @@ def _run_layout(renderer: Renderer, layout_root: UiNode) -> LayoutResult {
 
 # Replaces the legacy engine's snapshot_rects: record this frame's rects
 # as the damage baseline for the next one.
-def _snapshot_rects(renderer: Renderer) {
+def:pub _snapshot_rects(renderer: Renderer) {
     fresh: dict[str, Rect] = {};
     frame = renderer.layout.last_frame;
     if frame is not None {

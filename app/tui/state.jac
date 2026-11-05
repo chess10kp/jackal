@@ -12,7 +12,7 @@ import from tui.window { WindowState }
 
 # /explorer walk bounds + skip list (dot-dirs are always skipped; dot-FILES
 # stay selectable). Caps keep huge trees responsive inside an 8-row overlay.
-glob _EXPLORER_SKIP_DIRS: list[str] = [
+glob:pub _EXPLORER_SKIP_DIRS: list[str] = [
          "node_modules", "__pycache__", ".git", ".jac", ".jackal",
          ".venv", "venv", ".mypy_cache", ".pytest_cache",
      ],
@@ -26,11 +26,11 @@ glob _EXPLORER_SKIP_DIRS: list[str] = [
 # this shell's ownership, so the pre-pass lives here until then.
 # Quoted mention: @"path" / @"path:N[-M]" / @"path":N[-M] — an optional
 # line range is accepted inside OR after the closing quote.
-glob _QUOTED_MENTION_PATTERN: str = r'@"([^"]+)"(?::(\d+)(?:-(\d+))?)?';
+glob:pub _QUOTED_MENTION_PATTERN: str = r'@"([^"]+)"(?::(\d+)(?:-(\d+))?)?';
 
 # Built-in slash commands handled by _run_slash locally (name without the
 # leading "/" -> short description shown by /help).
-glob SLASH_BUILTINS: dict[str, str] = {
+glob:pub SLASH_BUILTINS: dict[str, str] = {
     "exit": "quit jackal",
     "quit": "quit jackal",
     "help": "list commands",
@@ -57,7 +57,7 @@ glob SLASH_BUILTINS: dict[str, str] = {
 };
 
 
-obj LiveShell {
+obj:pub LiveShell {
     has session: UiSession,
         shell: ShellScreen,
         proj: TranscriptProjection,

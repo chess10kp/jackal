@@ -13,7 +13,7 @@ exceptions. Functions never mutate their inputs.
 Returns the new source on success, or an "ERROR: ..." string describing the
 failure so callers can surface it to the model without exceptions.
 """
-def apply_edit(source: str, old_text: str, new_text: str) -> str {
+def:pub apply_edit(source: str, old_text: str, new_text: str) -> str {
     if len(old_text) == 0 {
         return "ERROR: old_text is empty";
     }
@@ -123,7 +123,7 @@ Space, minus and plus line prefixes; context unchanged lines around each
 hunk. Identical inputs produce the empty string. Negative context is
 rejected with an ERROR string.
 """
-def compute_unified_diff(old_text: str, new_text: str, context: int = 3) -> str {
+def:pub compute_unified_diff(old_text: str, new_text: str, context: int = 3) -> str {
     if context < 0 {
         return "ERROR: context must be >= 0";
     }

@@ -78,7 +78,7 @@ def _explorer_file_entries(cwd: str) -> dict[str, list[str]] {
 "name — description" row per skill (model-hidden skills tagged "· hidden");
 ids are skill names so enter can insert /skill:name. Pure over its input
 — replicated in tui/overlays.test.jac."""
-def _skills_picker_entries(skills: list[dict[str, any]]) -> dict[str, list[str]] {
+def:pub _skills_picker_entries(skills: list[dict[str, any]]) -> dict[str, list[str]] {
     if not skills {
         return {"rows": ["no skills found"], "ids": ["__header__"]};
     }
@@ -103,7 +103,7 @@ trailing space so typing continues cleanly. Paths containing whitespace
 use the quoted `@"a b.txt"` form, which the TUI-side pre-pass expands
 (see _take_quoted_mentions); bare paths stay unquoted for readability.
 Empty picks -> ""."""
-def _format_mentions(paths: list[str]) -> str {
+def:pub _format_mentions(paths: list[str]) -> str {
     parts: list[str] = [];
     seen: set[str] = set();
     for p in paths {
@@ -205,7 +205,7 @@ remaining text goes through the normal expansion (plain @mentions and
 !cmd still work alongside). Blocks are appended under an
 "Attached context:" header — merged into the existing section when the
 base expansion already produced one."""
-def _expand_quoted_context(cwd: str, text: str) -> str {
+def:pub _expand_quoted_context(cwd: str, text: str) -> str {
     lifted: tuple[str, list[dict[str, any]]] = _take_quoted_mentions(text);
     cleaned: str = lifted[0];
     quotes: list[dict[str, any]] = lifted[1];
@@ -242,7 +242,7 @@ def _expand_quoted_context(cwd: str, text: str) -> str {
 
 """Append text to the prompt draft (picker/skill insertion point moves to
 the end; manual edits drop history-browse mode as editor_insert does)."""
-def _insert_into_draft(app: LiveShell, addition: str) {
+def:pub _insert_into_draft(app: LiveShell, addition: str) {
     if not addition {
         return;
     }
@@ -255,7 +255,7 @@ def _insert_into_draft(app: LiveShell, addition: str) {
 
 
 """Open the EXPLORER multi-select overlay over the project tree."""
-def _open_explorer_picker(app: LiveShell) -> str {
+def:pub _open_explorer_picker(app: LiveShell) -> str {
     entries = _explorer_file_entries(os.getcwd());
     if not entries["rows"] {
         return "no readable project files";

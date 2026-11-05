@@ -35,7 +35,7 @@ import from ui.layout_compile_overlays { _emit_overlay }
 import from ui.layout_compile_relations { _emit_relation }
 
 
-def compile_layout(
+def:pub compile_layout(
     state: LayoutState,
     layout_root: UiNode,
     viewport: Viewport,

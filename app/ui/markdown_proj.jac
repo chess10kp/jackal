@@ -129,7 +129,7 @@ def _line_inline(text: str) -> ProjLine {
 
 
 """Project markdown source into display lines of styled spans (no OSP nodes)."""
-def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
+def:pub project_markdown(source: str, width: int = 80) -> list[ProjLine] {
     lines_out: list[ProjLine] = [];
     if not source {
         return [_line_plain("")];
@@ -263,7 +263,7 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
 
 
 """Flatten projected lines to the span dicts used by transcript / blit."""
-def proj_lines_to_span_dicts(lines: list[ProjLine]) -> list[dict[str, any]] {
+def:pub proj_lines_to_span_dicts(lines: list[ProjLine]) -> list[dict[str, any]] {
     out: list[dict[str, any]] = [];
     for line in lines {
         texts: list[str] = [];
@@ -281,7 +281,7 @@ def proj_lines_to_span_dicts(lines: list[ProjLine]) -> list[dict[str, any]] {
 
 
 """True when content likely benefits from markdown projection."""
-def looks_like_markdown(text: str) -> bool {
+def:pub looks_like_markdown(text: str) -> bool {
     if not text {
         return False;
     }

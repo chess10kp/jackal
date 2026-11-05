@@ -62,7 +62,7 @@ def _login_provider_entries() -> dict[str, any] {
 
 
 """Apply stored API keys to the environment (see agent.auth_env)."""
-def _hydrate_auth_environment() {
+def:pub _hydrate_auth_environment() {
     hydrate_auth_environment();
 }
 
@@ -81,7 +81,7 @@ def _login_error(app: LiveShell, message: str) {
 }
 
 
-def _cancel_login(app: LiveShell) {
+def:pub _cancel_login(app: LiveShell) {
     app.auth_flow = transition_auth_flow(app.auth_flow, "cancel");
     if _picker_state(app) is not None {
         _close_picker(app);
@@ -91,7 +91,7 @@ def _cancel_login(app: LiveShell) {
 }
 
 
-def _start_login_provider(app: LiveShell, provider_id: str) {
+def:pub _start_login_provider(app: LiveShell, provider_id: str) {
     entries = _login_provider_entries();
     stored: dict[str, any] = entries.get("stored", {});
     found: dict[str, any] | None = None;
@@ -145,7 +145,7 @@ def _start_login_provider(app: LiveShell, provider_id: str) {
     app.dirty = True;
 }
 
-def _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
+def:pub _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
     if not key {
         _login_error(app, "API key cannot be empty");
         return;
@@ -176,7 +176,7 @@ def _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
 }
 """Open /login's provider picker. An optional provider argument skips the
 picker while retaining the same state machine and input overlay."""
-def _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
+def:pub _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
     entries = _login_provider_entries();
     rows: list[str] = list(entries.get("rows", []));
     ids: list[str] = list(entries.get("ids", []));
@@ -221,7 +221,7 @@ def _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
 
 
 """Resume-picker rows from list_sessions(cwd): label "id  name", payload id."""
-def _open_resume_picker(app: LiveShell) -> str {
+def:pub _open_resume_picker(app: LiveShell) -> str {
     rows = list_sessions(os.getcwd());
     if not rows {
         return "no saved sessions";
@@ -291,7 +291,7 @@ def _checkpoint_picker_entries(cwd: str) -> dict[str, any] {
 }
 """Open the SKILLS catalog overlay; enter inserts `/skill:name ` into the
 draft (submitting it inlines the skill body via expand_skill_command)."""
-def _open_skills_picker(app: LiveShell) -> str {
+def:pub _open_skills_picker(app: LiveShell) -> str {
     skills: list[dict[str, any]] = [];
     try {
         catalog: dict[str, any] = load_jackal_skills();
@@ -322,7 +322,7 @@ def _open_skills_picker(app: LiveShell) -> str {
 
 """Open the read-only tasks overlay; enter on a task echoes the full
 rendered board into the transcript."""
-def _open_tasks_picker(app: LiveShell) -> str {
+def:pub _open_tasks_picker(app: LiveShell) -> str {
     entries = _task_picker_entries(os.getcwd());
     opened = _open_picker(app, "TASKS", entries["rows"], entries["ids"]);
     if not opened {
@@ -333,7 +333,7 @@ def _open_tasks_picker(app: LiveShell) -> str {
 
 
 """Open the checkpoints overlay for browse/restore."""
-def _open_checkpoints_picker(app: LiveShell) -> str {
+def:pub _open_checkpoints_picker(app: LiveShell) -> str {
     entries = _checkpoint_picker_entries(os.getcwd());
     if not entries["rows"] {
         return "no checkpoints yet (/checkpoint NAME to create one)";
@@ -349,7 +349,7 @@ def _open_checkpoints_picker(app: LiveShell) -> str {
 """Snapshot the current conversation plus working-tree changes into a new
 named checkpoint (/checkpoint NAME). Provider/model come from the active
 session model via provider_for."""
-def _create_checkpoint_now(app: LiveShell, name: str) -> str {
+def:pub _create_checkpoint_now(app: LiveShell, name: str) -> str {
     cwd = os.getcwd();
     hist = get_history();
     try {
@@ -376,7 +376,7 @@ Known gaps (honest scope of this pass):
   reflects pre-restore turns until the next save/export.
 - Transcript rows are rebuilt from raw conversation roles only, so tool-
   call formatting is approximated (same tradeoff as /resume)."""
-def _restore_checkpoint(app: LiveShell, name: str) -> str {
+def:pub _restore_checkpoint(app: LiveShell, name: str) -> str {
     cwd = os.getcwd();
     try {
         payload: any = load_checkpoint(cwd, name);

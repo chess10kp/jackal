@@ -30,7 +30,7 @@ import from constraints.results {
     SolverSnapshot,
 }
 
-enum SymbolKind {
+enum:pub SymbolKind {
     INVALID = "invalid",
     EXTERNAL = "external",
     SLACK = "slack",
@@ -39,13 +39,13 @@ enum SymbolKind {
 }
 
 
-obj Tag {
+obj:pub Tag {
     has marker: int = 0,
         other: int = 0;
 }
 
 
-obj Row {
+obj:pub Row {
     has constant: float = 0.0,
         cells: dict[int, float] = {};
 
@@ -124,7 +124,7 @@ obj Row {
 }
 
 
-obj CostRow {
+obj:pub CostRow {
     has constant: LexWeight = LexWeight(),
         cells: dict[int, LexWeight] = {};
 
@@ -186,7 +186,7 @@ obj CostRow {
 }
 
 
-obj MutationJournal {
+obj:pub MutationJournal {
     has id_tick_start: int = 0,
         # Symbol ids created during this operation.
         allocated_symbols: list[int] = [],
@@ -203,7 +203,7 @@ obj MutationJournal {
 }
 
 
-obj StoredConstraint {
+obj:pub StoredConstraint {
     has expression: Expression,
         relation: Relation,
         strength: StrengthTier = StrengthTier.REQUIRED,
@@ -212,7 +212,7 @@ obj StoredConstraint {
 }
 
 
-obj EditInfo {
+obj:pub EditInfo {
     has var_id: int,
         key: str,
         handle: ConstraintHandle,

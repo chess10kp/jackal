@@ -61,7 +61,7 @@ def apply_hello(bridge: any, hello: Envelope) {
 
 Hello shape matches plugin_host/host.mjs byte-for-byte in structure:
 {protocol, node, caps, compat, compat_label}."""
-def ensure_host(bridge: any, host: FakePluginHost | None = None) -> str {
+def:pub ensure_host(bridge: any, host: FakePluginHost | None = None) -> str {
     if (
         bridge.host_kind == "node"
         and bridge.proc is not None
@@ -98,7 +98,7 @@ def ensure_host(bridge: any, host: FakePluginHost | None = None) -> str {
 # ---- fake-host registrations (unit-test parity for the JS API surface) ----
 
 """Register a command handler on the FAKE host (unit-test path)."""
-def register_fake_command(
+def:pub register_fake_command(
     bridge: any,
     name: str,
     handler: any,

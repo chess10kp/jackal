@@ -9,7 +9,7 @@ import from ui.layout_compile_model { CompileResult, NodeEdges, _wants }
 import from ui.layout_compile_emit { _emit, _expr, _t }
 
 
-def _emit_relation(
+def:pub _emit_relation(
     result: CompileResult,
     rid: int,
     rel: LayoutRelation,
