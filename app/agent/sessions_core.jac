@@ -38,13 +38,15 @@ import re;
 import datetime;
 import from .json_pretty { json_pretty }
 
-glob _last_id_ms: int = 0,
-     _SESSION_ID_PATTERN: str = r"^sess_[0-9]+$",
-     _DEFAULT_NAME: str = "new session",
-     _INDEX_NAME: str = "index.json",
-     _LEGACY_INDEX_NAME: str = "latest.json",
-     _TRANSCRIPT_SUFFIX: str = ".json";
+glob:pub _last_id_ms: int = 0;
+glob:pub _SESSION_ID_PATTERN: str = r"^sess_[0-9]+$";
+glob:pub _DEFAULT_NAME: str = "new session";
+glob:pub _INDEX_NAME: str = "index.json";
+glob:pub _LEGACY_INDEX_NAME: str = "latest.json";
+glob:pub _TRANSCRIPT_SUFFIX: str = ".json";
 
+# These names are imported by the sessions facade and maintenance module;
+# export them across the native unit boundary.
 
 # ── Checker shims ─────────────────────────────────────────────────────────
 
@@ -52,27 +54,27 @@ glob _last_id_ms: int = 0,
 """Checker shims: os.path.abspath/dirname demand PathLike under native
 checking when plain str values flow in; route through any-typed aliases
 (same pattern as compaction.jac / extensions.jac)."""
-def _path_abspath(p: str) -> str {
+def:pub _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
 
-def _path_dirname(p: str) -> str {
+def:pub _path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
 }
 
 
-def _sessions_dir(cwd: str) -> str {
+def:pub _sessions_dir(cwd: str) -> str {
     return os.path.join(cwd, ".jackal", "sessions");
 }
 
 
-def _session_path(cwd: str, session_id: str) -> str {
+def:pub _session_path(cwd: str, session_id: str) -> str {
     return os.path.join(_sessions_dir(cwd), session_id + _TRANSCRIPT_SUFFIX);
 }
 
 
-def _index_path(cwd: str) -> str {
+def:pub _index_path(cwd: str) -> str {
     return os.path.join(_sessions_dir(cwd), _INDEX_NAME);
 }
 
@@ -83,7 +85,7 @@ def is_valid_session_id(session_id: str) -> bool {
 
 
 """Monotonic epoch milliseconds: same-millisecond callers get ms + 1."""
-def _next_epoch_ms() -> int {
+def:pub _next_epoch_ms() -> int {
     ms = int(time.time() * 1000);
     if ms <= _last_id_ms {
         ms = _last_id_ms + 1;
@@ -101,7 +103,7 @@ def new_session_id() -> str {
 
 """ISO 8601 UTC with milliseconds (strftime has no native floor; the
 civil-from-days arithmetic is exact and lowers cleanly)."""
-def _iso_from_ms(ms: int) -> str {
+def:pub _iso_from_ms(ms: int) -> str {
     (secs, msec) = divmod(ms, 1000);
     days: int = secs // 86400;
     rem: int = secs % 86400;
@@ -127,13 +129,13 @@ def _iso_from_ms(ms: int) -> str {
 }
 
 
-def _now_iso() -> str {
+def:pub _now_iso() -> str {
     return _iso_from_ms(_next_epoch_ms());
 }
 
 
 """Parse a JSON file; None when missing or corrupt."""
-def _read_json(path: str) -> any {
+def:pub _read_json(path: str) -> any {
     # fh stays non-union (jac#10536); json.loads+read, not json.load (jac#10537)
     try {
         fh = open(path, "r");
@@ -149,7 +151,7 @@ def _read_json(path: str) -> any {
 
 
 """Write pretty JSON (indent=2 + trailing newline); False on I/O failure."""
-def _write_json(path: str, data: any) -> bool {
+def:pub _write_json(path: str, data: any) -> bool {
     try {
         fh = open(path, "w");
         try {
@@ -166,7 +168,7 @@ def _write_json(path: str, data: any) -> bool {
 
 
 """Legacy SessionRecord shape check (mirrors isSessionRecord upstream)."""
-def _is_record(rec: any) -> bool {
+def:pub _is_record(rec: any) -> bool {
     if not isinstance(rec, dict) {
         return False;
     }
@@ -182,7 +184,7 @@ def _is_record(rec: any) -> bool {
 
 
 """Legacy SessionIndexEntry shape check (mirrors isIndexEntry upstream)."""
-def _is_index_entry(item: any) -> bool {
+def:pub _is_index_entry(item: any) -> bool {
     if not isinstance(item, dict) {
         return False;
     }
@@ -197,20 +199,20 @@ def _is_index_entry(item: any) -> bool {
 }
 
 
-def _entry_sort_key(rec: dict[str, any]) -> str {
+def:pub _entry_sort_key(rec: dict[str, any]) -> str {
     return str(rec.get("updatedAt", ""));
 }
 
 
 """Order entries newest-updated first (stable on ties)."""
-def _newest_first(entries: list[dict[str, any]]) -> list[dict[str, any]] {
+def:pub _newest_first(entries: list[dict[str, any]]) -> list[dict[str, any]] {
     return sorted(entries, key=_entry_sort_key, reverse=True);
 }
 
 
 """Validated index entries whose transcript still exists; second value is
 False when index.json was missing or corrupt."""
-def _read_index(cwd: str) -> tuple[list[dict[str, any]], bool] {
+def:pub _read_index(cwd: str) -> tuple[list[dict[str, any]], bool] {
     raw = _read_json(_index_path(cwd));
     valid: list[dict[str, any]] = [];
     if not isinstance(raw, list) {
@@ -236,7 +238,7 @@ def _read_index(cwd: str) -> tuple[list[dict[str, any]], bool] {
 }
 
 
-def _write_index(cwd: str, entries: list[dict[str, any]]) -> bool {
+def:pub _write_index(cwd: str, entries: list[dict[str, any]]) -> bool {
     sdir = _sessions_dir(cwd);
     try {
         os.makedirs(sdir, exist_ok=True);
@@ -248,7 +250,7 @@ def _write_index(cwd: str, entries: list[dict[str, any]]) -> bool {
 
 
 """Replace or append one entry in the index, preserving the others."""
-def _upsert_index_entry(cwd: str, rec: dict[str, any]) -> bool {
+def:pub _upsert_index_entry(cwd: str, rec: dict[str, any]) -> bool {
     (entries, _ok) = _read_index(cwd);
     kept: list[dict[str, any]] = [];
     for existing in entries {
@@ -272,7 +274,7 @@ def _upsert_index_entry(cwd: str, rec: dict[str, any]) -> bool {
 Returns legacy-shaped index entries; used to merge into listings and to
 rebuild a missing or corrupt index.
 """
-def _scan_directory(cwd: str) -> list[dict[str, any]] {
+def:pub _scan_directory(cwd: str) -> list[dict[str, any]] {
     found: list[dict[str, any]] = [];
     sdir = _sessions_dir(cwd);
     if not os.path.isdir(sdir) {

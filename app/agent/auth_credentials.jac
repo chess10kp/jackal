@@ -52,21 +52,23 @@ glob:pub OAUTH_REQUIRED_KEYS: list[str] = ["refresh", "access"];
 
 # ── Checker shims ───────────────────────────────────────────────────────
 
+# Export the path helpers for callers that cross this native module boundary.
+
 
 """Checker shims: the Jac type checker cannot bind AnyStr when plain str
 values flow into some os.path/stat signatures (abspath/expanduser/chmod),
 so route those calls through any-typed aliases."""
-def _path_abspath(p: str) -> str {
+def:pub _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
 
-def _path_expanduser(p: str) -> str {
+def:pub _path_expanduser(p: str) -> str {
     return str(os.path.expanduser(p));
 }
 
 
-def _path_dirname(p: str) -> str {
+def:pub _path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
 }
 
