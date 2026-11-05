@@ -37,7 +37,7 @@ import from .session_config {
 """Read live scalar session state for callers that outlive the split facade.
 The exported scalar names are maintained by the facade setters for
 compatibility; new code should use these accessors for live state."""
-def set_model(name: str) -> str {
+def:pub set_model(name: str) -> str {
     result = _set_model(name);
     if result == name {
         model = name;
@@ -45,7 +45,7 @@ def set_model(name: str) -> str {
     return result;
 }
 
-def set_thinking_level(level: str) -> str {
+def:pub set_thinking_level(level: str) -> str {
     result = _set_thinking_level(level);
     if result == level {
         thinking_level = level;
@@ -53,19 +53,19 @@ def set_thinking_level(level: str) -> str {
     return result;
 }
 
-def get_model() -> str {
+def:pub get_model() -> str {
     return get_model_state();
 }
 
 """Restore a persisted model reference without performing a live credential
 check; the next turn still reports provider errors before network I/O."""
-def restore_model(name: str) -> str {
+def:pub restore_model(name: str) -> str {
     set_model_state(name);
     model = name;
     return name;
 }
 
-def get_thinking_level() -> str {
+def:pub get_thinking_level() -> str {
     return get_thinking_level_state();
 }
 import from .session_lifecycle {

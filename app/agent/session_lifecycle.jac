@@ -32,7 +32,7 @@ import from .extensions {
 import from .mcp { McpClient, mcp_stop }
 
 
-def extensions_status() -> ExtensionStatus {
+def:pub extensions_status() -> ExtensionStatus {
     st = ExtensionStatus(
         phase=plugins.phase,
         loaded=plugins.loaded,
@@ -53,7 +53,7 @@ def extensions_status() -> ExtensionStatus {
 
 
 """Warm Node sidecar and load sidecar decls (runs under flow)."""
-def _warm_sidecar(base_cwd: str) {
+def:pub _warm_sidecar(base_cwd: str) {
     bridge = plugins.bridge;
     reg = plugins.reg;
     if bridge is None or reg <= 0 {
@@ -221,7 +221,7 @@ def:pub session_boot_interactive() -> None {
 
 
 """Compatibility wrapper for callers that need the initial status snapshot."""
-def session_boot(
+def:pub session_boot(
     sid: str = "",
     cwd: str = "",
     decls: list[any] | None = None,
@@ -240,7 +240,7 @@ def session_boot(
 
 
 """Block until extensions ready or wait budget expires (before model request)."""
-def wait_extensions_ready(timeout_s: float = -1.0) -> ExtensionStatus {
+def:pub wait_extensions_ready(timeout_s: float = -1.0) -> ExtensionStatus {
     budget = timeout_s if timeout_s >= 0.0 else plugins.wait_budget_s;
     if plugins.ready and plugins.warm_future is None {
         return extensions_status();
@@ -280,20 +280,20 @@ def wait_extensions_ready(timeout_s: float = -1.0) -> ExtensionStatus {
 
 
 """Queue a user prompt while extensions are still loading."""
-def enqueue_prompt(message: str) -> int {
+def:pub enqueue_prompt(message: str) -> int {
     plugins.prompt_queue.append(message);
     return len(plugins.prompt_queue);
 }
 
 
-def drain_prompt_queue() -> list[str] {
+def:pub drain_prompt_queue() -> list[str] {
     out: list[str] = list(plugins.prompt_queue);
     plugins.prompt_queue.clear();
     return out;
 }
 
 
-def session_dispose {
+def:pub session_dispose {
     wf = plugins.warm_future;
     if wf is not None {
         try {

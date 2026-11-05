@@ -16,13 +16,13 @@ import from .plugin_bridge {
 import from .sessions { new_session_id }
 
 
-def get_history() -> list[dict[str, any]] {
+def:pub get_history() -> list[dict[str, any]] {
     return list(history);
 }
 
 
 """Replace in-memory history with a loaded transcript (restore flow)."""
-def restore_history(msgs: list[dict[str, any]]) {
+def:pub restore_history(msgs: list[dict[str, any]]) {
     history.clear();
     for m in msgs {
         if isinstance(m, dict) {
@@ -32,7 +32,7 @@ def restore_history(msgs: list[dict[str, any]]) {
 }
 
 
-def set_current_session_id(sid: str) {
+def:pub set_current_session_id(sid: str) {
     plugins.session_id = sid if sid else new_session_id();
 }
 
@@ -40,7 +40,7 @@ def set_current_session_id(sid: str) {
 """Request cooperative abort of the active turn (if any). Safe to call from
 the UI thread while run_turn is streaming. Returns True when a live turn was
 flagged; False when no turn is in flight or it was already cancelled."""
-def cancel_active_turn() -> bool {
+def:pub cancel_active_turn() -> bool {
     c = plugins.active_cancel;
     if c is not None and not c.cancelled {
         c.cancelled = True;
@@ -55,7 +55,7 @@ def cancel_active_turn() -> bool {
 The bridge owns the authoritative set; this re-syncs from it so commands
 registered/unloaded after warm-up are reflected immediately.
 """
-def list_commands() -> dict[str, any] {
+def:pub list_commands() -> dict[str, any] {
     b = plugins.bridge;
     if b is not None {
         plugins.commands = dict((b as PluginBridge).commands);
@@ -69,7 +69,7 @@ def list_commands() -> dict[str, any] {
 Returns a display string: the command result plus any ctx.ui.notify lines the
 handler emitted. Never raises — failures come back as ERROR strings.
 """
-def run_command(name: str, args: str = "") -> str {
+def:pub run_command(name: str, args: str = "") -> str {
     bridge = plugins.bridge;
     if bridge is None {
         return f"ERROR: no plugin host running (command /{name} unavailable)";
@@ -98,7 +98,7 @@ def run_command(name: str, args: str = "") -> str {
 Returns a display string: handler notifications + result, or an ERROR line.
 Never raises. Shortcut handlers may call pi.setModel/setThinkingLevel.
 """
-def run_extension_shortcut(key: str) -> str {
+def:pub run_extension_shortcut(key: str) -> str {
     bridge = plugins.bridge;
     if bridge is None {
         return f"ERROR: no plugin host running (shortcut {key} unavailable)";
@@ -124,20 +124,20 @@ def run_extension_shortcut(key: str) -> str {
 """Shortcut bindings registered by loaded extensions (key -> meta with
 extension_id + description). Listed for host UIs; the TUI input loop matches
 keypresses against these and fires them via run_extension_shortcut."""
-def list_extension_shortcuts() -> dict[str, any] {
+def:pub list_extension_shortcuts() -> dict[str, any] {
     return list_shortcuts(plugins.bridge);
 }
 
 
 """Labels set by loaded extensions via pi.setLabel (id -> meta)."""
-def list_extension_labels() -> dict[str, any] {
+def:pub list_extension_labels() -> dict[str, any] {
     return list_labels(plugins.bridge);
 }
 
 
 """JSONL event sink: one serialized event per line on stdout. This IS the
 harness's UI protocol."""
-def json_event(kind: str, data: dict[str, any]) {
+def:pub json_event(kind: str, data: dict[str, any]) {
     line = json.dumps({"type": kind, **data});
     out: any = sys.stdout;
     out.write(line + "\n");

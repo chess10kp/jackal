@@ -59,7 +59,7 @@ import from .session_cwd { get_session_cwd }
 glob _MCP_REVIVE_LOCK: threading.Lock = threading.Lock();
 
 
-def set_mode(next_mode: str) -> str {
+def:pub set_mode(next_mode: str) -> str {
     if next_mode not in DEV_MODES {
         raise ValueError(
             "invalid mode '" + next_mode
@@ -72,7 +72,7 @@ def set_mode(next_mode: str) -> str {
 
 
 """Return the active dev mode for native UI clients."""
-def get_mode() -> str {
+def:pub get_mode() -> str {
     return get_mode_state();
 }
 
@@ -328,7 +328,7 @@ def _register_resource_tool(reg: int, server_name: str, client: McpClient) -> in
 
 """Public alias of _mcp_server_specs for UI modules (underscore names did
 not bind across modules at runtime): {name: argv} (windows show commands)."""
-def mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
+def:pub mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
     rich: dict[str, dict[str, any]] = _mcp_server_specs(cfg);
     out: dict[str, list[str]] = {};
     for (name, spec) in rich.items() {
@@ -416,7 +416,7 @@ def mcp_config(cwd: str) -> dict[str, any] {
 
 """Configured MCP servers (all sources merged) as {name: argv} for UI glue
 that must not parse config itself."""
-def mcp_configured_specs() -> dict[str, list[str]] {
+def:pub mcp_configured_specs() -> dict[str, list[str]] {
     cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
     return mcp_server_specs(mcp_config(cwd));
 }
@@ -665,7 +665,7 @@ def _revive_client(server_name: str) -> bool {
 `connected` but whose process is gone (or whose reader hit EOF) flips to
 `failed` with a notice. Frontends call this via drain_mcp_notices, so a
 death surfaces within one tick/turn without extra threads."""
-def mcp_health_check() {
+def:pub mcp_health_check() {
     for (name, client) in list(plugins.mcp_clients.items()) {
         st: dict[str, any] = plugins.mcp_status.get(name, {});
         if str(st.get("state", "")) != "connected" {
@@ -689,7 +689,7 @@ def mcp_health_check() {
 """Pop queued MCP notices for display (frontends call this each tick/turn).
 Also pumps buffered server notifications (list_changed diff) and runs the
 death health check first, so both surface within one tick/turn."""
-def drain_mcp_notices() -> list[str] {
+def:pub drain_mcp_notices() -> list[str] {
     mcp_health_check();
     mcp_pump_notifications();
     out: list[str] = list(plugins.mcp_notices);
@@ -1093,7 +1093,7 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
 """Parse the effective (user + project) MCP config and background-spawn
 each declared server. Disabled servers get a `disabled` status entry and
 never attach."""
-def _attach_mcp_servers() {
+def:pub _attach_mcp_servers() {
     cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
     imported: list[str] = mcp_import_legacy();
     if imported {
@@ -1127,7 +1127,7 @@ def _attach_mcp_servers() {
 
 """Stop a server's client and drop its tools, then spawn it again in the
 background with the command it was configured with. Returns a status line."""
-def mcp_restart(server_name: str) -> str {
+def:pub mcp_restart(server_name: str) -> str {
     spec: dict[str, any] = dict(plugins.mcp_specs.get(server_name, {}));
     st: dict[str, any] = plugins.mcp_status.get(server_name, {});
     is_http: bool = str(spec.get("type", "")) == "http";
@@ -1195,7 +1195,7 @@ def mcp_restart(server_name: str) -> str {
 connected server (live, bounded 5s per server); with uri, one resource is
 read and its text returned. Servers without resources are skipped
 silently — status carries their detail."""
-def mcp_resources(server_name: str, uri: str) -> str {
+def:pub mcp_resources(server_name: str, uri: str) -> str {
     if uri {
         client: any = plugins.mcp_clients.get(server_name);
         if client is None {
@@ -1254,7 +1254,7 @@ def mcp_resources(server_name: str, uri: str) -> str {
 """Resolve an MCP server prompt to its text (one line per message,
 role-prefixed). Returns the prompt text or an ERROR string callers can
 print directly; args_json must be a JSON object when given."""
-def mcp_prompt(server_name: str, prompt_name: str, args_json: str) -> str {
+def:pub mcp_prompt(server_name: str, prompt_name: str, args_json: str) -> str {
     client: any = plugins.mcp_clients.get(server_name);
     if client is None {
         return "ERROR: unknown mcp server: " + server_name;
@@ -1299,7 +1299,7 @@ def mcp_prompt(server_name: str, prompt_name: str, args_json: str) -> str {
 
 """Restart every server whose status is `failed` (bare /mcp restart).
 Returns a summary line; servers that were fine are left alone."""
-def mcp_restart_failed() -> str {
+def:pub mcp_restart_failed() -> str {
     doomed: list[str] = [];
     for name in sorted(plugins.mcp_status.keys()) {
         if str(plugins.mcp_status[name].get("state", "")) == "failed" {
@@ -1319,7 +1319,7 @@ def mcp_restart_failed() -> str {
 """Block (bounded) until no MCP server is still connecting, so the first
 model request sees every tool that is going to attach. Budget comes from
 JACKAL_MCP_WAIT_S (default 10s). Returns True when nothing is pending."""
-def wait_mcp_ready(timeout_s: float = -1.0) -> bool {
+def:pub wait_mcp_ready(timeout_s: float = -1.0) -> bool {
     budget: float = timeout_s;
     if budget < 0.0 {
         raw: str = os.environ.get("JACKAL_MCP_WAIT_S", "");
@@ -1344,7 +1344,7 @@ def wait_mcp_ready(timeout_s: float = -1.0) -> bool {
 
 
 """One status line per known MCP server (REPL /mcp)."""
-def mcp_status_lines() -> list[str] {
+def:pub mcp_status_lines() -> list[str] {
     lines: list[str] = [];
     for name in sorted(plugins.mcp_status.keys()) {
         st = plugins.mcp_status[name];
@@ -1370,7 +1370,7 @@ def _model_prefs_path() -> str {
 
 
 """One-time defensive load of model_prefs.json (missing/corrupt -> {})."""
-def _load_model_prefs() -> None {
+def:pub _load_model_prefs() -> None {
     if _model_prefs_loaded {
         return;
     }
@@ -1422,7 +1422,7 @@ def _record_model_pref(name: str) {
 
 """Snapshot of persisted last-model preferences ("last" + provider keys).
 For the TUI /model picker to preselect per-provider defaults."""
-def model_preferences() -> dict[str, any] {
+def:pub model_preferences() -> dict[str, any] {
     _load_model_prefs();
     return dict(_model_prefs);
 }
@@ -1469,7 +1469,7 @@ def:pub set_thinking_level(level: str) -> str {
 }
 
 
-def clear_history {
+def:pub clear_history {
     history.clear();
 }
 
@@ -1478,7 +1478,7 @@ def clear_history {
 
 
 """Apply extension-issued model and thinking-level requests."""
-def _apply_pending_model_requests() {
+def:pub _apply_pending_model_requests() {
     b: any = get_plugin_bridge();
     if b is None {
         return;

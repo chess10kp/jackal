@@ -38,7 +38,7 @@ import from .sessions { save_session, new_session_id, is_valid_session_id }
 import from .session_lifecycle { session_boot_native, wait_extensions_ready }
 
 
-def render_event(kind: str, data: dict[str, any]) {
+def:pub render_event(kind: str, data: dict[str, any]) {
     out: any = sys.stdout;
     if kind == "chunk" {
         out.write(str(data.get("content", "")));
@@ -69,7 +69,7 @@ def render_event(kind: str, data: dict[str, any]) {
 
 
 
-def relay_tool_hooks(bridge: PluginBridge | None, inner: any) -> any {
+def:pub relay_tool_hooks(bridge: PluginBridge | None, inner: any) -> any {
     if bridge is None {
         return inner;
     }
@@ -97,7 +97,7 @@ sendMessage/sendUserMessage payloads join LLM context (history); entries
 and ui_events are transcript-only and surface as `entry` events. Never
 raises — extension traffic must not break the turn.
 """
-def _apply_extension_traffic(bridge: PluginBridge | None, on_event: any) {
+def:pub _apply_extension_traffic(bridge: PluginBridge | None, on_event: any) {
     if bridge is None or on_event is None {
         return;
     }
@@ -132,7 +132,7 @@ def _apply_extension_traffic(bridge: PluginBridge | None, on_event: any) {
 """Index where the kept tail starts: `len(msgs) - keep_tail`, moved earlier
 so the tail never opens with a tool result orphaned from the assistant
 message carrying its tool_calls, and never earlier than `floor`."""
-def compaction_cut(msgs: list[dict[str, any]], keep_tail: int, floor: int = 0) -> int {
+def:pub compaction_cut(msgs: list[dict[str, any]], keep_tail: int, floor: int = 0) -> int {
     cut: int = max(floor, len(msgs) - keep_tail);
     while cut > floor and str(msgs[cut].get("role", "")) == "tool" {
         cut -= 1;
@@ -145,7 +145,7 @@ def compaction_cut(msgs: list[dict[str, any]], keep_tail: int, floor: int = 0) -
 the tail summarized (LLM when strategy="llm" and a key is available, else
 mechanical). Returns {"ok", "before", "after", "strategy"} or {"ok": False,
 "reason"}. `force` skips the threshold gate (manual /compact)."""
-def compact_history(bridge: PluginBridge | None = None, force: bool = False) -> dict[str, any] {
+def:pub compact_history(bridge: PluginBridge | None = None, force: bool = False) -> dict[str, any] {
     cwd = plugins.cwd if plugins.cwd else os.getcwd();
     raw_cfg = load_project_config(cwd);
     cfg = resolve_auto_compact_config(
@@ -217,7 +217,7 @@ def compact_history(bridge: PluginBridge | None = None, force: bool = False) -> 
 """Best-effort auto-compaction when the context threshold is crossed (checked
 after the user message lands). Never raises — compaction failure must not
 break the turn."""
-def _maybe_auto_compact(bridge: PluginBridge | None) {
+def:pub _maybe_auto_compact(bridge: PluginBridge | None) {
     try {
         compact_history(bridge, False);
     } except Exception {
@@ -226,7 +226,7 @@ def _maybe_auto_compact(bridge: PluginBridge | None) {
 
 
 """Manual compaction (/compact): status line for the UI."""
-def compact_now() -> str {
+def:pub compact_now() -> str {
     try {
         res = compact_history(plugins.bridge, True);
     } except Exception as e {
@@ -243,7 +243,7 @@ def compact_now() -> str {
 
 
 """Seed or refresh the session system prompt for the active dev mode."""
-def _ensure_mode_system_prompt {
+def:pub _ensure_mode_system_prompt {
     desired: str = system_prompt_for_mode(SYSTEM_PROMPT, get_mode_state());
     if not history {
         history.append({"role": "system", "content": desired});
@@ -266,7 +266,7 @@ def _ensure_mode_system_prompt {
 }
 
 
-def run_turn(
+def:pub run_turn(
     message: str,
     on_event: any = render_event,
     approve: any = None,
