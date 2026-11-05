@@ -2,18 +2,18 @@
 
 import os;import shutil;import from .protocol { Envelope, make_envelope }
 
-def _path_abspath(p: str) -> str {
+def:pub _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
 
-def _path_dirname(p: str) -> str {
+def:pub _path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
 }
 
 
 """Resolve plugin_host/host.mjs from cwd (app/ or repo root)."""
-def resolve_host_mjs(explicit: str = "") -> str {
+def:pub resolve_host_mjs(explicit: str = "") -> str {
     if explicit {
         if os.path.isfile(explicit) {
             return _path_abspath(explicit);
@@ -37,7 +37,7 @@ def resolve_host_mjs(explicit: str = "") -> str {
 
 
 """Resolve fixtures/stub_echo.mjs beside the host."""
-def resolve_stub_echo(explicit: str = "") -> str {
+def:pub resolve_stub_echo(explicit: str = "") -> str {
     if explicit {
         if os.path.isfile(explicit) {
             return _path_abspath(explicit);
@@ -51,7 +51,7 @@ def resolve_stub_echo(explicit: str = "") -> str {
     }
     return path;
 }
-def resolve_pi_greet(explicit: str = "") -> str {
+def:pub resolve_pi_greet(explicit: str = "") -> str {
     if explicit {
         if os.path.isfile(explicit) {
             return _path_abspath(explicit);
@@ -67,7 +67,7 @@ def resolve_pi_greet(explicit: str = "") -> str {
 }
 
 
-def resolve_pi_ctx_probe(explicit: str = "") -> str {
+def:pub resolve_pi_ctx_probe(explicit: str = "") -> str {
     if explicit {
         if os.path.isfile(explicit) {
             return _path_abspath(explicit);
@@ -82,7 +82,7 @@ def resolve_pi_ctx_probe(explicit: str = "") -> str {
     return path;
 }
 
-def resolve_stub_commands(explicit: str = "") -> str {
+def:pub resolve_stub_commands(explicit: str = "") -> str {
     if explicit {
         if os.path.isfile(explicit) {
             return _path_abspath(explicit);
@@ -97,7 +97,7 @@ def resolve_stub_commands(explicit: str = "") -> str {
     return path;
 }
 
-def resolve_pi_gated(explicit: str = "") -> str {
+def:pub resolve_pi_gated(explicit: str = "") -> str {
     if explicit {
         if os.path.isfile(explicit) {
             return _path_abspath(explicit);
@@ -121,7 +121,7 @@ Order:
 3. pinned sidecar under plugin_host/node/bin/node (or .node-bin)
 4. `node` on PATH
 """
-def resolve_node_bin(explicit: str = "") -> str {
+def:pub resolve_node_bin(explicit: str = "") -> str {
     if explicit {
         return explicit;
     }
@@ -152,7 +152,7 @@ def resolve_node_bin(explicit: str = "") -> str {
 
 
 
-def envelope_to_dict(env: Envelope) -> dict[str, any] {
+def:pub envelope_to_dict(env: Envelope) -> dict[str, any] {
     return {
         "version": env.version,
         "session_id": env.session_id,
@@ -167,7 +167,7 @@ def envelope_to_dict(env: Envelope) -> dict[str, any] {
 }
 
 
-def envelope_from_dict(data: dict[str, any]) -> Envelope {
+def:pub envelope_from_dict(data: dict[str, any]) -> Envelope {
     raw_payload: any = data.get("payload", {});
     payload: dict[str, any] = {};
     if isinstance(raw_payload, dict) {

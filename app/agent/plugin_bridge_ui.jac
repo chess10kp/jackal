@@ -5,7 +5,7 @@ import from .plugin_bridge_core { PluginBridge }
 import from .interactions { UiInteractionQueue }
 import from .plugin_bridge_io { _ui_queue, _ui_send_response }
 
-def poll_ui_request(bridge: PluginBridge) -> dict[str, any] | None {
+def:pub poll_ui_request(bridge: PluginBridge) -> dict[str, any] | None {
     if bridge is None or bridge.ui_q is None {
         return None;
     }
@@ -36,7 +36,7 @@ def poll_ui_request(bridge: PluginBridge) -> dict[str, any] | None {
 
 """Answer one pending request. select/input pass strings, confirm passes
 bool. Unknown/expired corr is ignored (idempotent)."""
-def respond_ui(bridge: PluginBridge, corr: str, value: any) -> bool {
+def:pub respond_ui(bridge: PluginBridge, corr: str, value: any) -> bool {
     if bridge is None or bridge.ui_q is None {
         return False;
     }
@@ -49,7 +49,7 @@ def respond_ui(bridge: PluginBridge, corr: str, value: any) -> bool {
 
 
 """Cancel one pending request by child correlation."""
-def cancel_ui(bridge: PluginBridge, corr: str, reason: str = "cancelled") -> bool {
+def:pub cancel_ui(bridge: PluginBridge, corr: str, reason: str = "cancelled") -> bool {
     if bridge is None or bridge.ui_q is None {
         return False;
     }
@@ -62,7 +62,7 @@ def cancel_ui(bridge: PluginBridge, corr: str, reason: str = "cancelled") -> boo
 
 
 """Cancel every open request (turn abort / dispose). Returns count."""
-def cancel_all_ui(bridge: PluginBridge, reason: str = "cancelled") -> int {
+def:pub cancel_all_ui(bridge: PluginBridge, reason: str = "cancelled") -> int {
     if bridge is None or bridge.ui_q is None {
         return 0;
     }

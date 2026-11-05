@@ -9,7 +9,7 @@ import from .plugin_bridge_io { _write_node, _prepare_corr, _read_node_until }
 import from .plugin_bridge_traffic { _absorb_payload, _absorb_pending_fake }
 import from .plugin_bridge_hooks { fire_hook_data, _ok_verdicts }
 
-def transform_markdown(
+def:pub transform_markdown(
     bridge: PluginBridge | None,
     markdown: str,
     message_type: str = "assistant",
@@ -71,7 +71,7 @@ def transform_markdown(
 """Pop accumulated extension traffic (messages pushed via sendMessage/
 sendUserMessage; entries/ui_events from appendEntry + display UI calls).
 Returns {"messages": [...], "entries": [...]} and clears the buffers."""
-def drain_extension_traffic(bridge: PluginBridge | None) -> dict[str, any] {
+def:pub drain_extension_traffic(bridge: PluginBridge | None) -> dict[str, any] {
     if bridge is None {
         return {"messages": [], "entries": []};
     }
@@ -93,7 +93,7 @@ def drain_extension_traffic(bridge: PluginBridge | None) -> dict[str, any] {
 
 
 """Set the host-side session name (round-trips through any envelope)."""
-def set_session_name(bridge: PluginBridge, name: str, timeout: float = 5.0) -> bool {
+def:pub set_session_name(bridge: PluginBridge, name: str, timeout: float = 5.0) -> bool {
     bridge.session_name = str(name);
     if bridge.host_kind == "node" and _node_alive(bridge) {
         corr = _alloc_corr(bridge);
@@ -127,7 +127,7 @@ def set_session_name(bridge: PluginBridge, name: str, timeout: float = 5.0) -> b
 
 Returns {provider, model, base_url, streaming} or None when the id does not
 match the namespace or no extension declared it."""
-def resolve_ext_model(bridge: PluginBridge | None, model_id: str) -> dict[str, any] | None {
+def:pub resolve_ext_model(bridge: PluginBridge | None, model_id: str) -> dict[str, any] | None {
     parts = str(model_id).split("/");
     if len(parts) != 3 or parts[0] != "ext" or not parts[1] or not parts[2] {
         return None;
@@ -166,7 +166,7 @@ Handlers may edit {model, url, headers, body} in place (echoed back) and/or
 return replacements ({body}, {url}, {headers} — last one wins per field).
 Full request control is intentional: extensions are trusted in-process code.
 Never raises; on any failure the original request passes through."""
-def prepare_provider_request(
+def:pub prepare_provider_request(
     bridge: PluginBridge | None,
     model: str,
     url: str,
@@ -210,7 +210,7 @@ def prepare_provider_request(
 
 
 """Mirror the shim's toContentLines normalization."""
-def _fake_content_lines(out: any) -> list[str] {
+def:pub _fake_content_lines(out: any) -> list[str] {
     if out is None {
         return [];
     }
@@ -227,7 +227,7 @@ def _fake_content_lines(out: any) -> list[str] {
 """P11: run an extension message/entry renderer; returns native content
 lines ({ok, lines}). Renderer errors degrade to unstyled fallback lines.
 No bridge/host/renderer -> {ok: False, lines: []} (caller uses defaults)."""
-def render_extension_block(
+def:pub render_extension_block(
     bridge: PluginBridge | None, kind: str, type: str, payload: any
 ) -> dict[str, any] {
     none_out: dict[str, any] = {"ok": False, "lines": []};

@@ -26,7 +26,7 @@ import from .plugin_bridge_io {
 }
 import from .plugin_bridge_traffic { _absorb_payload, _absorb_pending_fake }
 
-def load_extension(
+def:pub load_extension(
     bridge: PluginBridge,
     reg: ToolRegistry,
     extension_id: str,
@@ -104,7 +104,7 @@ def:pub load_extension_handle(
 
 
 """Return (ok, missing) for required capabilities vs host_caps (P4)."""
-def caps_satisfied(bridge: PluginBridge, requires: list[str]) -> list[any] {
+def:pub caps_satisfied(bridge: PluginBridge, requires: list[str]) -> list[any] {
     missing: list[str] = [];
     for r in requires {
         need = str(r);
@@ -119,7 +119,7 @@ def caps_satisfied(bridge: PluginBridge, requires: list[str]) -> list[any] {
 """Composite capability gate (P12 slice 5): interactive_ui means the Node
 host can round-trip AND this frontend installed a UI adapter. Line/JSON
 frontends fail loud at ext_load instead of at first ui.select call."""
-def ui_cap_satisfied(bridge: PluginBridge, requires: list[str], has_ui: bool) -> bool {
+def:pub ui_cap_satisfied(bridge: PluginBridge, requires: list[str], has_ui: bool) -> bool {
     if "interactive_ui" not in [str(x) for x in requires] {
         return True;
     }
@@ -132,7 +132,7 @@ def ui_cap_satisfied(bridge: PluginBridge, requires: list[str], has_ui: bool) ->
 `requires` lists capability names the extension needs (e.g. commands). Missing
 caps fail loud — never silent success with dead stubs (P4).
 """
-def load_extension_path(
+def:pub load_extension_path(
     bridge: PluginBridge,
     reg: ToolRegistry,
     extension_id: str,
@@ -266,7 +266,7 @@ def:pub load_extension_path_handle(
 }
 
 
-def unload_extension(
+def:pub unload_extension(
     bridge: PluginBridge, reg: ToolRegistry, extension_id: str
 ) -> int {
     removed = unregister_extension(reg, extension_id);
@@ -361,7 +361,7 @@ def:pub unload_extension_handle(
 }
 
 
-def invoke_shortcut(bridge: PluginBridge, key: str, timeout: float = 10.0) -> dict[str, any] {
+def:pub invoke_shortcut(bridge: PluginBridge, key: str, timeout: float = 10.0) -> dict[str, any] {
     if bridge.host_kind == "node" {
         if not _node_alive(bridge) {
             phase = maybe_restart_host(bridge);
@@ -433,7 +433,7 @@ def invoke_shortcut(bridge: PluginBridge, key: str, timeout: float = 10.0) -> di
 }
 
 
-def cancel_tool(bridge: PluginBridge, correlation_id: str) {
+def:pub cancel_tool(bridge: PluginBridge, correlation_id: str) {
     if bridge.host_kind == "node" and _node_alive(bridge) {
         req = make_envelope(
             kind="tool_cancel",
@@ -456,7 +456,7 @@ def cancel_tool(bridge: PluginBridge, correlation_id: str) {
 
 
 """Drain inbox plugin envelopes; return kinds seen (tests / status)."""
-def drain_inbox(bridge: PluginBridge) -> list[str] {
+def:pub drain_inbox(bridge: PluginBridge) -> list[str] {
     kinds: list[str] = [];
     while bridge.inbox {
         env = bridge.inbox.pop(0);
@@ -472,7 +472,7 @@ def drain_inbox(bridge: PluginBridge) -> list[str] {
 
 """Invoke an extension command. Returns the cmd_result payload dict:
 {ok, result?, error?, notifications?}. Raises TimeoutError on Node silence."""
-def invoke_command(
+def:pub invoke_command(
     bridge: PluginBridge, name: str, args: str = "", timeout: float = 10.0
 ) -> dict[str, any] {
     if bridge.host_kind == "node" {

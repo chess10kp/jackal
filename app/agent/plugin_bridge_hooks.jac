@@ -15,7 +15,7 @@ import from .plugin_bridge_traffic {
     _absorb_pending_fake,
 }
 
-def _absorb_hook_results(bridge: any, results: list[any]) {
+def:pub _absorb_hook_results(bridge: any, results: list[any]) {
     b: PluginBridge = bridge as PluginBridge;
     for r in results {
         if isinstance(r, dict) and r.get("ui_events") {
@@ -34,7 +34,7 @@ final working copy back as hook_done payload `data`. Other events return
 `data` unchanged. Results entries carry `verdict`: the handler's raw object
 return ({block}, {action}, {messages}, ...) or None for scalar/None returns.
 Returns {results, data}; never raises on transport failure (empty results)."""
-def fire_hook_data(
+def:pub fire_hook_data(
     bridge: PluginBridge | None, event: str, data: dict[str, any], timeout: float = 10.0
 ) -> dict[str, any] {
     empty: dict[str, any] = {"results": [], "data": dict(data)};
@@ -125,7 +125,7 @@ def fire_hook_data(
 
 
 """Verdict dicts from successful listener results, in fire order."""
-def _ok_verdicts(results: list[any]) -> list[any] {
+def:pub _ok_verdicts(results: list[any]) -> list[any] {
     verdicts: list[any] = [];
     for r in results {
         if isinstance(r, dict) and r.get("ok") and isinstance(r.get("verdict"), dict) {
@@ -141,7 +141,7 @@ def _ok_verdicts(results: list[any]) -> list[any] {
 Returns {blocked, reason, terminate, args} where args is the (possibly
 handler-mutated) tool input to actually execute with. First blocking handler
 wins. Never raises — default verdict lets the call through."""
-def tool_call_gate(bridge: PluginBridge | None, name: str, args: dict[str, any]) -> dict[str, any] {
+def:pub tool_call_gate(bridge: PluginBridge | None, name: str, args: dict[str, any]) -> dict[str, any] {
     out: dict[str, any] = {"blocked": False, "reason": "", "terminate": False, "args": args};
     if bridge is None {
         return out;
@@ -176,7 +176,7 @@ Pi middleware semantics: each handler sees the latest content (hosts apply
 {content, isError} patches between handlers) and may return partial patches.
 Returns {ok, result, is_error} — never raises; on any failure the original
 result passes through untouched."""
-def tool_result_gate(
+def:pub tool_result_gate(
     bridge: PluginBridge | None,
     name: str,
     args: dict[str, any],
@@ -226,7 +226,7 @@ Returns {action, text} — action is continue | transform | handled (first
 handled wins). Transforms CHAIN: hosts apply each transform verdict to the
 working copy between handlers, so later handlers and the echoed final text
 see the composed result — the echoed text is authoritative."""
-def input_gate(bridge: PluginBridge | None, text: str) -> dict[str, any] {
+def:pub input_gate(bridge: PluginBridge | None, text: str) -> dict[str, any] {
     out: dict[str, any] = {"action": "continue", "text": str(text)};
     if bridge is None {
         return out;
@@ -267,7 +267,7 @@ def input_gate(bridge: PluginBridge | None, text: str) -> dict[str, any] {
 Handlers may edit the message copy in place (echoed back) or return
 {messages} (explicit replacement — last one wins). Returns the message list
 to stream with; the caller's history is never mutated."""
-def context_gate(bridge: PluginBridge | None, messages: list[dict[str, any]]) -> list[dict[str, any]] {
+def:pub context_gate(bridge: PluginBridge | None, messages: list[dict[str, any]]) -> list[dict[str, any]] {
     if bridge is None {
         return messages;
     }
@@ -309,7 +309,7 @@ systemPrompt composes last-wins across handlers (each handler built its
 string from the same base prompt in this single-round-trip design — full
 chaining would need per-handler round trips). Message injection keeps the
 last non-empty content."""
-def agent_start_gate(bridge: PluginBridge | None, prompt: str) -> dict[str, any] {
+def:pub agent_start_gate(bridge: PluginBridge | None, prompt: str) -> dict[str, any] {
     out: dict[str, any] = {"message": "", "systemPrompt": ""};
     if bridge is None {
         return out;
@@ -422,7 +422,7 @@ def:pub notify_after_provider_response(
 Payload mirrors Pi: {command, result?}. Session-side call site (one-liner
 when wired): relay_tool_hooks in agent/session.jac — fire where tool ==
 "run_command". Best-effort: no host or transport failure returns []."""
-def fire_user_bash(
+def:pub fire_user_bash(
     bridge: PluginBridge | None, command: str, result: str = ""
 ) -> list[dict[str, any]] {
     if bridge is None {
@@ -443,7 +443,7 @@ def fire_user_bash(
 """Fire the Pi `project_trust` hook when a project directory is first
 trusted. Payload: {path}. Best-effort: no host or transport failure
 returns []."""
-def fire_project_trust(bridge: PluginBridge | None, path: str) -> list[dict[str, any]] {
+def:pub fire_project_trust(bridge: PluginBridge | None, path: str) -> list[dict[str, any]] {
     if bridge is None {
         return [];
     }

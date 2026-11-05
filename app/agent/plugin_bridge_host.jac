@@ -7,7 +7,7 @@ import time;
 import from .protocol { Envelope, make_envelope }
 import from .fake_host { ensure_host, touch_bridge, apply_hello }
 import from .plugin_bridge_support { resolve_host_mjs, resolve_node_bin }
-def _emit_host_status(bridge: any, phase: str, detail: str = "") {
+def:pub _emit_host_status(bridge: any, phase: str, detail: str = "") {
     bridge.status_phase = phase;
     bridge.inbox.append(
         make_envelope(
@@ -19,7 +19,7 @@ def _emit_host_status(bridge: any, phase: str, detail: str = "") {
 }
 
 
-def _node_alive(bridge: any) -> bool {
+def:pub _node_alive(bridge: any) -> bool {
     if bridge.host_kind != "node" or bridge.proc is None {
         return False;
     }
@@ -34,7 +34,7 @@ import from .plugin_bridge_io {
 }
 
 """Inspect host health. Dead Node → degraded status envelope; returns phase."""
-def host_status(bridge: any) -> str {
+def:pub host_status(bridge: any) -> str {
     if bridge.host_kind == "node" {
         if bridge.proc is not None and not _node_alive(bridge) {
             if bridge.status_phase != "dead" {
@@ -56,7 +56,7 @@ def host_status(bridge: any) -> str {
 
 
 """Reap Node host after idle_timeout_s with no activity. Returns True if reaped."""
-def maybe_reap_idle(
+def:pub maybe_reap_idle(
     bridge: any, idle_timeout_s: float = -1.0, now: float = -1.0
 ) -> bool {
     if bridge.host_kind != "node" or not _node_alive(bridge) {
@@ -83,7 +83,7 @@ def maybe_reap_idle(
     return True;
 }
 
-def ensure_node_host(
+def:pub ensure_node_host(
     bridge: any,
     host_mjs: str = "",
     node_bin: str = "",
@@ -126,7 +126,7 @@ def ensure_node_host(
 
 
 """One controlled restart after unexpected host death (P3). Returns phase."""
-def maybe_restart_host(bridge: any, timeout: float = 5.0) -> str {
+def:pub maybe_restart_host(bridge: any, timeout: float = 5.0) -> str {
     if _node_alive(bridge) {
         return "ready";
     }
@@ -161,7 +161,7 @@ def maybe_restart_host(bridge: any, timeout: float = 5.0) -> str {
 }
 
 
-def dispose_bridge(bridge: any) {
+def:pub dispose_bridge(bridge: any) {
     if bridge.host_kind == "node" and bridge.proc is not None {
         try {
             if bridge.proc.poll() is None {

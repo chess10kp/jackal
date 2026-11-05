@@ -53,17 +53,17 @@ obj:pub PluginBridge {
 
 
 # ── Checker shims ───────────────────────────────────────────────────────
-def create_bridge(session_id: str) -> PluginBridge {
+def:pub create_bridge(session_id: str) -> PluginBridge {
     return PluginBridge(session_id=session_id);
 }
-def _alloc_corr(bridge: PluginBridge) -> str {
+def:pub _alloc_corr(bridge: PluginBridge) -> str {
     corr = "corr-" + str(bridge.next_corr);
     bridge.next_corr += 1;
     return corr;
 }
 
 
-def _node_alive(bridge: PluginBridge) -> bool {
+def:pub _node_alive(bridge: PluginBridge) -> bool {
     if bridge.host_kind != "node" or bridge.proc is None {
         return False;
     }
@@ -72,7 +72,7 @@ def _node_alive(bridge: PluginBridge) -> bool {
 
 
 """Push host_status into inbox and record phase (D13 degraded visibility)."""
-def _emit_host_status(bridge: PluginBridge, phase: str, detail: str = "") {
+def:pub _emit_host_status(bridge: PluginBridge, phase: str, detail: str = "") {
     bridge.status_phase = phase;
     bridge.inbox.append(
         make_envelope(
@@ -85,7 +85,7 @@ def _emit_host_status(bridge: PluginBridge, phase: str, detail: str = "") {
 
 
 """Invoke a js tool via tool_invoke / tool_result (fake or Node)."""
-def invoke_tool(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
+def:pub invoke_tool(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
     # Surface dead Node before attempting RPC (D13 degraded, never crash).
     if bridge.host_kind == "node" and not _node_alive(bridge) {
         host_status(bridge);
@@ -105,7 +105,7 @@ def invoke_tool(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
 }
 
 
-def _invoke_tool_fake(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
+def:pub _invoke_tool_fake(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
     ensure_host(bridge);
     h = bridge.host;
     if h is None or not h.alive {
@@ -180,7 +180,7 @@ def _invoke_tool_fake(bridge: PluginBridge, name: str, args: dict[str, any]) -> 
 }
 
 
-def _invoke_tool_node(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
+def:pub _invoke_tool_node(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
     if not _node_alive(bridge) {
         phase = maybe_restart_host(bridge);
         if phase != "ready" or not _node_alive(bridge) {

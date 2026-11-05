@@ -2,7 +2,7 @@
 
 import from .fake_host { FakePluginHost }
 
-def _absorb_payload(bridge: any, payload: dict[str, any]) {
+def:pub _absorb_payload(bridge: any, payload: dict[str, any]) {
     msgs: any = payload.get("messages", []);
     if isinstance(msgs, list) {
         for m in msgs {
@@ -87,7 +87,7 @@ def _absorb_payload(bridge: any, payload: dict[str, any]) {
 
 """Shortcut bindings registered by loaded extensions (key -> meta dict with
 description + extension_id). Listed for host UIs; not yet bound to keys."""
-def list_shortcuts(bridge: any | None) -> dict[str, any] {
+def:pub list_shortcuts(bridge: any | None) -> dict[str, any] {
     if bridge is None {
         return {};
     }
@@ -96,7 +96,7 @@ def list_shortcuts(bridge: any | None) -> dict[str, any] {
 
 
 """Labels set by loaded extensions via pi.setLabel (id -> meta dict)."""
-def list_labels(bridge: any | None) -> dict[str, any] {
+def:pub list_labels(bridge: any | None) -> dict[str, any] {
     if bridge is None {
         return {};
     }
@@ -108,7 +108,7 @@ def list_labels(bridge: any | None) -> dict[str, any] {
 
 Returns {"model": str, "thinking_level": str} and clears both pendings so
 each request applies exactly once. Empty strings mean no request."""
-def drain_model_requests(bridge: any | None) -> dict[str, any] {
+def:pub drain_model_requests(bridge: any | None) -> dict[str, any] {
     out: dict[str, any] = {"model": "", "thinking_level": ""};
     if bridge is None {
         return out;
@@ -122,7 +122,7 @@ def drain_model_requests(bridge: any | None) -> dict[str, any] {
 
 
 """Pull per-listener ui_events buckets out of hook results."""
-def _absorb_pending_fake(bridge: any, h: FakePluginHost) {
+def:pub _absorb_pending_fake(bridge: any, h: FakePluginHost) {
     if h.pending_messages {
         msgs = h.pending_messages;
         h.pending_messages = [];
