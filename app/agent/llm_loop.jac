@@ -5,7 +5,7 @@ import time;
 import from collections.abc { Generator }
 import from .tool_spec { ToolSpec, MAX_TOOL_RESULT }
 import from .llm_transport { Transport }
-import from .registry { ToolRegistry, as_tool_specs, invoke }
+import from .registry { registry_tool_specs_handle, invoke_handle }
 import from .plugin_bridge {
     PluginBridge,
     context_gate,
@@ -31,6 +31,22 @@ def _tool_defs(specs: list[ToolSpec]) -> list[dict[str, any]] {
                 "name": s.name,
                 "description": s.description,
                 "parameters": s.parameters,
+            },
+        });
+    }
+    return defs;
+}
+
+
+def _handle_tool_defs(handle: int) -> list[dict[str, any]] {
+    defs: list[dict[str, any]] = [];
+    for spec in registry_tool_specs_handle(handle) {
+        defs.append({
+            "type": "function",
+            "function": {
+                "name": str(spec.get("name", "")),
+                "description": str(spec.get("description", "")),
+                "parameters": spec.get("parameters", {}),
             },
         });
     }
@@ -100,7 +116,7 @@ def react_loop(
     transport: Transport,
     on_event: any,
     max_iters: int = 30,
-    reg: ToolRegistry | None = None,
+    reg: int = 0,
     bridge: any = None,
     max_retries: int = 2,
     cancel: TurnCancel | None = None,
@@ -123,8 +139,7 @@ def react_loop(
         }
     }
     # Prefer registry when provided so js-origin tools share one invoke path.
-    active_specs = as_tool_specs(reg) if reg is not None else specs;
-    defs = _tool_defs(active_specs);
+    defs = _handle_tool_defs(reg) if reg > 0 else _tool_defs(specs);
     for turn in range(max_iters) {
         text = "";
         tool_calls: list[dict[str, any]] = [];
@@ -276,8 +291,8 @@ def react_loop(
                 } else {
                     result = "ERROR: blocked by extension";
                 }
-            } elif reg is not None {
-                result = invoke(reg, name, args, bridge);
+            } elif reg > 0 {
+                result = invoke_handle(reg, name, args, bridge);
             } else {
                 spec = _find_spec(specs, name);
                 if spec is None or spec.handler is None {

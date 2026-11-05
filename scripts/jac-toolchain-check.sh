@@ -8,7 +8,7 @@ JACKAL_DIR="$(cd "$(dirname "$(readlink -f "$SCRIPT_PATH")")/.." && pwd)"
 cd "$JACKAL_DIR"
 
 if ! command -v jac >/dev/null 2>&1; then
-  echo "FAIL: jac not on PATH (install jaclang: pip install jaclang)" >&2
+  echo "FAIL: jac not on PATH (install the workspace Jac binary with scripts/setup-macos.sh or scripts/setup-vendor-jac.sh)" >&2
   exit 1
 fi
 

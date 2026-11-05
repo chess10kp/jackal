@@ -69,33 +69,49 @@ test "save then load round-trips the legacy six-key record" {
     tmp = _make_tmp();
     try {
         hist = _hist("hello", "how are you");
-        meta = save_session(tmp, hist);
+        meta: dict[str, any] = save_session(tmp, hist);
+        session_id: str = str(meta["id"]);
+        session_path: str = str(meta["path"]);
+        session_name: str = str(meta["name"]);
+        message_count: int = int(meta["messageCount"]);
         assert isinstance(meta, dict);
-        assert meta["name"] == "new session";
-        assert meta["messageCount"] == len(hist);
-        assert os.path.exists(meta["path"]);
-        assert meta["path"].endswith(".json");
+        assert session_name == "new session";
+        assert message_count == len(hist);
+        assert os.path.exists(session_path);
+        assert session_path.endswith(".json");
 
-        raw = _read_raw(meta["path"]);
-        assert set(raw.keys()) == {"sessionId", "sessionName", "cwd", "createdAt", "updatedAt", "messages"};
-        assert raw["sessionId"] == meta["id"];
-        assert raw["sessionName"] == "new session";
-        assert raw["cwd"] == tmp;
-        assert _is_iso_z(raw["createdAt"]);
-        assert _is_iso_z(raw["updatedAt"]);
+        raw: dict[str, any] = _read_raw(session_path) as dict[str, any];
+        assert len(raw) == 6;
+        assert "sessionId" in raw and "sessionName" in raw and "cwd" in raw;
+        assert "createdAt" in raw and "updatedAt" in raw and "messages" in raw;
+        raw_id: str = str(raw["sessionId"]);
+        raw_name: str = str(raw["sessionName"]);
+        raw_cwd: str = str(raw["cwd"]);
+        created_at: str = str(raw["createdAt"]);
+        updated_at: str = str(raw["updatedAt"]);
+        assert raw_id == session_id;
+        assert raw_name == "new session";
+        assert raw_cwd == tmp;
+        assert _is_iso_z(created_at);
+        assert _is_iso_z(updated_at);
         assert isinstance(raw["messages"], list);
         assert raw["messages"] == hist;
 
-        loaded = load_session(tmp, str(meta["id"]));
+        loaded: list[dict[str, any]] = load_session(tmp, session_id);
         assert loaded == hist;
 
         # Re-saving under the same id preserves identity, created stamp,
         # and prior name when no new name is given.
-        again = save_session(tmp, _hist("more"), session_id=str(meta["id"]));
-        assert again["id"] == meta["id"];
-        assert again["created"] == meta["created"];
-        assert again["name"] == "new session";
-        assert load_session(tmp, str(meta["id"])) == _hist("more");
+        again: dict[str, any] = save_session(tmp, _hist("more"), session_id=session_id);
+        again_id: str = str(again["id"]);
+        again_created: str = str(again["created"]);
+        meta_created: str = str(meta["created"]);
+        again_name: str = str(again["name"]);
+        assert again_id == session_id;
+        assert again_created == meta_created;
+        assert again_name == "new session";
+        reloaded: list[dict[str, any]] = load_session(tmp, session_id);
+        assert reloaded == _hist("more");
         assert list_sessions(tmp)[0]["messageCount"] == 3;
     } finally {
         _cleanup(tmp);
@@ -130,8 +146,10 @@ test "legacy fixture file loads and lists exactly like the real runtime wrote it
         # can read our files back.
         hist = [{"role": "user", "content": "ours"}];
         meta = save_session(tmp, hist, name="renamed by us");
-        ours = _read_raw(meta["path"]);
-        assert set(ours.keys()) == {"sessionId", "sessionName", "cwd", "createdAt", "updatedAt", "messages"};
+        ours: dict[str, any] = _read_raw(meta["path"]) as dict[str, any];
+        assert len(ours) == 6;
+        assert "sessionId" in ours and "sessionName" in ours and "cwd" in ours;
+        assert "createdAt" in ours and "updatedAt" in ours and "messages" in ours;
         assert ours["messages"] == hist;
         assert load_session(tmp, str(meta["id"])) == hist;
     } finally {
@@ -181,7 +199,7 @@ test "rename updates BOTH transcript sessionName and index name" {
         meta = save_session(tmp, hist, name="before");
         assert rename_session(tmp, str(meta["id"]), "after");
 
-        raw = _read_raw(meta["path"]);
+        raw: dict[str, any] = _read_raw(meta["path"]) as dict[str, any];
         assert raw["sessionName"] == "after";
         assert raw["messages"] == hist;
         assert raw["createdAt"] == meta["created"];
@@ -339,11 +357,10 @@ test "model ref persists as optional seventh key and stays byte-compatible witho
     try {
         # No model -> exactly the legacy six keys.
         meta = save_session(tmp, _hist("a"), name="plain");
-        raw = _read_raw(meta["path"]);
-        assert set(raw.keys()) == {
-            "sessionId", "sessionName", "cwd", "createdAt", "updatedAt",
-            "messages",
-        };
+        raw: dict[str, any] = _read_raw(meta["path"]) as dict[str, any];
+        assert len(raw) == 6;
+        assert "sessionId" in raw and "sessionName" in raw and "cwd" in raw;
+        assert "createdAt" in raw and "updatedAt" in raw and "messages" in raw;
         assert meta["model"] == "";
 
         # With model -> seventh key present; re-save without arg keeps it.
@@ -425,31 +442,31 @@ test "export_session writes readable markdown from a transcript" {
 # ============================== retention prune ==============================
 
 
-def _backdate_transcript(tmp: str, session_id: str, updated_iso: str) {
+def _backdate_transcript(tmp: str, session_id: str, updated_iso: str) -> None {
     # Rewrite a saved transcript's updatedAt to an arbitrary ISO stamp.
     path = os.path.join(tmp, ".jackal", "sessions", session_id + ".json");
-    raw: any = _read_raw(path);
+    raw: dict[str, any] = _read_raw(path) as dict[str, any];
     raw["updatedAt"] = updated_iso;
     fh = open(path, "w");
     try {
-        json.dump(raw, fh, indent=2);
+        fh.write(json.dumps(raw));
         fh.write("\n");
     } finally {
         fh.close();
     }
     ipath = os.path.join(tmp, ".jackal", "sessions", "index.json");
-    idx: any = _read_raw(ipath);
+    idx: list[dict[str, any]] = _read_raw(ipath) as list[dict[str, any]];
     pos = 0;
     while pos < len(idx) {
         ent: dict[str, any] = idx[pos];
-        if str(ent.get("id")) == session_id {
+        if str(ent["id"]) == session_id {
             ent["updatedAt"] = updated_iso;
         }
         pos += 1;
     }
     fh = open(ipath, "w");
     try {
-        json.dump(idx, fh, indent=2);
+        fh.write(json.dumps(idx));
         fh.write("\n");
     } finally {
         fh.close();
@@ -530,11 +547,11 @@ test "prune_sessions combines age and count limits safely on junk timestamps" {
         time.sleep(0.01);
         # Corrupt one timestamp; pruning must still work (count rule applies).
         path = os.path.join(_sessions_dir(tmp), str(a["id"]) + ".json");
-        raw: any = _read_raw(path);
+        raw: dict[str, any] = _read_raw(path) as dict[str, any];
         raw["updatedAt"] = "";
         fh = open(path, "w");
         try {
-            json.dump(raw, fh, indent=2);
+            fh.write(json.dumps(raw));
             fh.write("\n");
         } finally {
             fh.close();
@@ -542,7 +559,7 @@ test "prune_sessions combines age and count limits safely on junk timestamps" {
         assert prune_sessions(tmp, max_count=2) == 1;
         remaining = list_sessions(tmp);
         assert len(remaining) == 2;
-        kept_ids: set[str] = set(str(e["id"]) for e in remaining);
+        kept_ids: list[str] = [str(e["id"]) for e in remaining];
         assert str(b["id"]) in kept_ids and str(c["id"]) in kept_ids;
     } finally {
         _cleanup(tmp);

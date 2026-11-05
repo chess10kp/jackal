@@ -40,7 +40,7 @@ Deviations from the Python toolchain:
 import os;
 import json;
 import re;
-import from .compaction { load_project_config }
+import from .project_config { load_project_config }
 
 glob SUBAGENT_TOOL_ALIASES: dict[str, str] = {
         "read_file": "read",

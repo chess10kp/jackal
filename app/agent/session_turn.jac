@@ -4,7 +4,8 @@ import sys;
 import os;
 import time;
 
-import from .session_state { history, show_stats, plugins, _t0, _n_tools, reset_turn_stats, bump_tool_count, get_model_state, get_thinking_level_state, get_mode_state }
+import from .session_state { history, show_stats, _t0, _n_tools, reset_turn_stats, bump_tool_count, get_model_state, get_thinking_level_state, get_mode_state }
+import from .session_plugins { plugins }
 import from .session_config { set_model, set_thinking_level, _apply_pending_model_requests, wait_mcp_ready }
 import from .llm {
     react_loop,
@@ -13,13 +14,13 @@ import from .llm {
     TurnCancel,
 }
 import from .compaction {
-    load_project_config,
     resolve_auto_compact_config,
     compute_context_usage,
     should_auto_compact,
     build_mechanical_summary,
     summarize_for_compaction,
 }
+import from .project_config { load_project_config }
 import from .system { SYSTEM_PROMPT }
 import from .modes { system_prompt_for_mode }
 import from .plugin_bridge {
@@ -32,9 +33,9 @@ import from .plugin_bridge {
     render_extension_block,
     drain_model_requests,
 }
-import from .tools { default_registry }
+import from .tools { default_registry_handle }
 import from .sessions { save_session, new_session_id, is_valid_session_id }
-import from .session_lifecycle { session_boot, wait_extensions_ready }
+import from .session_lifecycle { session_boot_native, wait_extensions_ready }
 
 
 def render_event(kind: str, data: dict[str, any]) {
@@ -272,8 +273,8 @@ def run_turn(
     max_iters: int = 30,
 ) -> str {
     # Auto-boot with no decls if never booted (native-only path).
-    if plugins.reg is None {
-        session_boot(plugins.session_id, plugins.cwd if plugins.cwd else os.getcwd(), []);
+    if plugins.reg <= 0 {
+        session_boot_native(plugins.session_id, plugins.cwd if plugins.cwd else os.getcwd(), []);
     }
     st = wait_extensions_ready();
     # MCP servers attach in background flows; give them a bounded window so
@@ -375,7 +376,7 @@ def run_turn(
     turn_cancel = TurnCancel();
     plugins.active_cancel = turn_cancel;
     try {
-        reg = plugins.reg if plugins.reg is not None else default_registry();
+        reg: int = plugins.reg if plugins.reg > 0 else default_registry_handle();
         answer = react_loop(
             history, [], transport, relay_tool_hooks(bridge, on_event),
             max_iters=max_iters, reg=reg, bridge=bridge, cancel=turn_cancel,

@@ -13,25 +13,9 @@ session.jac which owns the plugin bridge and the history glob.
 """
 
 import json;
-import os;
+import from .project_config { load_project_config }
 
 import from .llm { make_transport }
-
-
-# ── Checker shims ───────────────────────────────────────────────────────
-
-
-"""Checker shims: the Jac type checker cannot bind AnyStr when plain str
-values flow into os.path abspath/dirname, so route those calls through
-any-typed aliases (same pattern as auth.jac / checkpoints.jac)."""
-def _path_abspath(p: str) -> str {
-    return str(os.path.abspath(p));
-}
-
-
-def _path_dirname(p: str) -> str {
-    return str(os.path.dirname(p));
-}
 
 
 glob CHARS_PER_TOKEN: int = 4,
@@ -106,38 +90,6 @@ def compute_context_usage(messages: list[dict[str, any]], context_max_override: 
     }
     percent = min(100, round((used / max_tokens) * 100));
     return {"used": used, "max": max_tokens, "percent": percent};
-}
-
-
-"""Walk up from cwd for a `.jackal` JSON config file (mirrors
-lib/jac/config/_project_config_toolchain.py find/load)."""
-def load_project_config(cwd: str) -> dict[str, any] {
-    cur = _path_abspath(cwd);
-    while True {
-        cand = os.path.join(cur, ".jackal");
-        # `.jackal` is a JSON file, or a directory (sessions/tasks live there)
-        # holding the config as .jackal/config.json.
-        if os.path.isdir(cand) {
-            cand = os.path.join(cand, "config.json");
-        }
-        if os.path.isfile(cand) {
-            try {
-                with open(cand, "r", encoding="utf-8") as fh {
-                    parsed = json.load(fh);
-                }
-                if isinstance(parsed, dict) {
-                    return parsed;
-                }
-            } except Exception {
-                return {};
-            }
-        }
-        parent = _path_dirname(cur);
-        if parent == cur {
-            return {};
-        }
-        cur = parent;
-    }
 }
 
 

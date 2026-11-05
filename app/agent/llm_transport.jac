@@ -15,9 +15,13 @@ import os;
 import json;
 import time;
 import from collections.abc { Generator }
-import from .llm_http_stream { post_json_stream }
+import from .llm_http_stream { HttpStreamResponse, post_json_stream }
 import from .tool_spec { ToolSpec, MAX_TOOL_RESULT }
-import from .provider_routes { PROVIDER_ROUTES }
+import from .provider_routes {
+    PROVIDER_ROUTES,
+    provider_for,
+    credential_error,
+}
 import from .registry {
     ToolRegistry,
     as_tool_specs,
@@ -26,12 +30,12 @@ import from .registry {
 import from .plugin_bridge {
     PluginBridge,
     context_gate,
-    fire_hook,
     prepare_provider_request,
     resolve_ext_model,
     tool_call_gate,
     tool_result_gate,
 }
+import from .plugin_bridge_hooks { notify_after_provider_response }
 
 
 
@@ -39,7 +43,7 @@ import from .plugin_bridge {
 """Cooperative turn-abort flag. Session owns one per active turn; the UI
 thread flips `cancelled` and the ReAct loop checks it between stream chunks
 and before each tool call. Plain fields — safe to set from another thread."""
-obj Transport {
+obj:pub Transport {
     has base_url: str = "https://api.openai.com/v1",
         api_key: str = "",
         model: str = "",
@@ -89,11 +93,11 @@ obj Transport {
             return;
         }
         try {
-            fire_hook(
-                self.hook_bridge as PluginBridge,
-                "after_provider_response",
-                {"status": status, "headers": dict(headers)},
-                timeout=self.hook_timeout,
+            notify_after_provider_response(
+                self.hook_bridge,
+                status,
+                json.dumps(headers),
+                self.hook_timeout,
             );
         } except Exception {
             # Informational: hook failures are silent by design.
@@ -107,7 +111,7 @@ obj Transport {
         request_headers: dict[str, str] = dict(headers);
         request_headers["Content-Type"] = "application/json";
         request_headers["Accept"] = "text/event-stream";
-        r: any = None;
+        r: HttpStreamResponse | None = None;
         try {
             r = post_json_stream(url, request_headers, body);
             # Fire strictly before the first line is read so handlers observe
@@ -123,29 +127,36 @@ obj Transport {
                 if not raw_line {
                     break;
                 }
-                line: str = raw_line.rstrip("\r\n");
-                if not line.startswith("data: ") { continue; }
-                payload: str = line[len("data: "):];
+                line_end: int = raw_line.find("\r");
+                if line_end < 0 { line_end = raw_line.find("\n"); }
+                line: str = raw_line if line_end < 0 else raw_line[:line_end];
+                if line.find("data: ") != 0 { continue; }
+                payload: str = line[6:];
                 if payload == "[DONE]" { break; }
-                chunk: any = json.loads(payload);
-                delta: any = chunk["choices"][0].get("delta", {});
+                chunk: dict[str, any] = json.loads(payload) as dict[str, any];
+                choices: list[dict[str, any]] = chunk["choices"] as list[dict[str, any]];
+                choice: dict[str, any] = choices[0];
+                delta: dict[str, any] = choice.get("delta", {}) as dict[str, any];
                 piece: any = delta.get("content");
                 if piece {
                     yield {"content": str(piece)};
                 }
-                for raw_tc in delta.get("tool_calls", []) {
-                    tc: any = raw_tc;
+                tool_calls: list[dict[str, any]] = delta.get("tool_calls", []) as list[dict[str, any]];
+                for raw_tc in tool_calls {
+                    tc: dict[str, any] = raw_tc;
                     idx = int(tc.get("index", 0));
                     acc = calls.get(idx);
                     if acc is None {
-                        acc = {
+                        fn_acc: dict[str, any] = {"name": "", "arguments": ""};
+                        acc_new: dict[str, any] = {
                             "id": tc.get("id", ""),
                             "type": "function",
-                            "function": {"name": "", "arguments": ""},
+                            "function": fn_acc,
                         };
+                        acc = acc_new;
                         calls[idx] = acc;
                     }
-                    fn: any = tc.get("function", {});
+                    fn: dict[str, any] = tc.get("function", {}) as dict[str, any];
                     if fn.get("id") { acc["id"] = fn["id"]; }
                     if fn.get("name") {
                         acc["function"]["name"] = str(acc["function"]["name"]) + str(fn["name"]);
@@ -280,28 +291,6 @@ obj MockTransport (Transport) {
 }
 
 
-"""Map a model id to its provider id (pure function — reads nothing).
-
-Dispatch:
-  "openrouter/<model>"          -> "openrouter"
-  "deepseek/<model>"            -> "deepseek"
-  "zai/<model>"                 -> "zai"
-  "mock" | "mockllm" | "mock/*" -> "mock"
-  "ext/<extension>/<model>"     -> "ext" (resolved via plugin bridge)
-  anything else                 -> "openai_compat"
-"""
-def provider_for(model: str) -> str {
-    if model.startswith("openrouter/") { return "openrouter"; }
-    if model.startswith("deepseek/") { return "deepseek"; }
-    if model.startswith("zai/") { return "zai"; }
-    if model == "mock" or model == "mockllm" or model.startswith("mock/") {
-        return "mock";
-    }
-    if model.startswith("ext/") { return "ext"; }
-    return "openai_compat";
-}
-
-
 """The id the MODEL picker must advertise for `name` under `provider`.
 
 Routing dispatches on the provider prefix, so bare catalog names like
@@ -313,33 +302,6 @@ def routed_model_id(provider: str, name: str) -> str {
         return name;
     }
     return provider + "/" + name;
-}
-
-
-"""fx-style actionable credential check. Returns "" when the model is
-usable; otherwise ONE sentence naming the exact fix. Reads only os.environ
-and never raises.
-"""
-def credential_error(model: str) -> str {
-    try {
-        provider = provider_for(model);
-        if provider == "ext" { return ""; }
-        route: any = PROVIDER_ROUTES.get(provider);
-        if route is None { return ""; }
-        key_env = str(route.get("key_env", ""));
-        if not key_env { return ""; }
-        if os.environ.get(key_env, "") { return ""; }
-        fix = f'set {key_env}';
-        if provider == "openai_compat" {
-            fix += " (or point OPENAI_COMPAT_BASE at your endpoint)";
-        }
-        return (
-            f'model "{model}" routes via {provider} — {fix}'
-            + " or pick another provider (/model for options)."
-        );
-    } except Exception {
-        return "";
-    }
 }
 
 
@@ -423,8 +385,11 @@ obj ProviderTransport (Transport) {
 
 Returns None when the id is not in the ext/ namespace or no extension
 declared it — callers fall back to native routing."""
-def make_ext_transport(bridge: PluginBridge | None, model_id: str, thinking: str = "") -> ProviderTransport | None {
-    cfg = resolve_ext_model(bridge, model_id);
+def make_ext_transport(bridge: any, model_id: str, thinking: str = "") -> ProviderTransport | None {
+    if bridge is None {
+        return None;
+    }
+    cfg = resolve_ext_model(bridge as PluginBridge, model_id);
     if cfg is None {
         return None;
     }

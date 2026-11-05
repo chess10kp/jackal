@@ -1,4 +1,4 @@
-"""EmulatedTerminal (pyte-backed) fidelity tests (merged with emulated_terminal.jac)."""
+"""Jac-native EmulatedTerminal fidelity tests."""
 
 
 test "cursor addressing, erase, and trailing trim" {

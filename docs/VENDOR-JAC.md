@@ -61,16 +61,14 @@ Running Jackal on macOS does not require this build at all:
 ```
 
 The default lane fetches the published release binary, verifies its `.sha256`,
-installs it as `./jac`, then runs `jac install` in `app/` for the `[dependencies.pypi]`
-entries. The binary is self-contained (bundled runtime, no Python/pip) and
-`macos-x86_64` is not shipped by upstream (#8805), so the script refuses Intel Macs.
+and installs it as `./jac`. The binary is self-contained, so a separate Python
+installation is not needed; it currently embeds CPython, which remains an N6
+compiler-artifact seam. `macos-x86_64` is not shipped by upstream (#8805), so the
+script refuses Intel Macs.
 
-Startup: `run.sh` launches with `jac run -b python`, which is an upstream flag, so
-the dev fast path works with a released binary. The `JAC_IGNORE_PLACEMENT_PINS`
-hook that `run.sh` also exports exists **only** in this checkout's `vendor/jac`
-(commit `6e7e4986c`); it is not on upstream `main` and not in any release, so it is
-inert with a downloaded binary. Do not make anything depend on it — an upstream
-sync (`setup-vendor-jac.sh` checks out `origin/main`) drops the local commit.
+Startup: `run.sh` invokes the native product path and preserves placement pins.
+`JAC_IGNORE_PLACEMENT_PINS` exists in this checkout's `vendor/jac`, but product
+launch must not use it: it hides server placements that N6 must remove.
 
 ## Editing rules
 

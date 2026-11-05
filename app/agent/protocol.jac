@@ -10,7 +10,7 @@ import from ui.screen {
 }
 
 
-obj Envelope {
+obj:pub Envelope {
     has version: int = 1,
         session_id: str = "",
         request_id: str = "",

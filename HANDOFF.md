@@ -1,5 +1,9 @@
 # Jackal harness — implementation handoff
 
+> Historical handoff (2026-10-10). For current architecture, placement,
+> Python-removal scope, and validation constraints, use `AGENTS.md` and
+> `ROADMAP.md`; pyte-era runtime notes below are archival.
+
 Written 2026-10-10 by the previous agent for the next one. Read this file
 completely before touching code. It is meant to let you finish the work
 without re-deriving anything. Where it says **DO**, do exactly that; where it
@@ -46,10 +50,9 @@ tool. Do NOT delete other sessions' dirs under `/tmp/claude-1000/`. Deleting
 ### Toolchain
 - `./jac` at the repository root = locally built upstream `main`; rebuild with `./scripts/setup-vendor-jac.sh` (Zig 0.16.0 required).
 - Jac config shape: `[placement] default = "native"`,
-  `[placement.pins]`, `[dependencies.pypi]`, `entry-point = "main"`.
-- Python deps: `app/jac.toml` **and** root `jac.toml` both list
-  `httpx` and `pyte` under `[dependencies.pypi]`. Suites run from the repo
-  root use the ROOT project's venv, so a new pypi dep must go in BOTH files.
+  `[placement.pins]`, and `entry-point = "main"`. Root and app project configs
+  currently declare no PyPI dependencies; the stale generated lockfiles were
+  removed. Keep Python packages out of both projects.
 
 ### Never use `pkill -f <pattern>` on a pattern that appears in your own command
 It kills your own shell (exit 144). Use the background task ID instead.
@@ -109,9 +112,8 @@ fails to compile makes **every importer** fail with the misleading
     `tui/shell.jac`).
 11. Avoid Python builtin `any(...)` in Jac (clashes with the `any` type);
     write a loop.
-12. Default placement is native; modules importing Python-only stdlib
-    (`unicodedata`, `codecs`, `pyte`, `subprocess` …) are auto-demoted to the
-    server codespace with a `note:`. That is fine, not an error.
+12. Default placement is native. A demotion to server codespace is an open
+    native/runtime seam; it is not an accepted product fallback.
 13. On a cold cache, `jac run` prints many `native seam -- demoting …` lines
     to the terminal before the app starts. Harmless, but it pollutes the PTY
     screen (the PTY e2e boot marker is `● ready` for this reason) and is ugly
@@ -123,8 +125,8 @@ fails to compile makes **every importer** fail with the misleading
 
 ### CI: `.github/workflows/app-tests.yml`
 - Composite action `.github/actions/setup-jac`: downloads jac 0.38.2 release
-  binary (sha256 pinned), caches it, runs `jac install` in the repo root AND `app/`,
-  exports `JACKAL_ROOT`, `JACKAL_AGENT_DIR`.
+  binary (sha256 pinned), caches it, reports the version, and exports
+  `JACKAL_ROOT`, `JACKAL_AGENT_DIR` without installing Python packages.
 - Jobs: `check` (`cd app && jac check .`), and `test` matrix shards
   `agent | tui | ui | e2e | other`, each running `scripts/test.sh -j3
   --quarantine scripts/test-quarantine.txt <subtree>`.
@@ -214,7 +216,7 @@ Model id `mock` / `mockllm` / `mock/*`. Env:
   under a PTY, output replayed into an `EmulatedTerminal`).
 - Suites (each with a same-stem import-only `.jac`): `print_mode`,
   `json_protocol`, `repl`, `integrations` (fake MCP server
-  `fixtures/fake_mcp.py`, subagent, task board), `tui` (PTY smoke).
+  `fixtures/fake_mcp.mjs`, subagent, task board), `tui` (PTY smoke).
 - Use `sb.explain(r)` as the assertion message (includes model calls).
 
 ### Docs
@@ -419,7 +421,7 @@ on screen plus `calls()` plus files. Priority list:
 4. Pickers: `/resume` opens the session picker after a saved turn (it needs
    a previous turn in the same project: run one turn, `/new`, `/resume`, enter).
    `/tasks` after a `create_task` tool call. `/mcp` with
-   `.jackal/config.json` pointing at `app/e2e/fixtures/fake_mcp.py`
+   `.jackal/config.json` pointing at `app/e2e/fixtures/fake_mcp.mjs`
    (in-process: `files={".jackal/config.json": json.dumps(cfg)}`).
 5. Model picker: `/model ` then down/enter changes the status line model.
 6. Rendering invariants (Pi has these): after any scenario, every viewport line

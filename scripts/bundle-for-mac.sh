@@ -121,13 +121,12 @@ git clone git@github.com:chess10kp/jackal && cd jackal && git switch $BRANCH
 ## 2. Compiler — running Jackal needs only the published binary
 
 \`\`\`bash
-./scripts/setup-macos.sh    # jac-<ver>-macos-aarch64 -> ./jac, then jac install in app/
+./scripts/setup-macos.sh    # jac-<ver>-macos-aarch64 -> ./jac
 ./run.sh                    # TUI
 cd app && ../jac build      # seal check, report only
 \`\`\`
 
-\`JAC_IGNORE_PLACEMENT_PINS\` is not in a released binary, so run.sh's dev fast
-path is inert there; the \`-b python\` it passes is what keeps startup fast.
+\`run.sh\` uses the native product path and preserves configured placement pins.
 
 ## 3. Only for native-lowering work
 
@@ -142,8 +141,9 @@ cd vendor/jac && zig build -Ddev -Dpayload-progress   # build in place, do NOT r
 re-apply \`vendor-jac/*.patch\` afterwards on top of \`${BASE:-the recorded base}\`.
 
 Also note: the compiler kernel cannot be copied from the Linux box (different
-triple, different CPython) and the Linux one is stale anyway — a >32 GB host is
-needed to rebuild it there.
+triple), and the Linux one is stale anyway — a >32 GB host is needed to rebuild
+it there. Current Jac release binaries still bundle CPython; N6 compiler work
+must replace that payload before this setup path meets the no-Python target.
 
 ## 4. Credentials
 

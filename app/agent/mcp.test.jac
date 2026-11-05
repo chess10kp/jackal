@@ -1,7 +1,7 @@
 """Tests for agent/mcp.jac (same-stem annex, merged with the base module
-at test time - no import of the own stem). All transport tests run against
-a fake newline-delimited JSON-RPC MCP server generated into a temp dir at
-test time; the real `jac mcp` is never spawned here.
+at test time - no import of the own stem). Transport tests use the Node
+newline-delimited JSON-RPC fixture in `mcp_test_server.mjs`; the real
+`jac mcp` is never spawned here.
 
 Fake server modes:
   normal   - handshake + echo/boom tools (transport basics)
@@ -11,172 +11,16 @@ Fake server modes:
              the listed tool name proves whether the client answered them
   dieafter - exits immediately after the initialized notification (EOF path)
 
-A second fixture (FAKE_HTTP_SERVER_SRC) is a streamable-HTTP MCP server:
+A second mode in that fixture is a streamable-HTTP MCP server:
 initialize issues Mcp-Session-Id sess-42 and post-initialize requests
 without that header are rejected, tools/list answers as JSON, tools/call
 answers as text/event-stream (both client response paths).
 """
 
-glob FAKE_SERVER_SRC: str = """
-import sys, json, time, os
-
-def send(obj):
-    sys.stdout.write(json.dumps(obj) + "\\n")
-    sys.stdout.flush()
-
-mode = sys.argv[1] if len(sys.argv) > 1 else "normal"
-
-def read_replies(want_ids, deadline):
-    # Plain blocking readline (no select): the stdin iterator readahead can
-    # park bytes in the userspace buffer where select cannot see them. The
-    # client under test always answers or its own request timeout fires.
-    got = {}
-    while len(got) < len(want_ids) and time.time() < deadline:
-        line = sys.stdin.readline()
-        if not line:
-            break
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            msg = json.loads(line)
-        except Exception:
-            continue
-        mid = msg.get("id")
-        if mid in want_ids and "error" in msg:
-            got[mid] = msg["error"]
-    return got
-
-PAGE_TOOLS = [
-    {"name": "t%d" % i, "description": "page tool %d" % i,
-     "inputSchema": {"type": "object", "properties": {}, "required": []}}
-    for i in range(5)
-]
-
-for raw in sys.stdin:
-    raw = raw.strip()
-    if not raw:
-        continue
-    try:
-        req = json.loads(raw)
-    except Exception:
-        continue
-    method = req.get("method", "")
-    rid = req.get("id")
-    if mode == "silent" and method == "tools/list":
-        continue  # silent: never respond (timeout path)
-    if method == "initialize":
-        send({"jsonrpc": "2.0", "id": rid, "result": {
-            "protocolVersion": "2025-06-18",
-            "capabilities": {"tools": {}},
-            "serverInfo": {"name": "fake-mcp", "version": "0.0.1"},
-        }})
-    elif method == "notifications/initialized":
-        if mode == "dieafter":
-            os._exit(1)
-    elif method == "tools/list":
-        if mode == "paged":
-            cursor = str((req.get("params") or {}).get("cursor", ""))
-            start = int(cursor) if cursor.isdigit() else 0
-            page = PAGE_TOOLS[start:start + 2]
-            result = {"tools": page}
-            if start + 2 < len(PAGE_TOOLS):
-                result["nextCursor"] = str(start + 2)
-            send({"jsonrpc": "2.0", "id": rid, "result": result})
-        elif mode == "requests":
-            # Server->client requests: a compliant client answers each with
-            # a JSON-RPC error instead of leaving them hanging.
-            send({"jsonrpc": "2.0", "id": "s1", "method": "sampling/createMessage",
-                  "params": {"messages": []}})
-            send({"jsonrpc": "2.0", "id": "s2", "method": "roots/list", "params": {}})
-            errs = read_replies(["s1", "s2"], time.time() + 5.0)
-            ok = len(errs) == 2 and all(
-                e.get("code") == -32601 for e in errs.values())
-            send({"jsonrpc": "2.0", "id": rid, "result": {"tools": [
-                {"name": "ok_ping" if ok else "bad_no_reply",
-                 "description": "probe",
-                 "inputSchema": {"type": "object", "properties": {},
-                                 "required": []}}]}})
-        else:
-            send({"jsonrpc": "2.0", "id": rid, "result": {"tools": [
-                {"name": "echo", "description": "Echo the given text back.",
-                 "inputSchema": {"type": "object",
-                                 "properties": {"text": {"type": "string"}},
-                                 "required": ["text"]}},
-                {"name": "boom", "description": "Always fails.",
-                 "inputSchema": {"type": "object",
-                                 "properties": {}, "required": []}},
-                {"name": "rich", "description": "Returns mixed content blocks.",
-                 "inputSchema": {"type": "object",
-                                 "properties": {}, "required": []}},
-            ]}})
-    elif method == "prompts/list":
-        send({"jsonrpc": "2.0", "id": rid, "result": {"prompts": [
-            {"name": "greet", "description": "Greet someone.",
-             "arguments": [{"name": "who", "required": False}]},
-        ]}})
-    elif method == "prompts/get":
-        pname = str(req.get("params", {}).get("name", ""))
-        if pname != "greet":
-            send({"jsonrpc": "2.0", "id": rid, "error": {
-                "code": -32602, "message": "unknown prompt"}})
-            continue
-        who = str(req.get("params", {}).get("arguments", {}).get("who", "world"))
-        send({"jsonrpc": "2.0", "id": rid, "result": {
-            "description": "A greeting",
-            "messages": [
-                {"role": "user", "content": {"type": "text",
-                                             "text": "Hello, " + who + "!"}},
-            ]}})
-    elif method == "resources/list":
-        send({"jsonrpc": "2.0", "id": rid, "result": {"resources": [
-            {"uri": "mem://notes/1", "name": "notes", "description": "First note.",
-             "mimeType": "text/plain"},
-            {"uri": "mem://bin/1", "name": "blobby", "mimeType": "application/octet-stream"},
-        ]}})
-    elif method == "resources/read":
-        uri = str((req.get("params") or {}).get("uri", ""))
-        if uri == "mem://notes/1":
-            send({"jsonrpc": "2.0", "id": rid, "result": {"contents": [
-                {"uri": uri, "mimeType": "text/plain", "text": "resource one"}]}})
-        elif uri == "mem://bin/1":
-            send({"jsonrpc": "2.0", "id": rid, "result": {"contents": [
-                {"uri": uri, "mimeType": "application/octet-stream", "blob": "QUJD"}]}})
-        else:
-            send({"jsonrpc": "2.0", "id": rid, "error": {
-                "code": -32602, "message": "unknown resource"}})
-    elif method == "tools/call":
-        name = str(req.get("params", {}).get("name", ""))
-        args = req.get("params", {}).get("arguments", {}) or {}
-        if name == "echo":
-            text = str(args.get("text", ""))
-            send({"jsonrpc": "2.0", "id": rid, "result": {
-                "content": [{"type": "text", "text": "echo:" + text}],
-                "isError": False}})
-        elif name == "rich":
-            send({"jsonrpc": "2.0", "id": rid, "result": {
-                "content": [
-                    {"type": "image", "data": "aGVsbG8=",
-                     "mimeType": "image/png"},
-                    {"type": "resource", "resource": {
-                        "uri": "file:///x.txt", "mimeType": "text/plain",
-                        "text": "resource body"}},
-                    {"type": "resource_link", "uri": "file:///y.txt"},
-                ],
-                "isError": False}})
-        else:
-            send({"jsonrpc": "2.0", "id": rid, "error": {
-                "code": -32601, "message": "unknown tool: " + name}})
-    elif rid is not None:
-        send({"jsonrpc": "2.0", "id": rid, "error": {
-            "code": -32601, "message": "method not found"}})
-""";
-
-
 def _write_mode_server(tmp: str, mode: str) -> list[str] {
-    path = os.path.join(tmp, "mcp_server_" + mode + ".py");
-    with open(path, "w") as f { f.write(FAKE_SERVER_SRC); }
-    return [sys.executable, path, mode];
+    fixture: str = os.path.abspath(os.path.join(os.getcwd(), "agent", "mcp_test_server.mjs"));
+    node_bin: str = os.environ.get("JACKAL_NODE_BIN", "node");
+    return [node_bin, fixture, mode];
 }
 
 
@@ -441,86 +285,14 @@ test "resources list and read round trip" {
 }
 
 
-glob FAKE_HTTP_SERVER_SRC: str = """
-import json, sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
-SID = "sess-42"
-TOOLS = [{"name": "echo", "description": "Echo the given text back.",
-          "inputSchema": {"type": "object",
-                          "properties": {"text": {"type": "string"}},
-                          "required": ["text"]}}]
-
-
-class H(BaseHTTPRequestHandler):
-    def log_message(self, *a):
-        pass
-
-    def _json(self, code, obj, extra=None):
-        payload = json.dumps(obj).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(payload)))
-        for k, v in (extra or {}).items():
-            self.send_header(k, v)
-        self.end_headers()
-        self.wfile.write(payload)
-
-    def do_POST(self):
-        n = int(self.headers.get("Content-Length", 0))
-        req = json.loads(self.rfile.read(n) or b"{}")
-        method = req.get("method", "")
-        rid = req.get("id")
-        if method == "initialize":
-            self._json(200, {"jsonrpc": "2.0", "id": rid, "result": {
-                "protocolVersion": "2025-06-18",
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "fake-http-mcp", "version": "0"}}},
-                {"Mcp-Session-Id": SID})
-        elif method.startswith("notifications/"):
-            self.send_response(202)
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-        elif self.headers.get("Mcp-Session-Id") != SID:
-            self._json(400, {"jsonrpc": "2.0", "id": rid, "error": {
-                "code": -32001, "message": "missing or stale session id"}})
-        elif method == "tools/list":
-            self._json(200, {"jsonrpc": "2.0", "id": rid, "result": {"tools": TOOLS}})
-        elif method == "tools/call":
-            nm = str(req.get("params", {}).get("name", ""))
-            if nm != "echo":
-                self._json(200, {"jsonrpc": "2.0", "id": rid, "error": {
-                    "code": -32601, "message": "method not found"}})
-                return
-            text = str(req.get("params", {}).get("arguments", {}).get("text", ""))
-            body = {"jsonrpc": "2.0", "id": rid, "result": {
-                "content": [{"type": "text", "text": "echo:" + text}],
-                "isError": False}}
-            payload = json.dumps(body)
-            self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream")
-            self.end_headers()
-            self.wfile.write(("event: message\\ndata: " + payload + "\\n\\n").encode())
-        else:
-            self._json(200, {"jsonrpc": "2.0", "id": rid, "error": {
-                "code": -32601, "message": "method not found"}})
-
-
-srv = HTTPServer(("127.0.0.1", 0), H)
-print("READY %d" % srv.server_address[1], flush=True)
-srv.serve_forever()
-""";
-
-
-"""Spawn the fake HTTP server on an ephemeral port; returns the process and
-its URL (blocks until the server prints READY <port>)."""
+"""Spawn the Node fake HTTP server on an ephemeral port and read its READY line."""
 def _start_fake_http_server(tmp: str) -> tuple[any, str] {
-    path: str = os.path.join(tmp, "mcp_http_server.py");
-    with open(path, "w") as f { f.write(FAKE_HTTP_SERVER_SRC); }
+    fixture: str = os.path.abspath(os.path.join(os.getcwd(), "agent", "mcp_test_server.mjs"));
+    node_bin: str = os.environ.get("JACKAL_NODE_BIN", "node");
     err_path: str = os.path.join(tmp, "mcp_http_server.err");
     err_fh: any = open(err_path, "w");
     proc = subprocess.Popen(
-        [sys.executable, path], stdout=subprocess.PIPE,
+        [node_bin, fixture, "http"], stdout=subprocess.PIPE,
         stderr=err_fh, text=True,
     );
     out_pipe: any = proc.stdout;

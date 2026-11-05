@@ -136,7 +136,7 @@ def child_rank(parent: UiContainer, child: UiNode) -> int {
 """Return the single Child parent when mounted, else None."""
 def child_parent(child: UiNode) -> UiContainer | None {
     parents = [child <-:Child:<-];
-    if not parents {
+    if len(parents) == 0 {
         return None;
     }
     return parents[0];
@@ -151,7 +151,7 @@ def enclosing_screen(n: UiNode) -> Screen | None {
             return current;
         }
         parents = [current <-:Child:<-];
-        if not parents {
+        if len(parents) == 0 {
             return None;
         }
         current = parents[0];
@@ -165,7 +165,7 @@ def duplicate_sibling_keys(parent: UiContainer) -> list[str] {
     seen: dict[str, int] = {};
     dups: list[str] = [];
     for child in ordered_children(parent) {
-        if not child.key {
+        if child.key == "" {
             continue;
         }
         count = seen.get(child.key, 0) + 1;
@@ -186,7 +186,7 @@ def is_child_ancestor(ancestor: UiNode, child: UiNode) -> bool {
             return True;
         }
         parents = [current <-:Child:<-];
-        if not parents {
+        if len(parents) == 0 {
             return False;
         }
         current = parents[0];

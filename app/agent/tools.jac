@@ -15,6 +15,7 @@ import fnmatch;
 import re;
 import from core.edit { apply_edit }
 import from .tool_spec { ToolSpec, make_tool_spec, MAX_TOOL_RESULT, MAX_SEARCH_RESULTS }
+import from .registry { create_registry_handle, register_native_handle }
 import from .web_tools {
     _web_search_tool,
     _web_fetch_tool,
@@ -549,6 +550,20 @@ def default_registry() -> ToolRegistry {
         register_native_spec(reg, spec);
     }
     return reg;
+}
+
+
+"""Fresh scalar-handle registry seeded with the built-in native tools."""
+def default_registry_handle() -> int {
+    handle: int = create_registry_handle();
+    for spec in tool_specs() {
+        if spec.handler is not None {
+            register_native_handle(
+                handle, spec.name, spec.description, spec.parameters, spec.handler
+            );
+        }
+    }
+    return handle;
 }
 
 

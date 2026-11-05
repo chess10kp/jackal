@@ -27,7 +27,7 @@ test "hydrate exports stored keys and logout clears only those" {
         assert os.environ.get(key_env) == "sk-test";
         assert stored_providers() == ["openrouter"];
         assert logout_provider("openrouter") == "logged out of openrouter";
-        assert key_env not in os.environ;
+        assert os.environ.get(key_env, "") == "";
         assert stored_providers() == [];
         assert logout_provider("openrouter").startswith("no stored credential");
         assert logout_provider("not-a-provider").startswith("unknown provider");

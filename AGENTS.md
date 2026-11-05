@@ -31,11 +31,11 @@ cd app && ../jac build               # native compile check over app/
 
 **Running:** `./run.sh` launches Jackal through the workspace-built `./jac` (one process, from `app/`, with `JACKAL_ROOT`/`JACKAL_AGENT_DIR` set). Direct commands from `app/` use `../jac run tui/shell.jac` (TTY required) or `../jac run main.jac` (line REPL, add `-- --json` for JSONL protocol). Set `JACKAL_AGENT_DIR=<repo>/pi` and `JACKAL_ROOT=<repo>` so auth/catalogs resolve.
 
-**Dev fast path (dogfooding).** A dev `jac run` inside `app/` always prepares the whole application first, and the `[placement.pins]` there pull the native JIT into that prepare: cold ~6 min, and a *warm* restore hangs (>5 min in `MCJIT`, inside `_restore_sections` → `_load_native_from_cache`). `run.sh` therefore exports `JAC_IGNORE_PLACEMENT_PINS=1` (the vendored compiler honors it and treats every module as server/plain Python): ~3 s warm, ~2 min cold on the bytecode floor. `JACKAL_NATIVE=1 ./run.sh` keeps the pins. Never set `JAC_IGNORE_PLACEMENT_PINS` for `jac build` or a seal read — it would silently drop the pins the seal exists to enforce.
+**Native launch invariant.** `run.sh` launches the TUI without `-b python` and does not ignore placement pins. A server placement or CPython-backed fallback is an N6 blocker to remove, not a supported launch mode. `JAC_IGNORE_PLACEMENT_PINS` may be used only for isolated compiler diagnostics; never use it for product launch, `jac build`, or a seal read because it hides the placement state being closed.
 
 **Requirements:** build Jac with `./scripts/setup-vendor-jac.sh` (Zig 0.16.0 required); a TTY for the TUI; provider API keys via env or auth.json (see below).
 
-**macOS (Apple Silicon):** no compiler build needed — `./scripts/setup-macos.sh` installs the published `jac-<ver>-macos-aarch64` release binary as `./jac` (checksum-verified, self-contained runtime, no Python/zig). Running Jackal on macOS never requires Xcode or a source build; `--build` is only for native-lowering work.
+**macOS (Apple Silicon):** no compiler build needed to install the published `jac-<ver>-macos-aarch64` release binary as `./jac`. It is checksum-verified and self-contained, but currently embeds CPython; removing that payload remains an N6 compiler seam. Running Jackal on macOS does not require Xcode or a source build; `--build` is for compiler/native-lowering work.
 
 ---
 
@@ -49,7 +49,7 @@ app/tui/shell.jac  LiveShell (native TUI, ~2.4k LOC)
     │   runs run_tui(): raw input → normalizer → event handling → render loop
     │
     ▼
-app/agent/session.jac  THE agent loop (server placement)
+app/agent/session.jac  THE agent loop (native target; full root seal remains open)
     ├─ run_turn() on a worker thread; events flow to the UI queue
     ├─ tools (read/write/edit/bash/web/...), approvals (agent/approvals.jac)
     ├─ fx-style provider routing + LLM transport (agent/llm.jac)
@@ -62,7 +62,7 @@ app/ui/  OSP differential-TUI framework (terminal, renderer, editor,
          transcript, layout engine via constraints/, markdown, focus, overlays)
 ```
 
-- **Placement:** UI and agent modules are server-pinned by explicit pins in `app/jac.toml`; pure compute targets native (`core.edit` is natively pinned as the dogfooding example). Test suites are being lowered natively suite-by-suite (recent commits annotate types until each suite passes under `default_codespace = "native"`).
+- **Placement:** `app/jac.toml` defaults to native. Its explicit server pins are temporary lowering blockers, not supported product architecture; remove them as the import graph seals. The goal includes native test dispatch and no Python runtime in the delivered Jac compiler.
 - **Plugin host invariant (D21):** JavaScript never blocks the first frame. See [`docs/PLUGIN-HOST-PLAN.md`](docs/PLUGIN-HOST-PLAN.md).
 
 ## Source map (`app/`)
@@ -112,8 +112,7 @@ These paths are frozen. A deletion commit is upcoming — do not extend them:
 | `JACKAL_LOG` | `agent/logging.jac` | Structured JSONL debug log. `1` → `<cwd>/.jackal/logs/<date>-<pid>.jsonl`; any other value is a sink path. Unset/`0` = off |
 | `JACKAL_LOG_LEVEL` | `agent/logging.jac` | `debug`/`info`/`warn`/`error` threshold (default `info`) |
 | `JACKAL_SANDBOX_ROOT` | `agent/tools.jac` | When set, file tools reject paths outside this root (lexical `..` containment; off by default) |
-| `JAC_IGNORE_PLACEMENT_PINS` | vendored jac (`project/`, `compiler/placement/`) | Mutes `[placement.pins]` for this run — the dev fast path `run.sh` sets it. Never for `jac build`. |
-| `JACKAL_NATIVE` | `run.sh` | `1` keeps the native placement pins instead of the fast path |
+| `JAC_IGNORE_PLACEMENT_PINS` | vendored jac (`project/`, `compiler/placement/`) | Diagnostic-only switch that mutes `[placement.pins]`; forbidden for product launch, `jac build`, and seal verification. |
 | `JACKAL_ALLOW_PRIVATE_HOSTS` | `agent/web_tools.jac` | Offline-test escape hatch: lets `web_fetch` reach loopback/private hosts that the SSRF guard blocks. Never set in a normal session |
 
 Legacy vars (`JACKAL_HEAP_MB`, `JACKAL_TUI_OUT`, `JACKAL_SKIP_TUI_COMPILE`) belong to the old launcher path and die with the launcher cleanup. Provider keys come from env (e.g. `OPENROUTER_API_KEY`) or `auth.json` (byte-compatible with the legacy pi-ai shape; see `app/agent/auth.jac`).
@@ -169,7 +168,7 @@ Pruned as stale (legacy-runtime-bound, moot after deletion): `@jac/pi` hook nami
 ### Native lowering
 
 - Unannotated kwargs and intermediate values block native lowering; recent history is a steady stream of "annotate X so suite Y lowers natively" commits.
-- Placement pins are explicit and deliberate: the whole layout path stays server-pinned; `core.edit` is the showcase native pin. Don't add pins casually.
+- Placement pins are explicit and temporary: the layout path and agent/TUI imports still have native blockers; no server pin is an end-state exemption. Don't add pins casually.
 - In Jac tests, `root` is a built-in reference name; use `tmp_dir` or similar instead.
 - `node` is a Jac keyword → use `node_bin` in plugin-host code.
 

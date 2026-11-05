@@ -1,4 +1,4 @@
-"""Tool registry tests (merged with agent/registry.jac via same-stem annex).
+"""Tool registry tests kept separate from agent/registry.jac.
 
 Covers native/js registration, invoke routing, schema export, and extension teardown.
 """
@@ -7,6 +7,17 @@ import os;
 import json;
 import tempfile;
 import shutil;
+import from .registry {
+    create_registry,
+    register_native,
+    register_js,
+    get_tool,
+    invoke,
+    as_tool_specs,
+    openai_tools,
+    unregister,
+    unregister_extension,
+}
 
 
 def _echo(text: str) -> str {

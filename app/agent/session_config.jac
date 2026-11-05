@@ -1,16 +1,26 @@
-"""Session configuration, model preferences, and MCP attachment."""
+"""Session configuration, model preferences, and MCP attachment.
+
+Registry operations cross into agent.registry through scalar native handles.
+"""
 
 import os;
 import json;
+import io;
 import time;
 import fnmatch;
 import threading;
 
-import from .compaction { load_project_config }
-import from .llm { provider_for, credential_error }
-import from .modes { DEV_MODES, register_mcp_read_only_tools, unregister_mcp_read_only_tools }
+import from .project_config { load_project_config }
+import from .provider_routes { provider_for, credential_error }
 import from .plugin_bridge { PluginBridge, fire_hook, drain_model_requests }
-import from .registry { ToolRegistry, register_native, unregister, get_tool }
+import from .modes { DEV_MODES, register_mcp_read_only_tools, unregister_mcp_read_only_tools }
+import from .registry {
+    create_registry_handle,
+    register_native_handle,
+    unregister_tool_handle,
+    has_tool_handle,
+    registry_tool_names_handle,
+}
 import from .mcp {
     McpClient,
     create_mcp_client,
@@ -30,7 +40,6 @@ import from .session_state {
     model,
     thinking_level,
     mode,
-    plugins,
     _model_prefs,
     _model_prefs_loaded,
     set_mode_state,
@@ -41,11 +50,13 @@ import from .session_state {
     get_thinking_level_state,
     adopt_model_prefs,
 }
+import from .session_plugins { plugins, get_plugin_bridge }
+import from .session_cwd { get_session_cwd }
 
 
 # Serializes transparent restarts so concurrent tool calls against a dead
 # server produce exactly ONE restart, never a loop.
-glob _MCP_REVIVE_LOCK: any = threading.Lock();
+glob _MCP_REVIVE_LOCK: threading.Lock = threading.Lock();
 
 
 def set_mode(next_mode: str) -> str {
@@ -91,77 +102,83 @@ Spec shape (all keys present, defaults shown):
 Malformed entries (and unsupported types) are skipped silently."""
 def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
     out: dict[str, dict[str, any]] = {};
-    raw: any = cfg.get("mcp") if isinstance(cfg, dict) else None;
-    if not isinstance(raw, dict) {
+    raw_mcp: any = cfg.get("mcp") if isinstance(cfg, dict) else None;
+    if not isinstance(raw_mcp, dict) {
         return out;
     }
-    servers: any = raw.get("servers");
-    if not isinstance(servers, dict) {
+    mcp_cfg: dict[str, any] = raw_mcp as dict[str, any];
+    raw_servers: any = mcp_cfg.get("servers");
+    if not isinstance(raw_servers, dict) {
         return out;
     }
-    for (name, ent) in servers.items() {
+    servers: dict[str, any] = raw_servers as dict[str, any];
+    for (name, raw_ent) in servers.items() {
+        ent: any = raw_ent;
         if not isinstance(ent, dict) or not str(name) {
             continue;
         }
+        ent_cfg: dict[str, any] = ent as dict[str, any];
         stype: str = "stdio";
-        raw_type: any = ent.get("type", "stdio");
+        raw_type: any = ent_cfg.get("type", "stdio");
         if isinstance(raw_type, str) and str(raw_type).strip() {
             stype = str(raw_type).strip().lower();
         }
         # common scalar/policy keys parse identically for both transports
         env: dict[str, str] = {};
-        raw_env: any = ent.get("env");
+        raw_env: any = ent_cfg.get("env");
         if isinstance(raw_env, dict) {
-            for (env_k, env_v) in raw_env.items() {
+            env_cfg: dict[str, any] = raw_env as dict[str, any];
+            for (env_k, env_v) in env_cfg.items() {
                 env[str(env_k)] = str(env_v);
             }
         }
-        cwd: str = str(ent.get("cwd", "") or "");
+        cwd: str = str(ent_cfg.get("cwd", "") or "");
         enabled: bool = True;
-        raw_enabled: any = ent.get("enabled", True);
+        raw_enabled: any = ent_cfg.get("enabled", True);
         if isinstance(raw_enabled, bool) {
             enabled = raw_enabled;
         }
         timeout: float = -1.0;
-        raw_to: any = ent.get("timeout");
-        if isinstance(raw_to, (int, float)) and float(raw_to) > 0.0 {
-            timeout = float(raw_to);
+        raw_to: any = ent_cfg.get("timeout");
+        if isinstance(raw_to, (int, float)) and (raw_to as float) > 0.0 {
+            timeout = raw_to as float;
         }
         read_only: bool = False;
-        raw_ro: any = ent.get("read_only", False);
+        raw_ro: any = ent_cfg.get("read_only", False);
         if isinstance(raw_ro, bool) {
             read_only = raw_ro;
         }
         read_only_tools: list[str] = [];
-        raw_rot: any = ent.get("read_only_tools");
+        raw_rot: any = ent_cfg.get("read_only_tools");
         if isinstance(raw_rot, list) {
             for pat in raw_rot {
                 read_only_tools.append(str(pat));
             }
         }
         allow_tools: list[str] = [];
-        raw_allow: any = ent.get("allow_tools");
+        raw_allow: any = ent_cfg.get("allow_tools");
         if isinstance(raw_allow, list) {
             for pat in raw_allow {
                 allow_tools.append(str(pat));
             }
         }
         deny_tools: list[str] = [];
-        raw_deny: any = ent.get("deny_tools");
+        raw_deny: any = ent_cfg.get("deny_tools");
         if isinstance(raw_deny, list) {
             for pat in raw_deny {
                 deny_tools.append(str(pat));
             }
         }
         if stype in ("http", "streamable-http", "streamable_http") {
-            url: str = str(ent.get("url", "") or "");
+            url: str = str(ent_cfg.get("url", "") or "");
             if not url.startswith(("http://", "https://")) {
                 continue;
             }
             headers: dict[str, str] = {};
-            raw_hdrs: any = ent.get("headers");
+            raw_hdrs: any = ent_cfg.get("headers");
             if isinstance(raw_hdrs, dict) {
-                for (hk, hv) in raw_hdrs.items() {
+                hdr_cfg: dict[str, any] = raw_hdrs as dict[str, any];
+                for (hk, hv) in hdr_cfg.items() {
                     headers[str(hk)] = str(hv);
                 }
             }
@@ -181,7 +198,7 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
             };
             continue;
         }
-        cmd: any = ent.get("command");
+        cmd: any = ent_cfg.get("command");
         if isinstance(cmd, str) {
             cmd = [cmd];
         }
@@ -189,7 +206,7 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
             continue;
         }
         parts: list[str] = [str(c) for c in cmd];
-        extra: any = ent.get("args");
+        extra: any = ent_cfg.get("args");
         if isinstance(extra, list) {
             parts.extend([str(a) for a in extra]);
         }
@@ -268,7 +285,7 @@ exposes resources. Reading a resource is inherently read-only, so the
 generated tool is marked plan/ask-safe. A server-declared tool already
 owning the name wins (the generated reader is skipped, notice explains).
 Returns 1 when registered."""
-def _register_resource_tool(reg: ToolRegistry, server_name: str, client: McpClient) -> int {
+def _register_resource_tool(reg: int, server_name: str, client: McpClient) -> int {
     listed = mcp_list_resources(client, timeout_s=5.0);
     if not listed.get("ok") {
         return 0;  # resources capability absent: normal, not an error
@@ -279,7 +296,7 @@ def _register_resource_tool(reg: ToolRegistry, server_name: str, client: McpClie
     }
     sprefix: str = _mcp_name_chunk(server_name);
     full_name: str = "mcp_" + sprefix + "_read_resource";
-    if get_tool(reg, full_name) is not None {
+    if has_tool_handle(reg, full_name) {
         plugins.mcp_notices.append(
             "mcp server " + server_name + " exposes resources but its own "
             + full_name + " tool wins; no generated resource reader"
@@ -287,7 +304,7 @@ def _register_resource_tool(reg: ToolRegistry, server_name: str, client: McpClie
         return 0;
     }
     try {
-        register_native(
+        register_native_handle(
             reg,
             full_name,
             "Read one resource by URI from mcp server " + server_name
@@ -312,13 +329,19 @@ def _register_resource_tool(reg: ToolRegistry, server_name: str, client: McpClie
 """Public alias of _mcp_server_specs for UI modules (underscore names did
 not bind across modules at runtime): {name: argv} (windows show commands)."""
 def mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
-    rich = _mcp_server_specs(cfg);
+    rich: dict[str, dict[str, any]] = _mcp_server_specs(cfg);
     out: dict[str, list[str]] = {};
     for (name, spec) in rich.items() {
         if str(spec.get("type", "stdio")) == "http" {
             out[name] = [str(spec.get("url", ""))];
         } else {
-            out[name] = [str(c) for c in spec["cmd"]];
+            raw_cmd: any = spec.get("cmd", []);
+            cmd_values: list[any] = raw_cmd as list[any];
+            cmd: list[str] = [];
+            for part in cmd_values {
+                cmd.append(str(part));
+            }
+            out[name] = cmd;
         }
     }
     return out;
@@ -470,15 +493,18 @@ def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] 
             if not isinstance(raw_servers, dict) {
                 continue;
             }
-            for (name, ent) in raw_servers.items() {
+            servers_cfg: dict[str, any] = raw_servers as dict[str, any];
+            for (name, raw_ent) in servers_cfg.items() {
+                ent: any = raw_ent;
                 sname: str = str(name);
                 if not sname or not isinstance(ent, dict) {
                     continue;
                 }
+                ent_cfg: dict[str, any] = ent as dict[str, any];
                 if sname in us or sname in proj_specs {
                     continue;
                 }
-                raw_cmd: any = ent.get("command");
+                raw_cmd: any = ent_cfg.get("command");
                 if not isinstance(raw_cmd, (str, list)) or not raw_cmd {
                     continue;  # http-shaped or malformed: not importable
                 }
@@ -492,7 +518,7 @@ def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] 
                     }
                     server_entry["command"] = parts;
                 }
-                raw_args: any = ent.get("args");
+                raw_args: any = ent_cfg.get("args");
                 if isinstance(raw_args, list) {
                     args_out: list[str] = [];
                     for a in raw_args {
@@ -500,15 +526,17 @@ def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] 
                     }
                     server_entry["args"] = args_out;
                 }
-                raw_env: any = ent.get("env");
+                raw_env: any = ent_cfg.get("env");
                 if isinstance(raw_env, dict) {
                     env_out: dict[str, str] = {};
-                    for (ek, ev) in raw_env.items() {
+                    env_cfg: dict[str, any] = raw_env as dict[str, any];
+                    for (ek, ev) in env_cfg.items() {
                         env_out[str(ek)] = str(ev);
                     }
                     server_entry["env"] = env_out;
                 }
-                if ent.get("disabled") is True {
+                disabled: any = ent_cfg.get("disabled", False);
+                if isinstance(disabled, bool) and disabled {
                     server_entry["enabled"] = False;
                 }
                 us[sname] = server_entry;
@@ -564,20 +592,26 @@ object so registered handlers keep working). Returns True when a healthy
 initialized client is available afterwards. Serialized by a module lock:
 concurrent callers collapse into one restart and reuse the result."""
 def _revive_client(server_name: str) -> bool {
-    client: any = plugins.mcp_clients.get(server_name);
+    client: McpClient | None = plugins.mcp_clients.get(server_name);
     if client is None {
         return False;
     }
     spec: dict[str, any] = dict(plugins.mcp_specs.get(server_name, {}));
     spec_type: str = str(spec.get("type", "stdio"));
-    cmd: list[str] = [str(c) for c in spec.get("cmd", [])];
+    raw_cmd: any = spec.get("cmd", []);
+    cmd_values: list[any] = raw_cmd as list[any];
+    cmd: list[str] = [];
+    for part in cmd_values {
+        cmd.append(str(part));
+    }
     if not cmd and spec_type != "http" {
         return False;
     }
     env_extra: dict[str, str] = {};
     raw_env: any = spec.get("env", {});
     if isinstance(raw_env, dict) {
-        for (env_k, env_v) in raw_env.items() {
+        env_cfg: dict[str, any] = raw_env as dict[str, any];
+        for (env_k, env_v) in env_cfg.items() {
             env_extra[str(env_k)] = str(env_v);
         }
     }
@@ -585,17 +619,18 @@ def _revive_client(server_name: str) -> bool {
     timeout: float = -1.0;
     raw_to: any = spec.get("timeout", -1.0);
     if isinstance(raw_to, (int, float)) {
-        timeout = float(raw_to);
+        timeout = raw_to as float;
     }
     url: str = str(spec.get("url", "") or "");
     headers: dict[str, str] = {};
     raw_hdrs: any = spec.get("headers", {});
     if isinstance(raw_hdrs, dict) {
-        for (hk, hv) in raw_hdrs.items() {
+        hdr_cfg: dict[str, any] = raw_hdrs as dict[str, any];
+        for (hk, hv) in hdr_cfg.items() {
             headers[str(hk)] = str(hv);
         }
     }
-    lock: any = _MCP_REVIVE_LOCK;
+    lock: threading.Lock = _MCP_REVIVE_LOCK;
     lock.acquire();
     try {
         # Another thread may have revived it while we waited on the lock.
@@ -698,8 +733,8 @@ def mcp_pump_notifications() {
 why; a successful diff updates counts and announces the delta."""
 def _refresh_server_tools(server_name: str) {
     client: any = plugins.mcp_clients.get(server_name);
-    reg = plugins.reg;
-    if client is None or reg is None {
+    reg: int = plugins.reg;
+    if client is None or reg <= 0 {
         return;
     }
     listed = mcp_list_tools(client, timeout_s=5.0);
@@ -726,25 +761,31 @@ def _refresh_server_tools(server_name: str) {
         }
     }
     removed: int = 0;
-    for tname in list(reg.tools.keys()) {
+    tool_names: list[str] = registry_tool_names_handle(reg);
+    for tname in tool_names {
         n: str = str(tname);
         mine: bool = plugins.mcp_owned.get(n, "") == server_name;
         if n.startswith(prefix) and mine and (n not in wanted_full) {
-            if unregister(reg, n) {
+            if unregister_tool_handle(reg, n) {
                 plugins.mcp_owned.pop(n, None);
                 removed += 1;
             }
         }
     }
     spec: dict[str, any] = dict(plugins.mcp_specs.get(server_name, {}));
-    stats = _register_server_tools(reg, server_name, client, spec, raw_tools);
-    ro_names: list[str] = list(stats["ro_names"]);
-    unregister_mcp_read_only_tools(list(plugins.mcp_read_only.get(server_name, [])));
+    stats: dict[str, any] = _register_server_tools(reg, server_name, client, spec, raw_tools);
+    raw_ro_names: list[any] = stats["ro_names"] as list[any];
+    ro_names: list[str] = [];
+    for raw_name in raw_ro_names {
+        ro_names.append(str(raw_name));
+    }
+    old_ro_names: list[str] = plugins.mcp_read_only.get(server_name, []);
+    unregister_mcp_read_only_tools(old_ro_names);
     if ro_names {
         register_mcp_read_only_tools(ro_names);
     }
     n_res: int = _register_resource_tool(reg, server_name, client);
-    plugins.mcp_read_only[server_name] = list(plugins.mcp_read_only.get(server_name, []));
+    plugins.mcp_read_only[server_name] = old_ro_names;
     plugins.mcp_tools = max(0, plugins.mcp_tools - removed) + int(stats["registered"]) + n_res;
     _mcp_set_status(
         server_name, "connected",
@@ -765,7 +806,7 @@ with a _<n> suffix; if no slot is found the tool is reported lost (never
 silently swallowed). Returns {"registered", "lost", "lost_names",
 "ro_names"} and records ownership in plugins.mcp_owned.""" 
 def _register_server_tools(
-    reg: ToolRegistry,
+    reg: int,
     server_name: str,
     client: McpClient,
     spec: dict[str, any],
@@ -839,8 +880,7 @@ def _register_server_tools(
             schema = {"type": "object", "properties": {}, "required": []};
         }
         full_name: str = "mcp_" + sprefix + "_" + tname;
-        existing = get_tool(reg, full_name);
-        if existing is not None and plugins.mcp_owned.get(full_name, "") != server_name {
+        if has_tool_handle(reg, full_name) and plugins.mcp_owned.get(full_name, "") != server_name {
             renamed: bool = False;
             # Prefer this server's own previous renamed slot so repeated
             # attaches stay on one stable name instead of marching _2, _3…
@@ -856,7 +896,7 @@ def _register_server_tools(
                 # Collision with a foreign tool: rename deterministically.
                 for n in range(2, 51) {
                     cand: str = full_name + "_" + str(n);
-                    if get_tool(reg, cand) is None {
+                    if not has_tool_handle(reg, cand) {
                         full_name = cand;
                         renamed = True;
                         plugins.mcp_notices.append(
@@ -886,7 +926,7 @@ def _register_server_tools(
             ro_names.append(full_name);
         }
         try {
-            register_native(
+            register_native_handle(
                 reg,
                 full_name,
                 str(t.get("description", "")),
@@ -922,7 +962,7 @@ frontends)."""
 def _attach_one_mcp_server(server_name: str, spec_json: str) {
     try {
         reg = plugins.reg;
-        if reg is None {
+        if reg <= 0 {
             return;
         }
         # The spec crosses the flow boundary as an immutable JSON string.
@@ -944,11 +984,17 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
             unregister_mcp_read_only_tools(stale_ro);
         }
         plugins.mcp_read_only[server_name] = [];
-        cmd: list[str] = [str(c) for c in spec.get("cmd", [])];
+        raw_cmd: any = spec.get("cmd", []);
+        cmd_values: list[any] = raw_cmd as list[any];
+        cmd: list[str] = [];
+        for part in cmd_values {
+            cmd.append(str(part));
+        }
         env_extra: dict[str, str] = {};
         raw_env: any = spec.get("env", {});
         if isinstance(raw_env, dict) {
-            for (env_k, env_v) in raw_env.items() {
+            env_cfg: dict[str, any] = raw_env as dict[str, any];
+            for (env_k, env_v) in env_cfg.items() {
                 env_extra[str(env_k)] = str(env_v);
             }
         }
@@ -956,14 +1002,15 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
         timeout: float = -1.0;
         raw_to: any = spec.get("timeout", -1.0);
         if isinstance(raw_to, (int, float)) {
-            timeout = float(raw_to);
+            timeout = raw_to as float;
         }
         spec_type: str = str(spec.get("type", "stdio"));
         url: str = str(spec.get("url", "") or "");
         headers: dict[str, str] = {};
         raw_hdrs: any = spec.get("headers", {});
         if isinstance(raw_hdrs, dict) {
-            for (hk, hv) in raw_hdrs.items() {
+            hdr_cfg: dict[str, any] = raw_hdrs as dict[str, any];
+            for (hk, hv) in hdr_cfg.items() {
                 headers[str(hk)] = str(hv);
             }
         }
@@ -1000,22 +1047,37 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
             _mcp_fail(server_name, "tools/list returned no tool array");
             return;
         }
-        stats = _register_server_tools(reg, server_name, client, spec, raw_tools);
-        plugins.mcp_read_only[server_name] = list(stats["ro_names"]);
+        stats: dict[str, any] = _register_server_tools(reg, server_name, client, spec, raw_tools);
+        raw_ro_names: list[any] = stats["ro_names"] as list[any];
+        ro_names: list[str] = [];
+        for raw_name in raw_ro_names {
+            ro_names.append(str(raw_name));
+        }
+        plugins.mcp_read_only[server_name] = ro_names;
         n_res: int = _register_resource_tool(reg, server_name, client);
         plugins.mcp_tools += int(stats["registered"]) + n_res;
+        lost_names: list[any] = stats["lost_names"] as list[any];
+        lost_text: list[str] = [];
+        for lost_name in lost_names {
+            lost_text.append(str(lost_name));
+        }
         if int(stats["lost"]) > 0 {
             plugins.mcp_notices.append(
                 "mcp server " + server_name + " lost " + str(stats["lost"])
                 + " tool(s) to unresolvable name collisions: "
-                + ", ".join([str(x) for x in stats["lost_names"]])
+                + ", ".join(lost_text)
             );
+        }
+        denied_names: list[any] = stats["denied_names"] as list[any];
+        denied_text: list[str] = [];
+        for denied_name in denied_names {
+            denied_text.append(str(denied_name));
         }
         if int(stats["denied"]) > 0 {
             plugins.mcp_notices.append(
                 "mcp server " + server_name + " denied " + str(stats["denied"])
                 + " tool(s) by allow_tools/deny_tools: "
-                + ", ".join([str(x) for x in stats["denied_names"]])
+                + ", ".join(denied_text)
             );
         }
         _mcp_set_status(
@@ -1045,7 +1107,11 @@ def _attach_mcp_servers() {
     specs = _mcp_server_specs(mcp_config(cwd));
     for (name, spec) in specs.items() {
         plugins.mcp_specs[name] = dict(spec);
-        cmd: list[str] = [str(c) for c in spec["cmd"]];
+        raw_cmd: list[any] = spec["cmd"] as list[any];
+        cmd: list[str] = [];
+        for part in raw_cmd {
+            cmd.append(str(part));
+        }
         if str(spec.get("type", "stdio")) == "http" {
             cmd = [str(spec.get("url", ""))];
         }
@@ -1073,8 +1139,13 @@ def mcp_restart(server_name: str) -> str {
         return "unknown mcp server: " + server_name;
     }
     if not spec {
+        raw_cmd: list[any] = cmd as list[any];
+        command: list[str] = [];
+        for part in raw_cmd {
+            command.append(str(part));
+        }
         spec = {
-            "cmd": [str(c) for c in cmd],
+            "cmd": command,
             "env": {},
             "cwd": "",
             "enabled": True,
@@ -1089,12 +1160,13 @@ def mcp_restart(server_name: str) -> str {
         }
         plugins.mcp_clients.pop(server_name, None);
     }
-    reg = plugins.reg;
-    if reg is not None {
+    reg: int = plugins.reg;
+    if reg > 0 {
         prefix: str = "mcp_" + _mcp_name_chunk(server_name) + "_";
         removed: int = 0;
-        for tname in list(reg.tools.keys()) {
-            if str(tname).startswith(prefix) and unregister(reg, str(tname)) {
+        tool_names: list[str] = registry_tool_names_handle(reg);
+        for tname in tool_names {
+            if str(tname).startswith(prefix) and unregister_tool_handle(reg, str(tname)) {
                 removed += 1;
                 plugins.mcp_owned.pop(str(tname), None);
             }
@@ -1103,10 +1175,15 @@ def mcp_restart(server_name: str) -> str {
     }
     # HTTP specs have no argv; keep their endpoint in status so the live
     # status window continues to show the right reconnect target.
-    restart_cmd: list[str] = (
-        [str(spec.get("url", ""))] if is_http
-        else [str(c) for c in spec.get("cmd", cmd)]
-    );
+    restart_cmd: list[str] = [];
+    if is_http {
+        restart_cmd = [str(spec.get("url", ""))];
+    } else {
+        raw_restart_cmd: list[any] = spec.get("cmd", cmd) as list[any];
+        for part in raw_restart_cmd {
+            restart_cmd.append(str(part));
+        }
+    }
     _mcp_set_status(server_name, "connecting", cmd=restart_cmd);
     spec_wire: str = json.dumps(spec);
     flow _attach_one_mcp_server(server_name, spec_wire);
@@ -1143,7 +1220,10 @@ def mcp_resources(server_name: str, uri: str) -> str {
     }
     lines: list[str] = [];
     for name in names {
-        client2: any = plugins.mcp_clients.get(name);
+        client2: McpClient | None = plugins.mcp_clients.get(name);
+        if client2 is None {
+            continue;
+        }
         listed = mcp_list_resources(client2, timeout_s=5.0);
         if not listed.get("ok") {
             continue;
@@ -1152,12 +1232,14 @@ def mcp_resources(server_name: str, uri: str) -> str {
         if not isinstance(raw_res, list) or not raw_res {
             continue;
         }
+        resources: list[any] = raw_res as list[any];
         lines.append(name + ":");
-        for r in raw_res {
-            line: str = "  " + str(r.get("uri", ""));
-            nm: str = str(r.get("name", ""));
+        for raw_item in resources {
+            item: dict[str, any] = raw_item as dict[str, any];
+            line: str = "  " + str(item.get("uri", ""));
+            nm: str = str(item.get("name", ""));
             if nm { line += " — " + nm; }
-            mt: str = str(r.get("mimeType", ""));
+            mt: str = str(item.get("mimeType", ""));
             if mt { line += " (" + mt + ")"; }
             lines.append(line);
         }
@@ -1278,24 +1360,29 @@ def mcp_status_lines() -> list[str] {
 
 
 def _model_prefs_path() -> str {
-    cwd = plugins.cwd if plugins.cwd else os.getcwd();
-    return os.path.join(cwd, ".jackal", "model_prefs.json");
+    cwd: str = get_session_cwd();
+    if not cwd {
+        cwd = os.getcwd();
+    }
+    prefs_dir: str = os.path.join(cwd, ".jackal");
+    return os.path.join(prefs_dir, "model_prefs.json");
 }
 
 
 """One-time defensive load of model_prefs.json (missing/corrupt -> {})."""
-def _load_model_prefs {
+def _load_model_prefs() -> None {
     if _model_prefs_loaded {
         return;
     }
-    path = _model_prefs_path();
+    path: str = _model_prefs_path();
     if not os.path.isfile(path) {
         return;
     }
     try {
-        with open(path, "r") as fh {
-            raw = json.load(fh);
-        }
+        fh: io.FileIO = io.FileIO(path, "rb");
+        raw_bytes: bytes = fh.readall();
+        fh.close();
+        raw: any = json.loads(raw_bytes.decode("utf-8"));
         if isinstance(raw, dict) {
             adopt_model_prefs(raw);
         }
@@ -1312,14 +1399,21 @@ def _record_model_pref(name: str) {
         _load_model_prefs();
         _model_prefs["last"] = name;
         _model_prefs[provider_for(name)] = name;
-        prefs_dir = os.path.join(
-            plugins.cwd if plugins.cwd else os.getcwd(), ".jackal"
+        cwd: str = get_session_cwd();
+        if not cwd {
+            cwd = os.getcwd();
+        }
+        prefs_dir: str = os.path.join(
+            cwd, ".jackal"
         );
         os.makedirs(prefs_dir, exist_ok=True);
-        path = os.path.join(prefs_dir, "model_prefs.json");
-        with open(path, "w") as fh {
-            fh.write(json_pretty(json.dumps(_model_prefs, sort_keys=True)));
-            fh.write("\n");
+        path: str = os.path.join(prefs_dir, "model_prefs.json");
+        fh: io.FileIO = io.FileIO(path, "wb");
+        try {
+            contents: str = json_pretty(json.dumps(_model_prefs, sort_keys=True));
+            fh.write((contents + "\n").encode("utf-8"));
+        } finally {
+            fh.close();
         }
     } except Exception {
     }
@@ -1341,14 +1435,14 @@ string directly). On success fires Pi's model_select hook best-effort so
 listeners see every change regardless of source (/model command or an
 extension's pi.setModel applied via _apply_pending_model_requests) and
 records the per-provider/overall last-model preference."""
-def set_model(name: str) -> str {
+def:pub set_model(name: str) -> str {
     err = credential_error(name);
     if err {
         return err;
     }
     set_model_state(name);
     _record_model_pref(name);
-    b = plugins.bridge;
+    b: any = get_plugin_bridge();
     if b is not None {
         try {
             fire_hook(b as PluginBridge, "model_select", {"model": name});
@@ -1362,9 +1456,9 @@ def set_model(name: str) -> str {
 """Set the reasoning-effort level used for subsequent turns (empty = off).
 The transport layer maps it to the request body's reasoning.effort. Fires
 Pi's thinking_level_select hook best-effort, mirroring set_model."""
-def set_thinking_level(level: str) -> str {
+def:pub set_thinking_level(level: str) -> str {
     set_thinking_level_state(level);
-    b = plugins.bridge;
+    b: any = get_plugin_bridge();
     if b is not None {
         try {
             fire_hook(b as PluginBridge, "thinking_level_select", {"level": level});
@@ -1385,7 +1479,7 @@ def clear_history {
 
 """Apply extension-issued model and thinking-level requests."""
 def _apply_pending_model_requests() {
-    b = plugins.bridge;
+    b: any = get_plugin_bridge();
     if b is None {
         return;
     }

@@ -5,9 +5,9 @@
 # exactly one respect that matters here:
 #
 #   --download (default)  Fetch the self-contained release binary
-#                         (jac-<ver>-macos-aarch64, bundled runtime, no Python
-#                         or pip needed) and install it as ./jac. No compiler
-#                         build, no Xcode, no Zig. ~114 MB.
+#                         (jac-<ver>-macos-aarch64, bundled runtime, no
+#                         separately installed Python or pip needed) as ./jac.
+#                         No compiler build, no Xcode, no Zig. ~114 MB.
 #
 #   --build               Clone/build vendor/jac with scripts/setup-vendor-jac.sh.
 #                         Needs Xcode CLT + Zig 0.16.0, and pulls the pinned
@@ -17,11 +17,6 @@
 #
 # Run it from anywhere; it installs into the repository root.
 #
-# On the fast path: `run.sh` launches with `jac run -b python`, which is an
-# upstream flag and works with the released binary. The additional
-# JAC_IGNORE_PLACEMENT_PINS hook that run.sh also exports is local to the
-# vendor checkout (not on upstream main, absent from the v0.38.3 release), so
-# on a downloaded binary it is simply inert -- harmless, not required.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,7 +24,6 @@ REPO="jaseci-labs/jac"
 DEFAULT_VERSION="0.38.3"
 VERSION="${JAC_VERSION:-$DEFAULT_VERSION}"
 LANE="download"
-INSTALL_DEPS=1
 
 usage() {
   cat <<EOF
@@ -43,7 +37,6 @@ Options:
                       for native-lowering work, not for running jackal).
   --version V         Release version for --download (default $DEFAULT_VERSION,
                       or \$JAC_VERSION).
-  --skip-deps         Do not run 'jac install' in app/ afterwards.
   -h, --help          This message.
 
 After it succeeds:
@@ -68,7 +61,6 @@ while [[ $# -gt 0 ]]; do
       VERSION="$2"
       shift
       ;;
-    --skip-deps) INSTALL_DEPS=0 ;;
     -h | --help)
       usage
       exit 0
@@ -132,15 +124,6 @@ JAC_VERSION_OUT="$("$REPO_ROOT/jac" --version 2>&1 | tail -1)" ||
   die "$REPO_ROOT/jac --version failed (wrong arch, or quarantined: xattr -d com.apple.quarantine ./jac)"
 info "compiler: $JAC_VERSION_OUT"
 
-# --- Project dependencies -------------------------------------------------
-# app/jac.toml declares httpx and pyte under [dependencies.pypi]; the bundled
-# runtime starts empty, so the TUI will not import until they are installed.
-if [[ "$INSTALL_DEPS" == "1" ]]; then
-  info "installing project dependencies (app/jac.toml -> [dependencies.pypi])"
-  (cd "$REPO_ROOT/app" && "$REPO_ROOT/jac" install) ||
-    die "'jac install' failed -- rerun it by hand from app/, or pass --skip-deps to skip"
-fi
-
 # --- Report ---------------------------------------------------------------
 cat <<EOF
 
@@ -152,12 +135,3 @@ Ready.
   seal     : cd app && ../jac build
 
 EOF
-
-if [[ "$LANE" == "download" ]]; then
-  cat <<EOF
-Note: run.sh launches with 'jac run -b python' (upstream flag, works with this
-binary), so the dev fast path is intact. The extra JAC_IGNORE_PLACEMENT_PINS
-hook is local to the vendor checkout and is inert here -- it costs nothing.
-
-EOF
-fi

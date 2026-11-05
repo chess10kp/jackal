@@ -4,6 +4,8 @@ Kept independent from the LLM transport so native consumers such as the
 model catalog do not import the server-facing streaming implementation.
 """
 
+import os;
+
 glob:pub PROVIDER_ROUTES: dict[str, dict[str, any]] = {
     "openrouter": {
         "description": "OpenRouter multi-provider gateway",
@@ -41,3 +43,47 @@ glob:pub PROVIDER_ROUTES: dict[str, dict[str, any]] = {
         "models": ["mock"],
     },
 };
+
+# Dict key iteration and lookup currently lower poorly when the mapped value is
+# a nested dynamic dict. Keep the stable provider key set explicitly typed for
+# native consumers that enumerate credential and model routes.
+glob:pub PROVIDER_IDS: list[str] = [
+    "openrouter", "deepseek", "zai", "openai_compat", "mock",
+];
+
+
+"""Map a model id to its provider id (pure, prefix-based dispatch)."""
+def:pub provider_for(model: str) -> str {
+    if model.startswith("openrouter/") { return "openrouter"; }
+    if model.startswith("deepseek/") { return "deepseek"; }
+    if model.startswith("zai/") { return "zai"; }
+    if model == "mock" or model == "mockllm" or model.startswith("mock/") {
+        return "mock";
+    }
+    if model.startswith("ext/") { return "ext"; }
+    return "openai_compat";
+}
+
+
+"""Return the actionable missing-credential message, or empty when usable."""
+def:pub credential_error(model: str) -> str {
+    try {
+        provider: str = provider_for(model);
+        if provider == "ext" { return ""; }
+        route: dict[str, any] | None = PROVIDER_ROUTES.get(provider);
+        if route is None { return ""; }
+        key_env: str = str(route.get("key_env", ""));
+        if not key_env { return ""; }
+        if os.getenv(key_env, "") { return ""; }
+        fix: str = "set " + key_env;
+        if provider == "openai_compat" {
+            fix += " (or point OPENAI_COMPAT_BASE at your endpoint)";
+        }
+        return (
+            "model \"" + model + "\" routes via " + provider + " — " + fix
+            + " or pick another provider (/model for options)."
+        );
+    } except Exception {
+        return "";
+    }
+}

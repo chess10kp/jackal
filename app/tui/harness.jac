@@ -1,5 +1,5 @@
 """In-process TUI test harness: the real LiveShell rendering into an
-EmulatedTerminal (pyte), with the offline mock model.
+Jac-native EmulatedTerminal with the offline mock model.
 
 Mirrors how Pi tests its TUI against xterm-headless: no PTY, no subprocess,
 no sleeps-and-hope — the test owns the host loop and steps it, so every

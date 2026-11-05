@@ -3,18 +3,19 @@
 import os;
 import time;
 
-import from .session_state { plugins }
+import from .session_plugins { plugins }
+import from .session_cwd { set_session_cwd }
 import from .session_config { set_mode, _attach_mcp_servers, _load_model_prefs }
-import from .agent_tools { register_agent_tools }
-import from .tools { default_registry }
-import from .registry { get_tool }
+import from .agent_tools { register_agent_tools_handle }
+import from .tools { default_registry_handle }
+import from .registry { wrap_handler_handle }
 import from .plugin_bridge {
     PluginBridge,
     create_bridge,
     dispose_bridge,
     host_status,
     ensure_node_host,
-    load_extension_path,
+    load_extension_path_handle,
     fire_hook,
     fire_user_bash,
     fire_project_trust,
@@ -55,7 +56,7 @@ def extensions_status() -> ExtensionStatus {
 def _warm_sidecar(base_cwd: str) {
     bridge = plugins.bridge;
     reg = plugins.reg;
-    if bridge is None or reg is None {
+    if bridge is None or reg <= 0 {
         plugins.phase = "degraded";
         plugins.detail = "missing bridge/registry";
         plugins.ready = True;
@@ -70,7 +71,7 @@ def _warm_sidecar(base_cwd: str) {
         decls: list[ExtensionDecl] = node_sidecar_decls(plugins.decls);
         for d in decls {
             path = resolve_decl_path(d, base_cwd);
-            load_extension_path(
+            load_extension_path_handle(
                 bridge,
                 reg,
                 d.id,
@@ -126,21 +127,20 @@ def _warm_sidecar(base_cwd: str) {
 }
 
 
-"""Boot session plugins: first-frame clock + parallel sidecar when declared.
-
-Returns extensions_status. No Node if undeclared.
-"""
-def session_boot(
+"""Boot session plugins for product roots; status is queried separately."""
+def:pub session_boot_native(
     sid: str = "",
     cwd: str = "",
     decls: list[any] | None = None,
     wait_budget_s: float = 5.0,
     interactive_ui: bool = False,
-) -> ExtensionStatus {
+) -> None {
     requested_mode: str = os.environ.get("JACKAL_MODE", "");
     set_mode(requested_mode if requested_mode else "normal");
     plugins.session_id = sid if sid else "session";
-    plugins.cwd = cwd if cwd else os.getcwd();
+    session_cwd: str = cwd if cwd else os.getcwd();
+    set_session_cwd(session_cwd);
+    plugins.cwd = session_cwd;
     plugins.interactive_ui = interactive_ui;
     plugins.wait_budget_s = wait_budget_s;
     plugins.t_interactive = time.time();
@@ -163,25 +163,16 @@ def session_boot(
         parsed = load_extension_decls(plugins.cwd);
     }
     plugins.decls = parsed;
-    plugins.reg = default_registry();
-    register_agent_tools(plugins.reg);
+    plugins.reg = default_registry_handle();
+    register_agent_tools_handle(plugins.reg);
     # user_bash hook: tools.jac cannot import the bridge (import cycle), so
     # boot wraps the registered run_command handler; fire_user_bash never
     # raises and tolerates bridge=None.
-    rt = get_tool(plugins.reg, "run_command");
-    if rt is not None and rt.handler is not None {
-        cell: dict[str, any] = {"fn": rt.handler};
-
-        def _run_command_hooked(args: dict[str, any]) -> str {
-            cmd = str(args.get("cmd", ""));
-            timeout_raw: any = args.get("timeout_secs", 120);
-            timeout_secs = int(timeout_raw) if timeout_raw is not None else 120;
-            res = str(cell["fn"]({"cmd": cmd, "timeout_secs": timeout_secs}));
-            fire_user_bash(plugins.bridge as PluginBridge | None, cmd, res);
-            return res;
-        }
-        rt.handler = _run_command_hooked;
+    def _after_run_command(args: dict[str, any], result: str) {
+        cmd = str(args.get("cmd", ""));
+        fire_user_bash(plugins.bridge as PluginBridge | None, cmd, result);
     }
+    wrap_handler_handle(plugins.reg, "run_command", _after_run_command);
     # MCP attach (D21): config parse is a cheap sync file read; server spawns
     # run in background flows so boot/first frame is never blocked.
     plugins.mcp_status.clear();
@@ -205,7 +196,7 @@ def session_boot(
         plugins.ready = True;
         plugins.phase = "idle";
         plugins.t_ext_ready = plugins.t_interactive;
-        return extensions_status();
+        return;
     }
 
     plugins.bridge = create_bridge(plugins.session_id);
@@ -214,6 +205,36 @@ def session_boot(
     # Parallel warm — does not block the caller (first frame).
     warm_cwd: str = plugins.cwd;
     plugins.warm_future = flow _warm_sidecar(warm_cwd);
+}
+
+
+"""Boot the headless product session with native-safe defaults."""
+def:pub session_boot_headless() -> None {
+    session_boot_native();
+}
+
+
+"""Boot the interactive TUI session through a scalar-only native ABI."""
+def:pub session_boot_interactive() -> None {
+    session_boot_native(interactive_ui=True);
+}
+
+
+"""Compatibility wrapper for callers that need the initial status snapshot."""
+def session_boot(
+    sid: str = "",
+    cwd: str = "",
+    decls: list[any] | None = None,
+    wait_budget_s: float = 5.0,
+    interactive_ui: bool = False,
+) -> ExtensionStatus {
+    session_boot_native(
+        sid,
+        cwd,
+        decls,
+        wait_budget_s,
+        interactive_ui,
+    );
     return extensions_status();
 }
 
@@ -305,7 +326,7 @@ def session_dispose {
         dispose_bridge(b as PluginBridge);
         plugins.bridge = None;
     }
-    plugins.reg = None;
+    plugins.reg = 0;
     plugins.ready = True;
     plugins.phase = "idle";
     plugins.loaded = 0;

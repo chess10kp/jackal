@@ -46,7 +46,7 @@ obj McpPending {
 }
 
 
-obj McpClient {
+obj:pub McpClient {
     """State holder for one MCP server subprocess."""
     has dead: bool = False,
         proc: subprocess.Popen | None = None,
@@ -297,11 +297,15 @@ def _http_exchange(
             # until the correlated response arrives, buffering anything
             # else (notifications, server requests) bounded like stdio.
             while True {
-                line_raw: str = resp.readline();
+                line_raw: bytes | str = resp.readline();
                 if not line_raw {
                     break;
                 }
-                line_s: str = line_raw.strip();
+                line_s: str = (
+                    line_raw.decode("utf-8")
+                    if isinstance(line_raw, bytes)
+                    else line_raw
+                ).strip();
                 if not line_s {
                     continue;
                 }

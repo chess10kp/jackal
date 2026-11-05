@@ -120,7 +120,7 @@ match() { # match <suite> — filters/keywords are unions; excludes win
 
 _exec_suite() { # _exec_suite <suite> <log> — 124/137/143 mean the timeout bit
   # Suites run with cwd=app/ (the app project): module resolution, placement
-  # pins, and the app venv all resolve there. Running from the repo root
+  # pins resolve there. Running from the repo root
   # makes cross-package imports (tui.*, core.*) resolve against legacy
   # root-level shadow dirs and the root venv, skipping or crashing suites.
   local suite="$1" log="$2" rel="${1#app/}"

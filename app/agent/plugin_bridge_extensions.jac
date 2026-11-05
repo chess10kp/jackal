@@ -3,7 +3,13 @@
 import os;
 
 import from .protocol { Envelope, make_envelope, is_plugin_kind }
-import from .registry { ToolRegistry, register_js, unregister_extension }
+import from .registry {
+    ToolRegistry,
+    register_js,
+    unregister_extension,
+    registry_from_handle,
+    unregister_extension_handle,
+}
 import from .fake_host { FakeUi, ensure_host, touch_bridge }
 import from .plugin_bridge_support { _path_abspath }
 import from .plugin_bridge_core {
@@ -25,7 +31,7 @@ def load_extension(
     reg: ToolRegistry,
     extension_id: str,
     tool_defs: list[dict[str, any]],
-    handlers: dict[str, any],
+    handlers: dict[str, Callable[[dict[str, any]], any]],
 ) -> list[str] {
     if bridge.host_kind == "node" {
         raise RuntimeError("use load_extension_path for the Node host");
@@ -79,6 +85,21 @@ def load_extension(
     );
     touch_bridge(bridge);
     return names;
+}
+
+
+"""Load an extension into a registry kept behind its native scalar handle."""
+def:pub load_extension_handle(
+    bridge: PluginBridge,
+    registry_handle: int,
+    extension_id: str,
+    tool_defs: list[dict[str, any]],
+    handlers: dict[str, Callable[[dict[str, any]], any]],
+) -> list[str] {
+    return load_extension(
+        bridge, registry_from_handle(registry_handle), extension_id,
+        tool_defs, handlers
+    );
 }
 
 
@@ -228,6 +249,23 @@ def load_extension_path(
 }
 
 
+"""Load a Node extension into a registry kept behind its native scalar handle."""
+def:pub load_extension_path_handle(
+    bridge: PluginBridge,
+    registry_handle: int,
+    extension_id: str,
+    path: str,
+    timeout: float = 5.0,
+    requires: list[str] = [],
+    has_ui: bool = False,
+) -> list[str] {
+    return load_extension_path(
+        bridge, registry_from_handle(registry_handle), extension_id, path,
+        timeout=timeout, requires=requires, has_ui=has_ui
+    );
+}
+
+
 def unload_extension(
     bridge: PluginBridge, reg: ToolRegistry, extension_id: str
 ) -> int {
@@ -310,6 +348,16 @@ def unload_extension(
         }
     }
     return removed;
+}
+
+
+"""Unload registrations from a registry kept behind its native scalar handle."""
+def:pub unload_extension_handle(
+    bridge: PluginBridge, registry_handle: int, extension_id: str
+) -> int {
+    return unload_extension(
+        bridge, registry_from_handle(registry_handle), extension_id
+    );
 }
 
 

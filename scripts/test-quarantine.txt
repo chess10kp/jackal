@@ -19,7 +19,7 @@
 # Unquarantine when stored-callable calls lower (or when demotion is
 # order-independent and demoted callees are bridged instead of aborted).
 cordis/core
-# Harness drives the full LiveShell (pyte + native-pinned ui render stack).
+# Harness drives the full LiveShell (Jac emulated terminal + native UI stack).
 # It now RUNS (592 passed, 3 failed) instead of skipping — the old skip was
 # the missing httpx dependency. The 3 failures are text assertions against the
 # in-flight tui/* + ui/demo_live_shell_messages work: the mode badge never

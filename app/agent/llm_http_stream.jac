@@ -10,7 +10,7 @@ import from ssl { create_default_context, SSLSocket }
 import json;
 
 
-obj HttpStreamResponse {
+obj:pub HttpStreamResponse {
     has status: int = 0,
         headers: dict[str, str] = {},
         tcp: socket | None = None,
@@ -139,7 +139,7 @@ def _parse_headers(raw: bytes) -> tuple[int, dict[str, str]] {
 }
 
 
-def post_json_stream(
+def:pub post_json_stream(
     url: str,
     headers: dict[str, str],
     body: dict[str, any],

@@ -1,13 +1,16 @@
 """E2E: MCP servers and subagents through the real entry and mock model."""
 
 import os;
-import sys;
 import json;
 import subprocess;
 
 
+def _node_bin() -> str {
+    return os.environ.get("JACKAL_NODE_BIN", "node");
+}
+
 def _mcp_cfg(env_fail: bool = False) -> dict[str, any] {
-    return {"mcp": {"servers": {"fake": {"command": [sys.executable if not env_fail else "false", fixture_path("fake_mcp.py")]}}}};
+    return {"mcp": {"servers": {"fake": {"command": [_node_bin() if not env_fail else "false", fixture_path("fake_mcp.mjs")]}}}};
 }
 
 
@@ -70,7 +73,7 @@ test "mcp env and cwd reach the server subprocess" {
         sub = os.path.join(sb.project, "sub");
         os.makedirs(sub);
         write_project_config(sb, {"mcp": {"servers": {"fake": {
-            "command": [sys.executable, fixture_path("fake_mcp.py")],
+            "command": [_node_bin(), fixture_path("fake_mcp.mjs")],
             "env": {"FAKE_MCP_TOKEN": "xyz42"},
             "cwd": "sub",
         }}}});
@@ -94,7 +97,7 @@ test "an enabled:false mcp server never attaches" {
     sb = make_sandbox();
     try {
         write_project_config(sb, {"mcp": {"servers": {"off": {
-            "command": [sys.executable, fixture_path("fake_mcp.py")],
+            "command": [_node_bin(), fixture_path("fake_mcp.mjs")],
             "enabled": False,
         }}}});
         sb.script([{"text": "warm"}]);
@@ -119,8 +122,8 @@ test "legacy mcp.json import attaches imported servers with a notice" {
         legacy = os.path.join(sb.agent_dir, "mcp.json");
         with open(legacy, "w") as f {
             f.write(json.dumps({"mcpServers": {
-                "leg": {"command": sys.executable,
-                        "args": [fixture_path("fake_mcp.py")]},
+                "leg": {"command": _node_bin(),
+                        "args": [fixture_path("fake_mcp.mjs")]},
             }}));
         }
         sb.script([{"text": "warm"}]);
@@ -186,7 +189,7 @@ test "an http mcp server attaches and its tools are callable" {
     try {
         # ephemeral fake streamable-HTTP server on loopback
         proc = subprocess.Popen(
-            [sys.executable, fixture_path("fake_mcp_http.py")],
+            [_node_bin(), fixture_path("fake_mcp_http.mjs")],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, bufsize=1,
         );
@@ -223,7 +226,7 @@ test "repl /mcp reports an http server as connected" {
     proc: any = None;
     try {
         proc = subprocess.Popen(
-            [sys.executable, fixture_path("fake_mcp_http.py")],
+            [_node_bin(), fixture_path("fake_mcp_http.mjs")],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, bufsize=1,
         );

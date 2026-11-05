@@ -5,16 +5,18 @@ session_lifecycle, session_turn, and session_commands. Keep this module's
 exports stable: callers import the session API from agent.session.
 """
 
+import os;
 import from .session_state {
-    SessionPlugins,
     history,
     show_stats,
     mode,
-    plugins,
     get_model_state,
     get_thinking_level_state,
     set_model_state,
 }
+import from .session_plugins { SessionPlugins, plugins }
+glob model: str = os.environ.get("JACKAL_MODEL", "openrouter/anthropic/claude-sonnet-5"),
+     thinking_level: str = "";
 import from .session_config {
     set_mode,
     get_mode,
@@ -31,9 +33,6 @@ import from .session_config {
     mcp_server_specs,
     drain_mcp_notices,
 }
-
-glob model: str = get_model_state(),
-     thinking_level: str = get_thinking_level_state();
 
 """Read live scalar session state for callers that outlive the split facade.
 The exported scalar names are maintained by the facade setters for
@@ -71,6 +70,9 @@ def get_thinking_level() -> str {
 }
 import from .session_lifecycle {
     session_boot,
+    session_boot_native,
+    session_boot_headless,
+    session_boot_interactive,
     wait_extensions_ready,
     enqueue_prompt,
     drain_prompt_queue,

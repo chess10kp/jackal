@@ -15,10 +15,11 @@ import from .plugin_bridge_traffic {
     _absorb_pending_fake,
 }
 
-def _absorb_hook_results(bridge: PluginBridge, results: list[any]) {
+def _absorb_hook_results(bridge: any, results: list[any]) {
+    b: PluginBridge = bridge as PluginBridge;
     for r in results {
         if isinstance(r, dict) and r.get("ui_events") {
-            _absorb_payload(bridge, {"ui_events": r["ui_events"]});
+            _absorb_payload(b, {"ui_events": r["ui_events"]});
         }
     }
 }
@@ -336,7 +337,7 @@ def agent_start_gate(bridge: PluginBridge | None, prompt: str) -> dict[str, any]
     return out;
 }
 
-def fire_hook(bridge: PluginBridge, event: str, data: dict[str, any], timeout: float = 10.0) -> list[dict[str, any]] {
+def:pub fire_hook(bridge: PluginBridge, event: str, data: dict[str, any], timeout: float = 10.0) -> list[dict[str, any]] {
     if bridge.host_kind == "node" and _node_alive(bridge) {
         corr = _alloc_corr(bridge);
         _prepare_corr(bridge, corr, expect_kind="hook_done");
@@ -394,6 +395,23 @@ def fire_hook(bridge: PluginBridge, event: str, data: dict[str, any], timeout: f
     _absorb_pending_fake(bridge, h);
     _absorb_hook_results(bridge, results);
     return results;
+}
+
+
+"""Native-safe informational provider response hook boundary.
+
+The HTTP transport passes its header map as JSON across the module boundary;
+the bridge module reconstructs the dynamic hook payload beside fire_hook.
+"""
+def:pub notify_after_provider_response(
+    bridge: any, status: int, headers_json: str, timeout: float,
+) -> None {
+    if bridge is None {
+        return;
+    }
+    headers: dict[str, str] = json.loads(headers_json) as dict[str, str];
+    data: dict[str, any] = {"status": status, "headers": headers};
+    fire_hook(bridge as PluginBridge, "after_provider_response", data, timeout=timeout);
 }
 
 

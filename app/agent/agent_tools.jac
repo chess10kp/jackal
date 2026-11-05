@@ -8,8 +8,18 @@ register_agent_tools.
 import os;
 import json;
 
-import from .session_state { plugins, get_model_state, get_thinking_level_state, get_mode_state }
-import from .registry { ToolRegistry, register_native_spec, create_registry, get_tool }
+import from .session_state { get_model_state, get_thinking_level_state, get_mode_state }
+import from .session_plugins { plugins }
+import from .registry {
+    ToolRegistry,
+    register_native_spec,
+    create_registry,
+    get_tool,
+    create_registry_handle,
+    registry_tool_names_handle,
+    copy_registry_tools_handle,
+    register_native_handle,
+}
 import from .tool_spec { make_tool_spec, ToolSpec }
 import from .tasks { load_tasks, add_task, update_tasks, remove_task_by_id, format_tasks_list }
 import from .subagents {
@@ -120,6 +130,30 @@ def subagent_tool_names(parent: ToolRegistry, allowed: list[str] | None) -> list
 }
 
 
+def subagent_tool_names_handle(parent: int, allowed: list[str] | None) -> list[str] {
+    wanted: set[str] = {};
+    if allowed {
+        for raw in allowed {
+            name: str = str(raw).strip();
+            if name.startswith("mcp:") { name = name[4:]; }
+            if name { wanted.add(NATIVE_TOOL_NAMES.get(name, name)); }
+        }
+    }
+    excluded: set[str] = set(EXCLUDED_SUBAGENT_TOOLS);
+    excluded.add("subagent");
+    usable: list[str] = [];
+    for n in registry_tool_names_handle(parent) {
+        if n not in excluded { usable.append(n); }
+    }
+    if not wanted { return usable; }
+    picked: list[str] = [];
+    for n in usable {
+        if n in wanted { picked.append(n); }
+    }
+    return picked if picked else usable;
+}
+
+
 """Approver for nested loops: subagents cannot prompt the user, so
 confirm-gated calls are refused unless the session mode auto-approves them."""
 def _subagent_approve(name: str, args: dict[str, any]) -> any {
@@ -167,12 +201,10 @@ def _subagent_tool(args: dict[str, any]) -> str {
         want: str = str(overrides.get(agent_name, "") or agent.get("model", "") or overrides.get("__default__", "") or "");
         if want and want != "inherit" and not credential_error(want) { model = want; }
     }
-    parent: ToolRegistry = plugins.reg if plugins.reg is not None else create_registry();
-    child: ToolRegistry = create_registry();
-    for n in subagent_tool_names(parent, allowed) {
-        ent = get_tool(parent, n);
-        if ent is not None { child.tools[n] = ent; }
-    }
+    parent: int = plugins.reg if plugins.reg > 0 else create_registry_handle();
+    child: int = create_registry_handle();
+    names: list[str] = subagent_tool_names_handle(parent, allowed);
+    copy_registry_tools_handle(parent, child, names);
     messages: list[dict[str, any]] = [
         {"role": "system", "content": system + "\n\nYou are a subagent. Complete the task, then reply with a concise final report; the caller sees only that report."},
         {"role": "user", "content": task},
@@ -270,5 +302,16 @@ def agent_tool_specs() -> list[ToolSpec] {
 def register_agent_tools(reg: ToolRegistry) {
     for spec in agent_tool_specs() {
         register_native_spec(reg, spec);
+    }
+}
+
+
+def register_agent_tools_handle(reg: int) {
+    for spec in agent_tool_specs() {
+        if spec.handler is not None {
+            register_native_handle(
+                reg, spec.name, spec.description, spec.parameters, spec.handler
+            );
+        }
     }
 }

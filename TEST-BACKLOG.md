@@ -83,7 +83,7 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
   Fixed app-side by moving that one cross-context case to
   `app/ui/screen.test.jac` (server-placed owner). Upstream:
   [jac#10490](https://github.com/jaseci-labs/jac/issues/10490) (annexes are
-  folded into the hard-pinned unit; no annex-level placement escape). `scripts/seal-pin-guard.py`
+ folded into the hard-pinned unit; no annex-level placement escape). `scripts/seal-pin-guard.mjs`
   now checks the rule statically in CI (`seal-pins` job); see
   [`docs/TESTING.md`](docs/TESTING.md#placement-and-test-annexes).
 - **Linux re-read (floor compiler, kernel stale) — historical**: with the
@@ -138,7 +138,7 @@ Status as of 2026-10-31. Gotchas and runner rules live in [`docs/TESTING.md`](do
 1. **[us] Native lowering gate.** `jac check` runs parse-only; nothing in CI
    proves `app/` seals natively (`../jac build`). Blocked on the runner
  admitting a Zig-built jac (build RAM/time on ubuntu-latest 7 GB is
-   unproven). Shipped instead: `scripts/seal-pin-guard.py` (the `seal-pins`
+   unproven). Shipped instead: `scripts/seal-pin-guard.mjs` (the `seal-pins`
    CI job) statically rejects the native->server boundary class that is
    decidable from source. Once the full gate is feasible, add a `native-build`
    job that builds the

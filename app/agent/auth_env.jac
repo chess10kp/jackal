@@ -6,8 +6,8 @@ TUI, the line REPL, JSONL, and print mode alike.
 """
 
 import os;
-import from .llm { PROVIDER_ROUTES }
-import from .auth {
+import from .provider_routes { PROVIDER_ROUTES, PROVIDER_IDS }
+import from .auth_credentials {
     load_auth_file, save_auth_file, resolve_auth_path, stored_api_key,
     credential_remove, has_credential,
 }
@@ -17,23 +17,23 @@ glob _hydrated_envs: set[str] = set();
 
 
 def _key_env(provider_id: str) -> str {
-    route: any = PROVIDER_ROUTES.get(provider_id, {});
-    return str(route.get("key_env", "") or "") if isinstance(route, dict) else "";
+    if provider_id not in PROVIDER_IDS { return ""; }
+    route: dict[str, any] = PROVIDER_ROUTES[provider_id];
+    return str(route["key_env"] or "");
 }
 
 
 """Export stored API keys for providers whose env var is unset. Explicit
 environment values always win. Returns the providers hydrated."""
 def hydrate_auth_environment() -> list[str] {
-    stored = load_auth_file(resolve_auth_path());
+    stored: dict[str, any] = load_auth_file(resolve_auth_path());
     done: list[str] = [];
-    for prov in PROVIDER_ROUTES {
-        provider_id = str(prov);
-        key_env = _key_env(provider_id);
+    for provider_id in PROVIDER_IDS {
+        key_env: str = _key_env(provider_id);
         if not key_env or os.environ.get(key_env, "") {
             continue;
         }
-        key = stored_api_key(stored, provider_id);
+        key: str = stored_api_key(stored, provider_id) or "";
         if key {
             os.environ[key_env] = key;
             _hydrated_envs.add(key_env);
@@ -54,7 +54,7 @@ def note_hydrated(key_env: str) {
 came from auth.json; a key exported by the user's shell is left alone and
 reported. Returns a status line."""
 def logout_provider(provider_id: str) -> str {
-    if provider_id not in PROVIDER_ROUTES {
+    if provider_id not in PROVIDER_IDS {
         return "unknown provider: " + provider_id;
     }
     path = resolve_auth_path();
@@ -79,10 +79,10 @@ def logout_provider(provider_id: str) -> str {
 
 """Providers with a stored credential (for /logout completion and listing)."""
 def stored_providers() -> list[str] {
-    data = load_auth_file(resolve_auth_path());
+    data: dict[str, any] = load_auth_file(resolve_auth_path());
     out: list[str] = [];
-    for prov in PROVIDER_ROUTES {
-        if has_credential(data, str(prov)) { out.append(str(prov)); }
+    for provider_id in PROVIDER_IDS {
+        if has_credential(data, provider_id) { out.append(provider_id); }
     }
     return out;
 }

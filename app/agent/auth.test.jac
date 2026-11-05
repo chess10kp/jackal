@@ -77,12 +77,16 @@ def _oauth_cred(access: str, refresh: str, expires: int) -> dict[str, any] {
 test "load/save round trip preserves both credential types and unknown keys" {
     tmp = _make_tmp();
     try {
-        data = {
+        data: dict[str, any] = {
             "anthropic": _api_cred("sk-ant-live-1234"),
-            "openai-codex": dict(_oauth_cred("acc-token", "ref-token", 9999999999999),
-                                 **{"account_id": "acct-42", "lastRefresh": "2026-01-01"}),
             "totally-unknown-provider": {"type": "weird", "stuff": [1, 2]},
         };
+        codex: dict[str, any] = _oauth_cred(
+            "acc-token", "ref-token", 9999999999999
+        );
+        codex["account_id"] = "acct-42";
+        codex["lastRefresh"] = "2026-01-01";
+        data["openai-codex"] = codex;
         assert save_auth_file(_auth_path(tmp), data);
 
         loaded = load_auth_file(_auth_path(tmp));
@@ -334,7 +338,8 @@ test "redaction never leaks secrets in any display form" {
     assert masked["type"] == "oauth";
     assert masked["expires"] == 123;
     # Only the tail is shown for long secrets.
-    assert masked["access"].endswith(secret[-4:]);
+    masked_access: str = str(masked["access"]);
+    assert masked_access.endswith(secret[-4:]);
     assert "*" * 8 in str(masked["access"]);
     assert redact_credential(None) is None;
     assert redact_credential([]) is None;
@@ -344,7 +349,7 @@ test "redaction never leaks secrets in any display form" {
     assert short == "*" * 8;
     assert redact_secret("") == "(unset)";
     assert redact_secret(None) == "(unset)";
-    long_masked = redact_secret(secret);
+    long_masked: str = redact_secret(secret);
     assert long_masked.endswith("ZX9Q");
     assert secret not in long_masked;
 }
@@ -360,7 +365,7 @@ def _provider(pid: str, auth_type: str, configured: bool = False) -> dict[str, a
 
 
 test "picker transitions validate entries and drop invalid ones" {
-    st = initial_auth_flow_state();
+    st: dict[str, any] = initial_auth_flow_state();
     assert st["step"]["kind"] == "idle";
     st = transition_auth_flow(st, "open_provider_picker", {"providers": [
         _provider("anthropic", "oauth", True),
@@ -371,7 +376,11 @@ test "picker transitions validate entries and drop invalid ones" {
     ]});
     assert st["step"]["kind"] == "provider_picker";
     assert st["step"]["query"] == "";
-    ids = [str(e["id"]) for e in st["step"]["providers"]];
+    provider_rows: list[dict[str, any]] = st["step"]["providers"];
+    ids: list[str] = [];
+    for provider_row in provider_rows {
+        ids.append(str(provider_row["id"]));
+    }
     assert ids == ["anthropic", "mistral"];
     assert not step_is_pending(st);
 
@@ -388,7 +397,7 @@ test "picker transitions validate entries and drop invalid ones" {
 
 
 test "login happy path: picker to logging_in to browser_auth to logged_in" {
-    st = initial_auth_flow_state();
+    st: dict[str, any] = initial_auth_flow_state();
     st = transition_auth_flow(st, "open_provider_picker", {"providers": [_provider("anthropic", "oauth")]});
     st = transition_auth_flow(st, "set_logging_in",
                               {"providerId": "anthropic", "status": "starting OAuth"});
@@ -399,7 +408,8 @@ test "login happy path: picker to logging_in to browser_auth to logged_in" {
                               {"providerId": "anthropic", "url": "https://auth.example/x"});
     assert st["step"]["kind"] == "browser_auth";
     assert st["step"]["url"] == "https://auth.example/x";
-    assert "instructions" not in st["step"];
+    step: dict[str, any] = st["step"];
+    assert "instructions" not in step;
 
     st = transition_auth_flow(st, "set_browser_auth",
                               {"providerId": "anthropic", "url": "u", "instructions": "paste code"});
@@ -414,7 +424,7 @@ test "login happy path: picker to logging_in to browser_auth to logged_in" {
 
 
 test "user-input steps flag pending until resolved" {
-    st = initial_auth_flow_state();
+    st: dict[str, any] = initial_auth_flow_state();
     st = transition_auth_flow(st, "set_prompt",
                               {"providerId": "p", "message": "API key?", "placeholder": "sk-..."});
     assert st["step"]["kind"] == "prompt";
@@ -441,7 +451,7 @@ test "cancel mid-flow returns to idle from any pending state" {
         ("set_browser_auth", {"providerId": "p", "url": "u"}),
         ("set_logging_in", {"providerId": "p", "status": "s"}),
     ] {
-        st = initial_auth_flow_state();
+        st: dict[str, any] = initial_auth_flow_state();
         st = transition_auth_flow(st, action, payload);
         assert st["step"]["kind"] != "idle";
         cancelled = transition_auth_flow(st, "cancel");

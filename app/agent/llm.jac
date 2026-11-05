@@ -9,12 +9,11 @@ import from .llm_transport {
     ProviderTransport,
     PluginBridge,
     PROVIDER_ROUTES,
-    provider_for,
-    credential_error,
     routed_model_id,
     make_transport,
     make_ext_transport,
 }
+import from .provider_routes { provider_for, credential_error }
 import from .model_catalog {
     catalog_models,
     warm_model_catalog,

@@ -34,13 +34,13 @@ import from .fake_host {
 }
 
 
-def _echo(text: str) -> str {
-    return "JS:" + text;
+def _echo(args: dict[str, any]) -> str {
+    return "JS:" + str(args.get("text", ""));
 }
 
 
 def _tool_echo(args: dict[str, any]) -> str {
-    return _echo(str(args.get("text", "")));
+    return _echo(args);
 }
 
 
@@ -343,7 +343,8 @@ test "fake host command invoke round-trips with notifications" {
 
     missing = invoke_command(bridge, "nope", "");
     assert missing["ok"] is False;
-    assert "unknown command" in missing["error"];
+    missing_error: str = str(missing["error"]);
+    assert "unknown command" in missing_error;
 }
 
 
@@ -370,7 +371,8 @@ test "fake host shortcut invoke fires handler with ui ctx" {
 
     missing = invoke_shortcut(bridge, "ctrl+shift+z");
     assert missing["ok"] is False;
-    assert "unknown shortcut" in missing["error"];
+    missing_error: str = str(missing["error"]);
+    assert "unknown shortcut" in missing_error;
 }
 
 
@@ -401,7 +403,8 @@ test "fake host hook fire runs listeners serially and isolates errors" {
     assert order == ["h1", "boom", "h3"];
     assert len(results) == 3;
     assert results[0]["ok"] is True and results[0]["result"] == "one:hi";
-    assert results[1]["ok"] is False and "listener failed" in results[1]["error"];
+    listener_error: str = str(results[1]["error"]);
+    assert results[1]["ok"] is False and "listener failed" in listener_error;
     assert results[2]["ok"] is True and results[2]["result"] == "three";
 
     # Unregistered event returns empty results (best-effort, never fatal).
@@ -526,8 +529,9 @@ test "node host transforms markdown through the bridge" {
     );
     assert res["ok"] is True;
     # stub_commands replaces ``` with ≡≡≡ (display-only chain over the wire).
-    assert "≡≡≡" in res["markdown"];
-    assert "```" not in res["markdown"];
+    rendered_markdown: str = str(res["markdown"]);
+    assert "≡≡≡" in rendered_markdown;
+    assert "```" not in rendered_markdown;
 
     # No transformers registered on this event path -> identity.
     bare = create_bridge("s-t2b-bare");

@@ -13,7 +13,7 @@ plugin_bridge.jac wrappers so this stays unit-testable in isolation.
 import threading;
 
 
-obj UiInteraction {
+obj:pub UiInteraction {
     has corr: str = "",
         parent_corr: str = "",
         parent_kind: str = "",
@@ -37,8 +37,8 @@ def new_ui_queue() -> UiInteractionQueue {
 }
 
 
-obj UiInteractionQueue {
-    has lock: any = None,
+obj:pub UiInteractionQueue {
+    has lock: threading.Lock = threading.Lock(),
         records: list[UiInteraction] = [],
         by_corr: dict[str, UiInteraction] = {},
         next_id: int = 1;
@@ -55,9 +55,6 @@ obj UiInteractionQueue {
         if str(req.get("parent_corr", "")) == "" {
             return [False, "parent_correlation_id required"];
         }
-        if self.lock is None {
-            self.lock = threading.Lock();
-        }
         self.lock.acquire();
         try {
                 corr = str(req.get("corr", ""));
@@ -68,8 +65,15 @@ obj UiInteractionQueue {
                 if corr in self.by_corr {
                     return [False, f"duplicate correlation {corr}"];
                 }
-                created_f: float = float(req.get("created", 0.0));
-                timeout_f: float = float(req.get("timeout_ms", 30000.0));
+                created_f: float = req.get("created", 0.0) as float;
+                timeout_f: float = req.get("timeout_ms", 30000.0) as float;
+                options: list[str] = [];
+                raw_options: any = req.get("options", []);
+                if isinstance(raw_options, list) {
+                    for option in raw_options as list[any] {
+                        options.append(str(option));
+                    }
+                }
                 rec = UiInteraction(
                     corr=corr,
                     parent_corr=str(req.get("parent_corr", "")),
@@ -78,7 +82,7 @@ obj UiInteractionQueue {
                     method=method,
                     title=str(req.get("title", "")),
                     message=str(req.get("message", "")),
-                    options=[str(o) for o in req.get("options", [])] if isinstance(req.get("options"), list) else [],
+                    options=options,
                     placeholder=str(req.get("placeholder", "")),
                     created=created_f,
                     timeout_ms=timeout_f,
@@ -97,9 +101,6 @@ every tick and answers later via take(). Expired ones reap into element 2."""
     def poll(now: float) -> list[any] {
         live: UiInteraction | None = None;
         expired: list[UiInteraction] = [];
-        if self.lock is None {
-            return [None, []];
-        }
         self.lock.acquire();
         try {
                 remaining: list[UiInteraction] = [];
@@ -123,9 +124,6 @@ every tick and answers later via take(). Expired ones reap into element 2."""
 
     """Pop one record by child correlation (answer or explicit cancel)."""
     def take(corr: str) -> UiInteraction | None {
-        if self.lock is None {
-            return None;
-        }
         self.lock.acquire();
         try {
                 r: any = self.by_corr.pop(corr, None);
@@ -141,9 +139,6 @@ every tick and answers later via take(). Expired ones reap into element 2."""
     """Cancel every open child of one parent; returns the cancelled records."""
     def cancel_by_parent(parent_corr: str) -> list[UiInteraction] {
         cancelled: list[UiInteraction] = [];
-        if self.lock is None {
-            return cancelled;
-        }
         self.lock.acquire();
         try {
                 remaining: list[UiInteraction] = [];
@@ -165,9 +160,6 @@ every tick and answers later via take(). Expired ones reap into element 2."""
     """Cancel everything; returns how many."""
     def cancel_all() -> int {
         n = 0;
-        if self.lock is None {
-            return n;
-        }
         self.lock.acquire();
         try {
                 n = len(self.records);
@@ -180,9 +172,6 @@ every tick and answers later via take(). Expired ones reap into element 2."""
     }
 
     def has_open(parent_corr: str) -> bool {
-        if self.lock is None {
-            return False;
-        }
         self.lock.acquire();
         try {
                 for r in self.records {

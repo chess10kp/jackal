@@ -7,11 +7,13 @@ import from agent.llm { PROVIDER_ROUTES, provider_for }
 import from agent.session {
     get_history, restore_history, get_model,
 }
-import from agent.auth {
+import from agent.auth_credentials {
     load_auth_file, save_auth_file, resolve_auth_path, credential_set,
-    stored_api_key, get_auth_status, transition_auth_flow,
-    initial_auth_flow_state, format_provider_label, oauth_start_login,
+    stored_api_key, get_auth_status,
 }
+import from agent.auth_flow { transition_auth_flow, initial_auth_flow_state }
+import from agent.auth_display { format_provider_label }
+import from agent.auth_network { oauth_start_login }
 import from agent.auth_env { hydrate_auth_environment, note_hydrated }
 import from agent.tasks { load_tasks, format_tasks_list, task_counts }
 import from agent.sessions { list_sessions }

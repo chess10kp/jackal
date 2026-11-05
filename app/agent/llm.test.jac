@@ -78,13 +78,13 @@ obj ScriptedTransport {
     }
 }
 
-def _echo(text: str) -> str {
-    return "ECHO:" + text;
+def _echo(args: dict[str, any]) -> str {
+    return "ECHO:" + str(args.get("text", ""));
 }
 
 
 def _tool_echo(args: dict[str, any]) -> str {
-    return _echo(str(args.get("text", "")));
+    return _echo(args);
 }
 
 def _noop_event(kind: str, data: dict[str, any]) {
@@ -342,19 +342,20 @@ test "unknown tool yields error result without crashing" {
 
 
 test "react loop invokes js tool via registry bridge" {
-    import from .registry { create_registry }
+    import from .registry { create_registry_handle, registry_from_handle }
     import from .plugin_bridge {
         create_bridge,
         load_extension,
         dispose_bridge,
     }
 
-    def _js_echo(text: str) -> str {
-        return "JS:" + text;
+    def _js_echo(args: dict[str, any]) -> str {
+        return "JS:" + str(args.get("text", ""));
     }
 
     messages = [{"role": "user", "content": "echo hi"}];
-    reg = create_registry();
+    reg_handle = create_registry_handle();
+    reg = registry_from_handle(reg_handle);
     bridge = create_bridge("react-js");
     load_extension(
         bridge,
@@ -375,7 +376,7 @@ test "react loop invokes js tool via registry bridge" {
     transport.tool_name = "echo";
     transport.tool_args = "{\"text\": \"hi\"}";
     _events.clear();
-    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge);
+    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg_handle, bridge=bridge);
     assert answer == "done";
     assert _events[4][1]["result"] == "JS:hi";
     dispose_bridge(bridge);
@@ -391,21 +392,22 @@ test "react loop honors tool_call block verdicts from a plugin bridge" {
         ensure_host,
         register_fake_listener,
     }
-    import from .registry { create_registry }
+    import from .registry { create_registry_handle, registry_from_handle }
 
     def _block_no_terminate(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"block": True, "reason": "policy"};
     }
 
     messages = [{"role": "user", "content": "run echo"}];
-    reg = create_registry();
+    reg_handle = create_registry_handle();
+    reg = registry_from_handle(reg_handle);
     bridge = create_bridge("react-gate");
     ensure_host(bridge);
     register_fake_listener(bridge, "tool_call", _block_no_terminate);
     transport = ScriptedTransport();
     transport.tool_name = "echo";
     _events.clear();
-    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge);
+    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg_handle, bridge=bridge);
     # Blocked call becomes an error tool-result; the run continues normally.
     assert answer == "done";
     assert messages[2]["role"] == "tool";
@@ -423,21 +425,22 @@ test "react loop stops early on terminating block verdict" {
         ensure_host,
         register_fake_listener,
     }
-    import from .registry { create_registry }
+    import from .registry { create_registry_handle, registry_from_handle }
 
     def _terminate_block(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"block": True, "reason": "dangerous command", "terminate": True};
     }
 
     messages = [{"role": "user", "content": "run echo"}];
-    reg = create_registry();
+    reg_handle = create_registry_handle();
+    reg = registry_from_handle(reg_handle);
     bridge = create_bridge("react-term");
     ensure_host(bridge);
     register_fake_listener(bridge, "tool_call", _terminate_block);
     transport = ScriptedTransport();
     transport.tool_name = "echo";
     _events.clear();
-    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge);
+    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg_handle, bridge=bridge);
     assert answer == "";
     assert messages[-1]["content"] == "ERROR: blocked by extension: dangerous command";
     kinds = [e[0] for e in _events];
@@ -485,7 +488,11 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
         load_extension,
         dispose_bridge,
     }
-    import from .registry { create_registry, ToolRegistry }
+    import from .registry {
+        create_registry_handle,
+        registry_from_handle,
+        ToolRegistry,
+    }
 
     def _rewrite(data: dict[str, any], ctx: any) -> dict[str, any] | None {
         # Sees the latest content; appends a marker (middleware chain).
@@ -502,7 +509,8 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
     }
 
     messages = [{"role": "user", "content": "run echo"}];
-    reg = create_registry();
+    reg_handle = create_registry_handle();
+    reg = registry_from_handle(reg_handle);
     bridge = create_bridge("react-tres");
     ensure_host(bridge);
     register_fake_listener(bridge as PluginBridge, "tool_result", _rewrite);
@@ -522,7 +530,7 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
     transport.tool_name = "echo";
     transport.tool_args = "{\"text\": \"hi\"}";
     _events.clear();
-    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge);
+    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg_handle, bridge=bridge);
     assert answer == "done";
     # Module-level _echo prefixes ECHO:; the middleware appends +REWRITTEN.
     assert messages[2]["content"] == "ECHO:hi+REWRITTEN";
@@ -539,7 +547,7 @@ test "react loop skips tool execution when cancelled during the gate" {
         load_extension,
         dispose_bridge,
     }
-    import from .registry { create_registry }
+    import from .registry { create_registry_handle, registry_from_handle }
 
     # TurnCancel is module-level in this file.
     cancel = TurnCancel();
@@ -551,7 +559,8 @@ test "react loop skips tool execution when cancelled during the gate" {
     }
 
     messages = [{"role": "user", "content": "run echo"}];
-    reg = create_registry();
+    reg_handle = create_registry_handle();
+    reg = registry_from_handle(reg_handle);
     bridge = create_bridge("react-cancel-gate");
     ensure_host(bridge);
     register_fake_listener(bridge as PluginBridge, "tool_call", _slow_gate);
@@ -569,7 +578,7 @@ test "react loop skips tool execution when cancelled during the gate" {
     transport = ScriptedTransport();
     transport.tool_name = "echo";
     _events.clear();
-    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge, cancel=cancel);
+    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg_handle, bridge=bridge, cancel=cancel);
     # The gate fired; the tool itself must NOT have executed. Cancelled
     # calls get a terminal tool MESSAGE but no tool_result event (matching
     # the pre-existing cancel-before-invoke semantics).
@@ -716,7 +725,7 @@ test "_open_stream fires the hook even when the provider answers non-200" {
     }
 }
 
-import from sse_test_server { make_sse_server }
+import from .sse_test_server { make_sse_server }
 
 
 test "after_provider_response refires per retry attempt through react_loop" {

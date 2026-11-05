@@ -1,23 +1,25 @@
-# Jackal: Pi CLI + Jac (for MCP), with this repo baked in at /opt/jackal.
+# Jackal: Pi CLI + Jac, with this repo baked in at /opt/jackal.
 # Run with your Jac project mounted at /workspace (see README).
 
 FROM node:22-bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+ARG JAC_VERSION=0.38.2
+ARG JAC_SHA256=c712b056820f67e3035d962a547c7eaea1908a497b63b4b89093fecb9b533ed4
+
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
-		python3 \
-		python3-pip \
-		python3-venv \
 		ca-certificates \
+		curl \
 		git \
 	&& rm -rf /var/lib/apt/lists/*
 
-ENV VIRTUAL_ENV=/opt/jac-venv
-RUN python3 -m venv "$VIRTUAL_ENV"
-ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
-RUN pip install --no-cache-dir jaclang
+RUN curl -fsSL \
+		-o /usr/local/bin/jac \
+		"https://github.com/jaseci-labs/jac/releases/download/v${JAC_VERSION}/jac-${JAC_VERSION}-linux-x86_64" \
+	&& echo "${JAC_SHA256}  /usr/local/bin/jac" | sha256sum -c - \
+	&& chmod 0755 /usr/local/bin/jac
 
 # Keep in sync with package.json devDependencies / your local `pi --version`
 ARG PI_VERSION=0.74.0

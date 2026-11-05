@@ -3,7 +3,8 @@
 import sys;
 import json;
 
-import from .session_state { history, plugins }
+import from .session_state { history }
+import from .session_plugins { plugins }
 import from .session_config { _apply_pending_model_requests }
 import from .plugin_bridge {
     PluginBridge,

@@ -29,6 +29,12 @@ import from ui.markup {
     default_shell_registry,
     lower_markup,
 }
+import from agent.protocol {
+    create_adapter,
+    drain_and_drive,
+    enqueue,
+    make_envelope,
+}
 
 
 test "build_main_shell mounts header transcript status prompt once" {
@@ -192,4 +198,58 @@ test "lowered shell matches build_main_shell child keys" {
     } finally {
         dispose_session(session);
     }
+}
+
+
+test "agent envelopes drive shell status tool approval and cancel" {
+    handle = create_session();
+    session = handle.session;
+    shell = build_main_shell(session);
+    adapter = create_adapter("drv");
+    enqueue(adapter.queue, make_envelope(kind="turn_start", turn_id="t1"));
+    enqueue(
+        adapter.queue,
+        make_envelope(
+            kind="text_delta",
+            payload={"text": "hi"},
+            turn_id="t1",
+            correlation_id="c",
+        ),
+    );
+    enqueue(
+        adapter.queue,
+        make_envelope(
+            kind="tool_start",
+            tool_id="bash",
+            payload={"tool": "bash"},
+            turn_id="t1",
+        ),
+    );
+    enqueue(
+        adapter.queue,
+        make_envelope(
+            kind="approval_request",
+            correlation_id="ap-1",
+            tool_id="bash",
+            turn_id="t1",
+        ),
+    );
+    n = drain_and_drive(adapter, shell);
+    assert n == 4;
+    assert adapter.stream_buf == "hi";
+    assert adapter.last_tool == "bash";
+    assert adapter.pending_approval_id == "ap-1";
+    assert shell.status.phase == "approval";
+    enqueue(
+        adapter.queue,
+        make_envelope(
+            kind="turn_cancelled",
+            turn_id="t1",
+            correlation_id="t1",
+        ),
+    );
+    drain_and_drive(adapter, shell);
+    assert shell.status.phase == "cancelled";
+    assert adapter.busy == False;
+    dispose_session(session);
 }

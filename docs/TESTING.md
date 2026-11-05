@@ -10,7 +10,7 @@ locally.
 |---|---|---|
 | Unit | `app/**/<mod>.test.jac` | One module, merged with `<mod>.jac` by stem (symbols visible without imports) |
 | E2E headless | `app/e2e/{print_mode,json_protocol,repl}.test.jac` | The real `main.jac` process: flags, exit codes, output formats, approvals, sessions |
-| TUI (in-process) | `app/tui/harness.test.jac` | The real LiveShell rendering into `EmulatedTerminal` (pyte VT emulator — Pi's xterm-headless `VirtualTerminal` equivalent); the test steps the host loop and asserts on the exact screen |
+| TUI (in-process) | `app/tui/harness.test.jac` | The real LiveShell rendering into the Jac `EmulatedTerminal`; the test steps the host loop and asserts on the exact screen |
 | E2E TUI (PTY) | `app/e2e/tui.test.jac` | `../jac run tui/shell.jac` as a real process under a pseudo-terminal: boot, terminal restore |
 
 Every `*.test.jac` needs a same-stem `*.jac` module (the runner imports it);
@@ -24,9 +24,8 @@ follow, and both are checked without a compiler build:
 
 1. A hard-pinned module (and its `.impl.jac` / `.test.jac` annexes) must not
    call a server-placed module with anything but C-ABI values. Native calling
-   into Python is `E5093` (`Type 'UiSession' ... cannot cross the
-   native->Python call boundary`). Python calling into native is fine — that
-   direction goes through the marshal bridge.
+   into server code is `E5093` (`Type 'UiSession' ... cannot cross the
+   native->server call boundary`).
 2. The seal folds `<mod>.impl.jac` and `<mod>.test.jac` into `<mod>`'s unit
    (`NativeUnitRegistry._module_files_and_imports`). So a test-only import of
    a server module still fails the *module's* hard pin. Keep such cases in the
@@ -34,15 +33,15 @@ follow, and both are checked without a compiler build:
    live in `app/ui/screen.test.jac`, not `app/ui/markup.test.jac`, because
    `ui.markup` is native and `ui.screen` is server.
 
-`scripts/seal-pin-guard.py` enforces rule 1 statically (it reads the pins,
+`scripts/seal-pin-guard.mjs` enforces rule 1 statically (it reads the pins,
 the annexes and the import graph; `CALLED` means an imported server name has a
 call site). Reviewed exceptions live in `scripts/seal-pin-allowlist.txt`; an
 entry that stops crossing is reported XPASS so the list cannot rot. Run it
 directly or rely on the `seal-pins` CI job.
 
 ```bash
-python3 scripts/seal-pin-guard.py            # fail on unlisted crossings
-python3 scripts/seal-pin-guard.py --strict   # also fail on unused imports
+node scripts/seal-pin-guard.mjs            # fail on unlisted crossings
+node scripts/seal-pin-guard.mjs --strict   # also fail on unused imports
 ```
 
 
@@ -85,7 +84,7 @@ try {
 - `jsonl(kind, text, extra)` builds `--json` protocol request lines.
 - `spawn_tui(sb, cols, rows)` → `TuiSession`: `type_text`, `press("enter"|"esc"|"shift+tab"|...)`,
   `wait_for(text)` (fails with a screen dump), `screen_text()`, `raw_output()`,
-  `wait_exit()`, `close()`. Output is replayed into the same pyte-backed
+  `wait_exit()`, `close()`. Output is replayed into the same Jac
   `EmulatedTerminal` the in-process harness uses; assert on visible text.
 
 Always pass `sb.explain(r)` (run output + model calls) / rely on `wait_for`'s dump as the assertion
@@ -94,8 +93,8 @@ message — CI logs are the only debugger.
 ## Emulated terminal TUI harness (`app/tui/harness.jac`)
 
 The Pi approach: render into a real terminal emulator, read back what a user
-would see. `ui/emulated_terminal.jac` wraps pyte (cursor addressing, erase,
-scroll regions, wrapping, wide chars, SGR) behind the `Terminal` interface;
+would see. `ui/emulated_terminal.jac` implements cursor addressing, erase,
+scroll regions, wrapping, wide chars, and SGR behind the `Terminal` interface;
 `tui/shell.jac` exposes `boot_tui(term)` / `tui_step(app)` / `shutdown_tui(app)`
 so a test owns the host loop.
 
@@ -183,13 +182,13 @@ a seal result:
    two. `../jac native build kernel` (a Zig 0.16.0 host with the shared LLVM
    slice) fixes it.
 2. **Read the log, not the exit code.** The seal prints hundreds of demotions;
-   `scripts/seal-report.py` reduces them to hard walls, the source files the
+   `scripts/seal-report.mjs` reduces them to hard walls, the source files the
    diagnostics actually point at, erased fields, soft module demotions, and the
    abort's E-code:
 
    ```bash
    (cd app && ../jac build > /tmp/seal.log 2>&1 || true)
-   python3 scripts/seal-report.py /tmp/seal.log
+   node scripts/seal-report.mjs /tmp/seal.log
    ```
 
    A hard wall is a module pinned `native` that did not lower. Soft demotions

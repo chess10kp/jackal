@@ -1,6 +1,6 @@
 """Slash-command routing through builtins and extension commands."""
 
-import from agent.session { plugins, session_boot, session_dispose }
+import from agent.session { plugins, session_boot, session_dispose, set_mode }
 import from agent.plugin_bridge {
     PluginBridge,
     create_bridge,
@@ -155,7 +155,7 @@ test "handle_command sessions resume export round-trip" {
 
 
 test "headless approver follows the dev-mode policy" {
-    _session.set_mode("normal");
+    set_mode("normal");
     deny = make_approver(None);
     verdict = deny("write_file", {"path": "x"});
     assert isinstance(verdict, str) and "--mode" in verdict;
@@ -166,11 +166,11 @@ test "headless approver follows the dev-mode policy" {
     }
     assert make_approver(yes)("write_file", {"path": "x"}) is True;
     assert asked == ["write_file"];
-    _session.set_mode("yolo");
+    set_mode("yolo");
     assert deny("write_file", {"path": "x"}) is True;
-    _session.set_mode("plan");
+    set_mode("plan");
     assert isinstance(deny("write_file", {"path": "x"}), str);
-    _session.set_mode("normal");
+    set_mode("normal");
 }
 
 

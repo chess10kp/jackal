@@ -23,7 +23,7 @@ The reviewed decisions are binding:
 | Placement | Keep the complete UI layout path **server-pinned**. `ui.model` is OSP-based and `ui.width` imports Python `unicodedata`; moving `ui.layout` to native would contradict the verified placement design. |
 | Solver | Pure Jac, data-oriented Cassowary-style incremental simplex. No OSP nodes/edges in the tableau. |
 | Native work | None in this plan. Profile the landed server implementation first. A later native kernel requires a separate measured design. |
-| External dependency | `kiwisolver` is a test-only differential oracle provisioned by the oracle CI job. It is not an application dependency. |
+| External dependency | None. Seeded generated-system checks and fixed regression fixtures live in the Jac solver suite. |
 | Layout declarations | Process-local `LayoutSpec` and `LayoutRelation` values in the layout registry. OSP `Child` and `Layer` edges supply topology; do not add geometry relations to the semantic graph. |
 | Strengths | Symbolic lexicographic objectives. Do not approximate tiers with undocumented scalar weights. |
 | Grow | Deterministic bounded proportional allocation before constraint emission. Grow weights are not Cassowary strengths. |
@@ -97,7 +97,6 @@ app/
 │   ├── results.jac          # Handles, snapshots, typed solver outcomes
 │   ├── solver.jac           # Incremental tableau, objective, edits, rollback journal
 │   ├── solver.test.jac
-│   └── oracle_driver.jac    # JSONL batch driver; no Kiwi import
 └── ui/
     ├── layout.jac           # Permanent public seam + orchestration
     ├── layout_compile.jac   # Child/Layer topology + registry -> constraints
@@ -614,35 +613,12 @@ Property generators use seeded systems of 1–20 variables and 1–50 constraint
 random add/remove and edit sequences. Every minimized failure becomes a committed fixed
 fixture.
 
-### 8.2 Kiwi differential oracle
+### 8.2 Differential oracle (retired)
 
-Use a separate Python oracle harness; Jac production/test modules never import Kiwi:
-
-```text
-tests/oracle/test_constraints_oracle.py  # stdlib unittest + kiwisolver
-app/constraints/oracle_driver.jac        # batched JSONL stdin/stdout -> Solver
-```
-
-The Python harness generates seeded operation batches, evaluates them with Kiwi, sends
-the same batches to one `jac run constraints/oracle_driver.jac` subprocess with
-`cwd=app`, and compares normalized JSON responses. The driver imports only
-`constraints.*`; it does not import Python or Kiwi. JSON includes schema version, seed,
-variables, constraints, ordered operations, snapshots, residuals, objective vector, and
-error code. Unknown schema versions fail before execution.
-
-Exact local/CI command:
-
-```bash
-python3 -m venv .venv-layout-oracle
-.venv-layout-oracle/bin/python -m pip install 'kiwisolver==1.5.0'
-.venv-layout-oracle/bin/python tests/oracle/test_constraints_oracle.py \
-  --jac "$(command -v jac)"
-```
-
-The script uses `unittest` from the standard library, exits non-zero on disagreement,
-and prints the seed plus a minimized JSON fixture. CI caches or recreates the virtual
-environment outside application packaging. Do not add `kiwisolver` to `app/jac.toml`
-runtime dependencies.
+The temporary Kiwi differential harness and its Python/JSONL subprocess boundary were
+removed in M6. Required-system classification, residual validity, determinism,
+incremental add/remove behavior, and edit sequences are covered by seeded and fixed
+Jac solver tests. The test suite has no external solver or Python-package dependency.
 
 Compare:
 
@@ -728,10 +704,10 @@ Exit criteria:
 - finite float and sparse `dict[int, float]` row operations work without compiler
   fallback;
 - one equality system solves deterministically;
-- `kiwisolver` can be imported only in the oracle test job;
+- no external solver or Python package is needed for solver validation;
 - baseline row-operation and one-shot timings are recorded; and
 - `docs/decisions.org` records the server-first pure-Jac solver, symbolic strengths,
-  axis separation, test-only Kiwi oracle, and no-workaround stop rule.
+  axis separation, seeded solver properties, and no-workaround stop rule.
 
 Stop if any compiler/package requirement cannot be met directly. File a human handoff;
 do not vendor or shim.

@@ -73,7 +73,11 @@ test "Owns edge scopes UI-local ownership without Child containment" {
     screen +>:Child(rank=1024):+> prompt;
     prompt +>:Owns:+> draft_holder;
     assert draft_holder in [prompt ->:Owns:->];
-    assert draft_holder not in [screen ->:Child:->];
+    # The only containment child is the prompt; the owned status node is
+    # deliberately connected through Owns instead.
+    children = [screen ->:Child:->];
+    assert len(children) == 1;
+    assert children[0] is prompt;
 }
 
 

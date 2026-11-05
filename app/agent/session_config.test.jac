@@ -6,8 +6,8 @@ are used directly, no import from .session_config.
 """
 
 import os;
-import sys;
 import json;
+import subprocess;
 import tempfile;
 import shutil;
 
@@ -125,48 +125,6 @@ test "missing user config yields project-only mcp config" {
     }
 }
 
-glob REF_SERVER_SRC: str = """
-import sys, json
-
-def send(obj):
-    sys.stdout.write(json.dumps(obj) + "\\n")
-    sys.stdout.flush()
-
-calls = 0
-for raw in sys.stdin:
-    raw = raw.strip()
-    if not raw:
-        continue
-    try:
-        req = json.loads(raw)
-    except Exception:
-        continue
-    method = req.get("method", "")
-    rid = req.get("id")
-    if method == "initialize":
-        send({"jsonrpc": "2.0", "id": rid, "result": {
-            "protocolVersion": "2025-06-18",
-            "capabilities": {"tools": {}},
-            "serverInfo": {"name": "ref-mcp", "version": "0"}}})
-    elif method == "notifications/initialized":
-        pass
-    elif method == "tools/list":
-        # Registration in the annex test is manual (the tool dict is passed
-        # straight to _register_server_tools), so the FIRST list request
-        # already belongs to the post-change refresh.
-        calls += 1
-        name = "alpha" if calls == 0 else "beta"
-        send({"jsonrpc": "2.0", "id": rid, "result": {"tools": [
-            {"name": name, "description": "refcount tool",
-             "inputSchema": {"type": "object", "properties": {},
-                             "required": []}}]}})
-    elif method == "tools/call":
-        send({"jsonrpc": "2.0", "id": rid, "result": {
-            "content": [{"type": "text", "text": "pong"}], "isError": False}})
-    elif rid is not None:
-        send({"jsonrpc": "2.0", "id": rid, "error": {
-            "code": -32601, "message": "method not found"}})
-""";
 
 
 def _reset_mcp_plugin_state {
@@ -177,9 +135,15 @@ def _reset_mcp_plugin_state {
     plugins.mcp_owned.clear();
     plugins.mcp_notices.clear();
     plugins.mcp_tools = 0;
-    plugins.reg = None;
+    plugins.reg = 0;
 }
 
+
+def _refresh_server_cmd() -> list[str] {
+    fixture: str = os.path.abspath(os.path.join(os.getcwd(), "agent", "mcp_test_server.mjs"));
+    node_bin: str = os.environ.get("JACKAL_NODE_BIN", "node");
+    return [node_bin, fixture, "refresh"];
+}
 
 def _spec_for(cmd: list[str]) -> dict[str, any] {
     return {
@@ -196,15 +160,11 @@ def _spec_for(cmd: list[str]) -> dict[str, any] {
 
 test "tools/list_changed refresh diffs the registry without a respawn" {
     tmp = tempfile.mkdtemp(prefix="jackal-mcp-ref-");
-    reg = ToolRegistry();
+    reg: int = create_registry_handle();
     plugins.reg = reg;
     client = create_mcp_client();
     try {
-        path = os.path.join(tmp, "ref_server.py");
-        fh: any = open(path, "w");
-        fh.write(REF_SERVER_SRC);
-        fh.close();
-        cmd = [sys.executable, path];
+        cmd = _refresh_server_cmd();
         started = mcp_start(client, cmd, timeout_s=10.0);
         assert started.get("ok") is True, str(started.get("error", "no error"));
         plugins.mcp_clients["t"] = client;
@@ -214,7 +174,7 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
             {"name": "alpha", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
         ]);
         assert int(stats["registered"]) == 1;
-        assert get_tool(reg, "mcp_t_alpha") is not None;
+        assert has_tool_handle(reg, "mcp_t_alpha");
         assert plugins.mcp_owned.get("mcp_t_alpha", "") == "t";
 
         # Server now serves "beta"; a buffered list_changed must diff.
@@ -222,11 +182,12 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
             "jsonrpc": "2.0", "method": "notifications/tools/list_changed",
         });
         mcp_pump_notifications();
-        reg_names = sorted([str(k) for k in reg.tools.keys()]);
+        reg_names: list[str] = registry_tool_names_handle(reg);
+        reg_names.sort();
         notes = " | ".join(plugins.mcp_notices);
-        assert get_tool(reg, "mcp_t_alpha") is None, (
+        assert not has_tool_handle(reg, "mcp_t_alpha"), (
             "alpha still registered: " + str(reg_names) + " notices: " + notes);
-        assert get_tool(reg, "mcp_t_beta") is not None, (
+        assert has_tool_handle(reg, "mcp_t_beta"), (
             "beta missing: " + str(reg_names) + " notices: " + notes);
         assert plugins.mcp_owned.get("mcp_t_beta", "") == "t";
         assert int(plugins.mcp_status["t"]["tools"]) == 1;
@@ -241,7 +202,7 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
 
 
 test "cross-server tool name collisions rename deterministically" {
-    reg = ToolRegistry();
+    reg: int = create_registry_handle();
     plugins.reg = reg;
     dummy = create_mcp_client();
     try {
@@ -250,13 +211,13 @@ test "cross-server tool name collisions rename deterministically" {
             {"name": "x", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
         ]);
         assert int(s1["registered"]) == 1 and int(s1["lost"]) == 0;
-        assert get_tool(reg, "mcp_a_b_x") is not None;
+        assert has_tool_handle(reg, "mcp_a_b_x");
         # "a-b" sanitizes to the same chunk: second registration must rename
         s2 = _register_server_tools(reg, "a-b", dummy, spec, [
             {"name": "x", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
         ]);
         assert int(s2["registered"]) == 1 and int(s2["lost"]) == 0;
-        assert get_tool(reg, "mcp_a_b_x_2") is not None;
+        assert has_tool_handle(reg, "mcp_a_b_x_2");
         assert plugins.mcp_owned.get("mcp_a_b_x", "") == "a.b";
         assert plugins.mcp_owned.get("mcp_a_b_x_2", "") == "a-b";
         joined = " ".join(plugins.mcp_notices);
@@ -266,8 +227,8 @@ test "cross-server tool name collisions rename deterministically" {
             {"name": "x", "description": "d2", "inputSchema": {"type": "object", "properties": {}, "required": []}},
         ]);
         assert int(s3["registered"]) == 1;
-        assert get_tool(reg, "mcp_a_b_x_2") is not None;
-        assert get_tool(reg, "mcp_a_b_x_3") is None;
+        assert has_tool_handle(reg, "mcp_a_b_x_2");
+        assert not has_tool_handle(reg, "mcp_a_b_x_3");
     } finally {
         _reset_mcp_plugin_state();
     }
@@ -275,22 +236,19 @@ test "cross-server tool name collisions rename deterministically" {
 
 test "health check flips dead servers to failed with a notice" {
     tmp = tempfile.mkdtemp(prefix="jackal-mcp-hc-");
-    reg = ToolRegistry();
+    reg: int = create_registry_handle();
     plugins.reg = reg;
     client = create_mcp_client();
     try {
-        path = os.path.join(tmp, "hc_server.py");
-        fh: any = open(path, "w");
-        fh.write(REF_SERVER_SRC);
-        fh.close();
-        cmd = [sys.executable, path];
+        cmd = _refresh_server_cmd();
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         plugins.mcp_clients["t"] = client;
         plugins.mcp_specs["t"] = _spec_for(cmd);
         plugins.mcp_status["t"] = {"state": "connected", "error": "", "tools": 1, "cmd": cmd};
         # Kill the process out from under the healthy status.
-        client.proc.kill();
-        client.proc.wait(timeout=5);
+        proc: subprocess.Popen = client.proc as subprocess.Popen;
+        proc.kill();
+        proc.wait(timeout=5);
         mcp_health_check();
         assert str(plugins.mcp_status["t"]["state"]) == "failed";
         assert "died" in str(plugins.mcp_status["t"]["error"]);
@@ -306,23 +264,20 @@ test "health check flips dead servers to failed with a notice" {
 
 test "a tool call against a dead server revives once and succeeds" {
     tmp = tempfile.mkdtemp(prefix="jackal-mcp-rv-");
-    reg = ToolRegistry();
+    reg: int = create_registry_handle();
     plugins.reg = reg;
     client = create_mcp_client();
     try {
-        path = os.path.join(tmp, "rv_server.py");
-        fh: any = open(path, "w");
-        fh.write(REF_SERVER_SRC);
-        fh.close();
-        cmd = [sys.executable, path];
+        cmd = _refresh_server_cmd();
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         plugins.mcp_clients["t"] = client;
         plugins.mcp_specs["t"] = _spec_for(cmd);
         plugins.mcp_status["t"] = {"state": "connected", "error": "", "tools": 1, "cmd": cmd};
         handler = _make_mcp_handler(client, "t", "ping");
         # Kill the server, then call: transparent restart + retry must land.
-        client.proc.kill();
-        client.proc.wait(timeout=5);
+        proc: subprocess.Popen = client.proc as subprocess.Popen;
+        proc.kill();
+        proc.wait(timeout=5);
         res: str = handler({});
         assert res == "pong", res;
         assert str(plugins.mcp_status["t"]["state"]) == "connected";
@@ -340,7 +295,7 @@ test "a tool call against a dead server revives once and succeeds" {
 }
 
 test "allow_tools and deny_tools gate registration (deny wins)" {
-    reg = ToolRegistry();
+    reg: int = create_registry_handle();
     plugins.reg = reg;
     dummy = create_mcp_client();
     try {
@@ -354,9 +309,9 @@ test "allow_tools and deny_tools gate registration (deny wins)" {
         ];
         stats = _register_server_tools(reg, "g", dummy, spec, tools);
         assert int(stats["registered"]) == 1;
-        assert get_tool(reg, "mcp_g_read_docs") is not None;
-        assert get_tool(reg, "mcp_g_read_secret") is None;
-        assert get_tool(reg, "mcp_g_write_docs") is None;
+        assert has_tool_handle(reg, "mcp_g_read_docs");
+        assert not has_tool_handle(reg, "mcp_g_read_secret");
+        assert not has_tool_handle(reg, "mcp_g_write_docs");
         assert int(stats["denied"]) == 2;
         assert sorted([str(x) for x in stats["denied_names"]]) == ["read_secret", "write_docs"];
     } finally {
@@ -365,7 +320,7 @@ test "allow_tools and deny_tools gate registration (deny wins)" {
 }
 
 test "mcp_restart_failed restarts only failed servers" {
-    reg = ToolRegistry();
+    reg: int = create_registry_handle();
     plugins.reg = reg;
     try {
         plugins.mcp_status = {
@@ -423,8 +378,8 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
         );
         assert sorted(imported) == ["leg_off", "leg_one", "leg_two"], imported;
         # user config written with mapped entries
-        user_cfg: any = json.load(open(os.path.join(home_dir, ".jackal", "config.json")));
-        servers: any = user_cfg["mcp"]["servers"];
+        user_cfg: dict[str, any] = dict(json.load(open(os.path.join(home_dir, ".jackal", "config.json"))));
+        servers: dict[str, any] = dict(user_cfg["mcp"]["servers"]);
         assert servers["leg_one"]["command"] == "uvx";
         assert servers["leg_one"]["args"] == ["srv-one"];
         assert servers["leg_off"]["enabled"] is False;
@@ -435,8 +390,9 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
         # one-time marker: a second call is a no-op
         again = mcp_import_legacy(home_dir=home_dir, sources=[src1, src2]);
         assert again == [];
-        user_cfg2: any = json.load(open(os.path.join(home_dir, ".jackal", "config.json")));
-        assert "leg_web" not in user_cfg2["mcp"]["servers"];
+        user_cfg2: dict[str, any] = dict(json.load(open(os.path.join(home_dir, ".jackal", "config.json"))));
+        servers2: dict[str, any] = dict(user_cfg2["mcp"]["servers"]);
+        assert "leg_web" not in servers2;
     } finally {
         if old_agent_dir {
             os.environ["JACKAL_AGENT_DIR"] = old_agent_dir;

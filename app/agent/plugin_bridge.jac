@@ -62,10 +62,13 @@ import from .plugin_bridge_io {
 }
 import from .plugin_bridge_extensions {
     load_extension,
+    load_extension_handle,
     caps_satisfied,
     ui_cap_satisfied,
     load_extension_path,
+    load_extension_path_handle,
     unload_extension,
+    unload_extension_handle,
     invoke_shortcut,
     cancel_tool,
     drain_inbox,

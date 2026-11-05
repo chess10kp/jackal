@@ -21,6 +21,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - uses: ./.github/actions/setup-jac
         with:
           version: ${{ env.JAC_VERSION }}
@@ -39,8 +42,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Native pins vs server imports
-        run: python3 scripts/seal-pin-guard.py
+        run: node scripts/seal-pin-guard.mjs
 
   # Memory profile of the harness process tree under the mock provider.
   # Always annotates; the strict 100 MB resident budget gates in
@@ -51,6 +57,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - uses: ./.github/actions/setup-jac
         with:
           version: ${{ env.JAC_VERSION }}

@@ -48,7 +48,7 @@ def user_argv(raw: list[str]) -> list[str] {
     start: int = 1;
     for i in range(len(raw)) {
         a: str = raw[i];
-        if a.endswith("main.jac") or a.endswith("main.py") or a == "main" {
+        if a.endswith("main.jac") or a == "main" {
             start = i + 1;
             break;
         }

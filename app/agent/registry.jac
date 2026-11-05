@@ -12,7 +12,7 @@ import from .tool_spec {
 import from .logging { log_exception }
 
 
-obj RegisteredTool {
+obj:pub RegisteredTool {
     has name: str = "",
         description: str = "",
         parameters: dict[str, any] = {},
@@ -23,13 +23,48 @@ obj RegisteredTool {
 }
 
 
-obj ToolRegistry {
+obj:pub ToolRegistry {
     has tools: dict[str, RegisteredTool] = {};
 }
 
 
+glob _registry_handles: dict[int, ToolRegistry] = {},
+     _next_registry_handle: int = 1;
+
+
 def create_registry() -> ToolRegistry {
     return ToolRegistry();
+}
+
+
+"""Create a scalar handle for a registry owned by this module.
+
+The handle keeps concrete registry layouts inside this module across native
+unit boundaries. Callers exchange only an integer and data transfer values.
+"""
+def:pub create_registry_handle() -> int {
+    handle: int = _next_registry_handle;
+    _next_registry_handle += 1;
+    _registry_handles[handle] = ToolRegistry();
+    return handle;
+}
+
+
+def _registry_for_handle(handle: int) -> ToolRegistry {
+    reg: ToolRegistry | None = _registry_handles.get(handle);
+    if reg is None {
+        raise ValueError("unknown tool registry handle");
+    }
+    return reg;
+}
+
+
+"""Resolve a registry handle for native cross-module APIs.
+
+The returned object remains owned by this module; callers use it opaquely.
+"""
+def:pub registry_from_handle(handle: int) -> ToolRegistry {
+    return _registry_for_handle(handle);
 }
 
 
@@ -116,6 +151,151 @@ def unregister(reg: ToolRegistry, name: str) -> bool {
         return True;
     }
     return False;
+}
+
+
+"""Opaque-handle APIs for modules that keep ToolRegistry behind `any`.
+
+These keep the concrete registry layout inside this module, so native callers
+do not need the compiler to import the ToolRegistry field layout."""
+def:pub has_tool_opaque(registry: any, name: str) -> bool {
+    reg: ToolRegistry = registry as ToolRegistry;
+    return get_tool(reg, name) is not None;
+}
+
+
+def:pub unregister_tool_opaque(registry: any, name: str) -> bool {
+    reg: ToolRegistry = registry as ToolRegistry;
+    return unregister(reg, name);
+}
+
+
+def:pub register_native_opaque(
+    registry: any,
+    name: str,
+    description: str,
+    parameters: dict[str, any],
+    handler: Callable[[dict[str, any]], str],
+) -> None {
+    reg: ToolRegistry = registry as ToolRegistry;
+    register_native(reg, name, description, parameters, handler);
+}
+
+
+def:pub registry_tool_names(registry: any) -> list[str] {
+    reg: ToolRegistry = registry as ToolRegistry;
+    names: list[str] = [];
+    for (name, _tool) in reg.tools.items() {
+        names.append(name);
+    }
+    return names;
+}
+
+
+def:pub register_native_handle(
+    handle: int,
+    name: str,
+    description: str,
+    parameters: dict[str, any],
+    handler: Callable[[dict[str, any]], str],
+) -> None {
+    register_native(
+        _registry_for_handle(handle), name, description, parameters, handler
+    );
+}
+
+
+def:pub register_js_handle(
+    handle: int,
+    name: str,
+    description: str,
+    parameters: dict[str, any],
+    extension_id: str,
+) -> None {
+    register_js(
+        _registry_for_handle(handle), name, description, parameters, extension_id
+    );
+}
+
+
+def:pub has_tool_handle(handle: int, name: str) -> bool {
+    return get_tool(_registry_for_handle(handle), name) is not None;
+}
+
+
+def:pub unregister_tool_handle(handle: int, name: str) -> bool {
+    return unregister(_registry_for_handle(handle), name);
+}
+
+
+def:pub registry_tool_names_handle(handle: int) -> list[str] {
+    reg: ToolRegistry = _registry_for_handle(handle);
+    names: list[str] = [];
+    for (name, _tool) in reg.tools.items() {
+        names.append(name);
+    }
+    return names;
+}
+
+
+def:pub registry_tool_specs_handle(handle: int) -> list[dict[str, any]] {
+    reg: ToolRegistry = _registry_for_handle(handle);
+    specs: list[dict[str, any]] = [];
+    for (_name, tool) in reg.tools.items() {
+        specs.append({
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.parameters,
+            "origin": tool.origin,
+        });
+    }
+    return specs;
+}
+
+
+def:pub copy_registry_tools_handle(
+    source_handle: int, target_handle: int, names: list[str]
+) -> None {
+    source: ToolRegistry = _registry_for_handle(source_handle);
+    target: ToolRegistry = _registry_for_handle(target_handle);
+    for name in names {
+        tool: RegisteredTool | None = get_tool(source, name);
+        if tool is not None {
+            target.tools[name] = tool;
+        }
+    }
+}
+
+
+def:pub unregister_extension_handle(handle: int, extension_id: str) -> int {
+    return unregister_extension(_registry_for_handle(handle), extension_id);
+}
+
+
+def:pub invoke_handle(
+    handle: int, name: str, args: dict[str, any], bridge: any = None
+) -> str {
+    return invoke(_registry_for_handle(handle), name, args, bridge);
+}
+
+
+def:pub wrap_handler_handle(
+    handle: int,
+    name: str,
+    after: Callable[[dict[str, any], str], None],
+) -> bool {
+    tool: RegisteredTool | None = get_tool(_registry_for_handle(handle), name);
+    if tool is None or tool.handler is None {
+        return False;
+    }
+    inner: Callable[[dict[str, any]], str] = tool.handler;
+    def wrapped(args: dict[str, any]) -> str {
+        result: str = str(inner(args));
+        after(args, result);
+        return result;
+    }
+    tool.handler = wrapped;
+    return True;
 }
 
 

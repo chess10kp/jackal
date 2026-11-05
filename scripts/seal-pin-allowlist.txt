@@ -1,4 +1,4 @@
-# Crossings a hard native pin may not take (see scripts/seal-pin-guard.py).
+# Crossings a hard native pin may not take (see scripts/seal-pin-guard.mjs).
 # Format: <module> | <importing file> | <target module> | <reason>
 #
 # Every entry is a known native->server reference made from a module pinned

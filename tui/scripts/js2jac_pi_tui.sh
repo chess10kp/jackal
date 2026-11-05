@@ -9,6 +9,8 @@ OUT="$JACKAL_TUI/pi_jac_floor"
 DRIVER="$JACKAL_TUI/scripts/holeconvert.mjs"
 [[ -f "$DRIVER" ]] || DRIVER="$JAC_REPO/../scripts/js2jac_dataset/source/holeconvert.mjs"
 [[ -f "$DRIVER" ]] || DRIVER="/home/jac/repos/jac_llm_data/scripts/js2jac_dataset/source/holeconvert.mjs"
+FLOOR_TOOL="$JACKAL_TUI/scripts/js2jac_floor.mjs"
+[[ -f "$FLOOR_TOOL" ]] || { echo "missing floor converter: $FLOOR_TOOL"; exit 1; }
 
 export PATH="$HOME/.local/bin:$PATH"
 command -v jac >/dev/null || { echo "jac not on PATH"; exit 1; }
@@ -16,89 +18,14 @@ command -v bun >/dev/null || { echo "bun required for holeconvert.mjs"; exit 1; 
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
-
-python3 - "$PI_TUI" "$OUT" "$DRIVER" "$JAC_REPO" <<'PY'
-import json, re, subprocess, sys
-from pathlib import Path
-
-pi_tui, out, driver, jac_repo = map(Path, sys.argv[1:5])
-src = pi_tui / "src"
-summary = []
-
-# Mirror convert_bridge.mjs's snakeCasePathSegment() exactly: the emitted
-# imports are rewritten to snake_case sibling paths so kebab-case sources
-# qualify for the dotted relative-import form (jac#8371 workaround). The
-# on-disk .jac filenames MUST use the identical transform or those rewritten
-# imports won't resolve in project mode.
-def snake_seg(seg):
-    if seg in (".", ".."):
-        return seg
-    out_seg = re.sub(r"[^A-Za-z0-9_]+", "_", seg)
-    if re.match(r"^[0-9]", out_seg):
-        out_seg = "_" + out_seg
-    return out_seg or "_"
-
-def jac_out_rel(rel):
-    stem_parts = rel.with_suffix("").parts
-    return Path(*(snake_seg(p) for p in stem_parts)).with_suffix(".jac")
-
-seen_out_paths = {}  # out_path (str) -> source rel path that claimed it
-
-for fp in sorted(src.rglob("*.ts")):
-    rel = fp.relative_to(pi_tui)
-    js = fp.read_text(errors="replace")
-    p = subprocess.run(
-        ["bun", str(driver)],
-        input=json.dumps({"js": js, "path": str(rel)}),
-        capture_output=True, text=True, timeout=120,
-    )
-    try:
-        res = json.loads(p.stdout)
-    except Exception as e:
-        summary.append({"path": str(rel), "status": "driver_error", "error": str(e)})
-        continue
-    if not res.get("ok"):
-        summary.append({"path": str(rel), "status": "reject"})
-        continue
-    jac = res.get("jac", "")
-    out_rel = jac_out_rel(rel)
-    out_key = str(out_rel)
-    if out_key in seen_out_paths:
-        print(
-            f"COLLISION: {rel} and {seen_out_paths[out_key]} both snake_case to {out_key}",
-            file=sys.stderr,
-        )
-        summary.append({"path": str(rel), "status": "collision", "conflicts_with": seen_out_paths[out_key]})
-        continue
-    seen_out_paths[out_key] = str(rel)
-    out_path = out / out_rel
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(jac)
-    holes = jac.count("JS2JAC-HOLE")
-    cp = subprocess.run(
-        ["jac", "check", str(out_path)],
-        capture_output=True, text=True, timeout=90, cwd=str(jac_repo),
-    )
-    check_ok = cp.returncode == 0 and "FAILED" not in (cp.stdout + cp.stderr)
-    summary.append({
-        "path": str(rel),
-        "status": "floor",
-        "bytes": len(jac),
-        "holes": holes,
-        "jac_check": check_ok,
-    })
-
-# Project-mode check: whole floor tree, cross-file imports resolve.
-cp = subprocess.run(
-    ["jac", "check", str(out)],
-    capture_output=True, text=True, timeout=180, cwd=str(jac_repo),
-)
-project_ok = cp.returncode == 0 and "FAILED" not in (cp.stdout + cp.stderr)
-(out.parent / "pi_jac_floor_project_check.txt").write_text(cp.stdout + cp.stderr)
-
-(out.parent / "pi_jac_floor_summary.json").write_text(json.dumps(summary, indent=2))
-floor = [s for s in summary if s.get("status") == "floor"]
-print(f"floor={len(floor)} reject={len(summary)-len(floor)} check_pass={sum(1 for s in floor if s.get('jac_check'))} project_check={'PASS' if project_ok else 'FAIL'}")
-PY
+node "$FLOOR_TOOL" \
+  --source-root "$PI_TUI/src" \
+  --base "$PI_TUI" \
+  --out "$OUT" \
+  --driver "$DRIVER" \
+  --summary "$JACKAL_TUI/pi_jac_floor_summary.json" \
+  --project-log "$JACKAL_TUI/pi_jac_floor_project_check.txt" \
+  --jac-cwd "$JAC_REPO" \
+  --project-timeout 180
 
 echo "Wrote $OUT"

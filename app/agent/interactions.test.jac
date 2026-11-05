@@ -50,15 +50,18 @@ test "poll peeks FIFO head without detaching" {
     q = new_ui_queue();
     q.enqueue(_req(parent="p1"));
     q.enqueue(_req(method="confirm", parent="p2"));
-    first = q.poll(time.monotonic());
-    assert first[0] is not None and first[0].parent_corr == "p1";
+    first: list[any] = q.poll(time.monotonic());
+    first_record: UiInteraction = first[0] as UiInteraction;
+    assert first_record.parent_corr == "p1";
     # Peek semantics: still queued until taken.
-    again = q.poll(time.monotonic() + 1.0);
-    assert again[0] is not None and again[0].parent_corr == "p1";
-    peeked: any = first[0];
+    again: list[any] = q.poll(time.monotonic() + 1.0);
+    again_record: UiInteraction = again[0] as UiInteraction;
+    assert again_record.parent_corr == "p1";
+    peeked: UiInteraction = first[0] as UiInteraction;
     assert q.take(peeked.corr) is not None;
-    second = q.poll(time.monotonic() + 2.0);
-    assert second[0] is not None and second[0].method == "confirm";
+    second: list[any] = q.poll(time.monotonic() + 2.0);
+    second_record: UiInteraction = second[0] as UiInteraction;
+    assert second_record.method == "confirm";
 }
 
 
@@ -66,9 +69,10 @@ test "expired requests are reaped into the cancelled bucket" {
     q = new_ui_queue();
     q.enqueue(_req(timeout_ms=50.0));
     time.sleep(0.08);
-    res = q.poll(time.monotonic());
+    res: list[any] = q.poll(time.monotonic());
     assert res[0] is None;
-    assert len(res[1]) == 1 and res[1][0].corr == "ui-1";
+    expired: list[UiInteraction] = res[1] as list[UiInteraction];
+    assert len(expired) == 1 and expired[0].corr == "ui-1";
 }
 
 

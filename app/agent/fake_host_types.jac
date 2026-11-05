@@ -24,15 +24,15 @@ glob FAKE_HOST_CAPS: list[str] = [
      FAKE_COMPAT_TIER: str = "T2-partial";
 
 
-obj FakePluginHost {
-    has handlers: dict[str, any] = {},
+obj:pub FakePluginHost {
+    has handlers: dict[str, Callable[[dict[str, any]], any]] = {},
         command_handlers: dict[str, any] = {},
         shortcut_handlers: dict[str, any] = {},
         listeners: dict[str, list[any]] = {},
         md_transformers: list[dict[str, any]] = [],
         pending_messages: list[dict[str, any]] = [],
         pending_entries: list[dict[str, any]] = [],
-        active_tools: any = None,
+        active_tools: list[str] | None = None,
         session_name: str = "",
         providers: dict[str, any] = {},
         message_renderers: dict[str, any] = {},

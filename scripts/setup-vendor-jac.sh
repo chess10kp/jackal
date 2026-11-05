@@ -14,7 +14,8 @@
 # One-time downloads on a fresh machine (idempotent afterwards):
 #   - pinned LLVM subset (~84 MB -> .llvm-build/)
 #   - pinned bun runtime
-#   - pinned python-build-standalone CPython (build host)
+#   - checksum-pinned CPython source archive used to build JacPython (not a
+#     system-Python or python-build-standalone dependency)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

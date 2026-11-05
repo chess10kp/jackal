@@ -100,7 +100,7 @@ native checker collapses `(...) | None` unions to typing.Any/_SpecialForm
 """
 def _read_name(text: str, i: int) -> tuple[str, int] | None {
     n = len(text);
-    if i >= n or not _is_name_start(text[i]) {
+    if i >= n or _is_name_start(text[i]) == False {
         return None;
     }
     start = i;
@@ -231,7 +231,7 @@ def create_tag_registry() -> TagRegistry {
 
 """Register a markup tag name to a node archetype constructor."""
 def register_tag(registry: TagRegistry, tag: str, archetype: any) {
-    if not tag {
+    if tag == "" {
         raise ValueError("tag must not be empty");
     }
     registry.tags[tag] = archetype;
@@ -321,7 +321,7 @@ def _parse_markup(source: str) -> tuple[list[_MarkupElem], list[MarkupError]] {
         if close_m is not None {
             g1 = close_m.group(1);
             tag: str = g1 if g1 is not None else "";
-            if not stack {
+            if len(stack) == 0 {
                 errors.append(
                     MarkupError(path="/" + tag, message="unexpected close tag " + tag)
                 );
@@ -367,7 +367,7 @@ def _parse_markup(source: str) -> tuple[list[_MarkupElem], list[MarkupError]] {
         } else {
             roots.append(elem);
         }
-        if not self_closing {
+        if self_closing == False {
             stack.append(elem);
         }
         i = open_m.end();
@@ -424,7 +424,10 @@ def _apply_attrs(
 ) {
     allowed = _allowed_props(tag);
     for (name, raw) in attrs.items() {
-        if name not in allowed {
+        if name in allowed {
+            field = _field_name(name);
+            setattr(ui_node, field, _coerce_value(raw, field));
+        } else {
             errors.append(
                 MarkupError(
                     path=path,
@@ -433,8 +436,6 @@ def _apply_attrs(
             );
             continue;
         }
-        field = _field_name(name);
-        setattr(ui_node, field, _coerce_value(raw, field));
     }
 }
 
@@ -446,7 +447,7 @@ def _ctor_args(tag: str, attrs: dict[str, str]) -> str {
         if name == "key" {
             continue;
         }
-        if name not in _allowed_props(tag) {
+        if (name in _allowed_props(tag)) == False {
             continue;
         }
         field = _field_name(name);
@@ -467,7 +468,7 @@ def _instantiate_tracked(
     gen_lines: list[str],
     var_counter: list[int],
 ) -> (UiNode | None, str) {
-    if elem.tag not in registry.tags {
+    if (elem.tag in registry.tags) == False {
         errors.append(
             MarkupError(
                 path=elem.path,
@@ -506,17 +507,17 @@ def _instantiate_tracked(
         if child_node is None {
             continue;
         }
-        if not isinstance(ui_node, UiContainer) {
+        if isinstance(ui_node, UiContainer) {
+            append_child(ui_node, child_node);
+            gen_lines.append("append_child(" + var_name + ", " + child_var + ");");
+        } else {
             errors.append(
                 MarkupError(
                     path=elem.path,
                     message=elem.tag + " cannot contain children",
                 )
             );
-            continue;
         }
-        append_child(ui_node, child_node);
-        gen_lines.append("append_child(" + var_name + ", " + child_var + ");");
     }
     return (ui_node, var_name);
 }
@@ -534,8 +535,8 @@ def lower_markup(
     }
     (roots, parse_errors) = _parse_markup(source);
     errors: list[MarkupError] = list(parse_errors);
-    if not roots {
-        if not errors {
+    if len(roots) == 0 {
+        if len(errors) == 0 {
             errors.append(MarkupError(path="", message="empty markup"));
         }
         return LowerResult(errors=errors);

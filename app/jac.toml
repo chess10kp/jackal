@@ -4,19 +4,13 @@ version = "0.1.0"
 description = "Jackal - all-Jac na-codespace coding agent harness"
 entry-point = "main"
 
-# Model config for the ambient `llm` builtin. api_key here is a fallback;
-# provider env vars (e.g. OPENROUTER_API_KEY) take precedence.
-[byllm.model]
-default_model = "mockllm"
-api_key = ""
-
 # Pure compute: pin native (dogfooding target). Inference keeps core/edit
 # server while its importer tools.jac is server-anchored, so pin explicitly.
 [placement]
 default = "native"
 
 [placement.pins]
-# SEAL STATUS 2026-11-01: `cd app && ../jac build` is GREEN on macOS arm64
+# LAST GREEN SEAL 2026-11-01: `cd app && ../jac build` was GREEN on macOS arm64
 # with a current native kernel — `Built dist/jackal.jab` with a native payload
 # (.jac/native/libjackal.dylib, 63 units, no hard walls). The earlier red seal
 # was a kernel bug, not these pins: vendor commit 5103ea5cf added emit_hasattr,
@@ -36,9 +30,12 @@ default = "native"
 # placement of that module. Lower this graph together.
 # Marking those walkers `walker:protect` is the documented route to native;
 # it is gated on the kernel-side issue above, not on the app.
-# Current frontier: 29 explicit server pins remain. N6 requires reducing
-# this count to zero and proving the sealed app executes without CPython or
-# Python package dependencies. Keep each temporary pin annotated with its
+# Current ledger (2026-11-05): 24 explicit server pins remain (6 UI, 18 TUI).
+# Agent protocol/registry/plugin_bridge/session plus session_state,
+# session_plugins/session_cwd, and MCP are explicit native targets. The latest seal attempt
+# reaches native prebuild but still has cross-code-space and other lowering walls; see ROADMAP.md. N6 requires
+# zero server placements and proof the sealed app runs without CPython or
+# Python package dependencies. Keep every temporary pin annotated with its
 # compiler/runtime wall.
 # Constraint layout engine: algebra, layout_relations and solver all lower
 # natively (N6 retires the §3 server pin — see how-to-lower-all-native).
@@ -49,9 +46,6 @@ default = "native"
 "constraints.algebra" = "native"
 "constraints.solver" = "native"
 "constraints.layout_relations" = "native"
-# oracle_driver is the test-only JSONL process boundary. Keep even its
-# stdin/stdout adapter native so app/ has no server placement exceptions.
-"constraints.oracle_driver" = "native"
 "core.edit" = "native"
 
 # 2026-08-30 vendor sync: graph-shaped edge traversals and walkers now lower
@@ -88,6 +82,7 @@ default = "native"
 # Auth credentials store: filesystem and JSON operations are implemented by
 # the native standard library; keep the credential API in the native unit.
 "agent.auth_credentials" = "native"
+"agent.project_config" = "native"
 "agent.provider_routes" = "native"
 "agent.model_catalog" = "native"
 "agent.llm_http_stream" = "native"
@@ -133,8 +128,8 @@ default = "native"
 # ui.markup SEAL wall (2026-08-31): E5092 create_session.
 # ANNEX RULE (2026-11-01): the seal folds markup.test.jac into this native
 # unit, so its annex must not import server-placed ui.screen/ui.runtime.
-# The one cross-context case (lowered shell vs build_main_shell) moved to
-# ui/screen.test.jac. scripts/seal-pin-guard.py guards this statically.
+# Cross-context shell-construction cases live in ui/screen.test.jac.
+# scripts/seal-pin-guard.mjs guards this statically.
 # Upstream: jaseci-labs/jac#10490 (annex folded into the pinned unit).
 "ui.layout_types" = "native"
 "ui.markup" = "native"
@@ -216,46 +211,36 @@ default = "native"
 "ui.inspect" = "server"
 "ui.demo_complex_shell" = "server"
 "ui.demo_live_shell" = "server"
-# agent.protocol: Envelope/InProcessAdapter objs are constructed by server
-# session/tui/demo consumers (class-boundary wall, see agent.tool_spec);
-# drive_screen pokes shell.transcript/status attributes of server-pinned
-# ui.screen: demoted to soft-native 2026-11-01. As an explicit native pin it
-# hard-failed the seal on E5106 (bridge to walker InsertText/Submit/Cancel in
-# server-pinned ui.events) and E5093 (UiEvent/UiSession/UiNode crossing). The
-# `walker:protect` workaround clears E5106 but trips kernel prepare SIGABRT
-# (jaseci-labs/jac#10485), so screen stays unpinned and demotes softly until
-# upstream lands. All importers (tui.*, agent.protocol, demos) are server
-# already, so the boundary is unchanged in practice.
-# ui.screen ShellScreen across the boundary.
-"agent.protocol" = "server"
-# agent.tool_spec: NATIVE since the 2026-08-31 seal round-trip. The class-
-# boundary wall (server code constructing a native-pinned obj class dies with
-# NameError) is bypassed with the native factory fn `make_tool_spec` in
-# tool_spec.jac: server consumers (tools.jac tool_specs(), registry.jac
-# as_tool_specs()) construct through that seam; only test annexes still call
-# ToolSpec(...) directly (jac test runs pre-seal, so it is unaffected by
-# placement). Validated in the sealed artifact 2026-08-31 (dist/jackal.jab,
-# temporary /seam probe): construction through the native factory, str/dict
-# field reads, callable-field round-trip and registry invoke() all pass
-# server<->native; seals native with no demotion.
-# `jac test` does NOT honor [placement.pins] — suites always run pre-seal/
-# server-side, so a pin flip MUST be validated by `jac build` + running the
-# agent.registry still needs root-level proof before this pin can be retired.
-# `jac build agent/registry.jac --native --lib` now emits a native library,
-# after a typed assertion in its merged test annex; this does not establish
-# function-level placement for invoke() or its use from the agent loop. Check
-# logging, optional bridge dispatch, and model-tool shaping under the native
-# root before changing the pin.
-"agent.registry" = "server"
-"agent.plugin_bridge" = "server"
-"agent.session" = "server"
+# N6 agent graph promotion: protocol envelopes, registry objects, plugin
+# bridge state and the session facade must share native placement. Native
+# library probes previously crossed into server-pinned protocol/registry
+# functions with aggregate arguments, which the native-to-Python ABI rejects
+# (E5093). These targets stay native while those crossings are removed.
+"agent.protocol" = "native"
+"agent.registry" = "native"
+"agent.plugin_bridge" = "native"
+# The bridge state object and its hook consumers are in split implementation
+# modules; pin both declaration and receivers native so imported signatures see
+# one native PluginBridge layout.
+"agent.plugin_bridge_core" = "native"
+"agent.plugin_bridge_hooks" = "native"
+"agent.session_state" = "native"
+"agent.session_plugins" = "native"
+"agent.session_cwd" = "native"
+"agent.session" = "native"
+# agent.mcp product functions use the native subprocess descriptors,
+# threading, and inherited-environment preservation. Keep the product target
+# native. Application preparation now honors the project's native default;
+# the remaining full-seal blockers are tracked in ROADMAP.md. The same-stem
+# Python fixtures stay test-only.
+"agent.mcp" = "native"
 # agent.extensions is native now that json.load plus os.path.abspath/isabs
 # resolve through native floors. The TUI/session importer graph still stays
 # server-placed; N6 closes that crossing when the agent and TUI roots move.
 "agent.extensions" = "native"
 # TUI modules remain temporary server pins while jac-test seam dispatch and
 # the combined LiveShell/UI/agent graph are being untangled (#10213). The
-# harness also imports the Python-backed ui.emulated_terminal/pyte adapter.
+# in-process terminal model is Jac-native; its caller graph remains open.
 # These pins force the product TUI to run through Python under jac run, which
 # violates N6; retire them as the product graph and native test runner close.
 # The native typed tui.message_queue is an isolated first leaf, not evidence
@@ -279,7 +264,10 @@ default = "native"
 "tui.state" = "server"
 "tui.window" = "server"
 "tui.windows" = "server"
-"ui.emulated_terminal" = "server"
+# The in-process PTY harness screen is Jac-native and has no package runtime
+# dependency; keep it native as the native test runner replaces server test
+# dispatch.
+"ui.emulated_terminal" = "native"
 
 # Run with `jac x <name>` from app/ (the project root).
 [scripts]
@@ -288,7 +276,3 @@ default = "native"
 # scripts/test-quarantine.txt); quarantined in CI until upstream lands
 # seam dispatch or the ui.model lowering walls.
 harness = "jac test tui/harness.test.jac"
-
-[dependencies.pypi]
-# Terminal emulator for TUI tests (ui/emulated_terminal.jac).
-pyte = "~=0.8"

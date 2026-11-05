@@ -13,8 +13,34 @@ Flags are parsed by agent/cli.jac (`--help` for the list).
 import sys;
 import os;
 import json;
-import agent.session as _session;
-import from agent.session { clear_history }
+import from _subprocess_native { sp_read }
+import from agent.session {
+    cancel_active_turn,
+    clear_history,
+    compact_now,
+    drain_mcp_notices,
+    get_history,
+    get_mode,
+    get_model,
+    json_event,
+    list_commands,
+    mcp_prompt,
+    mcp_resources,
+    mcp_restart,
+    mcp_restart_failed,
+    mcp_status_lines,
+    plugins,
+    restore_history,
+    restore_model,
+    run_command,
+    run_turn,
+    session_dispose,
+    set_current_session_id,
+    set_mode,
+    set_model,
+    set_thinking_level,
+}
+import from agent.session_lifecycle { session_boot_headless }
 import from agent.auth_env { hydrate_auth_environment, logout_provider }
 import from agent.cli { parse_cli, user_argv, combine_prompt, CLI_USAGE, CLI_VERSION }
 import from agent.modes { requires_approval, is_read_only_mode, read_only_mode_block_reason }
@@ -27,10 +53,37 @@ import from agent.sessions {
     is_valid_session_id,
 }
 
+"""Read one stdin line through the native file-descriptor floor."""
+def _read_stdin_line() -> str {
+    data: bytes = b"";
+    while True {
+        byte: bytes = sp_read(0, 1);
+        if not byte {
+            return data.decode("utf-8");
+        }
+        data += byte;
+        if byte[0] == 10 {
+            return data.decode("utf-8");
+        }
+    }
+}
+
+"""Read the remaining stdin stream through the native file-descriptor floor."""
+def _read_stdin_all() -> str {
+    data: bytes = b"";
+    while True {
+        chunk: bytes = sp_read(0, 65536);
+        if not chunk {
+            return data.decode("utf-8");
+        }
+        data += chunk;
+    }
+}
+
 
 def print_banner {
     print("jackal - all-Jac agent harness");
-    print(f"model: {_session.get_model()}   cwd: {os.getcwd()}");
+    print(f"model: {get_model()}   cwd: {os.getcwd()}");
     print("/help for commands, /exit to quit");
 }
 
@@ -59,43 +112,43 @@ def handle_command(line: str) -> str | None {
     if line in ("/exit", "/quit") { return None; }
     if line == "/help" { print_help(); return ""; }
     if line in ("/clear", "/new") {
-        _session.clear_history();
+        clear_history();
         # Fresh id: the next save must not overwrite the previous transcript.
-        _session.set_current_session_id("");
+        set_current_session_id("");
         return "history cleared";
     }
     if line == "/mcp" {
-        mcp_rows: list[str] = _session.mcp_status_lines();
+        mcp_rows: list[str] = mcp_status_lines();
         if not mcp_rows { return "no mcp servers configured"; }
         return "mcp servers:\n" + "\n".join(mcp_rows);
     }
     if line.startswith("/mcp ") {
         rest = line[len("/mcp"):].strip();
         if rest == "restart" {
-            return _session.mcp_restart_failed();
+            return mcp_restart_failed();
         }
         if rest.startswith("restart ") {
-            return _session.mcp_restart(rest[len("restart "):].strip());
+            return mcp_restart(rest[len("restart "):].strip());
         }
         if rest == "resources" or rest.startswith("resources ") {
             sub: str = rest[len("resources"):].strip();
             if not sub {
-                return _session.mcp_resources("", "");
+                return mcp_resources("", "");
             }
             stoks: list[str] = sub.split(None, 1);
             s_uri: str = stoks[1] if len(stoks) > 1 else "";
-            return _session.mcp_resources(str(stoks[0]), s_uri);
+            return mcp_resources(str(stoks[0]), s_uri);
         }
         toks: list[str] = rest.split(None, 2);
         if len(toks) >= 2 {
             args_json: str = toks[2] if len(toks) >= 3 else "";
-            return _session.mcp_prompt(str(toks[0]), str(toks[1]), args_json);
+            return mcp_prompt(str(toks[0]), str(toks[1]), args_json);
         }
         return "usage: /mcp [restart [NAME] | resources [SERVER [URI]] | SERVER PROMPT [JSON_ARGS]]";
     }
-    if line == "/compact" { return _session.compact_now(); }
+    if line == "/compact" { return compact_now(); }
     if line == "/abort" {
-        return "turn aborted" if _session.cancel_active_turn() else "no active turn";
+        return "turn aborted" if cancel_active_turn() else "no active turn";
     }
     if line == "/sessions" {
         rows = list_sessions(os.getcwd());
@@ -115,7 +168,7 @@ def handle_command(line: str) -> str | None {
     if line.startswith("/export") {
         arg = line[len("/export"):].strip();
         path = arg if arg else "jackal-transcript.md";
-        hist = _session.get_history();
+        hist = get_history();
         has_content = False;
         for m in hist {
             if isinstance(m, dict) and str(m.get("role", "")) != "system" {
@@ -125,12 +178,12 @@ def handle_command(line: str) -> str | None {
         }
         if not has_content { return "nothing to export yet"; }
         # Export needs a saved record; persist the live transcript first.
-        if not is_valid_session_id(str(_session.plugins.session_id)) {
-            _session.set_current_session_id("");
+        if not is_valid_session_id(str(plugins.session_id)) {
+            set_current_session_id("");
         }
         try {
             meta = save_session(
-                os.getcwd(), hist, session_id=_session.plugins.session_id,
+                os.getcwd(), hist, session_id=plugins.session_id,
             );
         } except Exception as e {
             return "ERROR: could not save transcript: " + str(e);
@@ -141,7 +194,7 @@ def handle_command(line: str) -> str | None {
         return "ERROR: could not write " + path;
     }
     if line == "/commands" {
-        cmds = _session.list_commands();
+        cmds = list_commands();
         if not cmds { return "no extension commands loaded"; }
         lines: list[str] = ["extension commands:"];
         for raw_name in sorted(cmds.keys()) {
@@ -165,18 +218,18 @@ def handle_command(line: str) -> str | None {
         if not prov { return "usage: /logout PROVIDER"; }
         return logout_provider(prov);
     }
-    if line == "/mode" { return "mode: " + _session.get_mode(); }
+    if line == "/mode" { return "mode: " + get_mode(); }
     if line.startswith("/mode ") {
         want = line[len("/mode "):].strip();
         try {
-            return "mode -> " + _session.set_mode(want);
+            return "mode -> " + set_mode(want);
         } except ValueError as e {
             return str(e);
         }
     }
     if line.startswith("/model ") {
         name = line[len("/model "):].strip();
-        if name { return "model -> " + _session.set_model(name); }
+        if name { return "model -> " + set_model(name); }
         return "usage: /model NAME";
     }
     if line.startswith("/") {
@@ -184,8 +237,8 @@ def handle_command(line: str) -> str | None {
         parts = line[1:].split(None, 1);
         name = parts[0] if parts else "";
         args = parts[1].strip() if len(parts) > 1 else "";
-        if name and name in _session.list_commands() {
-            return _session.run_command(name, args);
+        if name and name in list_commands() {
+            return run_command(name, args);
         }
         hint = " (/commands for extension commands)";
         return "unknown command: " + line + " (/help for list)" + hint;
@@ -209,12 +262,12 @@ def resume_session(sid: str) -> str {
     if not isinstance(msgs, list) or not msgs {
         return "session has no transcript: " + sid;
     }
-    _session.restore_history(msgs as list);
-    _session.set_current_session_id(sid);
+    restore_history(msgs as list);
+    set_current_session_id(sid);
     rec_model: any = rec.get("model");
     reply: str = "resumed " + sid + " (" + str(len(msgs)) + " messages)";
-    if isinstance(rec_model, str) and rec_model and rec_model != _session.get_model() {
-        reply += "\nmodel -> " + _session.restore_model(rec_model);
+    if isinstance(rec_model, str) and rec_model and rec_model != get_model() {
+        reply += "\nmodel -> " + restore_model(rec_model);
     }
     return reply;
 }
@@ -227,7 +280,7 @@ def make_approver(ask: any) -> any {
     def approve(name: str, args: dict[str, any]) -> any {
         cmd: str = "";
         if isinstance(args, dict) { cmd = str(args.get("cmd", "")); }
-        mode: str = _session.get_mode();
+        mode: str = get_mode();
         policy: str = requires_approval(mode, name, cmd);
         if policy == "auto" { return True; }
         if policy == "blocked" {
@@ -278,20 +331,20 @@ requests are rejected while the turn is blocked on the decision."""
 def json_ask(name: str, args: dict[str, any]) -> bool {
     # react_loop already emitted approval_request on the event stream.
     while True {
-        raw = sys.stdin.readline();
+        raw: str = _read_stdin_line();
         if not raw { return False; }
         text_in: str = str(raw).strip();
         if not text_in { continue; }
         try {
             req: any = json.loads(text_in);
         } except ValueError {
-            _session.json_event("error", {"message": "bad json: " + text_in[:80]});
+            json_event("error", {"message": "bad json: " + text_in[:80]});
             continue;
         }
         if isinstance(req, dict) and str(req.get("type", "")) == "approval" {
             return bool(req.get("approved", False));
         }
-        _session.json_event("error", {"message": "awaiting approval decision"});
+        json_event("error", {"message": "awaiting approval decision"});
     }
     return False;
 }
@@ -306,11 +359,11 @@ def apply_cli_options(opts: dict[str, any]) -> str {
     }
     model_name: str = str(opts["model"]);
     if model_name {
-        result = _session.set_model(model_name);
+        result = set_model(model_name);
         if result != model_name { return result; }
     }
-    if opts["thinking"] { _session.set_thinking_level(str(opts["thinking"])); }
-    if opts["mode"] { _session.set_mode(str(opts["mode"])); }
+    if opts["thinking"] { set_thinking_level(str(opts["thinking"])); }
+    if opts["mode"] { set_mode(str(opts["mode"])); }
     return "";
 }
 
@@ -327,7 +380,7 @@ def run_print(prompt: str, opts: dict[str, any]) -> int {
         if kind == "tool_call" { stats["tools"] = int(stats["tools"]) + 1; }
         if kind == "turn_end" { stats["secs"] = data.get("secs", 0.0); }
         if fmt == "stream-json" {
-            _session.json_event(kind, data);
+            json_event(kind, data);
         } elif kind == "error" {
             sys.stderr.write("[error] " + str(data.get("message", "")) + "\n");
             sys.stderr.flush();
@@ -336,7 +389,7 @@ def run_print(prompt: str, opts: dict[str, any]) -> int {
     max_turns: int = int(opts["max_turns"]) if opts["max_turns"] else 30;
     answer: str = "";
     try {
-        answer = _session.run_turn(
+        answer = run_turn(
             prompt, on_event, approve=make_approver(None), max_iters=max_turns,
         );
     } except KeyboardInterrupt {
@@ -352,12 +405,12 @@ def run_print(prompt: str, opts: dict[str, any]) -> int {
             sys.stdout.flush();
         }
     } else {
-        _session.json_event("result", {
+        json_event("result", {
             "result": answer,
             "is_error": is_error,
             "errors": errors,
-            "session_id": str(_session.plugins.session_id),
-            "model": _session.get_model(),
+            "session_id": str(plugins.session_id),
+            "model": get_model(),
             "num_tools": stats["tools"],
             "duration_s": stats["secs"],
         });
@@ -381,7 +434,7 @@ with entry:__main__ {
     prompt: str = str(opts["prompt"]);
     if print_mode {
         piped: str = "";
-        if not sys.stdin.isatty() { piped = sys.stdin.read(); }
+        if not os.isatty(0) { piped = _read_stdin_all(); }
         prompt = combine_prompt(prompt, piped);
         if not prompt {
             sys.stderr.write("jackal: -p needs a prompt (argument or stdin)\n");
@@ -389,11 +442,11 @@ with entry:__main__ {
         }
     }
     hydrate_auth_environment();
-    _session.session_boot();
+    session_boot_headless();
     opt_err: str = apply_cli_options(opts);
     if opt_err {
         sys.stderr.write("jackal: " + opt_err + "\n");
-        _session.session_dispose();
+        session_dispose();
         sys.exit(1);
     }
     if print_mode {
@@ -401,20 +454,20 @@ with entry:__main__ {
         try {
             code = run_print(prompt, opts);
         } finally {
-            _session.session_dispose();
+            session_dispose();
         }
         sys.exit(code);
     }
     json_mode: bool = bool(opts["json"]);
     approver: any = make_approver(json_ask if json_mode else term_ask);
     if json_mode {
-        _session.json_event("session_ready", {"model": _session.get_model(), "cwd": os.getcwd()});
+        json_event("session_ready", {"model": get_model(), "cwd": os.getcwd()});
     } else {
         print_banner();
         if prompt {
             print("\n> " + prompt);
             try {
-                _session.run_turn(prompt, approve=approver);
+                run_turn(prompt, approve=approver);
             } except KeyboardInterrupt {
                 print("\n[interrupted]");
             }
@@ -426,15 +479,15 @@ with entry:__main__ {
             # Surface queued MCP notices (import/death/restart) each input
             # cycle — the TUI drains these per tick; the line/JSONL loops
             # per iteration. Also pumps death detection + list_changed.
-            for note in _session.drain_mcp_notices() {
+            for note in drain_mcp_notices() {
                 if json_mode {
-                    _session.json_event("notice", {"text": str(note)});
+                    json_event("notice", {"text": str(note)});
                 } else {
                     print("[mcp] " + str(note));
                 }
             }
             if json_mode {
-                raw = sys.stdin.readline();
+                raw: str = _read_stdin_line();
                 if not raw { break; }
                 raw_line: any = raw;
                 text_in: str = str(raw_line).strip();
@@ -442,7 +495,7 @@ with entry:__main__ {
                 try {
                     req: any = json.loads(text_in);
                 } except ValueError {
-                    _session.json_event("error", {"message": "bad json: " + text_in[:80]});
+                    json_event("error", {"message": "bad json: " + text_in[:80]});
                     continue;
                 }
                 text = str(req.get("text", ""));
@@ -463,32 +516,32 @@ with entry:__main__ {
             if kind == "command" {
                 reply = handle_command(text);
                 if reply is None {
-                    if json_mode { _session.json_event("session_end", {}); ended = True; }
+                    if json_mode { json_event("session_end", {}); ended = True; }
                     break;
                 }
                 if reply {
-                    if json_mode { _session.json_event("info", {"text": reply}); }
+                    if json_mode { json_event("info", {"text": reply}); }
                     else { print(reply); }
                 }
                 continue;
             }
             try {
                 if json_mode {
-                    _session.run_turn(text, _session.json_event, approve=approver);
+                    run_turn(text, json_event, approve=approver);
                 } else {
-                    _session.run_turn(text, approve=approver);
+                    run_turn(text, approve=approver);
                 }
             } except KeyboardInterrupt {
-                if json_mode { _session.json_event("error", {"message": "interrupted"}); }
+                if json_mode { json_event("error", {"message": "interrupted"}); }
                 else { print("\n[interrupted]"); }
             }
         }
     } finally {
         # Every exit path (EOF, /exit, fatal error) shuts extensions down:
         # session_shutdown hook fires, sidecar is disposed.
-        _session.session_dispose();
+        session_dispose();
     }
     if json_mode {
-        if not ended { _session.json_event("session_end", {}); }
+        if not ended { json_event("session_end", {}); }
     } else { print("bye."); }
 }

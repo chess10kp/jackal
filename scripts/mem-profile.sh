@@ -40,34 +40,31 @@ done
 [ ${#CMD[@]} -gt 0 ] || CMD=("$JAC" "run" "main.jac" "--mode" "yolo")
 
 cd "$REPO/app"
-OUT="$(python3 "$REPO/scripts/mem_profile.py" --idle-seconds "$IDLE" \
+OUT="$(node "$REPO/scripts/mem_profile.mjs" --idle-seconds "$IDLE" \
         -- "${CMD[@]}")" || { echo "mem-profile: sampler failed" >&2; exit 2; }
 cd "$REPO"
 
-python3 - "$OUT" ${BUDGET_RESIDENT:+$BUDGET_RESIDENT} ${BUDGET_PEAK:+$BUDGET_PEAK} <<'PY'
-import json, sys
-r = json.loads(sys.argv[1])
-res = r["idle_kb"] / 1024.0
-peak = r["tree_peak_kb"] / 1024.0
-worst = r.get("worst_process") or {}
-print(f"resident (idle tree total): {res:.0f} MB")
-print(f"peak     (whole run):       {peak:.0f} MB")
-if worst:
-    print(f"worst process: {worst.get('exe')} {worst.get('kb', 0)/1024:.0f} MB "
-          f"(pid {worst.get('pid')})")
-fail = False
-if len(sys.argv) > 2:
-    budget = float(sys.argv[2])
-    print(f"resident budget: {budget:.0f} MB")
-    if res > budget:
-        fail = True
-if len(sys.argv) > 3:
-    budget = float(sys.argv[3])
-    print(f"peak budget: {budget:.0f} MB")
-    if peak > budget:
-        fail = True
-sys.exit(1 if fail else 0)
-PY
+node --input-type=module - "$OUT" "${BUDGET_RESIDENT:-}" "${BUDGET_PEAK:-}" <<'JS'
+const result = JSON.parse(process.argv[2]);
+const resident = result.idle_kb / 1024;
+const peak = result.tree_peak_kb / 1024;
+const worst = result.worst_process ?? {};
+console.log(`resident (idle tree total): ${resident.toFixed(0)} MB`);
+console.log(`peak     (whole run):       ${peak.toFixed(0)} MB`);
+if (worst.pid !== undefined) {
+  console.log(`worst process: ${worst.exe} ${(worst.kb / 1024).toFixed(0)} MB (pid ${worst.pid})`);
+}
+let failed = false;
+for (const [index, label, measured] of [[3, 'resident', resident], [4, 'peak', peak]]) {
+  const raw = process.argv[index];
+  if (raw) {
+    const budget = Number(raw);
+    console.log(`${label} budget: ${budget.toFixed(0)} MB`);
+    if (measured > budget) failed = true;
+  }
+}
+process.exitCode = failed ? 1 : 0;
+JS
 RC=$?
 [ $RC -ne 0 ] && echo "mem-profile: BUDGET EXCEEDED"
 exit $RC
