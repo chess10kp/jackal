@@ -283,6 +283,11 @@ Do not mix unrelated legacy edits into `app/` feature commits.
 
 ### N6 — Native-only product runtime — active
 
+The current seam gates, closure criteria, and execution dependencies are
+maintained in [`docs/ALL-NATIVE-SEAM-SCOPE.md`](docs/ALL-NATIVE-SEAM-SCOPE.md).
+Use that document as the working closure checklist; the inventory below keeps
+the historical evidence and root-level context.
+
 **Goal:** Jackal’s delivered build, run, and app-test workflows do not require
 CPython, Python bytecode, Python packages, or server-codespace modules. Every
 product module and every app test/helper executes in native codespace. The
