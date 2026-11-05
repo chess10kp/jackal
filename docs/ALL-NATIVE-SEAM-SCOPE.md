@@ -55,6 +55,39 @@ focused source/lowering work, but cannot count as end-to-end closure until gates
    scan tracked and untracked source, ignored vendor/build outputs, release
    packaging, containers, and CI commands.
 
+## Seam register and first work batches
+
+The gates above describe acceptance. This register identifies the concrete
+seams to close first and prevents app pin work from being mistaken for compiler
+or runtime closure.
+
+| Order | Seam | Owning area | Work to close it | Depends on / proof |
+|---|---|---|---|---|
+| 1 | Kernel build is not reproducible from current sources | `vendor/jac` compiler kernel, build/cache tooling | Free enough local disk for a full kernel build; rebuild from the current source; capture each demotion with module, function, expression, and whether it is a hard error or a soft fallback. Current storage pressure is a workstation constraint, not a compiler fix. Do not treat the older 196-unit link as current evidence. | Gate 0. Current source type-checks for the touched driver/project/backend files, but the full rebuild after the latest edits stopped during cache writes with `ENOSPC`. Repeat only when there is working space; record clean kernel commit and source revision. |
+| 2 | Pass schedule stores compiler classes as runtime values | `compiler/driver/pipeline.jac`, pass contracts and native dispatcher | Decide one representation and use it consistently: an explicit `PassKind` registry with static contract/factory/run dispatch, or first-class native class references with `.has`, `.__name__`, `contract_of`, and `run_pass` support. Convert the schedule and all consumers together; avoid a partial list-literal workaround. | Gate 0. Native kernel compile and pipeline parity over the complete compiler pass order, including option-gated passes and diagnostics. |
+| 3 | Compiler helper and product paths still depend on unsupported dynamic shapes | `compiler/backends/native`, `compiler/driver/unit_products`, placement/cache/report, frontend | Use the fresh demotion report to group remaining failures by shared missing operation. Initial known groups are LLVM type inspection/C-entry selection, product/cache serialization, placement reporting, frontend deep-copy/repr, and ES entry generation. Add native implementations or replace reflection with typed dispatch at the owning API. | Gate 0. Each helper lowers in the kernel and is exercised through a compiler command; source `jac check` alone does not close it. |
+| 4 | Python is still part of the compiler architecture and bootstrap | `jaclang/bootstrap`, launcher/importer, compiler source-products and Python interop | Choose the native compiler's supported input universe, then remove Python execution and source compilation paths from bootstrap, CLI, compiler sessions, imports, interop, test tooling, packaging, and release. Port Jac-authored tooling first; replace or delete Python-only facilities and their fixtures. | Gates 0 and 6. Clean bootstrap/run/build/test with Python executables and libpython unavailable, followed by source/artifact inventory. This is the largest workstream and must not be represented as a cleanup of the 91 tracked Python paths alone. |
+| 5 | Native runtime ABI and standard-library coverage | `vendor/jac` native runtime/stdlib; `app/agent`, `app/ui` consumers | Drive runtime work from the app root imports: imported function ABI and cross-module type layouts; subprocess/thread/channel/terminal behavior; path, JSON, URL/IP, Unicode, HTTP/TLS. Replace Python URL parsing/IP checks and close native cancellation/error behavior where product code relies on it. | Gate 2. Small native consumer programs must link and run on macOS and Linux with Python absent; library lowering by itself is insufficient. |
+| 6 | App module placement and cross-code-space object boundaries | `app/ui`, `app/agent`, `app/tui`, `app/jac.toml` | Close the UI graph before the shell graph. First settle shared `UiNode`/`UiSession`/event/walker layouts and `ui.screen` dispatch; independently diagnose the `ui.input` native crash. Then promote headless agent roots and TUI modules in root-sized slices, resolving imported constructors and callback/object boundaries where they occur. | Gates 1 and 2. The current 24 server pins are 6 UI and 18 TUI; pin retirement needs a current root manifest and executable root probes. Existing explicit native module pins are work targets, not proof of native runtime closure. |
+| 7 | Native test discovery, annexes, and fixtures | compiler test command; `app/**/*.test.jac`; `app/e2e/` | Implement native test discovery and dispatch, setup/teardown, assertions, process fixtures, and reports. Give each test its own recorded root and dependency closure; stop folding test-only imports into product units. Port Node MCP/SSE fixtures to Jac-native process fixtures once subprocess capabilities are available. | Gates 0–2. Run every app test root through the native runner with Python absent; verify product roots independently of test annexes. |
+| 8 | Release and artifact proof | launcher/bootstrap, packaging/CI, root audit scripts | Build and launch from a clean checkout; inspect executable dependencies and runtime-loaded libraries; scan source, generated artifacts, release bundles, container/CI files, and ignored vendor trees. Remove obsolete Python compatibility claims and scripts only when the corresponding native replacement is covered. | All previous gates. Reproduce on macOS and Linux; preserve command output and artifact hashes as closure evidence. |
+
+### Immediate next steps
+
+1. Restore sufficient disk capacity for the compiler's full-cache workload, then
+   rebuild the kernel from the current nested-checkout revision. The current
+   machine has about 245 MiB free; the shared Jac cache is large and in its
+   retention window, so do not purge it as a substitute for capacity planning.
+2. Use that clean demotion report to finish one compiler seam at a time, starting
+   with the pass schedule because it is a shared architecture contract. Keep the
+   schedule representation decision explicit before changing its consumers.
+3. In parallel, prepare gate 1's root manifest shape for `main.jac`,
+   `tui/shell.jac`, and each test root. Report reachable modules, annex membership,
+   requested placement, actual placement, and demotion reason separately.
+4. Once the kernel and manifest are current, close native runtime floors against
+   the headless root, then the UI root, then the TUI root. Retire pins only as
+   each root builds and executes with zero server placement.
+
 ## Explicit non-closure shortcuts
 
 - Selecting a Python/server codespace, retaining an embedded JacPython runtime,
