@@ -25,6 +25,19 @@ at [jac#10601](https://github.com/jaseci-labs/jac/issues/10601). The specific
 native lowering gap in the compiler's statically known pass-class schedule is
 tracked at [jac#10600](https://github.com/jaseci-labs/jac/issues/10600).
 
+There are two independent kinds of closure:
+
+1. **Native app closure:** every supported app and test root executes in native
+   codespace, with no server placement or silent demotion.
+2. **Python-free toolchain closure:** the Jac compiler used to build and launch
+   Jackal has no Python interpreter, Python bytecode backend, Python source
+   runtime, or Python-only bootstrap path.
+
+Both are required. App placement work can proceed while the toolchain is being
+replaced, but it cannot establish the final goal by itself. Likewise, a native
+compiler kernel does not prove that `jac run`, `jac build`, or `jac test` avoid
+the Python tier: the current executable still carries JacPython/libpython.
+
 | Gate | Scope | Current seam | Closure evidence |
 |---|---|---|---|
 | 0. Python-free Jac compiler | Replace the embedded JacPython/CPython runtime and Python-tier compiler execution with a native compiler executable and native compiler runtime. Remove CPython source archives, JacPython generation/runtime payloads, Python-only compiler functions, Python bytecode fallbacks, and Python-dependent bootstrap/release steps. Port or delete Python source across the compiler repository, including bootstrap, launcher/import hooks, compiler entry points, tests/fixtures, and examples; no Python-source exceptions are assumed. Remove or replace Python interop itself if it requires a Python runtime. Preserve Jac source compilation and project preparation. | The shipped `jac` binary embeds JacPython/libpython. The active nested `vendor/jac` checkout has 91 tracked `.py`/`.pyc` paths: 26 compiler/runtime/bootstrap/launcher files, 60 tests and fixtures, 3 Python helper scripts, and 2 Python examples. They include `jac/_jac_finder.py`, `jac/bootstrap/python/{finalize,prepare_native,smoke}.py`, Python importer hooks and compiler entry files, interop fixtures, and compatibility tests. A fresh post-cleanup build successfully linked a 196-unit native kernel after 1,279 seconds; it clears the `BaseOf` archwire diagnostic but emitted 29 Python-only demotions. They group into: compiler pass registry (`PassSchedule = list[type[CompilerPass]]`); native backend helpers (`_emit_intrinsic_list_data`, C-entry selection); unit-product and cache serialization (`InteropContext`, comprehensions, dict updates, list construction); placement cache/report helpers; frontend deep-copy/repr (`__dict__`, `__new__`, `super`); and ES backend entry generation. The pass registry stores class objects, whose consumers inspect `.has`/`.__name__`, read static contracts with `contract_of`, and call generic `run_pass`; native class references currently lower to names for limited type operations, so replacing the list literal alone will not close the seam. Use an explicit `PassKind` plus static contract/factory/runner dispatch, or implement the full native class-object contract. The `is_secret_file` suffix-tuple call was rewritten as a loop, and backend checks were simplified to remove unsupported `getattr`/comprehension shapes. The follow-up kernel analysis first exposed three `Unknown`-to-dict type errors in the cache-record rewrite; those assignments now use typed record defaults. That build could not be completed: global disk space fell to 118 MB while compiler caches were being written. After stopping the run, 468 MB was available; the shared Jac cache reports 85.7 GB of module JIR and 12.1 GB of runtime artifacts, all currently inside retention windows. The native kernel is stale against current source; the latest edits do not yet have a clean native rebuild, and demotions remain. | From a clean checkout, bootstrap, run, and build with Python absent. Inspect the resulting compiler and loaded libraries: no Python interpreter, bytecode VM, `.py` source/runtime modules, or Python payload. Every compiler source unit required by CLI/build/test dispatch has native execution or a non-Python native implementation; all remaining Python files and compatibility fixtures are gone. |
@@ -60,6 +73,29 @@ tracked at [jac#10600](https://github.com/jaseci-labs/jac/issues/10600).
    scan tracked and untracked source, ignored vendor/build outputs, release
    packaging, containers, and CI commands.
 
+## Work batches
+
+These batches turn the gates into reviewable deliverables. A batch closes only
+when its stated evidence is recorded; source edits or successful lowering alone
+do not close it.
+
+| Batch | Deliverable | Scope boundary | Exit evidence |
+|---|---|---|---|
+| A. Reproducible compiler kernel | A current native kernel built from the exact compiler source revision, with a machine-readable demotion/error report. | Fix compiler startup/build failures first; then close kernel demotions by shared operation. Start with the pass schedule (`PassKind` or full native class-object support), then native backend helpers, cache/product serialization, placement/reporting, frontend reflection, and ES generation. Do not rewrite the entire compiler before the report identifies actual blockers. | Clean kernel build; zero Python-only demotions for kernel-required modules; compiler pass order and diagnostics match the established pipeline. |
+| B. Root and annex ledger | A compiler-generated closure manifest for `main.jac`, `tui/shell.jac`, and every app test root. | Keep product dependencies and same-stem test annex dependencies distinct. Record dynamic imports, actual selected codespace, and fallback reason, not only source pins. | Current manifests agree with runtime placement traces and are tied to the compiler/source revision that produced them. |
+| C. Python-free compiler and bootstrap | A Jac compiler artifact that prepares and executes Jac without a Python payload. | Replace the Python-emitting bootstrap and Python-tier CLI/import hooks; remove the JacPython/CPython payload, Python bytecode path, Python interop/runtime, and Python-only build/test/release code. Decide which Python interoperability/package features are removed versus reimplemented natively. | From clean source, build and run `jac` with Python absent; inspect dependencies and loaded libraries; no Python source/runtime/bytecode in compiler artifacts or required source closure. |
+| D. Native runtime floors | A cross-platform native API contract for the app's imported calls and OS services. | Prioritize cross-module function/type ABI, process lifecycle, threads/channels/locks, terminal I/O, path/env/JSON/Unicode, and URL/IP/HTTP/TLS according to the root manifests. Replace Python URL parsing and classify each capability as Jac, Zig/platform ABI, or removed feature. | Small native consumers and failure/cancellation probes pass on macOS and Linux without Python. |
+| E. Product roots | Native headless, OSP/UI, then TUI artifacts with root-specific runtime evidence. | Headless: session/config/registry/provider/MCP/bridge lifecycle. UI: shared records, events/walkers, input, screen, render/layout. TUI: shell composition, worker handoff, approvals, resize, cancellation, restoration. Retire pins only inside the root slice that has passed. | Each supported root builds and executes with zero server placements or demotions; TUI acceptance includes PTY/virtual-terminal behavior. |
+| F. Native test system | Native discovery and execution for every app test and its fixtures. | Separate test roots from product units; implement test lifecycle/reporting and native Jac process fixtures; remove Node fixture launch dependencies from app tests. The supported Node extension host remains a product subprocess boundary, not a test-runner dependency. | Every app test runs through native `jac test` with Python absent; product manifests are unchanged by test-only imports. |
+| G. Release proof | A clean, auditable no-Python Jackal release. | Remove obsolete Python build/install/release paths and scan source, dependencies, generated files, ignored vendor snapshots, release artifacts, CI, and launch scripts. | Reproducible clean build/run/test on macOS and Linux; dependency/load inspection finds no Python runtime, and source/workflow scans find no Python implementation or invocation. |
+
+Batch dependencies: A and B establish trustworthy compiler and graph evidence.
+C depends on A; D can progress from B's root imports while C is underway. E
+depends on B and D, with UI before TUI. F depends on C and D and validates each
+test root from B. G closes after C through F. App lowering and runtime-floor
+work can progress before the compiler rewrite finishes, but does not count as
+end-to-end completion.
+
 ## Seam register and first work batches
 
 The gates above describe acceptance. This register identifies the concrete
@@ -79,19 +115,18 @@ or runtime closure.
 
 ### Immediate next steps
 
-1. Restore sufficient disk capacity for the compiler's full-cache workload, then
-   rebuild the kernel from the current nested-checkout revision. The current
-   machine has about 245 MiB free; the shared Jac cache is large and in its
-   retention window, so do not purge it as a substitute for capacity planning.
-2. Use that clean demotion report to finish one compiler seam at a time, starting
-   with the pass schedule because it is a shared architecture contract. Keep the
-   schedule representation decision explicit before changing its consumers.
-3. In parallel, prepare gate 1's root manifest shape for `main.jac`,
-   `tui/shell.jac`, and each test root. Report reachable modules, annex membership,
-   requested placement, actual placement, and demotion reason separately.
-4. Once the kernel and manifest are current, close native runtime floors against
-   the headless root, then the UI root, then the TUI root. Retire pins only as
-   each root builds and executes with zero server placement.
+1. Rebuild the compiler kernel from the current nested-checkout revision when
+   local build capacity permits; record the exact revision and capture a fresh
+   demotion report. Do not use an old kernel or cached seal as current evidence.
+2. Close the compiler's class-valued pass-schedule seam as a complete contract:
+   representation, metadata lookup, execution dispatch, and order parity.
+3. Define and generate the root/annex ledger for `main.jac`, `tui/shell.jac`,
+   and every test root. Keep requested placement, actual placement, and demotion
+   reason separately visible.
+4. Use that ledger to drive runtime-floor probes and close product roots in this
+   order: headless agent, shared UI, TUI. Track Python-free compiler/bootstrap
+   replacement as its own deliverable throughout; no app milestone closes the
+   overall goal without it.
 
 ## Explicit non-closure shortcuts
 
