@@ -322,8 +322,8 @@ obj:pub EmulatedTerminal(Terminal) {
         elif final == "l" and body == "?2004" { self.bracketed_paste = False; }
         elif final == "h" and body == "?2026" { self.sync_active = True; }
         elif final == "l" and body == "?2026" { self.sync_active = False; }
-        elif final == "h" and body == "?25" { self.cursor_visible = False; }
-        elif final == "l" and body == "?25" { self.cursor_visible = True; }
+        elif final == "h" and body == "?25" { self.cursor_visible = True; }
+        elif final == "l" and body == "?25" { self.cursor_visible = False; }
     }
 
     def write(data: str) -> None {
