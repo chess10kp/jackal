@@ -27,7 +27,7 @@ import tempfile;
 import threading;
 import time;
 import from http.client { HTTPResponse }
-import from _subprocess_native { sp_close, sp_env_strings, sp_read, sp_write }
+import from _subprocess_native { sp_env_strings, sp_read, sp_write }
 import urllib.request;
 import from urllib.request { Request }
 
@@ -141,12 +141,17 @@ def _start_inbound_worker(
 def _reader_loop(client: McpClient) {
     stop = client.reader_stop;
     proc: subprocess.Popen | None = client.proc;
-    if proc is None or proc._stdout_r < 0 {
+    if proc is None or proc.stdout is None {
+        return;
+    }
+    stdout = proc.stdout;
+    stdout_fd: int = stdout.fileno();
+    if stdout_fd < 0 {
         return;
     }
     while stop is None or not stop.is_set() {
         try {
-            line_raw: bytes = _read_process_line(client, proc._stdout_r);
+            line_raw: bytes = _read_process_line(client, stdout_fd);
         } except Exception {
             break;
         }
@@ -401,20 +406,25 @@ def _write_line(client: McpClient, msg: dict[str, any]) {
         return;
     }
     proc: subprocess.Popen | None = client.proc;
-    if not _alive(client) or proc is None or proc._stdin_w < 0 {
+    if not _alive(client) or proc is None or proc.stdin is None {
         raise RuntimeError("mcp server not running");
+    }
+    stdin = proc.stdin;
+    stdin_fd: int = stdin.fileno();
+    if stdin_fd < 0 {
+        raise RuntimeError("mcp server stdin is closed");
     }
     line: bytes = (json.dumps(msg) + "\n").encode("utf-8");
     lock: threading.Lock | None = client.write_lock;
     if lock is not None {
         lock.acquire();
         try {
-            _write_process_bytes(proc._stdin_w, line);
+            _write_process_bytes(stdin_fd, line);
         } finally {
             lock.release();
         }
     } else {
-        _write_process_bytes(proc._stdin_w, line);
+        _write_process_bytes(stdin_fd, line);
     }
 }
 
@@ -890,9 +900,8 @@ def mcp_stop(client: McpClient) -> dict[str, any] {
     proc: subprocess.Popen | None = client.proc;
     if proc is not None {
         try {
-            if proc._stdin_w >= 0 {
-                sp_close(proc._stdin_w);
-                proc._stdin_w = -1;
+            if proc.stdin is not None {
+                proc.stdin.close();
             }
             if proc.poll() is None {
                 proc.terminate();
@@ -908,9 +917,8 @@ def mcp_stop(client: McpClient) -> dict[str, any] {
             }
         } except Exception {
         }
-        if proc._stdout_r >= 0 {
-            sp_close(proc._stdout_r);
-            proc._stdout_r = -1;
+        if proc.stdout is not None {
+            proc.stdout.close();
         }
     }
     _stop_reader(client);

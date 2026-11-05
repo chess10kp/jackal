@@ -14,6 +14,7 @@ import from .llm_transport {
     make_ext_transport,
 }
 import from .provider_routes { provider_for, credential_error }
+import from .registry { ToolRegistry }
 import from .model_catalog {
     catalog_models,
     warm_model_catalog,
@@ -22,7 +23,6 @@ import from .model_catalog {
 import from .llm_loop {
     ToolSpec,
     MAX_TOOL_RESULT,
-    ToolRegistry,
     TurnCancel,
     react_loop,
     _tool_defs,
