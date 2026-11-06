@@ -10,6 +10,8 @@ import from .tool_spec {
     make_tool_spec,
 }
 import from .logging { log_exception }
+import from .plugin_bridge_model { PluginBridge }
+import from .plugin_bridge_core { invoke_tool }
 
 
 obj:pub RegisteredTool {
@@ -355,7 +357,7 @@ Js: require `bridge` with invoke_js_tool(bridge, name, args) -> str.
 Unknown / missing handler / missing bridge -> ERROR string (loop-safe).
 """
 def invoke(
-    reg: ToolRegistry, name: str, args: dict[str, any], bridge: any = None
+    reg: ToolRegistry, name: str, args: dict[str, any], bridge: PluginBridge | None = None
 ) -> str {
     ent = get_tool(reg, name);
     if ent is None {
@@ -377,7 +379,7 @@ def invoke(
             return f"ERROR: js tool {name} requires a plugin bridge";
         }
         try {
-            return str(bridge.invoke_js_tool(name, args));
+            return str(invoke_tool(bridge, name, args));
         } except Exception as e {
             log_exception("registry.invoke", e, {"tool": name, "origin": "js"});
             return f"ERROR: {e}";

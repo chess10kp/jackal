@@ -25,7 +25,6 @@ One JSON object per line, keys: ts, level, source, msg, pid, and optional
 import os;
 import json;
 import datetime;
-import traceback;
 
 glob LOG_LEVELS: dict[str, int] = {
         "debug": 10,
@@ -229,31 +228,15 @@ def log_exception(
         kind: str = "Exception";
         detail: str = "";
         if exc is not None {
-            try {
-                kind = type(exc).__name__;
-            } except Exception {
-                kind = "Exception";
+            if isinstance(exc, ValueError) {
+                kind = "ValueError";
+            } elif isinstance(exc, OSError) {
+                kind = "OSError";
             }
-            try {
-                detail = str(exc);
-            } except Exception {
-                detail = "<no message>";
-            }
+            detail = str(exc);
         }
         payload["exception"] = kind;
         payload["detail"] = safe_fields(detail);
-        tb: str = "";
-        try {
-            tb = traceback.format_exc();
-        } except Exception {
-            tb = "";
-        }
-        if tb and tb.strip() != "NoneType: None" {
-            if len(tb) > MAX_TRACEBACK_LEN {
-                tb = tb[-MAX_TRACEBACK_LEN:];
-            }
-            payload["traceback"] = tb;
-        }
         return log_event("error", source, kind + ": " + detail, payload);
     } except Exception {
         return False;

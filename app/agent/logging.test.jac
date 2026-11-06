@@ -149,12 +149,13 @@ test "unserializable payloads are projected, not raised" {
         "huge": "z" * (MAX_STRING_LEN + 50),
         "many": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
     };
-    proj: any = safe_fields(fields);
+    proj: dict[str, any] = safe_fields(fields) as dict[str, any];
     assert isinstance(proj, dict), proj;
     assert proj["obj"] == "<weird object>", proj["obj"];
     assert isinstance(proj["blob"], str), proj["blob"];
-    assert proj["huge"].endswith("..."), proj["huge"];
-    assert len(proj["huge"]) <= MAX_STRING_LEN + 3, len(proj["huge"]);
+    huge: str = proj["huge"] as str;
+    assert huge.endswith("..."), huge;
+    assert len(huge) <= MAX_STRING_LEN + 3, len(huge);
     assert proj["many"][-1] == "...", proj["many"];
     # The whole write path must also survive it.
     tmp = tempfile.mkdtemp(prefix="jackal-log-weird-");
@@ -191,7 +192,7 @@ test "an unusable sink path is a no-op, not an exception" {
 }
 
 
-test "log_exception records type, message and traceback, and never raises" {
+test "log_exception records type and message without Python traceback" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-exc-");
     try {
         sink = os.path.join(tmp, "e.jsonl");
@@ -213,11 +214,13 @@ test "log_exception records type, message and traceback, and never raises" {
         assert rec["fields"]["exception"] == "ValueError", rec;
         assert rec["fields"]["detail"] == "disk on fire", rec;
         assert rec["fields"]["phase"] == "capture", rec;
-        assert "ValueError: disk on fire" in rec["fields"]["traceback"], rec;
+        rec_fields: dict[str, any] = rec["fields"] as dict[str, any];
+        assert not ("traceback" in rec_fields), rec;
         # The no-exception call still logs, without a traceback field.
         second_rec = recs[1];
         assert second_rec["level"] == "error", second_rec;
-        assert not ("traceback" in second_rec["fields"]), second_rec;
+        second_fields: dict[str, any] = second_rec["fields"] as dict[str, any];
+        assert not ("traceback" in second_fields), second_rec;
     } finally {
         shutil.rmtree(tmp, ignore_errors=True);
     }
