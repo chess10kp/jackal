@@ -4,6 +4,8 @@ import from ui.runtime { UiSession }
 import from ui.transcript { TranscriptMessage, TranscriptProjection }
 import from ui.renderer { Renderer }
 import from ui.terminal { ProcessTerminal }
+import from ui.screen { ShellScreen }
+import from ui.input { InputNormalizer }
 import from ui.progress_bar { ProgressBar }
 
 
@@ -13,8 +15,8 @@ obj:pub LiveShell {
         # ui.screen, InputNormalizer in ui.input) are server-pinned, and a
         # shared native unit cannot import them at all — they erase to
         # opaque slots in the native layout either way.
-        shell: any,
-        normalizer: any,
+        shell: ShellScreen,
+        normalizer: InputNormalizer,
         proj: TranscriptProjection,
         renderer: Renderer,
         term: ProcessTerminal,
@@ -37,17 +39,14 @@ obj:pub LiveShell {
 }
 
 
-"""Native factory seam: server modules (ui.demo_live_shell) cannot construct
-a native-pinned obj class directly. `shell`/`normalizer` are `any` because
-ShellScreen (ui.screen) and InputNormalizer (ui.input) are server-pinned and
-erase to opaque slots inside the native layout."""
+"""Factory seam for the live shell demo's typed native state."""
 def:pub make_live_shell(
     session: UiSession,
-    shell: any,
+    shell: ShellScreen,
     proj: TranscriptProjection,
     renderer: Renderer,
     term: ProcessTerminal,
-    normalizer: any,
+    normalizer: InputNormalizer,
     progress: ProgressBar,
     columns: int,
     rows: int,

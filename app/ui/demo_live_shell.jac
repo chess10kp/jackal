@@ -19,6 +19,7 @@ Keys:
 """
 
 import sys;
+import os;
 
 import from ui.runtime {
     UiSession,
@@ -545,7 +546,7 @@ def run_live_shell_demo() {
 
 
 with entry {
-    if not sys.stdin.isatty() or not sys.stdout.isatty() {
+    if not os.isatty(0) or not os.isatty(1) {
         print("demo_live_shell needs a real TTY.");
         print("  JACPATH=. jac run ui/demo_live_shell.jac");
         raise SystemExit(1);
