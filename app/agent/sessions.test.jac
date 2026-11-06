@@ -204,8 +204,12 @@ test "rename updates BOTH transcript sessionName and index name" {
         assert raw["messages"] == hist;
         assert raw["createdAt"] == meta["created"];
 
-        index_raw = _read_raw(os.path.join(_sessions_dir(tmp), "index.json"));
-        names = {str(e["id"]): str(e["name"]) for e in index_raw};
+        index_raw: any = _read_raw(os.path.join(_sessions_dir(tmp), "index.json"));
+        index_entries: list[dict[str, any]] = index_raw as list[dict[str, any]];
+        names: dict[str, str] = {};
+        for item_rec in index_entries {
+            names[str(item_rec["id"])] = str(item_rec["name"]);
+        }
         assert names[meta["id"]] == "after";
 
         entries = list_sessions(tmp);
@@ -231,12 +235,15 @@ test "delete removes transcript and index entry" {
         assert delete_session(tmp, str(gone["id"]));
         assert not os.path.exists(str(gone["path"]));
 
-        index_raw = _read_raw(os.path.join(_sessions_dir(tmp), "index.json"));
-        ids = [str(e["id"]) for e in index_raw];
+        index_raw: any = _read_raw(os.path.join(_sessions_dir(tmp), "index.json"));
+        index_entries: list[dict[str, any]] = index_raw as list[dict[str, any]];
+        ids: list[str] = [];
+        for item_rec in index_entries { ids.append(str(item_rec["id"])); }
         assert gone["id"] not in ids;
         assert keep["id"] in ids;
 
-        listed = [str(e["id"]) for e in list_sessions(tmp)];
+        listed: list[str] = [];
+        for item_rec in list_sessions(tmp) { listed.append(str(item_rec["id"])); }
         assert gone["id"] not in listed;
         assert keep["id"] in listed;
         assert load_session(tmp, str(gone["id"])) == [];
@@ -280,15 +287,22 @@ test "missing or corrupt index falls back to scan and gets rebuilt" {
         index_path = os.path.join(_sessions_dir(tmp), "index.json");
 
         os.remove(index_path);
-        entries = list_sessions(tmp);
-        assert [str(e["id"]) for e in entries] == [m2["id"], m1["id"]];
+        entries: list[dict[str, any]] = list_sessions(tmp);
+        found_ids: list[str] = [];
+        for item_rec in entries { found_ids.append(str(item_rec["id"])); }
+        assert found_ids == [m2["id"], m1["id"]];
         assert entries[0]["name"] == "second";
-        rebuilt = _read_raw(index_path);
-        assert sorted(str(e["id"]) for e in rebuilt) == sorted([m1["id"], m2["id"]]);
+        rebuilt: any = _read_raw(index_path);
+        rebuilt_entries: list[dict[str, any]] = rebuilt as list[dict[str, any]];
+        rebuilt_ids: list[str] = [];
+        for item_rec in rebuilt_entries { rebuilt_ids.append(str(item_rec["id"])); }
+        assert sorted(rebuilt_ids) == sorted([m1["id"], m2["id"]]);
 
         _write_text(index_path, "}{ total garbage {");
         entries = list_sessions(tmp);
-        assert [str(e["id"]) for e in entries] == [m2["id"], m1["id"]];
+        found_ids = [];
+        for item_rec in entries { found_ids.append(str(item_rec["id"])); }
+        assert found_ids == [m2["id"], m1["id"]];
         assert latest_session_id(tmp) == m2["id"];
 
         assert delete_session(tmp, str(m2["id"]));
@@ -500,8 +514,11 @@ test "prune_sessions keeps newest N and rewrites the index" {
         remaining = list_sessions(tmp);
         assert [str(e["id"]) for e in remaining] == [ids[2]];
         # Index must agree with the surviving transcripts.
-        idx = _read_raw(os.path.join(_sessions_dir(tmp), "index.json"));
-        assert [str(e["id"]) for e in idx] == [ids[2]];
+        idx: any = _read_raw(os.path.join(_sessions_dir(tmp), "index.json"));
+        idx_entries: list[dict[str, any]] = idx as list[dict[str, any]];
+        idx_ids: list[str] = [];
+        for item_rec in idx_entries { idx_ids.append(str(item_rec["id"])); }
+        assert idx_ids == [ids[2]];
         for sid in ids[:2] {
             assert not os.path.exists(
                 os.path.join(_sessions_dir(tmp), sid + ".json")
