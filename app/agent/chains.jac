@@ -39,7 +39,7 @@ import from .subagents {
     resolve_jackal_root,
     frontmatter_string,
     parse_frontmatter,
-    _abs_path,
+    _subagents_abs_path,
 }
 
 
@@ -216,7 +216,7 @@ def discover_chain_dirs(cwd: str, agent_dir: str = "") -> dict[str, str] {
     base_root = agent_dir if agent_dir else resolve_jackal_root();
     return {
         "packageDir": os.path.join(base_root, "chains"),
-        "projectDir": os.path.join(_abs_path(cwd), "chains"),
+        "projectDir": os.path.join(_subagents_abs_path(cwd), "chains"),
     };
 }
 
