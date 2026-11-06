@@ -57,7 +57,7 @@ def:pub create_bridge(session_id: str) -> PluginBridge {
     return PluginBridge(session_id=session_id);
 }
 def:pub _alloc_corr(bridge: PluginBridge) -> str {
-    corr = "corr-" + str(bridge.next_corr);
+    corr: str = "corr-" + str(bridge.next_corr);
     bridge.next_corr += 1;
     return corr;
 }

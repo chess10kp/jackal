@@ -121,9 +121,9 @@ def can_coalesce(a: Envelope, b: Envelope) -> bool {
 
 """Merge two compatible text-delta envelopes into one."""
 def coalesce_text_deltas(a: Envelope, b: Envelope) -> Envelope {
-    left = str(a.payload.get("text", ""));
-    right = str(b.payload.get("text", ""));
-    seq = b.sequence if b.sequence >= a.sequence else a.sequence;
+    left: str = str(a.payload.get("text", ""));
+    right: str = str(b.payload.get("text", ""));
+    seq: int = b.sequence if b.sequence >= a.sequence else a.sequence;
     return make_envelope(
         kind="text_delta",
         payload={"text": left + right},
