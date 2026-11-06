@@ -7,7 +7,6 @@ import from agent.protocol {
 }
 import from ui.runtime { create_session, dispose_session }
 import from ui.screen { build_main_shell }
-import from ui.screen_protocol { drain_and_drive }
 
 
 test "agent envelopes drive shell status tool approval and cancel" {

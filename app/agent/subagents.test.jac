@@ -35,7 +35,7 @@ def _cleanup(tmp: str) {
 
 
 """str-typed shim over os.path.dirname, which demands PathLike here."""
-def _parent_dir(p: any) -> str {
+def _parent_dir(p: str) -> str {
     return str(os.path.dirname(p));
 }
 
