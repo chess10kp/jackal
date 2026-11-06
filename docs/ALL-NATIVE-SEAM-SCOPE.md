@@ -166,16 +166,35 @@ or runtime closure.
 
 ### Current app build evidence (2026-11-06)
 
-A fresh `cd app && ../jac build` processed 151 app Jac files and 480 native
+**Fresh root seal after the 2026-11-06 TUI and headless CLI closures:**
+`cd app && ../jac build` precompiled 148 of 150 modules; only
+`ui/demo_complex_shell.jac` and `ui/demo_live_shell.jac` lacked native JIR.
+The live-shell cascade was caused by `LiveShell.shell` and
+`LiveShell.normalizer` being typed as `any`; they are now `ShellScreen` and
+`InputNormalizer`, and the demo builds as a 73-unit native library with no
+demotion messages. The headless `main.jac` also builds to a self-contained
+native binary with no demotions. The remaining root-seal blocker is the
+complex-shell demo's persistent-root reachability probe: `root` and its
+adjacency are explicitly refused by native codegen (E5092), cascading into
+`ui_jids_reachable_from_persistent_root` and its caller. This is the existing
+compiler gap in [jac#10545](https://github.com/jaseci-labs/jac/issues/10545);
+the Jac app cannot claim zero demotions or a complete seal until native code
+can inspect the persistent root, or that required runtime capability receives
+a proper native implementation. The seal itself still invokes the current
+JacPython/CPython-314 precompile path, so a successful app seal would not prove
+the Python-free toolchain gate.
+
+An earlier seal attempt, superseded by the evidence above, processed 151 app Jac files and 480 native
 units. The prior `_parent_dir` native ICE and the test-annex self-import were
 removed by giving the path shim a `str` parameter and using annex symbols
 directly. The launcher executable check now uses `shutil.which`; subagent file
 discovery has a fixed native predicate instead of a dynamic callback. The
 three affected annexes and `run.jac`/`subagents.jac` pass `jac check`.
 
-The build still ends before producing a seal: the staged app and the source
-tree both contribute `constraints/algebra.jac` under the same native unit
-prefix. This is tracked upstream in [jac#10623](https://github.com/jaseci-labs/jac/issues/10623).
+That attempt ended before producing a seal because the staged app and source
+tree contributed `constraints/algebra.jac` under the same native unit prefix.
+This separate build-identity issue is tracked upstream in
+[jac#10623](https://github.com/jaseci-labs/jac/issues/10623).
 
 Independent `--native --lib` builds now produce native libraries without seam
 demotions for the interaction queue (8 units), plugin bridge I/O (27), UI
