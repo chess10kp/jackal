@@ -608,12 +608,12 @@ test "fake host enforces active tools" {
     set_fake_active_tools(bridge, ["other_tool"]);
     r1 = invoke(reg, "t_only", {}, bridge);
     r1_text: str = str(r1);
-    assert r1_text.find("ERROR:") == 0 and r1_text.find("not active") >= 0;
+    assert r1_text == "ERROR: tool t_only is not active";
 
     set_fake_active_tools(bridge, None);
     r2 = invoke(reg, "t_only", {}, bridge);
     r2_text: str = str(r2);
-    assert r2_text.find("ERROR:") != 0;
+    assert r2_text == "ok";
 }
 
 
@@ -1223,7 +1223,7 @@ test "node host sends builtins on ext_load and getAllTools sees them" {
     load_extension_path(bridge, reg, "ctx.probe", resolve_pi_ctx_probe());
 
     ctx_report = invoke(reg, "probe_ctx", {}, bridge);
-    assert ctx_report.startswith("{");
+    assert str(ctx_report)[:1] == "{";
     import json;
     data: dict[str, any] = json.loads(ctx_report);
     assert data["has_cwd"] is True;
