@@ -14,7 +14,8 @@ test "print mode answers and exits 0" {
         calls = sb.calls();
         assert len(calls) == 1, sb.explain(r);
         assert calls[0]["last"]["content"] == "say hi";
-        assert "read_file" in calls[0]["tools"];
+        first_tools: list[str] = calls[0]["tools"] as list[str];
+        assert "read_file" in first_tools;
     } finally {
         sb.cleanup();
     }
@@ -49,7 +50,8 @@ test "tool loop edits a file in yolo mode" {
         assert len(calls) == 3, sb.explain(r);
         # The model saw the read_file result before editing.
         assert calls[1]["last"]["role"] == "tool";
-        assert "alpha" in calls[1]["last"]["content"];
+        tool_content: str = str(calls[1]["last"]["content"]);
+        assert tool_content.find("alpha") >= 0;
     } finally {
         sb.cleanup();
     }
@@ -67,7 +69,8 @@ test "normal mode refuses confirm-gated tools without a prompt" {
         assert r.code == 0, sb.explain(r);
         assert sb.read("keep.txt") == "original\n", sb.explain(r);
         calls = sb.calls();
-        assert "needs approval" in calls[1]["last"]["content"], sb.explain(r);
+        tool_content: str = str(calls[1]["last"]["content"]);
+        assert tool_content.find("needs approval") >= 0, sb.explain(r);
     } finally {
         sb.cleanup();
     }
@@ -133,7 +136,12 @@ test "provider error exits 1" {
         assert r.code == 1, sb.explain(r);
         res = r.events()[-1];
         assert res["is_error"] == True;
-        assert "HTTP 400" in " ".join(res["errors"]);
+        error_text: str = "";
+        errors: list[any] = res["errors"] as list[any];
+        for part in errors {
+            error_text += " " + str(part);
+        }
+        assert error_text.find("HTTP 400") >= 0;
     } finally {
         sb.cleanup();
     }

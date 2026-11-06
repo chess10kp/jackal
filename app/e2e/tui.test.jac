@@ -1,5 +1,7 @@
 """E2E: the native TUI driven through a real pseudo-terminal."""
 
+import io;
+
 
 
 test "tui boots, streams a reply, and quits cleanly on esc" {
@@ -64,7 +66,8 @@ test "tui approval modal rejects with n" {
         tui.press("n");
         tui.wait_for("not written", 60.0);
         assert not sb.exists("no.txt");
-        assert "denied" in sb.calls()[1]["last"]["content"];
+        denied_content: str = str(sb.calls()[1]["last"]["content"]);
+        assert denied_content.find("denied") >= 0;
     } finally {
         if tui is not None { tui.close(); }
         sb.cleanup();
@@ -140,7 +143,8 @@ test "tui previews long tool results at six lines with a more-lines footer" {
         # last message is the untruncated tool result).
         calls = sb.calls();
         assert len(calls) >= 2, str(calls)[:2000];
-        assert "fixture line 7" in calls[1]["last"]["content"], str(calls[1])[:2000];
+        full_tool_result: str = str(calls[1]["last"]["content"]);
+        assert full_tool_result.find("fixture line 7") >= 0, str(calls[1])[:2000];
         tui.press("esc");
         code = tui.wait_exit(30.0);
         assert code == 0, "exit " + str(code) + "\n" + tui.screen_text();
@@ -201,8 +205,8 @@ test "tui login api-key input accepts a bracketed paste" {
         tui.wait_for("logged in to deepseek", 15.0);
         # The decisive assertion: the pasted bytes landed in auth.json.
         auth_path: str = os.path.join(sb.agent_dir, "auth.json");
-        fh: any = open(auth_path, "r", encoding="utf-8");
-        stored: str = fh.read();
+        fh: io.FileIO = io.FileIO(auth_path, "rb");
+        stored: str = fh.read().decode("utf-8", "replace");
         fh.close();
         assert key in stored, stored;
     } finally {

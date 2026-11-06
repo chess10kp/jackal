@@ -209,11 +209,17 @@ test "normalize_allowed_tool_names applies aliases mcp prefix and empty rule" {
     assert normalize_allowed_tool_names([]) is None;
     # Blank-only lists normalize to an empty (falsy) set -- callers treat
     # that as "all allowed", matching the toolchain's behavior.
-    assert normalize_allowed_tool_names(["   ", ""]) == set();
+    blank_names = normalize_allowed_tool_names(["   ", ""]);
+    assert blank_names is not None;
+    assert len(blank_names) == 0;
 
     got = normalize_allowed_tool_names(["read_file", "grep", "mcp:jac_docs", "custom_tool"]);
     assert got is not None;
-    assert got == {"read", "bash", "jac_docs", "custom_tool"};
+    assert len(got) == 4;
+    assert "read" in got;
+    assert "bash" in got;
+    assert "jac_docs" in got;
+    assert "custom_tool" in got;
 }
 
 
