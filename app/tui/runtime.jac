@@ -14,7 +14,8 @@ import from tui.format {
     format_tool_result,
 }
 import from tui.preview { tool_result_preview }
-import from agent.session { run_turn, cancel_active_turn }
+import from agent.session { cancel_active_turn }
+import from agent.session_turn { run_turn }
 import from agent.modes {
     requires_approval, is_read_only_mode, read_only_mode_block_reason,
 }
@@ -24,6 +25,85 @@ import from ui.screen {
 import from ui.renderer { create_renderer }
 import from tui.window { WindowSpec, WindowState }
 import from tui.windows { _open_window, _close_top_window, _approval_state }
+
+glob _active_turn_app: LiveShell | None = None;
+glob _active_turn_payload: str = "";
+
+
+def _collect_turn_event(kind: str, data: dict[str, any]) -> None {
+    app: LiveShell | None = _active_turn_app;
+    if app is None or app.evq is None {
+        return;
+    }
+    queue: MessageQueue = app.evq;
+    queue.put((str(kind), data));
+}
+
+
+def _approve_turn_tool(name: str, args: dict[str, any]) -> any {
+    app: LiveShell | None = _active_turn_app;
+    if app is None {
+        return "denied by user";
+    }
+    cmd: str = "";
+    if isinstance(args, dict) {
+        cmd = str(args.get("cmd", ""));
+    }
+    policy: str = requires_approval(app.mode, name, cmd);
+    if policy == "auto" {
+        return True;
+    }
+    if policy == "blocked" {
+        if is_read_only_mode(app.mode) {
+            return read_only_mode_block_reason(name, app.mode);
+        }
+        return "blocked in " + app.mode + " mode";
+    }
+    if app.evq is None {
+        return "denied by user";
+    }
+    queue: MessageQueue = app.evq;
+    approval_data: dict[str, any] = {};
+    approval_data["tool"] = name;
+    approval_data["args"] = args;
+    queue.put(("__approve__", approval_data));
+    ev: threading.Event = threading.Event();
+    app.appr_event = ev;
+    app.appr_approved = False;
+    approved: bool = ev.wait(600.0);
+    app.appr_event = None;
+    if not approved or not app.appr_approved {
+        return "denied by user";
+    }
+    return True;
+}
+
+
+def _turn_worker() {
+    app: LiveShell | None = _active_turn_app;
+    if app is None or app.evq is None {
+        _active_turn_app = None;
+        return;
+    }
+    queue: MessageQueue = app.evq;
+    payload: str = _active_turn_payload;
+    try {
+        answer: str = run_turn(payload, _collect_turn_event, approve=_approve_turn_tool);
+        _active_turn_app = None;
+        done_data: dict[str, any] = {};
+        done_data["answer"] = answer;
+        queue.put(("__done__", done_data));
+    } except Exception as e {
+        _active_turn_app = None;
+        error_data: dict[str, any] = {};
+        error_data["message"] = str(e);
+        queue.put(("error", error_data));
+        done_data: dict[str, any] = {};
+        done_data["answer"] = "";
+        queue.put(("__done__", done_data));
+    }
+}
+
 
 def:pub _apply_resize(app: LiveShell, columns: int, rows: int) {
     if columns < 40 {
@@ -64,61 +144,10 @@ def:pub _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str =
     # ends, and late worker events must never dereference that field.
     q = MessageQueue();
     app.evq = q;
+    _active_turn_app = app;
+    _active_turn_payload = payload;
     app.stream_msg_id = _push_turn(app, "assistant", "▍");
-    def collector(kind: str, data: dict[str, any]) {
-        try {
-            q.put((str(kind), data));
-        } except Exception {
-        }
-    }
-
-    # Tool approver: auto-allow per the ACTIVE dev mode (Shift+Tab cycle);
-    # destructive ones raise the modal and block the WORKER thread on an
-    # Event until the UI resolves it.
-    def approve(name: str, args: dict[str, any]) -> any {
-        cmd = "";
-        if isinstance(args, dict) {
-            cmd = str(args.get("cmd", ""));
-        }
-        policy = requires_approval(app.mode, name, cmd);
-        if policy == "auto" {
-            return True;
-        }
-        if policy == "blocked" {
-            # react_loop wraps a non-True verdict as an ERROR tool result and
-            # relays it through the event queue — the transcript gets the
-            # ERROR row without this worker thread touching UI state.
-            if is_read_only_mode(app.mode) {
-                return read_only_mode_block_reason(name, app.mode);
-            }
-            return "blocked in " + app.mode + " mode";
-        }
-        q.put(("__approve__", {"tool": name, "args": args}));
-        ev = threading.Event();
-        app.appr_event = ev;
-        app.appr_approved = False;
-        approved = ev.wait(600.0);
-        app.appr_event = None;
-        if not approved or not app.appr_approved {
-            return "denied by user";
-        }
-        return True;
-    }
-
-    def worker_main {
-        try {
-            answer = run_turn(payload, collector, approve=approve);
-            q.put(("__done__", {"answer": str(answer)}));
-        } except Exception as e {
-            try {
-                q.put(("error", {"message": str(e)}));
-            } except Exception {
-            }
-            q.put(("__done__", {"answer": ""}));
-        }
-    }
-
-    app.worker = threading.Thread(target=worker_main, daemon=True);
+    app.worker = threading.Thread(target=_turn_worker, daemon=True);
     app.worker.start();
 }
 
@@ -171,8 +200,6 @@ def:pub _tick_stream(app: LiveShell) {
             _push_turn(app, "tool", "retry  " + note + "\n        " + str(data.get("message", ""))[:120]);
         } elif kind == "cancelled" {
             app.stream_full = app.stream_full + "\n[cancelled]";
-            _finish_stream(app, app.stream_full);
-            return;
         } elif kind == "loop_limit" {
             _push_turn(app, "tool", "stop  iteration limit reached");
         } elif kind == "extensions" {
@@ -191,9 +218,8 @@ def:pub _tick_stream(app: LiveShell) {
             );
         } elif kind == "error" {
             msg = str(data.get("message", "unknown error"));
-            _rewrite_turn(app, app.stream_msg_id, "assistant", "ERROR: " + msg[:400]);
-            _finish_stream(app, "ERROR: " + msg[:400]);
-            return;
+            app.stream_full = "ERROR: " + msg[:400];
+            _rewrite_turn(app, app.stream_msg_id, "assistant", app.stream_full);
         } elif kind == "__approve__" {
             tool_name = str(data.get("tool", "?"));
             args: any = data.get("args", {});

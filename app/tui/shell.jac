@@ -8,7 +8,8 @@ import from tui.core { _push_turn, _install_layout }
 import from tui.overlay { _render }
 import from tui.runtime { _apply_resize }
 import from tui.input { _tick_app, _handle_host_events }
-import from agent.session { session_boot_interactive, get_model, set_mode, get_mode, drain_mcp_notices }
+import from agent.session { get_model, set_mode, get_mode, drain_mcp_notices }
+import from agent.session_lifecycle { session_boot_interactive }
 import from agent.llm { warm_model_catalog }
 import from ui.runtime { create_session, dispose_session }
 import from ui.screen { build_main_shell, install_shell_contracts }

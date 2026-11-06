@@ -33,7 +33,7 @@ import from ui.transcript { set_follow_tail }
 import from ui.input { HostEvent, TextEvent, KeyEvent, PasteEvent, coalesce_events }
 
 def _handle_picker_key(app: LiveShell, key: str) {
-    p: any = _picker_state(app);
+    p: dict[str, any] | None = _picker_state(app);
     if p is None {
         return;
     }
@@ -82,8 +82,6 @@ def _handle_picker_key(app: LiveShell, key: str) {
         }
         return;
     }
-    options: list[str] = list(p.get("options", []));
-    ids: list[str] = list(p.get("ids", []));
     is_multi: bool = bool(p.get("multi", False));
     # Every picker uses the same type-to-filter behavior. In multi-select,
     # space remains the toggle key; all other printable text narrows labels.
@@ -103,16 +101,18 @@ def _handle_picker_key(app: LiveShell, key: str) {
         return;
     }
     vis: tuple[list[str], list[str]] = _multi_filtered(p);
-    options = vis[0];
-    ids = vis[1];
+    options: list[str] = vis[0];
+    ids: list[str] = vis[1];
     sel = int(p.get("selected", 0));
     if key == " " and is_multi and len(options) > 0 {
         # Multi-select toggle (space arrives as a TextEvent char). Header/
         # divider rows are furniture and never toggle.
-        idx = min(sel, len(options) - 1);
+        idx: int = sel;
+        if idx < 0 { idx = 0; }
+        if idx >= len(options) { idx = len(options) - 1; }
         rid = str(ids[idx]) if idx < len(ids) else "";
         if rid and rid != "__header__" {
-            toggled: list[str] = list(p.get("toggled", []));
+            toggled: list[str] = p.get("toggled", []) as list[str];
             if rid in toggled {
                 toggled.remove(rid);
             } else {
@@ -130,7 +130,9 @@ def _handle_picker_key(app: LiveShell, key: str) {
         p["selected"] = (sel + 1) % len(options);
         app.dirty = True;
     } elif key == "enter" and len(options) > 0 {
-        idx = min(sel, len(options) - 1);
+        idx: int = sel;
+        if idx < 0 { idx = 0; }
+        if idx >= len(options) { idx = len(options) - 1; }
         chosen_id = str(ids[idx]) if idx < len(ids) else "";
         if chosen_id == "__type__" {
             p["mode"] = "input";
@@ -167,7 +169,7 @@ def _handle_picker_key(app: LiveShell, key: str) {
         if bool(p.get("multi", False)) {
             # Multi-select confirm: insert every toggled path as @mentions;
             # with nothing toggled, fall back to the cursor row.
-            picks: list[str] = list(p.get("toggled", []));
+            picks: list[str] = p.get("toggled", []) as list[str];
             if not picks {
                 picks = [chosen_id];
             }
@@ -227,7 +229,7 @@ def _tick_cmd(app: LiveShell) {
         drained = True;
         name = str(item[1].get("name", "?"));
         out = str(item[1].get("output", ""));
-        ok = item[1].get("ok") is True;
+        ok = bool(item[1].get("ok", False));
         tag = "[ext] /" + name + " -> ";
         for ln in out.split("\n")[:8] {
             _push_turn(app, "tool", tag + ln[:160]);

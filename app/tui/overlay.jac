@@ -77,9 +77,12 @@ def _approval_diff_preview(name: str, args: dict[str, any]) -> list[str] {
 or generic key=value pairs, then a capped unified-diff preview."""
 def _approval_lines(app: LiveShell) -> list[str] {
     inner = 46;
-    approval: any = _approval_state(app);
+    approval: dict[str, any] | None = _approval_state(app);
+    if approval is None {
+        return [];
+    }
     tool_name = str(approval.get("tool", "?"));
-    args: any = approval.get("args", {});
+    args: dict[str, any] = approval.get("args", {}) as dict[str, any];
     head = "TOOL APPROVAL · " + tool_name;
     body: list[str] = [];
     if isinstance(args, dict) {
@@ -120,10 +123,16 @@ def _approval_lines(app: LiveShell) -> list[str] {
 """Foreground extension-ui modal content — painted into the shared
 overlay node while app.ui_modal is set."""
 def _ui_modal_lines(app: LiveShell) -> list[str] {
-    m: any = _ui_modal_state(app);
+    m: dict[str, any] | None = _ui_modal_state(app);
+    if m is None {
+        return [];
+    }
     inner = 46;
     method = str(m.get("method", ""));
-    head = "? [ui] " + method.upper();
+    method_label: str = method;
+    if method == "select" { method_label = "SELECT"; }
+    if method == "confirm" { method_label = "CONFIRM"; }
+    head = "? [ui] " + method_label;
     body: list[str] = [];
     title = str(m.get("title", ""));
     message = str(m.get("message", ""));
@@ -136,7 +145,7 @@ def _ui_modal_lines(app: LiveShell) -> list[str] {
     }
     body.append("");
     if method == "select" {
-        options: list[any] = list(m.get("options", []));
+        options: list[any] = m.get("options", []) as list[any];
         sel = int(m.get("selected", 0));
         i = 0;
         for opt in options[:8] {
@@ -163,7 +172,7 @@ def _ui_modal_lines(app: LiveShell) -> list[str] {
 The same selection pattern handles provider login, sessions, skills, tasks,
 checkpoints, explorer, and extension select requests."""
 def _picker_popup_rows(app: LiveShell) -> list[str] {
-    p: any = _picker_state(app);
+    p: dict[str, any] | None = _picker_state(app);
     if p is None {
         return [];
     }
@@ -186,7 +195,7 @@ def _picker_popup_rows(app: LiveShell) -> list[str] {
     labels: list[str] = [];
     opts = vis[0];
     ids = vis[1];
-    toggled: list[str] = list(p.get("toggled", []));
+    toggled: list[str] = p.get("toggled", []) as list[str];
     for i in range(len(opts)) {
         label = str(opts[i]);
         if bool(p.get("multi", False)) {
@@ -216,11 +225,11 @@ def _picker_popup_rows(app: LiveShell) -> list[str] {
 
 """Prompt-anchored drop-up for extension select requests."""
 def _ui_select_popup_rows(app: LiveShell) -> list[str] {
-    m: any = _ui_modal_state(app);
+    m: dict[str, any] | None = _ui_modal_state(app);
     if m is None {
         return [];
     }
-    options: list[any] = list(m.get("options", []));
+    options: list[any] = m.get("options", []) as list[any];
     filt = str(m.get("filter", ""));
     q = filt.lower();
     labels: list[str] = [];
@@ -447,11 +456,12 @@ def _paint(app: LiveShell) {
     # Choices and model completion render ABOVE the prompt box inside the
     # prompt node; its fixed contract grows/shrinks with the drop-up.
     popup: list[list[str]] | None = _slash_popup_state(app);
+    modal_state: dict[str, any] | None = _ui_modal_state(app);
     popup_rows: list[str] = [];
     if _picker_state(app) is not None {
         popup_rows = _picker_popup_rows(app);
-    } elif _ui_modal_state(app) is not None
-        and str(_ui_modal_state(app).get("method", "")) == "select" {
+    } elif modal_state is not None
+        and str(modal_state.get("method", "")) == "select" {
         popup_rows = _ui_select_popup_rows(app);
     } elif popup is not None {
         popup_rows = _slash_popup_rows(app, popup);
@@ -470,16 +480,16 @@ def _paint(app: LiveShell) {
     overlay: list[str] | None = None;
     if app.phase == "approval" {
         overlay = _approval_lines(app);
-    } elif _ui_modal_state(app) is not None
-        and str(_ui_modal_state(app).get("method", "")) != "select" {
+    } elif modal_state is not None
+        and str(modal_state.get("method", "")) != "select" {
         overlay = _ui_modal_lines(app);
     }
     win_lines: list[str] | None = None;
     if overlay is None and _picker_state(app) is None
         and app.phase != "approval"
         and not (
-            _ui_modal_state(app) is not None
-            and str(_ui_modal_state(app).get("method", "")) == "select"
+            modal_state is not None
+            and str(modal_state.get("method", "")) == "select"
         ) {
         win_lines = _window_paint_lines(app);
         if win_lines is not None {

@@ -131,6 +131,12 @@ def:pub _warm_sidecar(base_cwd: str) {
 }
 
 
+def _after_run_command(args: dict[str, any], result: str) -> None {
+    cmd = str(args.get("cmd", ""));
+    fire_user_bash(plugins.bridge as PluginBridge | None, cmd, result);
+}
+
+
 """Boot session plugins for product roots; status is queried separately."""
 def:pub session_boot_native(
     sid: str = "",
@@ -172,10 +178,6 @@ def:pub session_boot_native(
     # user_bash hook: tools.jac cannot import the bridge (import cycle), so
     # boot wraps the registered run_command handler; fire_user_bash never
     # raises and tolerates bridge=None.
-    def _after_run_command(args: dict[str, any], result: str) {
-        cmd = str(args.get("cmd", ""));
-        fire_user_bash(plugins.bridge as PluginBridge | None, cmd, result);
-    }
     wrap_handler_handle(plugins.reg, "run_command", _after_run_command);
     # MCP attach (D21): config parse is a cheap sync file read; server spawns
     # run in background flows so boot/first frame is never blocked.
