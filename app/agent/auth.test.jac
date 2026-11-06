@@ -204,8 +204,10 @@ test "credential set/remove are immutable snapshots and persist to disk" {
     tmp = _make_tmp();
     try {
         path = _auth_path(tmp);
-        original = {"a": _api_cred("ka")};
-        updated = credential_set(original, "b", _oauth_cred("t", "r", 5_000_000_000_000));
+        original: dict[str, any] = {"a": _api_cred("ka")};
+        updated: dict[str, any] = credential_set(
+            original, "b", _oauth_cred("t", "r", 5_000_000_000_000)
+        );
         assert original == {"a": _api_cred("ka")};  # input untouched
         assert has_credential(updated, "b");
         assert not has_credential(original, "b");
@@ -221,7 +223,10 @@ test "credential set/remove are immutable snapshots and persist to disk" {
         assert credential_remove(trimmed, "nope") == trimmed;
 
         # Malformed entries are skipped by the validated accessors...
-        broken = {"bad": {"type": "api_key"}, "ok": _api_cred("fine")};
+        broken: dict[str, any] = {
+            "bad": {"type": "api_key"},
+            "ok": _api_cred("fine"),
+        };
         assert credential_get(broken, "bad") is None;
         assert credential_get(broken, "ok") is not None;
         assert not has_credential(broken, "bad");
@@ -242,10 +247,19 @@ test "validate_credential rejects junk but preserves unknown extra keys" {
     for item in tmp_data_list {
         assert validate_credential(item) is None;
     }
-    api = validate_credential({"type": "api_key", "key": "kk", "note": "extra"});
-    assert api == {"type": "api_key", "key": "kk", "note": "extra"};
-    oa = validate_credential({"type": "oauth", "access": "a", "refresh": "r",
-                              "expires": 123, "project_id": "pj"});
+    api_input: dict[str, any] = {
+        "type": "api_key", "key": "kk", "note": "extra"
+    };
+    api = validate_credential(api_input);
+    assert api is not None;
+    assert api["type"] == "api_key";
+    assert api["key"] == "kk";
+    assert api["note"] == "extra";
+    oauth_input: dict[str, any] = {
+        "type": "oauth", "access": "a", "refresh": "r",
+        "expires": 123, "project_id": "pj",
+    };
+    oa = validate_credential(oauth_input);
     assert oa["project_id"] == "pj" and oa["expires"] == 123;
 }
 
@@ -272,7 +286,7 @@ test "expiry math: live, expired, boundary-inclusive, garbage expires" {
 
 test "stored_api_key routes api keys live oauth and expired-oauth-to-seam" {
     now = 1_000_000_000_000;
-    data = {
+    data: dict[str, any] = {
         "plain": _api_cred("the-key"),
         "live": _oauth_cred("live-access", "r", now + 60_000),
         "dead": _oauth_cred("stale-access", "r", now - 60_000),
@@ -289,7 +303,7 @@ test "stored_api_key routes api keys live oauth and expired-oauth-to-seam" {
 
 
 test "get_auth_status precedence: runtime > stored > env > unconfigured" {
-    stored = {"a": _api_cred("k")};
+    stored: dict[str, any] = {"a": _api_cred("k")};
     assert get_auth_status("a", stored, runtime_keys=["a"]) == {
         "configured": True, "source": "stored", "label": "runtime override",
     };
@@ -443,16 +457,17 @@ test "user-input steps flag pending until resolved" {
 
 
 test "cancel mid-flow returns to idle from any pending state" {
-    for (action, payload) in [
+    cases: list[tuple[str, any]] = [
         ("set_prompt", {"providerId": "p", "message": "m"}),
         ("set_manual_code", {"providerId": "p"}),
         ("set_select", {"providerId": "p", "message": "m", "options": []}),
         ("set_api_key_input", {"providerId": "p"}),
         ("set_browser_auth", {"providerId": "p", "url": "u"}),
         ("set_logging_in", {"providerId": "p", "status": "s"}),
-    ] {
+    ];
+    for (action, payload) in cases {
         st: dict[str, any] = initial_auth_flow_state();
-        st = transition_auth_flow(st, action, payload);
+        st = transition_auth_flow(st, action, payload as dict[str, any]);
         assert st["step"]["kind"] != "idle";
         cancelled = transition_auth_flow(st, "cancel");
         assert cancelled["step"]["kind"] == "idle";
@@ -517,7 +532,7 @@ test "filters and labels match the picker rendering contract" {
     assert len(filter_providers_by_query(providers, "OpenAI")) == 1;
     assert filter_providers_by_query(providers, "") == providers;
 
-    models = [
+    models: list[dict[str, any]] = [
         {"provider": "anthropic", "modelId": "claude-opus", "displayName": "Opus"},
         {"provider": "openai", "modelId": "gpt-mini", "displayName": "Mini"},
         {"provider": "anthropic", "modelId": "claude-haiku", "displayName": "Haiku"},
@@ -530,8 +545,10 @@ test "filters and labels match the picker rendering contract" {
     assert format_provider_label(providers[0]) == "[✓] Anthropic (OAuth, 2 models)";
     assert format_provider_label(providers[1]) == "[ ] Openai (API Key, 2 models)";
     assert format_model_label(models[0]) == "Opus (anthropic/claude-opus)";
-    assert format_model_label({"modelId": "bare"}) == "bare";
-    assert format_model_label({}) == "unknown";
+    bare_model: dict[str, any] = {"modelId": "bare"};
+    empty_model: dict[str, any] = {};
+    assert format_model_label(bare_model) == "bare";
+    assert format_model_label(empty_model) == "unknown";
 }
 
 

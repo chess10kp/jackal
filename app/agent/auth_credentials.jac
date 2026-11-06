@@ -155,7 +155,9 @@ def:pub validate_credential(cred: any) -> dict[str, any] | None {
         if not isinstance(key, str) or not key {
             return None;
         }
-        out: dict[str, any] = {"type": "api_key", "key": key};
+        out: dict[str, any] = {};
+        out["type"] = "api_key";
+        out["key"] = key;
     } elif ctype == "oauth" {
         for field in OAUTH_REQUIRED_KEYS {
             if not isinstance(cred.get(field), str) or not cred[field] {
@@ -166,8 +168,11 @@ def:pub validate_credential(cred: any) -> dict[str, any] | None {
         if not isinstance(expires, (int, float)) or isinstance(expires, bool) {
             return None;
         }
-        out = {"type": "oauth", "access": cred["access"],
-               "refresh": cred["refresh"], "expires": expires};
+        out = {};
+        out["type"] = "oauth";
+        out["access"] = cred["access"];
+        out["refresh"] = cred["refresh"];
+        out["expires"] = expires;
     } else {
         return None;
     }
