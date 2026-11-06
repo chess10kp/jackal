@@ -6,7 +6,7 @@ import time;
 
 import from .session_state { history, show_stats, _t0, _n_tools, reset_turn_stats, bump_tool_count, get_model_state, get_thinking_level_state, get_mode_state }
 import from .session_plugins { plugins }
-import from .session_config { set_model, set_thinking_level, _apply_pending_model_requests, wait_mcp_ready }
+import from .session_config { _apply_pending_model_requests, wait_mcp_ready }
 import from .llm {
     react_loop,
     make_transport,

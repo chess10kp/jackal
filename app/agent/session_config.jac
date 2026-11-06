@@ -1400,7 +1400,7 @@ string directly). On success fires Pi's model_select hook best-effort so
 listeners see every change regardless of source (/model command or an
 extension's pi.setModel applied via _apply_pending_model_requests) and
 records the per-provider/overall last-model preference."""
-def:pub set_model(name: str) -> str {
+def _set_model_from_extension(name: str) -> str {
     err = credential_error(name);
     if err {
         return err;
@@ -1421,7 +1421,7 @@ def:pub set_model(name: str) -> str {
 """Set the reasoning-effort level used for subsequent turns (empty = off).
 The transport layer maps it to the request body's reasoning.effort. Fires
 Pi's thinking_level_select hook best-effort, mirroring set_model."""
-def:pub set_thinking_level(level: str) -> str {
+def _set_thinking_level_from_extension(level: str) -> str {
     set_thinking_level_state(level);
     b: any = get_plugin_bridge();
     if b is not None {
@@ -1452,9 +1452,9 @@ def:pub _apply_pending_model_requests() {
     m = str(req.get("model", ""));
     lv = str(req.get("thinking_level", ""));
     if m and m != get_model_state() {
-        set_model(m);
+        _set_model_from_extension(m);
     }
     if lv and lv != get_thinking_level_state() {
-        set_thinking_level(lv);
+        _set_thinking_level_from_extension(lv);
     }
 }
