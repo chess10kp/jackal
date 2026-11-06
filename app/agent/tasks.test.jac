@@ -125,14 +125,14 @@ test "load filters entries that miss required fields or have wrong types" {
     tmp = _make_tmp();
     try {
         good = add_task(tmp, "real task");
-        raw: any = _read_raw(_tasks_path(tmp));
+        raw: list[any] = _read_raw(_tasks_path(tmp)) as list[any];
         raw.insert(0, {"id": "abc12345"});  # missing fields
         raw.append({"id": 7, "title": "num id", "status": "pending",
                     "createdAt": "x", "updatedAt": "y"});  # wrong id type
         raw.append("just a string");  # not a dict
         fh = open(_tasks_path(tmp), "w");
         try {
-            json.dump(raw, fh, indent=2);
+            fh.write(json.dumps(raw));
             fh.write("\n");
         } finally {
             fh.close();
@@ -311,9 +311,14 @@ test "task_counts buckets by status and ignores foreign statuses" {
         counts = task_counts(load_tasks(tmp));
         assert counts == {"pending": 1, "in_progress": 1, "completed": 1};
 
-        raw: any = _read_raw(_tasks_path(tmp));
-        raw.append({"id": "ffffffff", "title": "weird", "status": "cancelled",
-                    "createdAt": "t", "updatedAt": "t"});
+        raw: list[dict[str, any]] = _read_raw(_tasks_path(tmp)) as list[dict[str, any]];
+        foreign: dict[str, any] = {};
+        foreign["id"] = "ffffffff";
+        foreign["title"] = "weird";
+        foreign["status"] = "cancelled";
+        foreign["createdAt"] = "t";
+        foreign["updatedAt"] = "t";
+        raw.append(foreign);
         assert task_counts(raw)["pending"] == 1;
         assert task_counts([]) == {"pending": 0, "in_progress": 0, "completed": 0};
     } finally {
@@ -325,13 +330,21 @@ test "task_counts buckets by status and ignores foreign statuses" {
 test "format_task_line picks icons per status and renders optional blurb" {
     tmp = _make_tmp();
     try {
-        plain: dict[str, any] = {"id": "aaaa1111", "title": "plain", "description": None,
-                       "status": "pending", "createdAt": "t", "updatedAt": "t"};
-        running: dict[str, any] = dict(plain);
+        plain: dict[str, any] = {};
+        plain["id"] = "aaaa1111";
+        plain["title"] = "plain";
+        plain["description"] = None;
+        plain["status"] = "pending";
+        plain["createdAt"] = "t";
+        plain["updatedAt"] = "t";
+        running: dict[str, any] = {};
+        for (key, value) in plain.items() { running[key] = value; }
         running["status"] = "in_progress";
-        done: dict[str, any] = dict(plain);
+        done: dict[str, any] = {};
+        for (key, value) in plain.items() { done[key] = value; }
         done["status"] = "completed";
-        with_desc: dict[str, any] = dict(plain);
+        with_desc: dict[str, any] = {};
+        for (key, value) in plain.items() { with_desc[key] = value; }
         with_desc["description"] = "the details";
 
         line = format_task_line(with_desc);
@@ -341,7 +354,10 @@ test "format_task_line picks icons per status and renders optional blurb" {
         assert format_task_line(plain) == "○ [aaaa1111] plain";
 
         # Legacy files may omit description entirely; must not crash.
-        bare: dict[str, str] = {"id": "bbbb2222", "title": "bare", "status": "pending"};
+        bare: dict[str, any] = {};
+        bare["id"] = "bbbb2222";
+        bare["title"] = "bare";
+        bare["status"] = "pending";
         assert format_task_line(bare) == "○ [bbbb2222] bare";
     } finally {
         _cleanup(tmp);
@@ -382,12 +398,18 @@ test "store survives reopen: every op reads fresh state from disk" {
         add_task(tmp, "one");
         add_task(tmp, "two");
         # Simulate another process appending directly to the file.
-        raw: any = _read_raw(_tasks_path(tmp));
-        raw.append({"id": "deadbeef", "title": "external", "description": None,
-                    "status": "pending", "createdAt": "t", "updatedAt": "t"});
+        raw: list[any] = _read_raw(_tasks_path(tmp)) as list[any];
+        external: dict[str, any] = {};
+        external["id"] = "deadbeef";
+        external["title"] = "external";
+        external["description"] = None;
+        external["status"] = "pending";
+        external["createdAt"] = "t";
+        external["updatedAt"] = "t";
+        raw.append(external);
         fh = open(_tasks_path(tmp), "w");
         try {
-            json.dump(raw, fh, indent=2);
+            fh.write(json.dumps(raw));
             fh.write("\n");
         } finally {
             fh.close();
