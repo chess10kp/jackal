@@ -1,6 +1,6 @@
 # All-native / no-Python closure scope
 
-**Status:** scope, not completion evidence (2026-11-05)
+**Status:** scope, not completion evidence (2026-11-06)
 
 Jackal's end state has no Python runtime or Python source anywhere in the
 Jackal/Jac toolchain or app workflow. This includes the compiler used to build
@@ -13,6 +13,25 @@ This scope does not remove the explicitly supported Node extension host. Node
 is an intentional Pi-compatibility process boundary. Node-based test fixtures
 are temporary, though: app tests and their fixtures must run through the
 native Jac test path.
+
+## Upstream review slices
+
+The oversized compiler change in [jac#10604](https://github.com/jaseci-labs/jac/pull/10604)
+is closed. Its non-generated source changes are split across these focused PRs;
+the slices can be reviewed and landed independently:
+
+| PR | Seam |
+|---|---|
+| [#10586](https://github.com/jaseci-labs/jac/pull/10586) | Darwin subprocess and inherited environment support |
+| [#10587](https://github.com/jaseci-labs/jac/pull/10587) | Native tempfile directory creation |
+| [#10610](https://github.com/jaseci-labs/jac/pull/10610) | Compiler lowering closure and unit identity |
+| [#10611](https://github.com/jaseci-labs/jac/pull/10611) | Placement pin diagnostic fast path |
+| [#10612](https://github.com/jaseci-labs/jac/pull/10612) | Native module interop mirroring |
+| [#10613](https://github.com/jaseci-labs/jac/pull/10613) | Native HTTP and urllib support |
+| [#10614](https://github.com/jaseci-labs/jac/pull/10614) | Native threading primitives |
+
+Together these account for the original change's non-generated source paths.
+The PRs are review slices, not closure evidence for the Python-free toolchain.
 
 ## Closure gates
 
