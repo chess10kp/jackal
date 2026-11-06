@@ -41,6 +41,7 @@ import os;
 import json;
 import re;
 import from .project_config { load_project_config }
+import from .skills_support { parse_frontmatter, frontmatter_string }
 
 glob SUBAGENT_TOOL_ALIASES: dict[str, str] = {
         "read_file": "read",
@@ -59,8 +60,8 @@ glob SUBAGENT_TOOL_ALIASES: dict[str, str] = {
 # ============================ path shims =================================
 
 
-"""str-typed shim over os.path.abspath, which demands PathLike here."""
-def:pub _abs_path(p: any) -> str {
+"""String-typed shim over os.path.abspath for local paths."""
+def _subagents_abs_path(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
@@ -96,74 +97,6 @@ def _parse_scalar(value: str) -> any {
 }
 
 
-"""Parse --- delimited YAML-like frontmatter; returns (metadata, body).
-
-Mirrors orchestration/_frontmatter_toolchain.parse_frontmatter: CRLF
-normalized, missing terminator keeps the whole text as body, dash-block
-lists collect under the preceding bare key."""
-def:pub parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
-    fm: dict[str, any] = {};
-    normalized = content.replace("\r\n", "\n");
-    if not normalized.startswith("---") {
-        return (fm, normalized);
-    }
-    end_index = normalized.find("\n---", 3);
-    if end_index == -1 {
-        return (fm, normalized);
-    }
-    block = normalized[4:end_index];
-    body = normalized[end_index + 4:].strip();
-
-    current_key = "";
-    list_items: list[str] = [];
-    for raw_line in block.split("\n") {
-        line = raw_line.rstrip();
-        list_match = re.match(r"^\s*-\s+(.*)$", line);
-        if list_match and current_key {
-            list_items.append(str(list_match.group(1)).strip().strip("\"'").strip("'\""));
-            continue;
-        }
-        # Flush any pending dash-block collection.
-        if current_key and list_items {
-            fm[current_key] = list_items[:];
-        }
-        list_items = [];
-        current_key = "";
-        key_match = re.match(r"^([\w-]+):\s*(.*)$", line);
-        if not key_match {
-            continue;
-        }
-        key = str(key_match.group(1));
-        value = str(key_match.group(2) or "");
-        if not value.strip() {
-            current_key = key;
-            continue;
-        }
-        fm[key] = _parse_scalar(value);
-    }
-    if current_key and list_items {
-        fm[current_key] = list_items[:];
-    }
-    return (fm, body);
-}
-
-
-"""Coerce a frontmatter value to display text (lists join with ', ')."""
-def:pub frontmatter_string(value: any) -> str | None {
-    if value is None {
-        return None;
-    }
-    if isinstance(value, list) {
-        parts: list[str] = [];
-        for item in value {
-            parts.append(str(item));
-        }
-        return ", ".join(parts);
-    }
-    return str(value);
-}
-
-
 """Coerce a frontmatter value to a string list (comma split for scalars)."""
 def frontmatter_string_list(value: any) -> list[str] {
     if value is None {
@@ -196,17 +129,17 @@ def frontmatter_string_list(value: any) -> list[str] {
 """Resolve JACKAL_AGENT_DIR, else JACKAL_ROOT, else cwd (see docstring)."""
 def:pub resolve_jackal_root(agent_dir: str = "") -> str {
     if agent_dir {
-        return _abs_path(agent_dir);
+        return _subagents_abs_path(agent_dir);
     }
     env = os.environ.get("JACKAL_AGENT_DIR");
     if env {
-        return _abs_path(env);
+        return _subagents_abs_path(env);
     }
     root_env = os.environ.get("JACKAL_ROOT");
     if root_env {
-        return _abs_path(root_env);
+        return _subagents_abs_path(root_env);
     }
-    return _abs_path(os.getcwd());
+    return _subagents_abs_path(os.getcwd());
 }
 
 
@@ -316,7 +249,7 @@ def discover_subagent_dirs(cwd: str, agent_dir: str = "") -> dict[str, str] {
     base_root = resolve_jackal_root(agent_dir);
     return {
         "packageDir": os.path.join(base_root, ".pi", "agents"),
-        "projectDir": os.path.join(_abs_path(cwd), "subagents"),
+        "projectDir": os.path.join(_subagents_abs_path(cwd), "subagents"),
     };
 }
 
