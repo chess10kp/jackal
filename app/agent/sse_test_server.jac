@@ -2,6 +2,8 @@
 
 import os;
 import subprocess;
+import io;
+import time;
 
 
 obj SseTestServer {
@@ -29,18 +31,35 @@ def make_sse_server(mode: str = "ok") -> SseTestServer {
         os.getcwd(), "agent", "sse_test_server.mjs"
     ));
     node_bin: str = os.environ.get("JACKAL_NODE_BIN", "node");
-    proc: subprocess.Popen = subprocess.Popen(
-        [node_bin, fixture, mode],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+    ready_file: str = os.path.join(
+        os.getcwd(),
+        ".jackal-sse-" + str(os.getpid()) + "-" + str(time.monotonic_ns()) + ".port",
     );
-    out_pipe: any = proc.stdout;
-    ready: str = out_pipe.readline().strip();
-    if not ready.startswith("READY ") {
+    proc: subprocess.Popen = subprocess.Popen(
+        [node_bin, fixture, mode, ready_file],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    );
+    deadline: float = time.monotonic() + 5.0;
+    while not os.path.exists(ready_file) and time.monotonic() < deadline {
+        if proc.poll() is not None {
+            break;
+        }
+        time.sleep(0.01);
+    }
+    if not os.path.exists(ready_file) {
         proc.terminate();
         try { proc.wait(timeout=5.0); } except Exception { proc.kill(); }
-        raise RuntimeError("SSE fixture did not start: " + ready);
+        raise RuntimeError("SSE fixture did not create its ready file");
     }
-    return SseTestServer(proc=proc, server_port=int(ready.split(" ")[1]));
+    fh: io.FileIO = io.FileIO(ready_file, "rb");
+    ready: str = fh.read().decode("utf-8").strip();
+    fh.close();
+    os.remove(ready_file);
+    if not ready.isdigit() {
+        proc.terminate();
+        try { proc.wait(timeout=5.0); } except Exception { proc.kill(); }
+        raise RuntimeError("SSE fixture returned an invalid port: " + ready);
+    }
+    return SseTestServer(proc=proc, server_port=int(ready));
 }

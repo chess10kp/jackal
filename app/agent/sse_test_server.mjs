@@ -1,6 +1,8 @@
 import http from 'node:http';
+import fs from 'node:fs';
 
 const mode = process.argv[2] ?? 'ok';
+const readyFile = process.argv[3];
 let posts = 0;
 const server = http.createServer((req, res) => {
   if (req.method !== 'POST') { res.writeHead(404).end(); return; }
@@ -18,6 +20,6 @@ const server = http.createServer((req, res) => {
   });
 });
 server.listen(0, '127.0.0.1', () => {
-  process.stdout.write(`READY ${server.address().port}\n`);
+  fs.writeFileSync(readyFile, String(server.address().port));
 });
 process.once('SIGTERM', () => server.close(() => process.exit(0)));
