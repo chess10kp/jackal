@@ -130,21 +130,21 @@ def:pub _window_paint_lines(app: LiveShell) -> list[str] | None {
     return window_lines(win);
 }
 
-def:pub _picker_state(app: LiveShell) -> any {
+def:pub _picker_state(app: LiveShell) -> dict[str, any] | None {
     if app.windows and app.windows[len(app.windows) - 1].kind == "picker" {
         return app.windows[len(app.windows) - 1].payload;
     }
     return None;
 }
 
-def:pub _ui_modal_state(app: LiveShell) -> any {
+def:pub _ui_modal_state(app: LiveShell) -> dict[str, any] | None {
     if app.windows and app.windows[len(app.windows) - 1].kind == "ui_modal" {
         return app.windows[len(app.windows) - 1].payload;
     }
     return None;
 }
 
-def:pub _approval_state(app: LiveShell) -> any {
+def:pub _approval_state(app: LiveShell) -> dict[str, any] | None {
     if app.windows and app.windows[len(app.windows) - 1].kind == "approval" {
         return app.windows[len(app.windows) - 1].payload;
     }

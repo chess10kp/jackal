@@ -26,10 +26,16 @@ import from agent.skills { load_jackal_skills }
 import from tui.context { _skills_picker_entries }
 import from tui.windows { _picker_state }
 
+obj LoginProviderEntries {
+    has rows: list[str] = [],
+        ids: list[str] = [],
+        stored: dict[str, any] = {};
+}
+
 """Provider rows for /login. Native routes use API-key auth today; routes
 that advertise an OAuth authType are retained so their explicit network seam
 can report a useful error instead of pretending to log in."""
-def _login_provider_entries() -> dict[str, any] {
+def _login_provider_entries() -> LoginProviderEntries {
     stored = load_auth_file(resolve_auth_path());
     rows: list[str] = [];
     ids: list[str] = [];
@@ -57,7 +63,7 @@ def _login_provider_entries() -> dict[str, any] {
         rows.append(format_provider_label(item));
         ids.append(provider_id);
     }
-    return {"rows": rows, "ids": ids, "stored": stored};
+    return LoginProviderEntries(rows=rows, ids=ids, stored=stored);
 }
 
 
@@ -68,10 +74,15 @@ def:pub _hydrate_auth_environment() {
 
 
 def _login_error(app: LiveShell, message: str) {
+    picker: dict[str, any] | None = _picker_state(app);
+    provider_id: str = "";
+    if picker is not None {
+        provider_id = str(picker.get("providerId", ""));
+    }
     app.auth_flow = transition_auth_flow(
         app.auth_flow,
         "set_error",
-        {"message": message, "providerId": _picker_state(app).get("providerId", "") if _picker_state(app) is not None else ""},
+        {"message": message, "providerId": provider_id},
     );
     if _picker_state(app) is not None {
         _close_picker(app);
@@ -93,7 +104,7 @@ def:pub _cancel_login(app: LiveShell) {
 
 def:pub _start_login_provider(app: LiveShell, provider_id: str) {
     entries = _login_provider_entries();
-    stored: dict[str, any] = entries.get("stored", {});
+    stored: dict[str, any] = entries.stored;
     found: dict[str, any] | None = None;
     for item in PROVIDER_ROUTES {
         if str(item) == provider_id {
@@ -178,8 +189,8 @@ def:pub _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
 picker while retaining the same state machine and input overlay."""
 def:pub _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
     entries = _login_provider_entries();
-    rows: list[str] = list(entries.get("rows", []));
-    ids: list[str] = list(entries.get("ids", []));
+    rows: list[str] = entries.rows;
+    ids: list[str] = entries.ids;
     if provider_arg {
         if provider_arg not in ids {
             return "unknown login provider: " + provider_arg;
@@ -189,7 +200,7 @@ def:pub _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
             return "login unavailable (overlay busy)";
         }
         _picker_state(app)["providerId"] = provider_arg;
-        app.auth_data = entries.get("stored", {});
+        app.auth_data = entries.stored;
         _start_login_provider(app, provider_arg);
         return "";
     }
@@ -199,7 +210,7 @@ def:pub _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
     if not _open_picker(app, "LOGIN", rows, ids) {
         return "login unavailable (overlay busy)";
     }
-    app.auth_data = entries.get("stored", {});
+    app.auth_data = entries.stored;
     app.auth_flow = transition_auth_flow(
         initial_auth_flow_state(),
         "open_provider_picker",
@@ -294,13 +305,13 @@ draft (submitting it inlines the skill body via expand_skill_command)."""
 def:pub _open_skills_picker(app: LiveShell) -> str {
     skills: list[dict[str, any]] = [];
     try {
-        catalog: dict[str, any] = load_jackal_skills();
-        skills = list(catalog.get("skills", []));
+        catalog: dict[str, list[dict[str, any]]] = load_jackal_skills();
+        skills = catalog["skills"];
     } except Exception as e {
         return "ERROR: failed to load skills: " + str(e)[:80];
     }
     entries = _skills_picker_entries(skills);
-    ids: list[str] = list(entries["ids"]);
+    ids: list[str] = entries["ids"];
     selectable = False;
     for rid in ids {
         if str(rid) != "__header__" {
@@ -311,7 +322,7 @@ def:pub _open_skills_picker(app: LiveShell) -> str {
     if not selectable {
         return str(entries["rows"][0]) if entries["rows"] else "no skills found";
     }
-    rows: list[str] = list(entries["rows"]);
+    rows: list[str] = entries["rows"];
     opened = _open_picker(app, "SKILLS", rows, ids);
     if not opened {
         return "picker unavailable (overlay busy)";
@@ -389,8 +400,8 @@ def:pub _restore_checkpoint(app: LiveShell, name: str) -> str {
         msgs = [];
     }
     note = "";
-    files: any = payload.get("fileSnapshots", {}) if isinstance(payload, dict) else {};
-    if isinstance(files, dict) and files {
+    files: dict[str, str] = payload["fileSnapshots"] if isinstance(payload, dict) else {};
+    if files {
         try {
             restore_checkpoint_files(cwd, files);
             note = ", " + str(len(files)) + " files restored";
