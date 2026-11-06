@@ -45,7 +45,8 @@ def:pub extensions_status() -> ExtensionStatus {
     );
     b = plugins.bridge;
     if b is not None {
-        st.compat_tier = b.compat_tier;
+        bridge: PluginBridge = b as PluginBridge;
+        st.compat_tier = bridge.compat_tier;
     }
     st.label = extensions_label(st);
     return st;
@@ -87,7 +88,10 @@ def:pub _warm_sidecar(base_cwd: str) {
         plugins.detail = "";
         plugins.t_ext_ready = time.time();
         # T2-partial: mirror extension commands for the shell/UI layer.
-        plugins.commands.update(bridge.commands);
+        typed_bridge: PluginBridge = bridge as PluginBridge;
+        for (command_name, command) in typed_bridge.commands.items() {
+            plugins.commands[command_name] = command;
+        }
         # Lifecycle hook: session is fully loaded (best-effort, never fatal).
         fire_hook(bridge as PluginBridge, "session_start", {
             "session_id": plugins.session_id,
