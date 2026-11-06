@@ -24,14 +24,24 @@ the slices can be reviewed and landed independently:
 |---|---|
 | [#10586](https://github.com/jaseci-labs/jac/pull/10586) | Darwin subprocess and inherited environment support |
 | [#10587](https://github.com/jaseci-labs/jac/pull/10587) | Native tempfile directory creation |
-| [#10610](https://github.com/jaseci-labs/jac/pull/10610) | Compiler lowering closure and unit identity |
+| [#10632](https://github.com/jaseci-labs/jac/pull/10632) | Native project identity and preparation |
+| [#10633](https://github.com/jaseci-labs/jac/pull/10633) | Compiler lowering and manifests |
+| [#10634](https://github.com/jaseci-labs/jac/pull/10634) | Native build cache and dependency deduplication |
 | [#10611](https://github.com/jaseci-labs/jac/pull/10611) | Placement pin diagnostic fast path |
 | [#10612](https://github.com/jaseci-labs/jac/pull/10612) | Native module interop mirroring |
 | [#10613](https://github.com/jaseci-labs/jac/pull/10613) | Native HTTP and urllib support |
 | [#10614](https://github.com/jaseci-labs/jac/pull/10614) | Native threading primitives |
+| [#10641](https://github.com/jaseci-labs/jac/pull/10641) | Remove server fallbacks from native unit compilation |
+| [#10642](https://github.com/jaseci-labs/jac/pull/10642) | Advance compiler import closure |
+| [#10643](https://github.com/jaseci-labs/jac/pull/10643) | Represent native pass schedules as values |
+| [#10644](https://github.com/jaseci-labs/jac/pull/10644) | Match JacPython's native compile ABI |
+| [#10645](https://github.com/jaseci-labs/jac/pull/10645) | Sync sealed JIR with linked native interfaces |
 
-Together these account for the original change's non-generated source paths.
-The PRs are review slices, not closure evidence for the Python-free toolchain.
+The earlier compiler closure PRs [#10604](https://github.com/jaseci-labs/jac/pull/10604)
+and [#10610](https://github.com/jaseci-labs/jac/pull/10610) are closed; their
+work is represented by the focused PRs above. Together the open slices account
+for the original change's non-generated source paths. They are review slices,
+not closure evidence for the Python-free toolchain.
 
 ## Closure gates
 
