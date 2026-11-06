@@ -8,12 +8,16 @@ import os;
 import time;
 
 import from .plugin_bridge_model { BridgeWaiter }
-import from .tools { default_registry }
 import from .registry {
     create_registry,
+    create_registry_handle,
+    has_tool_handle,
+    registry_tool_specs_handle,
     get_tool,
     invoke,
-    as_tool_specs,
+    invoke_handle,
+    register_native_handle,
+    register_js_handle,
     register_native,
 }
 import from .protocol {
@@ -94,40 +98,42 @@ test "load_extension registers js tools and invoke round-trips" {
 }
 
 
-test "default_registry is native-only until extension loads" {
-    reg = default_registry();
-    native = get_tool(reg, "read_file");
-    assert native is not None;
-    assert native.origin == "native";
-    native_n = len(as_tool_specs(reg));
-    assert native_n >= 5;
+test "handle registry accepts bridge tools through scalar APIs" {
+    reg: int = create_registry_handle();
+    register_native_handle(reg, "read_file", "read", {}, _echo);
+    assert has_tool_handle(reg, "read_file");
+    native_n: int = len(registry_tool_specs_handle(reg));
+    assert native_n == 1;
     bridge = create_bridge("s-def");
-    load_extension(
+    load_extension_handle(
         bridge,
         reg,
         "stub.echo",
         [{"name": "echo", "description": "e", "parameters": {}}],
         {"echo": _echo},
     );
-    assert len(as_tool_specs(reg)) == native_n + 1;
-    assert invoke(reg, "echo", {"text": "x"}, bridge) == "JS:x";
+    assert len(registry_tool_specs_handle(reg)) == native_n + 1;
+    assert invoke_handle(reg, "echo", {"text": "x"}, bridge) == "JS:x";
 }
 
 
 test "unload_extension removes js tools only" {
     bridge = create_bridge("s-un");
-    reg = default_registry();
-    load_extension(
+    reg: int = create_registry_handle();
+    register_native_handle(reg, "read_file", "read", {}, _echo);
+    register_js_handle(reg, "keep", "kept by another extension", {}, "keep.ext");
+    load_extension_handle(
         bridge,
         reg,
         "stub.echo",
         [{"name": "echo", "description": "e", "parameters": {}}],
         {"echo": _echo},
     );
-    n = unload_extension(bridge, reg, "stub.echo");
+    n = unload_extension_handle(bridge, reg, "stub.echo");
     assert n == 1;
-    assert get_tool(reg, "echo") is None;
-    assert get_tool(reg, "read_file") is not None;
+    assert not has_tool_handle(reg, "echo");
+    assert has_tool_handle(reg, "read_file");
+    assert has_tool_handle(reg, "keep");
 }
 
 
@@ -789,7 +795,8 @@ test "agent_start_gate collects systemPrompt and message" {
     ensure_host(bridge);
 
     def _sys(data: dict[str, any], ctx: any) -> dict[str, any] {
-        return {"systemPrompt": data["prompt"] + "+sys", "message": {"content": "extra ctx"}};
+        prompt: str = str(data["prompt"]);
+        return {"systemPrompt": prompt + "+sys", "message": {"content": "extra ctx"}};
     }
 
     register_fake_listener(bridge, "before_agent_start", _sys);
