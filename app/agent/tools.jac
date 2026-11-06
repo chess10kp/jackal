@@ -1,10 +1,7 @@
-"""Jackal agent tools - file and shell operations for the ReAct loop.
-
-Server codespace (subprocess/os are server anchors). Pure logic is delegated
-to core/ modules which place native by inference.
-"""
+"""Jackal agent tools - file and shell operations for the ReAct loop."""
 
 import os;
+import io;
 import subprocess;
 # NOTE: shutil/tempfile are unused by this module's runtime code but REQUIRED
 # here: the same-stem test annex (tools.test.jac) resolves names against the
@@ -13,6 +10,7 @@ import tempfile;
 import shutil;
 import fnmatch;
 import re;
+import from _subprocess_native { sp_env_strings }
 import from core.edit { apply_edit }
 import from .tool_spec { ToolSpec, make_tool_spec, MAX_TOOL_RESULT, MAX_SEARCH_RESULTS }
 import from .registry { create_registry_handle, register_native_handle }
@@ -95,8 +93,13 @@ sem resolve_path.path = "Filesystem path, relative or absolute.";
 
 def read_file(path: str) -> str {
     full = resolve_path(path);
-    with open(full, "r", errors="replace") as f { text = f.read(); }
-    lines = text.split("\n");
+    fh: io.FileIO = io.FileIO(full, "rb");
+    raw: bytes = fh.read();
+    fh.close();
+    text: str = raw.decode("utf-8", "replace").replace("\r\n", "\n").replace(
+        "\r", "\n"
+    );
+    lines: list[str] = text.split("\n");
     if len(lines) > READ_LINE_CAP {
         lines = lines[:READ_LINE_CAP];
         lines.append("... [truncated at " + str(READ_LINE_CAP) + " lines]");
@@ -111,7 +114,9 @@ def write_file(path: str, content: str) -> str {
     full: str = resolve_path(path);
     d: str = os.path.dirname(full);
     if d { os.makedirs(d, exist_ok=True); }
-    with open(full, "w") as f { f.write(content); }
+    fh: io.FileIO = io.FileIO(full, "wb");
+    fh.write(content.encode("utf-8"));
+    fh.close();
     return f"Wrote {len(content)} bytes to {path}";
 }
 sem write_file = "Create or completely overwrite a file with the given content. Prefer edit_file for small changes to existing files.";
@@ -120,10 +125,17 @@ sem write_file.content = "Full file content to write.";
 
 def edit_file(path: str, old_text: str, new_text: str) -> str {
     full = resolve_path(path);
-    with open(full, "r", errors="replace") as f { text = f.read(); }
+    in_fh: io.FileIO = io.FileIO(full, "rb");
+    raw: bytes = in_fh.read();
+    in_fh.close();
+    text: str = raw.decode("utf-8", "replace").replace("\r\n", "\n").replace(
+        "\r", "\n"
+    );
     result = apply_edit(text, old_text, new_text);
     if result.startswith("ERROR:") { return result; }
-    with open(full, "w") as f { f.write(result); }
+    out_fh: io.FileIO = io.FileIO(full, "wb");
+    out_fh.write(result.encode("utf-8"));
+    out_fh.close();
     return f"Edited {path} ({len(old_text)} -> {len(new_text)} chars)";
 }
 sem edit_file = "Replace an exact, unique snippet in a file. old_text must match the file byte-for-byte and appear exactly once; on failure read the file again and retry with a wider or corrected snippet.";
@@ -180,8 +192,11 @@ glob JAC_CHILD_ENV_DROP: list[str] = ["JAC_HANDOFF"];
 removed, so the child is a plain CLI invocation."""
 def _jac_child_env() -> dict[str, str] {
     env: dict[str, str] = {};
-    for pair in os.environ.items() {
-        env[str(pair[0])] = str(pair[1]);
+    for env_line in sp_env_strings() {
+        sep: int = env_line.find("=");
+        if sep >= 0 {
+            env[env_line[:sep]] = env_line[sep + 1:];
+        }
     }
     for key in JAC_CHILD_ENV_DROP {
         env.pop(key, None);
@@ -236,7 +251,39 @@ sem jac_format.path = "File or directory to format (default: project root).";
 
 
 def _skip_walk_dir(name: str) -> bool {
-    return name.startswith(".") or name in ["node_modules", ".jac", "__pycache__"];
+    return name[:1] == "." or name in ["node_modules", ".jac", "__pycache__"];
+}
+
+
+def _walk_files(base_path: str) -> list[str] {
+    pending: list[str] = [base_path];
+    files: list[str] = [];
+    seen_dirs: set[str] = {os.path.realpath(base_path)};
+    while pending {
+        current: str = pending.pop();
+        names: list[str] = [];
+        try {
+            names = os.listdir(current);
+        } except OSError {
+            continue;
+        }
+        for name in names {
+            if _skip_walk_dir(name) {
+                continue;
+            }
+            full: str = os.path.join(current, name);
+            if os.path.isdir(full) {
+                canonical: str = os.path.realpath(full);
+                if canonical not in seen_dirs {
+                    seen_dirs.add(canonical);
+                    pending.append(full);
+                }
+            } else {
+                files.append(full);
+            }
+        }
+    }
+    return files;
 }
 
 
@@ -252,18 +299,11 @@ def file_glob(pattern: str, base_dir: str = ".", max_results: int = MAX_SEARCH_R
     if not os.path.isdir(base_path) { return f"ERROR: directory not found: {base_dir}"; }
     cap = _search_limit(max_results);
     matches: list[str] = [];
-    for walk_item in os.walk(base_path) {
-        current = walk_item[0];
-        dirs = walk_item[1];
-        files = walk_item[2];
-        dirs[:] = [d for d in dirs if not _skip_walk_dir(d)];
-        for name in files {
-            if name.startswith(".") { continue; }
-            full = os.path.join(current, name);
-            rel: str = str(os.path.relpath(str(full), str(base_path))).replace(os.sep, "/");
-            if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(name, pattern) {
-                matches.append(rel);
-            }
+    for full in _walk_files(base_path) {
+        name: str = full.rsplit("/", 1)[-1];
+        rel: str = str(os.path.relpath(str(full), str(base_path))).replace(os.sep, "/");
+        if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(name, pattern) {
+            matches.append(rel);
         }
     }
     matches.sort();
@@ -284,32 +324,33 @@ def content_grep(pattern: str, base_dir: str = ".", regex: bool = False, max_res
     base_path = resolve_path(base_dir);
     if not os.path.isdir(base_path) { return f"ERROR: directory not found: {base_dir}"; }
     cap = _search_limit(max_results);
-    matcher: any = None;
+    matcher: re.Pattern = re.compile("");
     if regex {
         try { matcher = re.compile(pattern); }
         except re.error as e { return f"ERROR: invalid regex: {e}"; }
     }
     matches: list[str] = [];
-    for walk_item in os.walk(base_path) {
-        current = walk_item[0];
-        dirs = walk_item[1];
-        files = walk_item[2];
-        dirs[:] = [d for d in dirs if not _skip_walk_dir(d)];
-        for name in files {
-            if name.startswith(".") { continue; }
-            full = os.path.join(current, name);
-            rel: str = str(os.path.relpath(str(full), str(base_path))).replace(os.sep, "/");
-            try {
-                with open(full, "r", errors="replace") as f { lines = f.readlines(); }
-            } except (OSError, UnicodeError) { continue; }
-            for line_item in enumerate(lines, 1) {
-                line_no = line_item[0];
-                line = line_item[1];
-                text = line.rstrip("\n");
-                found = matcher.search(text) if regex else pattern in text;
-                if found {
-                    matches.append(f"{rel}:{line_no}:{text[:500]}");
-                }
+    for full in _walk_files(base_path) {
+        name: str = full.rsplit("/", 1)[-1];
+        rel: str = str(os.path.relpath(str(full), str(base_path))).replace(os.sep, "/");
+        try {
+            fh: io.FileIO = io.FileIO(full, "rb");
+            raw: bytes = fh.read();
+            fh.close();
+            lines: list[str] = raw.decode("utf-8", "replace").splitlines();
+        } except (OSError, UnicodeError) { continue; }
+        for line_item in enumerate(lines, 1) {
+            line_no = line_item[0];
+            line = line_item[1];
+            text: str = line;
+            found: bool = False;
+            if regex {
+                found = len(matcher.findall(text)) > 0;
+            } else {
+                found = text.find(pattern) >= 0;
+            }
+            if found {
+                matches.append(f"{rel}:{line_no}:{text[:500]}");
             }
         }
     }
@@ -554,7 +595,7 @@ def default_registry() -> ToolRegistry {
 
 
 """Fresh scalar-handle registry seeded with the built-in native tools."""
-def default_registry_handle() -> int {
+def:pub default_registry_handle() -> int {
     handle: int = create_registry_handle();
     for spec in tool_specs() {
         if spec.handler is not None {
