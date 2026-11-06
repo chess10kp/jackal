@@ -17,6 +17,8 @@ without that header are rejected, tools/list answers as JSON, tools/call
 answers as text/event-stream (both client response paths).
 """
 
+import io;
+
 def _write_mode_server(tmp: str, mode: str) -> list[str] {
     fixture: str = os.path.abspath(os.path.join(os.getcwd(), "agent", "mcp_test_server.mjs"));
     node_bin: str = os.environ.get("JACKAL_NODE_BIN", "node");
@@ -285,35 +287,45 @@ test "resources list and read round trip" {
 }
 
 
-"""Spawn the Node fake HTTP server on an ephemeral port and read its READY line."""
-def _start_fake_http_server(tmp: str) -> tuple[any, str] {
+"""Spawn the fake HTTP server and read its file-based ready signal."""
+def _start_fake_http_server(tmp: str) -> tuple[subprocess.Popen, str] {
     fixture: str = os.path.abspath(os.path.join(os.getcwd(), "agent", "mcp_test_server.mjs"));
     node_bin: str = os.environ.get("JACKAL_NODE_BIN", "node");
-    err_path: str = os.path.join(tmp, "mcp_http_server.err");
-    err_fh: any = open(err_path, "w");
-    proc = subprocess.Popen(
-        [node_bin, fixture, "http"], stdout=subprocess.PIPE,
-        stderr=err_fh, text=True,
+    ready_file: str = os.path.join(
+        tmp,
+        "mcp-http-" + str(os.getpid()) + "-" + str(time.monotonic_ns()) + ".port",
     );
-    out_pipe: any = proc.stdout;
-    ready: str = out_pipe.readline().strip();
-    if not ready.startswith("READY ") {
+    proc = subprocess.Popen(
+        [node_bin, fixture, "http", ready_file],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    );
+    deadline: float = time.monotonic() + 5.0;
+    while not os.path.exists(ready_file) and time.monotonic() < deadline {
+        if proc.poll() is not None {
+            break;
+        }
+        time.sleep(0.01);
+    }
+    if not os.path.exists(ready_file) {
         proc.terminate();
         try { proc.wait(timeout=5.0); } except Exception {
             proc.kill();
         }
-        err_fh.close();
-        err_txt: str = "";
-        try {
-            err_txt = open(err_path).read()[:500];
-        } except Exception {
-        }
-        raise RuntimeError(
-            "fake http server did not start: " + ready + " | stderr: " + err_txt
-        );
+        raise RuntimeError("fake HTTP server did not create its ready file");
     }
-    err_fh.close();
-    port: int = int(ready.split(" ")[1]);
+    ready_fh: io.FileIO = io.FileIO(ready_file, "rb");
+    ready: str = ready_fh.read().decode("utf-8").strip();
+    ready_fh.close();
+    os.remove(ready_file);
+    if not ready.isdigit() {
+        proc.terminate();
+        try { proc.wait(timeout=5.0); } except Exception {
+            proc.kill();
+        }
+        raise RuntimeError("fake HTTP server returned an invalid port: " + ready);
+    }
+    port: int = int(ready);
     url: str = "http://127.0.0.1:" + str(port) + "/mcp";
     return (proc, url);
 }
@@ -321,7 +333,7 @@ def _start_fake_http_server(tmp: str) -> tuple[any, str] {
 
 test "http transport round trip: initialize, session echo, json and sse bodies" {
     tmp = tempfile.mkdtemp();
-    proc: any = None;
+    proc: subprocess.Popen | None = None;
     client = create_mcp_client();
     try {
         started_up = _start_fake_http_server(tmp);

@@ -1,5 +1,6 @@
 import http from 'node:http';
 import readline from 'node:readline';
+import { writeFileSync } from 'node:fs';
 
 const mode = process.argv[2] ?? 'normal';
 const send = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -148,7 +149,12 @@ function runHttp() {
       }
     });
   });
-  server.listen(0, '127.0.0.1', () => process.stdout.write(`READY ${server.address().port}\n`));
+  server.listen(0, '127.0.0.1', () => {
+    const readyFile = process.argv[3];
+    const port = server.address().port;
+    if (readyFile) writeFileSync(readyFile, String(port));
+    else process.stdout.write('READY ' + port + '\n');
+  });
 }
 
 if (mode === 'http') runHttp();
