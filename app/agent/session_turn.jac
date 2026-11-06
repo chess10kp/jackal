@@ -39,13 +39,13 @@ import from .session_lifecycle { session_boot_native, wait_extensions_ready }
 
 
 def:pub render_event(kind: str, data: dict[str, any]) {
-    out: any = sys.stdout;
+    out = sys.stdout;
     if kind == "chunk" {
         out.write(str(data.get("content", "")));
         out.flush();
     } elif kind == "tool_call" {
         out.write("\n");
-        args: any = data.get("args", {});
+        args: dict[str, any] = data.get("args", {}) as dict[str, any];
         parts: list[str] = [];
         for pair in args.items() {
             parts.append(str(pair[0]) + "=" + str(pair[1])[:40]);
@@ -67,9 +67,19 @@ def:pub render_event(kind: str, data: dict[str, any]) {
 }
 
 
+def _discard_event(kind: str, data: dict[str, any]) -> None {
+}
 
 
-def:pub relay_tool_hooks(bridge: PluginBridge | None, inner: any) -> any {
+
+
+def:pub relay_tool_hooks(
+    bridge: PluginBridge | None,
+    inner: Callable[[str, dict[str, any]], None] | None,
+) -> Callable[[str, dict[str, any]], None] {
+    if inner is None {
+        return _discard_event;
+    }
     if bridge is None {
         return inner;
     }
@@ -97,7 +107,10 @@ sendMessage/sendUserMessage payloads join LLM context (history); entries
 and ui_events are transcript-only and surface as `entry` events. Never
 raises — extension traffic must not break the turn.
 """
-def:pub _apply_extension_traffic(bridge: PluginBridge | None, on_event: any) {
+def:pub _apply_extension_traffic(
+    bridge: PluginBridge | None,
+    on_event: Callable[[str, dict[str, any]], None] | None,
+) {
     if bridge is None or on_event is None {
         return;
     }
@@ -268,10 +281,13 @@ def:pub _ensure_mode_system_prompt {
 
 def:pub run_turn(
     message: str,
-    on_event: any = render_event,
-    approve: any = None,
+    on_event: Callable[[str, dict[str, any]], None] | None = None,
+    approve: Callable[[str, dict[str, any]], any] | None = None,
     max_iters: int = 30,
 ) -> str {
+    terminal_output: bool = on_event is None;
+    event_callback: Callable[[str, dict[str, any]], None] = render_event;
+    if on_event is not None { event_callback = on_event; }
     # Auto-boot with no decls if never booted (native-only path).
     if plugins.reg <= 0 {
         session_boot_native(plugins.session_id, plugins.cwd if plugins.cwd else os.getcwd(), []);
@@ -282,8 +298,8 @@ def:pub run_turn(
     wait_mcp_ready();
     # Extensions may have called pi.setModel/setThinkingLevel during load.
     _apply_pending_model_requests();
-    if on_event is not None and st.total > 0 {
-        on_event(
+    if st.total > 0 {
+        event_callback(
             "extensions",
             {
                 "label": st.label,
@@ -309,7 +325,7 @@ def:pub run_turn(
             igate = {"action": "continue", "text": message};
         }
         if igate.get("action") == "handled" {
-            _apply_extension_traffic(bridge as PluginBridge, on_event);
+            _apply_extension_traffic(bridge as PluginBridge, event_callback);
             return "";
         }
         if igate.get("action") == "transform" {
@@ -330,9 +346,7 @@ def:pub run_turn(
             transport = None;
         }
         if transport is None {
-            if on_event is not None {
-                on_event("error", {"message": f"unknown extension model {get_model_state()}"});
-            }
+            event_callback("error", {"message": f"unknown extension model {get_model_state()}"});
             return "";
         }
     }
@@ -378,7 +392,7 @@ def:pub run_turn(
     try {
         reg: int = plugins.reg if plugins.reg > 0 else default_registry_handle();
         answer = react_loop(
-            history, [], transport, relay_tool_hooks(bridge, on_event),
+            history, [], transport, relay_tool_hooks(bridge, event_callback),
             max_iters=max_iters, reg=reg, bridge=bridge, cancel=turn_cancel,
             approve=approve,
         );
@@ -392,7 +406,7 @@ def:pub run_turn(
             } except Exception {
             }
         }
-        if on_event is render_event {
+        if terminal_output {
             sys.stdout.write("\n");
             if show_stats {
                 sys.stdout.write(
@@ -401,7 +415,7 @@ def:pub run_turn(
             }
             sys.stdout.flush();
         } else {
-            on_event("turn_end", {"secs": time.time() - _t0, "tools": _n_tools});
+            event_callback("turn_end", {"secs": time.time() - _t0, "tools": _n_tools});
         }
         if bridge is not None {
             b2 = bridge as PluginBridge;
@@ -412,7 +426,7 @@ def:pub run_turn(
             });
             fire_hook(b2, "agent_end", {"answer": answer});
             fire_hook(b2, "agent_settled", {});
-            _apply_extension_traffic(b2, on_event);
+            _apply_extension_traffic(b2, event_callback);
         }
         # Best-effort transcript persistence after every turn. The boot-time
         # id may be a placeholder ("session") — mint a real one on first save.
@@ -431,10 +445,10 @@ def:pub run_turn(
     # T2b: display-only markdown transformer chain over the complete answer,
     # surfaced as a `message` event for JSON/UI clients (term mode ignores it
     # — the raw stream is already printed). Never mutates session history.
-    if answer and on_event is not None {
+    if answer {
         xres = transform_markdown(bridge, answer);
         shown = str(xres.get("markdown", answer)) if xres.get("ok") else answer;
-        on_event("message", {"role": "assistant", "content": shown});
+        event_callback("message", {"role": "assistant", "content": shown});
         # P11: extension message renderer produces native content lines for
         # the finalized assistant message (surfaced as an entry event so
         # line-based and native-screen clients share one protocol).
@@ -447,7 +461,7 @@ def:pub run_turn(
                     {"role": "assistant", "content": shown},
                 );
                 if mr.get("ok") and mr.get("lines") {
-                    on_event("entry", {
+                    event_callback("entry", {
                         "type": "extension_render",
                         "render_type": "assistant",
                         "lines": mr["lines"],

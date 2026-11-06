@@ -56,8 +56,9 @@ test "session_boot parallel sidecar loads fixture and run_turn uses bridge" {
     assert ready.ready;
     assert ready.t_ext_ready_s >= ready.t_interactive_s;
     assert plugins.bridge is not None;
-    assert plugins.bridge.host_kind == "node";
-    assert plugins.bridge.compat_tier in ("T0", "T1", "T2-partial");
+    typed_bridge: PluginBridge = plugins.bridge as PluginBridge;
+    assert typed_bridge.host_kind == "node";
+    assert typed_bridge.compat_tier in ("T0", "T1", "T2-partial");
     reg = plugins.reg;
     bridge = plugins.bridge;
     assert reg is not None;
@@ -99,7 +100,7 @@ test "load_extension_decls reads .jackal/extensions.json" {
         os.makedirs(jackal);
         stub = resolve_stub_echo();
         path = os.path.join(jackal, "extensions.json");
-        fh: any = open(path, "w");
+        fh = open(path, "w");
         try {
             fh.write(
                 '{"extensions":[{"id":"stub.echo","path":"'
@@ -191,7 +192,8 @@ test "turn_start and turn_end hooks fire around a turn" {
     }
 
     def _on_end(data: dict[str, any], ctx: any) -> str {
-        seen.append("end:" + str(round(float(data.get("secs", 0.0)), 1)));
+        secs: float = data.get("secs", 0.0) as float;
+        seen.append("end:" + str(round(secs, 1)));
         return "";
     }
 
@@ -406,10 +408,11 @@ test "set_model persists per-provider last-model prefs to .jackal" {
     path = os.path.join(tmp, ".jackal", "model_prefs.json");
     assert os.path.isfile(path);
     with open(path, "r") as fh {
-        raw = json.load(fh);
+        raw: dict[str, any] = json.load(fh) as dict[str, any];
     }
     assert raw.get("last") == "mock";
     assert raw.get("mock") == "mock";
-    assert model_preferences().get("last") == "mock";
+    prefs: dict[str, any] = model_preferences();
+    assert prefs.get("last") == "mock";
     session_dispose();
 }

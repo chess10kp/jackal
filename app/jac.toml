@@ -228,6 +228,10 @@ default = "native"
 "agent.session_plugins" = "native"
 "agent.session_cwd" = "native"
 "agent.session" = "native"
+# The facade exports boot/dispose APIs from this split implementation module;
+# pin it so the session test annex and native callers resolve the same ABI.
+"agent.session_lifecycle" = "native"
+"agent.session_turn" = "native"
 # Session boot seeds built-in tools through default_registry_handle; keep the
 # registry factory and its file/process tool handlers in the native graph.
 "agent.tools" = "native"

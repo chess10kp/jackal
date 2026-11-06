@@ -297,7 +297,7 @@ def:pub drain_prompt_queue() -> list[str] {
 }
 
 
-def:pub session_dispose {
+def:pub session_dispose() -> None {
     wf = plugins.warm_future;
     if wf is not None {
         try {
