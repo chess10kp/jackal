@@ -33,16 +33,21 @@ the slices can be reviewed and landed independently:
 | [#10634](https://github.com/jaseci-labs/jac/pull/10634) | Native build cache and dependency deduplication |
 | [#10641](https://github.com/jaseci-labs/jac/pull/10641) | Remove server fallbacks from native unit compilation |
 | [#10642](https://github.com/jaseci-labs/jac/pull/10642) | Advance compiler import closure |
-| [#10643](https://github.com/jaseci-labs/jac/pull/10643) | Represent native pass schedules as values |
 | [#10644](https://github.com/jaseci-labs/jac/pull/10644) | Match JacPython's native compile ABI |
 | [#10645](https://github.com/jaseci-labs/jac/pull/10645) | Sync sealed JIR with linked native interfaces |
+| [#10655](https://github.com/jaseci-labs/jac/pull/10655) | Native `PassKind` dispatch implementation |
+| [#10656](https://github.com/jaseci-labs/jac/pull/10656) | Pass-schedule tests (depends on #10655) |
 
 The oversized compiler closure PRs [#10604](https://github.com/jaseci-labs/jac/pull/10604),
 [#10610](https://github.com/jaseci-labs/jac/pull/10610), and
 [#10639](https://github.com/jaseci-labs/jac/pull/10639) are closed; their work
-is represented by the focused PRs above. Together the open slices account for
-the original changes' non-generated source paths. They are review slices, not
-closure evidence for the Python-free toolchain.
+is represented by the focused PRs above. The former pass-schedule PR
+[#10643](https://github.com/jaseci-labs/jac/pull/10643) is also closed and
+reissued as implementation PR [#10655](https://github.com/jaseci-labs/jac/pull/10655)
+and dependent test PR [#10656](https://github.com/jaseci-labs/jac/pull/10656).
+Together the open slices account for the original changes' non-generated
+source paths. They are review slices, not closure evidence for the Python-free
+toolchain.
 
 ## Closure gates
 
