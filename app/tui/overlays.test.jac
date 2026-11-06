@@ -364,7 +364,8 @@ def _make_project -> str {
 def _seed_task_file(cwd: str, tasks: list[dict[str, any]]) {
     os.makedirs(os.path.join(cwd, ".jackal"), exist_ok=True);
     fh = open(os.path.join(cwd, ".jackal", "tasks.json"), "w");
-    json.dump(tasks, fh);
+    payload: str = json.dumps(tasks);
+    fh.write(payload);
     fh.close();
 }
 
@@ -537,7 +538,7 @@ test "skills picker lists project skills with hidden tagging" {
         _seed_skill(cwd, "quiet-skill", "quiet-skill", "hidden helper", hidden=True);
 
         # Real loader: parse the seeded project skills dir, then format.
-        loaded: dict[str, any] = load_skills_from_dir(
+        loaded: dict[str, list[dict[str, any]]] = load_skills_from_dir(
             os.path.join(cwd, ".jackal", "skills"), "project"
         );
         assert len(loaded["skills"]) == 2;
