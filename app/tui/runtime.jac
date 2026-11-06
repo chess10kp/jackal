@@ -1,5 +1,6 @@
 """Streaming worker and approval lifecycle."""
 import threading;
+import json;
 import from tui.message_queue { Message, MessageQueue, QueueEmpty }
 import from tui.state { LiveShell }
 import from tui.core {
@@ -66,7 +67,7 @@ def:pub _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str =
     app.stream_msg_id = _push_turn(app, "assistant", "▍");
     def collector(kind: str, data: dict[str, any]) {
         try {
-            q.put((str(kind), dict(data)));
+            q.put((str(kind), data));
         } except Exception {
         }
     }
@@ -149,7 +150,7 @@ def:pub _tick_stream(app: LiveShell) {
             break;
         }
         kind = str(item[0]);
-        data: any = item[1];
+        data: dict[str, any] = item[1];
         drained = True;
         if kind == "chunk" {
             app.stream_full = app.stream_full + str(data.get("content", ""));
@@ -196,14 +197,9 @@ def:pub _tick_stream(app: LiveShell) {
         } elif kind == "__approve__" {
             tool_name = str(data.get("tool", "?"));
             args: any = data.get("args", {});
-            parts: list[str] = [];
-            if isinstance(args, dict) {
-                for pair in args.items() {
-                    parts.append(str(pair[0]) + "=" + str(pair[1])[:60]);
-                }
-            }
             approval_args: dict[str, any] = args if isinstance(args, dict) else {};
-            approval_label = tool_name + "(" + (", ".join(parts))[:160] + ")";
+            args_text: str = json.dumps(approval_args);
+            approval_label = tool_name + "(" + args_text[:160] + ")";
             app.phase = "approval";
             _open_window(
                 app,
