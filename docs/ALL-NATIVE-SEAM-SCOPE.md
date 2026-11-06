@@ -148,6 +148,24 @@ or runtime closure.
    replacement as its own deliverable throughout; no app milestone closes the
    overall goal without it.
 
+### Current app build evidence (2026-11-06)
+
+A fresh `cd app && ../jac build` processed 151 app Jac files and 480 native
+units. The prior `_parent_dir` native ICE and the test-annex self-import were
+removed by giving the path shim a `str` parameter and using annex symbols
+directly. The launcher executable check now uses `shutil.which`; subagent file
+discovery has a fixed native predicate instead of a dynamic callback. The
+three affected annexes and `run.jac`/`subagents.jac` pass `jac check`.
+
+The build still ends before producing a seal: the staged app and the source
+tree both contribute `constraints/algebra.jac` under the same native unit
+prefix. This is tracked upstream in [jac#10623](https://github.com/jaseci-labs/jac/issues/10623).
+The current run reports 238 seam demotions, so the check is not closure
+evidence. The highest-impact app dependency groups remain plugin bridge I/O
+and callback typing, session lifecycle composition, imported registry calls,
+and native test-root accounting. Fix the link-plan identity collision first
+so subsequent full builds can produce trustworthy root closure evidence.
+
 ### Boundary map
 
 The work crosses distinct contracts. A seam closes only when both sides of its

@@ -221,10 +221,10 @@ def _is_agent_md(name: str) -> bool {
 }
 
 
-"""Recursively list files under *directory* accepted by *accept*, sorted.
+"""Recursively list subagent markdown files under *directory*, sorted.
 
 Returns [] for missing/unreadable directories."""
-def _list_files(directory: str, accept: any) -> list[str] {
+def _list_agent_files(directory: str) -> list[str] {
     found: list[str] = [];
     if not _is_existing_dir(directory) {
         return found;
@@ -240,14 +240,14 @@ def _list_files(directory: str, accept: any) -> list[str] {
         full = os.path.join(directory, name);
         if os.path.isdir(full) {
             dirs.append(full);
-        } elif os.path.isfile(full) and accept(name) {
+        } elif os.path.isfile(full) and _is_agent_md(name) {
             files.append(full);
         }
     }
     # Files of this level first, then recurse (depth-first, name-sorted).
     found.extend(files);
     for sub in dirs {
-        found.extend(_list_files(sub, accept));
+        found.extend(_list_agent_files(sub));
     }
     return found;
 }
@@ -297,7 +297,7 @@ def load_agent_file(file_path: str, source: str) -> dict[str, any] | None {
 """Load all valid agent definitions found under *directory*."""
 def load_agents_from_dir(directory: str, source: str) -> list[dict[str, any]] {
     agents: list[dict[str, any]] = [];
-    for fp in _list_files(directory, _is_agent_md) {
+    for fp in _list_agent_files(directory) {
         agent = load_agent_file(fp, source);
         if agent is not None {
             agents.append(agent);
