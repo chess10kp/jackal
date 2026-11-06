@@ -64,19 +64,33 @@ Case-insensitive substring match over option labels; empty filter returns
 the full lists. Paint and key handling share this helper so the cursor index
 always refers to the same visible rows. Pure over its input."""
 def:pub _picker_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
-    options: list[str] = list(p.get("options", []));
-    ids: list[str] = list(p.get("ids", []));
+    options: list[str] = [];
+    raw_options: any = p.get("options", []);
+    if isinstance(raw_options, list) {
+        for item in raw_options {
+            options.append(str(item));
+        }
+    }
+    ids: list[str] = [];
+    raw_ids: any = p.get("ids", []);
+    if isinstance(raw_ids, list) {
+        for item in raw_ids {
+            ids.append(str(item));
+        }
+    }
     filt: str = str(p.get("filter", "")).strip().lower();
     if not filt {
         return (options, ids);
     }
     vis_options: list[str] = [];
     vis_ids: list[str] = [];
-    for i in range(len(options)) {
+    i: int = 0;
+    while i < len(options) {
         if filt in str(options[i]).lower() {
             vis_options.append(options[i]);
             vis_ids.append(str(ids[i]) if i < len(ids) else "");
         }
+        i += 1;
     }
     return (vis_options, vis_ids);
 }
