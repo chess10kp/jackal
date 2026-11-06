@@ -7,31 +7,43 @@ tool_call block verdicts.
 Test-only transports and helpers live here, not in llm.jac.
 """
 
-
 obj RetryTransport {
     has calls: int = 0;
 
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    def stream(
+        messages: list[dict[str, any]],
+        tool_defs: list[dict[str, any]],
+        on_chunk: Callable[[dict[str, any], any], bool],
+        stream_context: any,
+    ) {
         self.calls += 1;
         if self.calls == 1 {
-            yield {"error": "HTTP 503: temporarily unavailable"};
+            chunk: dict[str, any] = {"error": "HTTP 503: temporarily unavailable"};
+            on_chunk(chunk, stream_context);
         } else {
-            yield {"content": "recovered"};
+            chunk: dict[str, any] = {"content": "recovered"};
+            on_chunk(chunk, stream_context);
         }
     }
 }
 
 
 obj TwoCallTransport {
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    def stream(
+        messages: list[dict[str, any]],
+        tool_defs: list[dict[str, any]],
+        on_chunk: Callable[[dict[str, any], any], bool],
+        stream_context: any,
+    ) {
         saw = False;
         for m in messages {
-            msg: any = m;
+            msg: dict[str, any] = m;
             if msg.get("role") == "tool" { saw = True; }
         }
         if not saw {
-            yield {"content": "working"};
-            yield {"tool_calls": [
+            content_chunk: dict[str, any] = {"content": "working"};
+            on_chunk(content_chunk, stream_context);
+            tool_calls_chunk: dict[str, any] = {"tool_calls": [
                 {
                     "id": "call_1",
                     "type": "function",
@@ -43,8 +55,10 @@ obj TwoCallTransport {
                     "function": {"name": "echo", "arguments": "{\"text\": \"two\"}"},
                 },
             ]};
+            on_chunk(tool_calls_chunk, stream_context);
         } else {
-            yield {"content": "done"};
+            done_chunk: dict[str, any] = {"content": "done"};
+            on_chunk(done_chunk, stream_context);
         }
     }
 }
@@ -59,21 +73,29 @@ obj ScriptedTransport {
         tool_args: str = "{\"text\": \"hi\"}",
         final_text: str = "done";
 
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    def stream(
+        messages: list[dict[str, any]],
+        tool_defs: list[dict[str, any]],
+        on_chunk: Callable[[dict[str, any], any], bool],
+        stream_context: any,
+    ) {
         saw_tool_result = False;
         for m in messages {
-            msg: any = m;
+            msg: dict[str, any] = m;
             if msg.get("role") == "tool" { saw_tool_result = True; }
         }
         if not saw_tool_result {
-            yield {"content": "let me check"};
-            yield {"tool_calls": [{
+            content_chunk: dict[str, any] = {"content": "let me check"};
+            on_chunk(content_chunk, stream_context);
+            tool_calls_chunk: dict[str, any] = {"tool_calls": [{
                 "id": self.tool_call_id,
                 "type": "function",
                 "function": {"name": self.tool_name, "arguments": self.tool_args},
             }]};
+            on_chunk(tool_calls_chunk, stream_context);
         } else {
-            yield {"content": self.final_text};
+            final_chunk: dict[str, any] = {"content": self.final_text};
+            on_chunk(final_chunk, stream_context);
         }
     }
 }
@@ -92,6 +114,23 @@ def _noop_event(kind: str, data: dict[str, any]) {
 }
 
 glob _events: list[any] = [];
+
+obj _StreamCapture {
+    has order: list[str] = [],
+        chunks: list[str] = [],
+        rows: list[dict[str, any]] = [],
+        capture_content: bool = False;
+}
+
+def _capture_stream_chunk(chunk: dict[str, any], raw_capture: any) -> bool {
+    capture: _StreamCapture = raw_capture as _StreamCapture;
+    capture.rows.append(dict(chunk));
+    if capture.capture_content and "content" in chunk {
+        capture.order.append("chunk");
+        capture.chunks.append(str(chunk["content"]));
+    }
+    return True;
+}
 
 
 test "react loop runs a tool then finishes" {
@@ -135,12 +174,20 @@ test "react loop retries transient transport errors" {
 obj CancelMidStreamTransport {
     has flag: any = None;
 
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
-        yield {"content": "partial"};
+    def stream(
+        messages: list[dict[str, any]],
+        tool_defs: list[dict[str, any]],
+        on_chunk: Callable[[dict[str, any], any], bool],
+        stream_context: any,
+    ) {
+        partial_chunk: dict[str, any] = {"content": "partial"};
+        if not on_chunk(partial_chunk, stream_context) { return; }
         if self.flag is not None {
-            self.flag.cancelled = True;
+            cancel: TurnCancel = self.flag as TurnCancel;
+            cancel.cancelled = True;
         }
-        yield {"content": " never seen"};
+        unseen_chunk: dict[str, any] = {"content": " never seen"};
+        on_chunk(unseen_chunk, stream_context);
     }
 }
 
@@ -221,8 +268,14 @@ test "approve hook denial yields error tool result without executing" {
     # No echo ran; the request + denial pair is on the event stream.
     kinds = [e[0] for e in _events];
     assert "approval_request" in kinds and "approval_decision" in kinds;
-    idx_req = kinds.index("approval_request");
-    assert _events[idx_req][1]["tool"] == "echo";
+    request_tool: str = "";
+    for event in _events {
+        if str(event[0]) == "approval_request" {
+            request_tool = str(event[1]["tool"]);
+            break;
+        }
+    }
+    assert request_tool == "echo";
 }
 
 test "approve hook allow runs the tool unchanged" {
@@ -336,8 +389,10 @@ test "unknown tool yields error result without crashing" {
     spec.tool_name = "missing";
     _events.clear();
     answer = react_loop(messages, [], spec as Transport, _noop_event);
-    assert "unknown tool" in _events[4][1]["result"];
-    assert messages[2]["content"].startswith("ERROR");
+    result_text: str = str(_events[4][1]["result"]);
+    assistant_text: str = str(messages[2]["content"]);
+    assert "unknown tool" in result_text;
+    assert assistant_text.startswith("ERROR");
 }
 
 
@@ -662,12 +717,13 @@ test "_open_stream fires hook before the first delta from a live SSE server" {
     import from .plugin_bridge { create_bridge, dispose_bridge }
 
     order: list[str] = [];
+    capture = _StreamCapture(order=order, capture_content=True);
     def _mark(data: dict[str, any], ctx: any) -> str {
         order.append("hook:" + str(data.get("status")));
         return "";
     }
 
-    server: any = make_sse_server("ok");
+    server: SseTestServer = make_sse_server("ok");
     bridge = create_bridge("apr-live");
     register_fake_listener(bridge, "after_provider_response", _mark);
     try {
@@ -676,14 +732,9 @@ test "_open_stream fires hook before the first delta from a live SSE server" {
             model="test-model",
             hook_bridge=bridge,
         );
-        chunks: list[str] = [];
-        for chunk in t.stream([{"role": "user", "content": "hi"}], []) {
-            if "content" in chunk {
-                order.append("chunk");
-                chunks.append(chunk["content"]);
-            }
-        }
-        assert chunks == ["hello"];
+        request: list[dict[str, any]] = [{"role": "user", "content": "hi"}];
+        t.stream(request, [], _capture_stream_chunk, capture);
+        assert capture.chunks == ["hello"];
         # Hook strictly precedes the first content delta downstream.
         assert order == ["hook:200", "chunk"];
     } finally {
@@ -703,7 +754,7 @@ test "_open_stream fires the hook even when the provider answers non-200" {
         return "";
     }
 
-    server: any = make_sse_server("boom");
+    server: SseTestServer = make_sse_server("boom");
     bridge = create_bridge("apr-503");
     register_fake_listener(bridge, "after_provider_response", _cap);
     try {
@@ -712,12 +763,10 @@ test "_open_stream fires the hook even when the provider answers non-200" {
             model="test-model",
             hook_bridge=bridge,
         );
-        out: list[dict[str, any]] = [];
-        for chunk in t.stream([], []) {
-            out.append(dict(chunk));
-        }
-        assert len(out) == 1;
-        assert "HTTP 503" in str(out[0].get("error", ""));
+        capture = _StreamCapture();
+        t.stream([], [], _capture_stream_chunk, capture);
+        assert len(capture.rows) == 1;
+        assert "HTTP 503" in str(capture.rows[0].get("error", ""));
         assert statuses == [503];
     } finally {
         server.shutdown();
@@ -725,7 +774,7 @@ test "_open_stream fires the hook even when the provider answers non-200" {
     }
 }
 
-import from .sse_test_server { make_sse_server }
+import from .sse_test_server { SseTestServer, make_sse_server }
 
 
 test "after_provider_response refires per retry attempt through react_loop" {
@@ -738,7 +787,7 @@ test "after_provider_response refires per retry attempt through react_loop" {
         return "";
     }
 
-    server: any = make_sse_server("flaky");
+    server: SseTestServer = make_sse_server("flaky");
     bridge = create_bridge("apr-retry");
     register_fake_listener(bridge, "after_provider_response", _cap);
     try {

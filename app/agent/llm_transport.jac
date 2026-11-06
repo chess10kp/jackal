@@ -14,7 +14,6 @@ dicts as they arrive:
 import os;
 import json;
 import time;
-import from collections.abc { Generator }
 import from .llm_http_stream { HttpStreamResponse, post_json_stream }
 import from .tool_spec { ToolSpec, MAX_TOOL_RESULT }
 import from .provider_routes {
@@ -73,16 +72,24 @@ obj:pub Transport {
         # style, and OpenRouter's documented form is top-level
         # `reasoning: {"effort": ...}` (OpenAI-compatible too via mapping).
         # Omitted entirely when no level was requested.
-        if self.thinking { body["reasoning"] = {"effort": self.thinking}; }
+        if self.thinking {
+            reasoning: dict[str, any] = {"effort": self.thinking};
+            body["reasoning"] = reasoning;
+        }
         return body;
     }
 
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    def stream(
+        messages: list[dict[str, any]],
+        tool_defs: list[dict[str, any]],
+        on_chunk: Callable[[dict[str, any], any], bool],
+        stream_context: any,
+    ) {
         body = self._build_body(messages, tool_defs);
         headers: dict[str, str] = {};
         if self.api_key { headers["Authorization"] = "Bearer " + self.api_key; }
         url = self.base_url.rstrip("/") + "/chat/completions";
-        yield from self._open_stream(url, headers, body);
+        self._open_stream(url, headers, body, on_chunk, stream_context);
     }
 
     """Fire the informational after_provider_response hook (Pi parity).
@@ -106,7 +113,13 @@ obj:pub Transport {
 
     """POST `body` to `url` and yield normalized chunks (shared by native
     and P10 provider transports)."""
-    def _open_stream(url: str, headers: dict[str, str], body: dict[str, any]) -> Generator[dict[str, any], None, None] {
+    def _open_stream(
+        url: str,
+        headers: dict[str, str],
+        body: dict[str, any],
+        on_chunk: Callable[[dict[str, any], any], bool],
+        stream_context: any,
+    ) {
         calls: dict[int, dict[str, any]] = {};
         request_headers: dict[str, str] = dict(headers);
         request_headers["Content-Type"] = "application/json";
@@ -119,7 +132,8 @@ obj:pub Transport {
             self._notify_response(r.status, r.headers);
             if r.status != 200 {
                 detail = r.read().decode("utf-8", "replace")[:400];
-                yield {"error": f"HTTP {r.status}: {detail}"};
+                error_chunk: dict[str, any] = {"error": f"HTTP {r.status}: {detail}"};
+                on_chunk(error_chunk, stream_context);
                 return;
             }
             while True {
@@ -139,7 +153,8 @@ obj:pub Transport {
                 delta: dict[str, any] = choice.get("delta", {}) as dict[str, any];
                 piece: any = delta.get("content");
                 if piece {
-                    yield {"content": str(piece)};
+                    content_chunk: dict[str, any] = {"content": str(piece)};
+                    if not on_chunk(content_chunk, stream_context) { return; }
                 }
                 tool_calls: list[dict[str, any]] = delta.get("tool_calls", []) as list[dict[str, any]];
                 for raw_tc in tool_calls {
@@ -157,12 +172,13 @@ obj:pub Transport {
                         calls[idx] = acc;
                     }
                     fn: dict[str, any] = tc.get("function", {}) as dict[str, any];
+                    acc_fn: dict[str, any] = acc["function"] as dict[str, any];
                     if fn.get("id") { acc["id"] = fn["id"]; }
                     if fn.get("name") {
-                        acc["function"]["name"] = str(acc["function"]["name"]) + str(fn["name"]);
+                        acc_fn["name"] = str(acc_fn["name"]) + str(fn["name"]);
                     }
                     if fn.get("arguments") {
-                        acc["function"]["arguments"] = str(acc["function"]["arguments"]) + str(fn["arguments"]);
+                        acc_fn["arguments"] = str(acc_fn["arguments"]) + str(fn["arguments"]);
                     }
                 }
             }
@@ -172,7 +188,8 @@ obj:pub Transport {
         if calls {
             ordered: list[dict[str, any]] = [];
             for i in sorted(calls) { ordered.append(calls[i]); }
-            yield {"tool_calls": ordered};
+            tool_calls_chunk: dict[str, any] = {"tool_calls": ordered};
+            on_chunk(tool_calls_chunk, stream_context);
         }
     }
 }
@@ -207,14 +224,16 @@ def _mock_next_response(script_path: str) -> dict[str, any] | None {
         return None;
     }
     try {
-        fh: any = open(script_path, "r", encoding="utf-8");
+        fh = open(script_path, "r", encoding="utf-8");
         steps: any = json.loads(fh.read());
         fh.close();
     } except Exception as e {
-        return {"error": "mock script unreadable: " + str(e)};
+        error_response: dict[str, any] = {"error": "mock script unreadable: " + str(e)};
+        return error_response;
     }
     if not isinstance(steps, list) {
-        return {"error": "mock script must be a JSON list"};
+        error_response: dict[str, any] = {"error": "mock script must be a JSON list"};
+        return error_response;
     }
     idx: int = _mock_cursor.get(script_path, 0);
     _mock_cursor[script_path] = idx + 1;
@@ -225,35 +244,46 @@ def _mock_next_response(script_path: str) -> dict[str, any] | None {
 }
 
 obj MockTransport (Transport) {
-    override def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    override def stream(
+        messages: list[dict[str, any]],
+        tool_defs: list[dict[str, any]],
+        on_chunk: Callable[[dict[str, any], any], bool],
+        stream_context: any,
+    ) {
         script_path: str = os.environ.get("JACKAL_MOCK_SCRIPT", "");
         step: dict[str, any] | None = _mock_next_response(script_path);
         log_path: str = os.environ.get("JACKAL_MOCK_LOG", "");
         if log_path {
             tool_names: list[str] = [];
             for d in tool_defs {
-                fn: any = d.get("function", {}) if isinstance(d, dict) else {};
+                fn: dict[str, any] = d.get("function", {}) as dict[str, any] if isinstance(d, dict) else {};
                 tool_names.append(str(fn.get("name", "")) if isinstance(fn, dict) else "");
             }
             last: dict[str, any] = messages[-1] if messages else {};
+            last_fields: dict[str, any] = {
+                "role": str(last.get("role", "")),
+                "content": str(last.get("content", "")),
+            };
             log_entry: dict[str, any] = {
                 "call": _mock_cursor.get(script_path, 0),
                 "messages": len(messages),
-                "last": {"role": str(last.get("role", "")), "content": str(last.get("content", ""))},
+                "last": last_fields,
                 "tools": tool_names,
             };
             try {
-                lf: any = open(log_path, "a", encoding="utf-8");
+                lf = open(log_path, "a", encoding="utf-8");
                 lf.write(json.dumps(log_entry) + "\n");
                 lf.close();
             } except Exception {
             }
         }
         if step is None {
-            step = {"text": "mock: " + _mock_last_user(messages)};
+            fallback_response: dict[str, any] = {"text": "mock: " + _mock_last_user(messages)};
+            step = fallback_response;
         }
         if "error" in step {
-            yield {"error": str(step["error"])};
+            error_chunk: dict[str, any] = {"error": str(step["error"])};
+                on_chunk(error_chunk, stream_context);
             return;
         }
         text: str = str(step.get("text", "") or "");
@@ -261,11 +291,15 @@ obj MockTransport (Transport) {
         # chunk (tests assert exact chunk lists), long ones split into
         # ~80-char pieces so frontends exercise per-chunk drain paths.
         if len(text) <= 160 {
-            if text { yield {"content": text}; }
+            if text {
+                content_chunk: dict[str, any] = {"content": text};
+                if not on_chunk(content_chunk, stream_context) { return; }
+            }
         } else {
             i: int = 0;
             while i < len(text) {
-                yield {"content": text[i:i + 80]};
+                content_chunk: dict[str, any] = {"content": text[i:i + 80]};
+                if not on_chunk(content_chunk, stream_context) { return; }
                 i += 80;
             }
         }
@@ -276,16 +310,19 @@ obj MockTransport (Transport) {
             for rc in raw_calls {
                 if not isinstance(rc, dict) { continue; }
                 n += 1;
-                calls.append({
+                function_call: dict[str, any] = {
+                    "name": str(rc.get("name", "")),
+                    "arguments": json.dumps(rc.get("args", {})),
+                };
+                mock_call: dict[str, any] = {
                     "id": "mock_call_" + str(n),
                     "type": "function",
-                    "function": {
-                        "name": str(rc.get("name", "")),
-                        "arguments": json.dumps(rc.get("args", {})),
-                    },
-                });
+                    "function": function_call,
+                };
+                calls.append(mock_call);
             }
-            yield {"tool_calls": calls};
+            tool_calls_chunk: dict[str, any] = {"tool_calls": calls};
+            on_chunk(tool_calls_chunk, stream_context);
         }
     }
 }
@@ -351,7 +388,12 @@ obj ProviderTransport (Transport) {
     has ext_bridge: any = None,
         ext_cfg: dict[str, any] = {};
 
-    override def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    override def stream(
+        messages: list[dict[str, any]],
+        tool_defs: list[dict[str, any]],
+        on_chunk: Callable[[dict[str, any], any], bool],
+        stream_context: any,
+    ) {
         body = self._build_body(messages, tool_defs);
         headers: dict[str, str] = {};
         if self.api_key { headers["Authorization"] = "Bearer " + self.api_key; }
@@ -369,14 +411,19 @@ obj ProviderTransport (Transport) {
                 );
                 url = str(prepped.get("url", url));
                 h2: any = prepped.get("headers");
-                if isinstance(h2, dict) { headers = h2; }
+                if isinstance(h2, dict) {
+                    raw_headers: dict[str, any] = h2 as dict[str, any];
+                    for (key, value) in raw_headers.items() {
+                        headers[str(key)] = str(value);
+                    }
+                }
                 b2: any = prepped.get("body");
                 if isinstance(b2, dict) { body = b2; }
             } except Exception {
                 # Hook failure never blocks the request.
             }
         }
-        yield from self._open_stream(url, headers, body);
+        self._open_stream(url, headers, body, on_chunk, stream_context);
     }
 }
 

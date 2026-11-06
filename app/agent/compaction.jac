@@ -23,6 +23,24 @@ glob CHARS_PER_TOKEN: int = 4,
      SUMMARY_RESERVE_TOKENS: int = 8192;
 
 
+obj _SummaryStreamState {
+    has pieces: list[str] = [],
+        failed: bool = False;
+}
+
+
+def _collect_summary_chunk(chunk: dict[str, any], raw_state: any) -> bool {
+    state: _SummaryStreamState = raw_state as _SummaryStreamState;
+    c: any = chunk.get("content");
+    if isinstance(c, str) { state.pieces.append(c); }
+    if chunk.get("error") is not None {
+        state.failed = True;
+        return False;
+    }
+    return True;
+}
+
+
 """Defaults mirror AutoCompactConfig in src/session/auto-compact.ts."""
 glob DEFAULT_AUTO_COMPACT: dict[str, any] = {
     "enabled": True,
@@ -127,7 +145,9 @@ def should_auto_compact(usage: dict[str, int], config: dict[str, any]) -> bool {
     }
     threshold: any = config.get("thresholdPercent", 80);
     pct: any = usage.get("percent", 0);
-    return float(pct) >= float(threshold);
+    threshold_f: float = threshold as float;
+    pct_f: float = pct as float;
+    return pct_f >= threshold_f;
 }
 
 
@@ -250,17 +270,11 @@ def summarize_for_compaction(
         if not transport.api_key {
             return None;
         }
-        pieces: list[str] = [];
-        for chunk in transport.stream([{"role": "user", "content": prompt}], []) {
-            c: any = chunk.get("content");
-            if isinstance(c, str) {
-                pieces.append(c);
-            }
-            if chunk.get("error") is not None {
-                return None;
-            }
-        }
-        return wrap_compaction_summary("".join(pieces)) or None;
+        summary_state = _SummaryStreamState();
+        request: list[dict[str, any]] = [{"role": "user", "content": prompt}];
+        transport.stream(request, [], _collect_summary_chunk, summary_state);
+        if summary_state.failed { return None; }
+        return wrap_compaction_summary("".join(summary_state.pieces)) or None;
     } except Exception {
         return None;
     }

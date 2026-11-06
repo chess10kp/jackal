@@ -2,7 +2,6 @@
 
 import json;
 import time;
-import from collections.abc { Generator }
 import from .tool_spec { ToolSpec, MAX_TOOL_RESULT }
 import from .llm_transport { Transport }
 import from .registry { registry_tool_specs_handle, invoke_handle }
@@ -18,6 +17,39 @@ obj TurnCancel {
     has turn_id: str = "",
         cancelled: bool = False,
         reason: str = "user";
+}
+
+obj _StreamState {
+    has cancel: TurnCancel | None,
+        on_event: Callable[[str, dict[str, any]], None],
+        aborted: bool = False,
+        error: str = "",
+        text: str = "",
+        tool_calls: list[dict[str, any]] = [];
+}
+
+
+def _consume_stream_chunk(chunk: dict[str, any], raw_state: any) -> bool {
+    state: _StreamState = raw_state as _StreamState;
+    if state.cancel is not None and state.cancel.cancelled {
+        state.aborted = True;
+        return False;
+    }
+    if "error" in chunk {
+        state.error = str(chunk["error"]);
+        return False;
+    }
+    piece: any = chunk.get("content");
+    if piece {
+        chunk_text: str = str(piece);
+        state.text = state.text + chunk_text;
+        chunk_event: dict[str, any] = {"content": chunk_text};
+        state.on_event("chunk", chunk_event);
+    }
+    if "tool_calls" in chunk {
+        state.tool_calls = chunk["tool_calls"] as list[dict[str, any]];
+    }
+    return True;
 }
 
 
@@ -114,13 +146,13 @@ def react_loop(
     messages: list[dict[str, any]],
     specs: list[ToolSpec],
     transport: Transport,
-    on_event: any,
+    on_event: Callable[[str, dict[str, any]], None],
     max_iters: int = 30,
     reg: int = 0,
     bridge: any = None,
     max_retries: int = 2,
     cancel: TurnCancel | None = None,
-    approve: any = None,
+    approve: Callable[[str, dict[str, any]], any] | None = None,
 ) -> str {
     def _is_cancelled() -> bool {
         return cancel is not None and cancel.cancelled;
@@ -148,6 +180,7 @@ def react_loop(
             stream_error = "";
             text = "";
             tool_calls = [];
+            stream_state = _StreamState(cancel=cancel, on_event=on_event);
             # Pi `context` hook (batch-2): handlers may edit a copy of the
             # messages per LLM call; edits apply to this call only — the
             # caller's history is never mutated.
@@ -159,33 +192,15 @@ def react_loop(
                     call_messages = messages;
                 }
             }
-            gen: any = transport.stream(call_messages, defs);
-            aborted = False;
             try {
-                for chunk_obj in gen {
-                    if _is_cancelled() { aborted = True; break; }
-                    c: any = chunk_obj;
-                    if "error" in c {
-                        stream_error = str(c["error"]);
-                        break;
-                    }
-                    piece: any = c.get("content");
-                    if piece {
-                        text = text + str(piece);
-                        on_event("chunk", {"content": str(piece)});
-                    }
-                    if "tool_calls" in c { tool_calls = c["tool_calls"]; }
-                }
+                transport.stream(call_messages, defs, _consume_stream_chunk, stream_state);
             } except Exception as e {
-                stream_error = str(e);
-            } finally {
-                # Guard: custom Transport.stream impls may return a plain
-                # iterator with no .close().
-                try {
-                    gen.close();
-                } except AttributeError {
-                }
+                stream_state.error = str(e);
             }
+            aborted: bool = stream_state.aborted;
+            stream_error = stream_state.error;
+            text = stream_state.text;
+            tool_calls = stream_state.tool_calls;
             if aborted {
                 on_event("cancelled", {"phase": "streaming", "text": text});
                 return text;
@@ -218,8 +233,8 @@ def react_loop(
         messages.append(tc_msg);
         _notify_message_end(bridge, tc_msg);
         for call in tool_calls {
-            cl: any = call;
-            fn: any = cl.get("function", {});
+            cl: dict[str, any] = call;
+            fn: dict[str, any] = cl.get("function", {}) as dict[str, any];
             name = str(fn.get("name", ""));
             raw: any = fn.get("arguments") or "{}";
             if _is_cancelled() {
@@ -261,7 +276,7 @@ def react_loop(
             gate: dict[str, any] = {"blocked": False, "reason": "", "terminate": False};
             if bridge is not None {
                 try {
-                    g = tool_call_gate(bridge as PluginBridge, name, args);
+                    g: dict[str, any] = tool_call_gate(bridge as PluginBridge, name, args);
                     gated_args: any = g.get("args");
                     if isinstance(gated_args, dict) {
                         args = gated_args;
@@ -311,7 +326,7 @@ def react_loop(
             # the raw result above).
             if bridge is not None and not gate["blocked"] {
                 try {
-                    rg = tool_result_gate(bridge as PluginBridge, name, args, safe_result);
+                    rg: dict[str, any] = tool_result_gate(bridge as PluginBridge, name, args, safe_result);
                     safe_result = str(rg.get("result", safe_result));
                 } except Exception {
                 }
