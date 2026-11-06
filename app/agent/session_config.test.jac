@@ -61,10 +61,10 @@ test "user-level config merges beneath the project config" {
     try {
         # User level: a user-only server and a shared server (user flavor).
         fh = open(os.path.join(agent_dir, "config.json"), "w");
-        fh.write(json.dumps({"mcp": {"servers": {
-            "useronly": {"command": "user-cmd"},
-            "shared": {"command": "user-shared", "env": {"U": "1"}},
-        }}}));
+        fh.write(
+            "{\"mcp\":{\"servers\":{\"useronly\":{\"command\":\"user-cmd\"},"
+            + "\"shared\":{\"command\":\"user-shared\",\"env\":{\"U\":\"1\"}}}}}"
+        );
         fh.close();
         # Project level: shared overrides wholesale; project-only added.
         proj = os.path.join(tmp_dir, "proj");
@@ -78,8 +78,9 @@ test "user-level config merges beneath the project config" {
         snames = sorted(list(servers.keys()));
         assert snames == ["projonly", "shared", "useronly"];
         # project entry replaces the user entry wholesale (same name wins)
-        assert servers["shared"]["command"] == "proj-shared";
-        assert servers["shared"].get("cwd") == "/w";
+        shared_server: dict[str, any] = servers["shared"] as dict[str, any];
+        assert shared_server["command"] == "proj-shared";
+        assert shared_server["cwd"] == "/w";
         assert servers["useronly"]["command"] == "user-cmd";
         assert servers["projonly"]["command"] == "proj-cmd";
         # and the parsed specs reflect the merge
@@ -356,21 +357,20 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
         os.environ.pop("JACKAL_MCP_NO_IMPORT", None);
         src1 = os.path.join(tmp, "cursor.json");
         with open(src1, "w") as f {
-            f.write(json.dumps({"mcpServers": {
-                "leg_one": {"command": "uvx", "args": ["srv-one"]},
-                "leg_off": {"command": ["jac", "mcp"], "disabled": True},
-                "leg_web": {"url": "https://x.example/mcp"},
-                "leg_bare": {"args": ["no-command"]},
-            }}));
+            f.write(
+                "{\"mcpServers\":{\"leg_one\":{\"command\":\"uvx\",\"args\":[\"srv-one\"]},"
+                + "\"leg_off\":{\"command\":[\"jac\",\"mcp\"],\"disabled\":true},"
+                + "\"leg_web\":{\"url\":\"https://x.example/mcp\"},"
+                + "\"leg_bare\":{\"args\":[\"no-command\"]}}}"
+            );
         }
         src2 = os.path.join(tmp, "vscode.json");
         with open(src2, "w") as f {
-            f.write(json.dumps({"mcpServers": {
-                # duplicate name loses to the first source
-                "leg_one": {"command": "other"},
-                "leg_two": {"command": "npx", "args": ["srv-two"],
-                             "env": {"K": "V"}},
-            }}));
+            f.write(
+                "{\"mcpServers\":{\"leg_one\":{\"command\":\"other\"},"
+                + "\"leg_two\":{\"command\":\"npx\",\"args\":[\"srv-two\"],"
+                + "\"env\":{\"K\":\"V\"}}}}"
+            );
         }
         imported = mcp_import_legacy(
             home_dir=home_dir, sources=[src1, src2],
@@ -423,16 +423,11 @@ test "legacy import respects JACKAL_MCP_NO_IMPORT and existing names" {
         target = os.path.join(home_dir, ".jackal", "config.json");
         os.makedirs(os.path.dirname(target), exist_ok=True);
         with open(target, "w") as f {
-            f.write(json.dumps({"mcp": {"servers": {
-                "leg_one": {"command": "already-here"},
-            }}}));
+            f.write("{\"mcp\":{\"servers\":{\"leg_one\":{\"command\":\"already-here\"}}}}");
         }
         src1 = os.path.join(tmp, "cursor.json");
         with open(src1, "w") as f {
-            f.write(json.dumps({"mcpServers": {
-                "leg_one": {"command": "uvx"},
-                "leg_two": {"command": "npx"},
-            }}));
+            f.write("{\"mcpServers\":{\"leg_one\":{\"command\":\"uvx\"},\"leg_two\":{\"command\":\"npx\"}}}");
         }
         imported = mcp_import_legacy(home_dir=home_dir, sources=[src1]);
         assert imported == ["leg_two"], imported;
