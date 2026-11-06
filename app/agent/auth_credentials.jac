@@ -58,17 +58,17 @@ glob:pub OAUTH_REQUIRED_KEYS: list[str] = ["refresh", "access"];
 """Checker shims: the Jac type checker cannot bind AnyStr when plain str
 values flow into some os.path/stat signatures (abspath/expanduser/chmod),
 so route those calls through any-typed aliases."""
-def:pub _path_abspath(p: str) -> str {
+def:pub _auth_path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
 
-def:pub _path_expanduser(p: str) -> str {
+def:pub _auth_path_expanduser(p: str) -> str {
     return str(os.path.expanduser(p));
 }
 
 
-def:pub _path_dirname(p: str) -> str {
+def:pub _auth_path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
 }
 
@@ -84,7 +84,7 @@ def:pub resolve_auth_path(agent_dir: str = "") -> str {
         base = os.environ.get("JACKAL_AGENT_DIR") or "";
     }
     if not base {
-        base = os.path.join(_path_expanduser("~"), DEFAULT_AGENT_DIR_NAME);
+        base = os.path.join(_auth_path_expanduser("~"), DEFAULT_AGENT_DIR_NAME);
     }
     return os.path.join(base, AUTH_FILE_NAME);
 }
@@ -123,7 +123,7 @@ import from .json_pretty { json_pretty }
 """Save auth data as pretty JSON (indent=2 + trailing newline), creating
 parent dirs 0700 and chmod-ing the file 0600. True on success."""
 def:pub save_auth_file(path: str, data: dict[str, any]) -> bool {
-    parent = _path_dirname(_path_abspath(path));
+    parent = _auth_path_dirname(_auth_path_abspath(path));
     try {
         if not os.path.isdir(parent) {
             os.makedirs(parent, mode=0o700, exist_ok=True);
