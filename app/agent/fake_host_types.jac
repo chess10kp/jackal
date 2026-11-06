@@ -28,7 +28,7 @@ obj:pub FakePluginHost {
     has handlers: dict[str, Callable[[dict[str, any]], any]] = {},
         command_handlers: dict[str, any] = {},
         shortcut_handlers: dict[str, any] = {},
-        listeners: dict[str, list[any]] = {},
+        listeners: dict[str, list[Callable[[dict[str, any], dict[str, any]], any]]] = {},
         md_transformers: list[dict[str, any]] = [],
         pending_messages: list[dict[str, any]] = [],
         pending_entries: list[dict[str, any]] = [],

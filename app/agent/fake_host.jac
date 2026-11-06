@@ -22,10 +22,11 @@ import from .fake_host_types {
     FakePluginHost,
     create_fake_host,
 }
+import from .plugin_bridge_model { PluginBridge }
 
 
 """Mark bridge activity (resets idle reap clock)."""
-def touch_bridge(bridge: any) {
+def touch_bridge(bridge: PluginBridge) {
     bridge.last_active = time.monotonic();
     if bridge.status_phase in ("idle", "ready", "") {
         bridge.status_phase = "ready";
@@ -36,7 +37,7 @@ def touch_bridge(bridge: any) {
 """Apply host_hello payload onto bridge capability fields (P4).
 
 Caps/tier are DERIVED from the received hello — never hand-copied constants."""
-def apply_hello(bridge: any, hello: Envelope) {
+def apply_hello(bridge: PluginBridge, hello: Envelope) {
     payload = hello.payload if hello.payload is not None else {};
     bridge.hello_payload = dict(payload);
     raw_caps: any = payload.get("caps", []);
@@ -61,7 +62,7 @@ def apply_hello(bridge: any, hello: Envelope) {
 
 Hello shape matches plugin_host/host.mjs byte-for-byte in structure:
 {protocol, node, caps, compat, compat_label}."""
-def:pub ensure_host(bridge: any, host: FakePluginHost | None = None) -> str {
+def:pub ensure_host(bridge: PluginBridge, host: FakePluginHost | None = None) -> str {
     if (
         bridge.host_kind == "node"
         and bridge.proc is not None
@@ -99,14 +100,14 @@ def:pub ensure_host(bridge: any, host: FakePluginHost | None = None) -> str {
 
 """Register a command handler on the FAKE host (unit-test path)."""
 def:pub register_fake_command(
-    bridge: any,
+    bridge: PluginBridge,
     name: str,
     handler: any,
     description: str = "",
     extension_id: str = "fake.commands",
 ) {
     ensure_host(bridge);
-    h: FakePluginHost = bridge.host;
+    h: FakePluginHost | None = bridge.host;
     if h is None {
         raise RuntimeError("plugin host unavailable");
     }
@@ -120,14 +121,14 @@ def:pub register_fake_command(
 
 
 def register_fake_shortcut(
-    bridge: any,
+    bridge: PluginBridge,
     key: str,
     handler: any,
     description: str = "",
     extension_id: str = "fake.shortcuts",
 ) {
     ensure_host(bridge);
-    h: FakePluginHost = bridge.host;
+    h: FakePluginHost | None = bridge.host;
     if h is None {
         raise RuntimeError("plugin host unavailable");
     }
@@ -141,9 +142,13 @@ def register_fake_shortcut(
 
 
 """Register a lifecycle listener on the FAKE host (unit-test path)."""
-def register_fake_listener(bridge: any, event: str, handler: any) {
+def register_fake_listener(
+    bridge: PluginBridge,
+    event: str,
+    handler: Callable[[dict[str, any], dict[str, any]], any],
+) {
     ensure_host(bridge);
-    h: FakePluginHost = bridge.host;
+    h: FakePluginHost | None = bridge.host;
     if h is None {
         raise RuntimeError("plugin host unavailable");
     }
@@ -156,12 +161,12 @@ def register_fake_listener(bridge: any, event: str, handler: any) {
 
 """Register a markdown transformer on the FAKE host (unit-test path)."""
 def register_fake_transformer(
-    bridge: any,
+    bridge: PluginBridge,
     fn: any,
     extension_id: str = "fake.xform",
 ) {
     ensure_host(bridge);
-    h: FakePluginHost = bridge.host;
+    h: FakePluginHost | None = bridge.host;
     if h is None {
         raise RuntimeError("plugin host unavailable");
     }
@@ -172,13 +177,13 @@ def register_fake_transformer(
 
 
 """Register a provider on the FAKE host (unit-test parity for registerProvider)."""
-def register_fake_provider(bridge: any, cfg: dict[str, any], extension_id: str = "fake.provider") {
+def register_fake_provider(bridge: PluginBridge, cfg: dict[str, any], extension_id: str = "fake.provider") {
     ensure_host(bridge);
     name = str(cfg.get("name", ""));
     if not name {
         raise ValueError("provider config requires a name");
     }
-    h: FakePluginHost = bridge.host;
+    h: FakePluginHost | None = bridge.host;
     provider_cfg = dict(cfg);
     if h is not None {
         h.providers[name] = {**provider_cfg, "owner": extension_id};
@@ -190,14 +195,14 @@ def register_fake_provider(bridge: any, cfg: dict[str, any], extension_id: str =
 
 """Register a renderer on the FAKE host (unit-test parity)."""
 def register_fake_renderer(
-    bridge: any,
+    bridge: PluginBridge,
     kind: str,
     type: str,
     fn: any,
     extension_id: str = "fake.renderer",
 ) {
     ensure_host(bridge);
-    h: FakePluginHost = bridge.host;
+    h: FakePluginHost | None = bridge.host;
     if h is None {
         raise RuntimeError("plugin host unavailable");
     }
@@ -206,34 +211,34 @@ def register_fake_renderer(
 }
 
 
-def fake_push_message(bridge: any, role: str, content: str) {
+def fake_push_message(bridge: PluginBridge, role: str, content: str) {
     ensure_host(bridge);
-    h: FakePluginHost = bridge.host;
+    h: FakePluginHost | None = bridge.host;
     if h is not None {
         h.pending_messages.append({"role": role, "content": content});
     }
 }
 
 
-def fake_push_entry(bridge: any, type: str, data: dict[str, any]) {
+def fake_push_entry(bridge: PluginBridge, type: str, data: dict[str, any]) {
     ensure_host(bridge);
-    h: FakePluginHost = bridge.host;
+    h: FakePluginHost | None = bridge.host;
     if h is not None {
         h.pending_entries.append({"type": type, "data": data});
     }
 }
 
 
-def set_fake_active_tools(bridge: any, names: list[str] | None) {
+def set_fake_active_tools(bridge: PluginBridge, names: list[str] | None) {
     ensure_host(bridge);
-    h: FakePluginHost = bridge.host;
+    h: FakePluginHost | None = bridge.host;
     if h is not None {
         h.active_tools = list(names) if names is not None else None;
     }
 }
 
 
-def fake_session_name(bridge: any) -> str {
+def fake_session_name(bridge: PluginBridge) -> str {
     return str(bridge.session_name);
 }
 

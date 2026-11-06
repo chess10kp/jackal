@@ -15,7 +15,7 @@ import from .plugin_bridge_traffic {
     _absorb_pending_fake,
 }
 
-def:pub _absorb_hook_results(bridge: any, results: list[any]) {
+def:pub _absorb_hook_results(bridge: PluginBridge, results: list[dict[str, any]]) {
     b: PluginBridge = bridge as PluginBridge;
     for r in results {
         if isinstance(r, dict) and r.get("ui_events") {
@@ -60,7 +60,7 @@ def:pub fire_hook_data(
         }
         touch_bridge(bridge);
         raw: any = reply.payload.get("results", []);
-        out_list: list[any] = raw if isinstance(raw, list) else [];
+        out_list: list[dict[str, any]] = raw as list[dict[str, any]] if isinstance(raw, list) else [];
         final: any = reply.payload.get("data");
         final_data: dict[str, any] = dict(final) if isinstance(final, dict) else dict(data);
         _absorb_payload(bridge, dict(reply.payload));
@@ -80,23 +80,28 @@ def:pub fire_hook_data(
         try {
             ui = FakeUi(notifications, []);
             out = handler(working, {"ui": ui});
+            out_map: dict[str, any] = {};
+            if isinstance(out, dict) {
+                out_map = out as dict[str, any];
+            }
             # Transform verdicts rewrite the working text so later handlers
             # see the composed input (Pi input-transform chaining).
             if (
-                isinstance(out, dict)
-                and str(out.get("action")) == "transform"
-                and out.get("text") is not None
+                "action" in out_map
+                and str(out_map["action"]) == "transform"
+                and "text" in out_map
+                and out_map["text"] is not None
             ) {
-                working["text"] = str(out.get("text"));
+                working["text"] = str(out_map["text"]);
             }
             # tool_result middleware: partial patches apply to the working
             # copy so later handlers see the latest result.
             if isinstance(out, dict) {
-                if isinstance(out.get("content"), str) {
-                    working["content"] = out["content"];
+                if "content" in out_map and isinstance(out_map["content"], str) {
+                    working["content"] = out_map["content"];
                 }
-                if isinstance(out.get("isError"), bool) {
-                    working["isError"] = out["isError"];
+                if "isError" in out_map and isinstance(out_map["isError"], bool) {
+                    working["isError"] = out_map["isError"];
                 }
             }
             entry_r: dict[str, any] = {
@@ -125,11 +130,11 @@ def:pub fire_hook_data(
 
 
 """Verdict dicts from successful listener results, in fire order."""
-def:pub _ok_verdicts(results: list[any]) -> list[any] {
-    verdicts: list[any] = [];
+def:pub _ok_verdicts(results: list[dict[str, any]]) -> list[dict[str, any]] {
+    verdicts: list[dict[str, any]] = [];
     for r in results {
-        if isinstance(r, dict) and r.get("ok") and isinstance(r.get("verdict"), dict) {
-            verdicts.append(r["verdict"]);
+        if "ok" in r and bool(r["ok"]) and "verdict" in r and isinstance(r["verdict"], dict) {
+            verdicts.append(r["verdict"] as dict[str, any]);
         }
     }
     return verdicts;
@@ -149,20 +154,20 @@ def:pub tool_call_gate(bridge: PluginBridge | None, name: str, args: dict[str, a
     data = {"toolName": str(name), "toolCallId": "", "input": args};
     try {
         fired = fire_hook_data(bridge, "tool_call", data);
-        results = fired["results"];
-        final = fired["data"];
+        results: list[dict[str, any]] = fired["results"] as list[dict[str, any]];
+        final: dict[str, any] = fired["data"] as dict[str, any];
     } except Exception {
         return out;
     }
-    mutated: any = final.get("input") if isinstance(final, dict) else None;
+    mutated: any = final["input"] if "input" in final else None;
     if isinstance(mutated, dict) {
         out["args"] = mutated;
     }
     for v in _ok_verdicts(results) {
-        if v.get("block") {
+        if "block" in v and bool(v["block"]) {
             out["blocked"] = True;
-            out["reason"] = str(v.get("reason", ""));
-            out["terminate"] = bool(v.get("terminate", False));
+            out["reason"] = str(v["reason"]) if "reason" in v else "";
+            out["terminate"] = bool(v["terminate"]) if "terminate" in v else False;
             break;
         }
     }
@@ -195,22 +200,22 @@ def:pub tool_result_gate(
     };
     try {
         fired = fire_hook_data(bridge, "tool_result", data);
-        results = fired.get("results", []);
-        final = fired.get("data", {});
+        results: list[dict[str, any]] = fired["results"] as list[dict[str, any]];
+        final: dict[str, any] = fired["data"] as dict[str, any];
     } except Exception {
         return out;
     }
     any_ok = False;
     for v in _ok_verdicts(results) {
-        if isinstance(v.get("content"), str) or isinstance(v.get("isError"), bool) {
+        if ("content" in v and isinstance(v["content"], str)) or ("isError" in v and isinstance(v["isError"], bool)) {
             any_ok = True;
         }
     }
     if not any_ok {
         return out;
     }
-    content: any = final.get("content") if isinstance(final, dict) else None;
-    is_err: any = final.get("isError") if isinstance(final, dict) else None;
+    content: any = final["content"] if "content" in final else None;
+    is_err: any = final["isError"] if "isError" in final else None;
     out["ok"] = True;
     if isinstance(content, str) {
         out["result"] = content;
@@ -235,25 +240,26 @@ def:pub input_gate(bridge: PluginBridge | None, text: str) -> dict[str, any] {
         fired = fire_hook_data(
             bridge, "input", {"text": str(text), "source": "interactive"}
         );
-        results = fired.get("results", []);
-        final = fired.get("data", {});
+        results: list[dict[str, any]] = fired["results"] as list[dict[str, any]];
+        final: dict[str, any] = fired["data"] as dict[str, any];
     } except Exception {
         return out;
     }
     for v in _ok_verdicts(results) {
-        if str(v.get("action", "continue")) == "handled" {
-            t: any = final.get("text") if isinstance(final, dict) else None;
+        action = str(v["action"]) if "action" in v else "continue";
+        if action == "handled" {
+            t: any = final["text"] if "text" in final else None;
             return {
                 "action": "handled",
                 "text": str(t) if isinstance(t, str) else out["text"],
             };
         }
-        if str(v.get("action", "continue")) == "transform" {
+        if action == "transform" {
             out["action"] = "transform";
         }
     }
     if out["action"] == "transform" and isinstance(final, dict) {
-        t2: any = final.get("text");
+        t2: any = final["text"] if "text" in final else None;
         if isinstance(t2, str) {
             out["text"] = t2;
         }
@@ -281,21 +287,21 @@ def:pub context_gate(bridge: PluginBridge | None, messages: list[dict[str, any]]
     }
     try {
         fired = fire_hook_data(bridge, "context", {"messages": snapshot});
-        results = fired["results"];
-        final = fired["data"];
+        results: list[dict[str, any]] = fired["results"] as list[dict[str, any]];
+        final: dict[str, any] = fired["data"] as dict[str, any];
     } except Exception {
         return messages;
     }
     replaced: any = None;
     for v in _ok_verdicts(results) {
-        if isinstance(v.get("messages"), list) {
+        if "messages" in v and isinstance(v["messages"], list) {
             replaced = v["messages"];
         }
     }
     if replaced is not None {
         return replaced;
     }
-    echoed: any = final.get("messages") if isinstance(final, dict) else None;
+    echoed: any = final["messages"] if "messages" in final else None;
     if isinstance(echoed, list) {
         return echoed;
     }
@@ -318,18 +324,18 @@ def:pub agent_start_gate(bridge: PluginBridge | None, prompt: str) -> dict[str, 
         fired = fire_hook_data(
             bridge, "before_agent_start", {"prompt": str(prompt)}
         );
-        results = fired["results"];
+        results: list[dict[str, any]] = fired["results"] as list[dict[str, any]];
     } except Exception {
         return out;
     }
     for v in _ok_verdicts(results) {
-        sp = v.get("systemPrompt");
+        sp = v["systemPrompt"] if "systemPrompt" in v else None;
         if isinstance(sp, str) and sp {
             out["systemPrompt"] = sp;
         }
-        m: any = v.get("message");
-        if isinstance(m, dict) and m.get("content") is not None {
-            out["message"] = str(m.get("content"));
+        m: any = v["message"] if "message" in v else None;
+        if isinstance(m, dict) and "content" in m and m["content"] is not None {
+            out["message"] = str(m["content"]);
         } elif isinstance(m, str) and m {
             out["message"] = m;
         }
@@ -404,7 +410,7 @@ The HTTP transport passes its header map as JSON across the module boundary;
 the bridge module reconstructs the dynamic hook payload beside fire_hook.
 """
 def:pub notify_after_provider_response(
-    bridge: any, status: int, headers_json: str, timeout: float,
+    bridge: PluginBridge, status: int, headers_json: str, timeout: float,
 ) -> None {
     if bridge is None {
         return;
