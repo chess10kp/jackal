@@ -98,7 +98,7 @@ obj:pub UiInteractionQueue {
 
     """Peek the oldest live record WITHOUT detaching it — the TUI polls
 every tick and answers later via take(). Expired ones reap into element 2."""
-    def poll(now: float) -> list[any] {
+    def poll(now: float) -> tuple[UiInteraction | None, list[UiInteraction]] {
         live: UiInteraction | None = None;
         expired: list[UiInteraction] = [];
         self.lock.acquire();
@@ -119,7 +119,7 @@ every tick and answers later via take(). Expired ones reap into element 2."""
         } finally {
             self.lock.release();
         }
-        return [live, expired];
+        return (live, expired);
     }
 
     """Pop one record by child correlation (answer or explicit cancel)."""
