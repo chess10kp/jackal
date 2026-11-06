@@ -7,6 +7,7 @@ registry.invoke, and protocol kind helpers — without spawning Node.
 import os;
 import time;
 
+import from .plugin_bridge_model { BridgeWaiter }
 import from .tools { default_registry }
 import from .registry {
     create_registry,
@@ -223,8 +224,11 @@ test "host_status marks degraded when node dies" {
     ensure_node_host(bridge);
     drain_inbox(bridge);
     # Kill the child without going through dispose.
-    bridge.proc.kill();
-    bridge.proc.wait(timeout=2.0);
+    proc = bridge.proc;
+    if proc is not None {
+        proc.kill();
+        proc.wait(timeout=2.0);
+    }
     phase = host_status(bridge);
     assert phase == "degraded";
     kinds = drain_inbox(bridge);
@@ -296,7 +300,7 @@ test "tool_cancel aborts slow Pi tool" {
     reg = create_registry();
     ensure_node_host(bridge);
     host = resolve_host_mjs();
-    slow = os.path.join(_path_dirname(str(host)), "fixtures", "pi_slow.mjs");
+    slow = os.path.join(_bridge_path_dirname(str(host)), "fixtures", "pi_slow.mjs");
     load_extension_path(bridge, reg, "pi.slow", slow);
     # Fire invoke on a worker thread; cancel shortly after.
     import threading;
@@ -895,7 +899,7 @@ test "node host ext_loaded carries providers and unload drops them" {
     reg = create_registry();
     ensure_node_host(bridge);
     prov = resolve_host_mjs();
-    path = os.path.join(_path_dirname(prov), "fixtures", "pi_provider.mjs");
+    path = os.path.join(_bridge_path_dirname(prov), "fixtures", "pi_provider.mjs");
     names = load_extension_path(bridge, reg, "pi.provider", path);
     drain_inbox(bridge);
 
@@ -961,7 +965,7 @@ test "node host renders message and entry blocks over the wire" {
     reg = create_registry();
     ensure_node_host(bridge);
     prov = resolve_host_mjs();
-    path = os.path.join(_path_dirname(prov), "fixtures", "pi_renderer.mjs");
+    path = os.path.join(_bridge_path_dirname(prov), "fixtures", "pi_renderer.mjs");
     load_extension_path(bridge, reg, "pi.renderer", path);
     drain_inbox(bridge);
 
@@ -1069,9 +1073,9 @@ test "interleaved sibling traffic does not wake or consume the wrong waiter" {
         tool_id="slow",
     );
     _dispatch_inbound(bridge as PluginBridge, res);
-    waiter: any = bridge.pending.get(corr);
-    assert waiter is not None and waiter["env"] is not None;
-    assert waiter["env"].kind == "tool_result";
+    waiter: BridgeWaiter | None = bridge.pending.get(corr);
+    assert waiter is not None and waiter.env is not None;
+    assert waiter.env.kind == "tool_result";
     dispose_bridge(bridge);
 }
 

@@ -6,31 +6,59 @@ import time;
 import from .protocol { Envelope, make_envelope, is_plugin_kind }
 import from .interactions { new_ui_queue, UiInteractionQueue }
 import from .plugin_bridge_support { envelope_to_dict, envelope_from_dict }
-def:pub _node_alive(bridge: any) -> bool {
+import from .plugin_bridge_model { BridgeWaiter, PluginBridge }
+import from _subprocess_native { sp_read, sp_write }
+def:pub _node_alive_io(bridge: PluginBridge) -> bool {
     if bridge.host_kind != "node" or bridge.proc is None {
         return False;
     }
     return bridge.proc.poll() is None;
 }
 
-def:pub _write_node(bridge: any, env: Envelope) {
-    if not _node_alive(bridge) {
+def:pub _write_node(bridge: PluginBridge, env: Envelope) {
+    if not _node_alive_io(bridge) {
         raise RuntimeError("plugin node host not running");
     }
-    line = json.dumps(envelope_to_dict(env)) + "\n";
-    lock: any = bridge.write_lock;
+    line: bytes = (json.dumps(envelope_to_dict(env)) + "\n").encode("utf-8");
+    lock: threading.Lock | None = bridge.write_lock;
     if lock is not None {
         lock.acquire();
         try {
-            bridge.proc.stdin.write(line);
-            bridge.proc.stdin.flush();
+            _write_node_bytes(bridge.stdin_fd, line);
         } finally {
             lock.release();
         }
     } else {
-        bridge.proc.stdin.write(line);
-        bridge.proc.stdin.flush();
+        _write_node_bytes(bridge.stdin_fd, line);
     }
+}
+
+def _write_node_bytes(fd: int, data: bytes) {
+    off: int = 0;
+    while off < len(data) {
+        n: int = sp_write(fd, data[off:]);
+        if n <= 0 {
+            raise RuntimeError("plugin host stdin closed");
+        }
+        off += n;
+    }
+}
+
+def _read_node_line(bridge: PluginBridge, fd: int) -> bytes {
+    newline: int = bridge.reader_buffer.find(b"\n");
+    while newline < 0 {
+        chunk: bytes = sp_read(fd, 4096);
+        if not chunk {
+            line: bytes = bridge.reader_buffer;
+            bridge.reader_buffer = b"";
+            return line;
+        }
+        bridge.reader_buffer += chunk;
+        newline = bridge.reader_buffer.find(b"\n");
+    }
+    line: bytes = bridge.reader_buffer[:newline];
+    bridge.reader_buffer = bridge.reader_buffer[newline + 1:];
+    return line;
 }
 
 
@@ -40,7 +68,7 @@ Kind-aware: a waiter registered with expect_kind only completes for that kind;
 mismatched envelopes stay inbox-only so interleaved traffic (tool_update vs
 tool_result, future ui_request children) cannot wake or consume the wrong
 waiter."""
-def:pub _dispatch_inbound(bridge: any, env: Envelope) {
+def:pub _dispatch_inbound(bridge: PluginBridge, env: Envelope) {
     # P12 interactive-UI traffic routes to the interaction queue, never to
     # parent waiters and never into the unbounded diagnostic inbox.
     if env.kind == "ui_request" {
@@ -56,40 +84,35 @@ def:pub _dispatch_inbound(bridge: any, env: Envelope) {
     }
     bridge.inbox.append(env);
     corr = env.correlation_id;
-    pending: dict[str, any] = bridge.pending;
+    pending: dict[str, BridgeWaiter] = bridge.pending;
     if corr and corr in pending {
-        waiter: any = pending[corr];
-        expect: any = waiter.get("expect", "");
-        if expect and str(expect) != env.kind {
+        waiter: BridgeWaiter = pending[corr];
+        if waiter.expect and waiter.expect != env.kind {
             return;
         }
-        waiter["env"] = env;
-        ev: any = waiter.get("event");
-        if ev is not None {
-            ev.set();
-        }
+        waiter.env = env;
+        waiter.event.set();
     }
 }
 
 
 """Background stdout reader — multiplexes replies by correlation_id (P3)."""
-def:pub _reader_loop(bridge: any) {
-    stop = bridge.reader_stop;
+def:pub _reader_loop(bridge: PluginBridge) {
+    stop: threading.Event | None = bridge.reader_stop;
     proc = bridge.proc;
-    if proc is None {
+    if proc is None or bridge.stdout_fd < 0 or stop is None {
         return;
     }
-    stdout = proc.stdout;
     while stop is None or not stop.is_set() {
         try {
-            line_raw: any = stdout.readline();
+            line_raw: bytes = _read_node_line(bridge, bridge.stdout_fd);
         } except Exception {
             break;
         }
         if not line_raw {
             break;
         }
-        line_s: str = str(line_raw).strip();
+        line_s: str = line_raw.decode("utf-8", errors="replace").strip();
         if not line_s {
             continue;
         }
@@ -114,7 +137,7 @@ def:pub _reader_loop(bridge: any) {
 }
 
 
-def:pub _ensure_io(bridge: any) {
+def:pub _ensure_io(bridge: PluginBridge) {
     if bridge.write_lock is None {
         bridge.write_lock = threading.Lock();
     }
@@ -127,12 +150,16 @@ def:pub _ensure_io(bridge: any) {
 }
 
 
-def:pub _start_reader(bridge: any) {
+def:pub _start_reader(bridge: PluginBridge) {
     _ensure_io(bridge);
     if bridge.reader_thread is not None and bridge.reader_thread.is_alive() {
         return;
     }
-    bridge.reader_stop.clear();
+    stop: threading.Event | None = bridge.reader_stop;
+    if stop is None {
+        return;
+    }
+    stop.clear();
     def read_bridge() {
         _reader_loop(bridge);
     }
@@ -144,7 +171,7 @@ def:pub _start_reader(bridge: any) {
 }
 
 
-def:pub _stop_reader(bridge: any) {
+def:pub _stop_reader(bridge: PluginBridge) {
     if bridge.reader_stop is not None {
         bridge.reader_stop.set();
     }
@@ -159,25 +186,23 @@ Callers that write a request MUST register `correlation_id` in
 reader cannot win the race.
 """
 def:pub _prepare_corr(
-    bridge: any, correlation_id: str, expect_kind: str = ""
+    bridge: PluginBridge, correlation_id: str, expect_kind: str = ""
 ) {
     _ensure_io(bridge);
-    pending: dict[str, any] = bridge.pending;
+    pending: dict[str, BridgeWaiter] = bridge.pending;
     if correlation_id and correlation_id not in pending {
         # expect_kind: only an envelope of this kind may complete the waiter.
         # Guards against sibling traffic (e.g. tool_update sharing the parent
         # correlation with tool_result) waking the wrong waiter.
-        bridge.pending[correlation_id] = {
-            "event": threading.Event(),
-            "env": None,
-            "expect": expect_kind,
-        };
+        bridge.pending[correlation_id] = BridgeWaiter(
+            event=threading.Event(), expect=expect_kind
+        );
     }
 }
 
 
 def:pub _wait_corr(
-    bridge: any,
+    bridge: PluginBridge,
     kind: str,
     correlation_id: str = "",
     timeout: float = 5.0,
@@ -190,28 +215,26 @@ def:pub _wait_corr(
         # cumulative 600s lease measured from first grant. User think-time
         # must not kill the command/hook that asked the question.
         while True {
-            pending: any = bridge.pending.get(correlation_id);
-            if pending is None {
+            waiter: BridgeWaiter | None = bridge.pending.get(correlation_id);
+            if waiter is None {
                 break;  # dispatcher consumed it without storing env
             }
-            if pending.get("env") is not None {
+            if waiter.env is not None {
                 bridge.pending.pop(correlation_id, None);
-                got: any = pending["env"];
-                return got as Envelope;
+                return waiter.env as Envelope;
             }
-            lease_start: any = pending.get("ui_lease_start");
-            if lease_start is not None {
+            if waiter.ui_lease_start > 0.0 {
                 # Lease active: short polls only (honors the 600s cap and
                 # keeps wakeups bounded to the interaction window).
-                if time.monotonic() >= float(lease_start) + 600.0 {
+                if time.monotonic() >= waiter.ui_lease_start + 600.0 {
                     bridge.pending.pop(correlation_id, None);
                     raise TimeoutError(f"timed out waiting for {kind}");
                 }
-                pending["event"].wait(timeout=0.05);
+                waiter.event.wait(timeout=0.05);
                 continue;
             }
             remaining = max(0.01, deadline - time.monotonic());
-            ok = pending["event"].wait(timeout=remaining);
+            ok = waiter.event.wait(timeout=remaining);
             if ok {
                 continue;  # dispatcher stored env; re-check at loop top
             }
@@ -223,7 +246,7 @@ def:pub _wait_corr(
                 has_pending_ui = (q as UiInteractionQueue).has_open(correlation_id);
             }
             if has_pending_ui {
-                pending["ui_lease_start"] = time.monotonic();
+                waiter.ui_lease_start = time.monotonic();
                 continue;
             }
             bridge.pending.pop(correlation_id, None);
@@ -245,14 +268,14 @@ def:pub _wait_corr(
 }
 
 
-def:pub _read_node(bridge: any, timeout: float = 5.0) -> Envelope {
+def:pub _read_node(bridge: PluginBridge, timeout: float = 5.0) -> Envelope {
     return _wait_corr(bridge, "", "", timeout=timeout);
 }
 
 
 """Read until an envelope with kind matches (or timeout)."""
 def:pub _read_node_until(
-    bridge: any, kind: str, correlation_id: str = "", timeout: float = 5.0
+    bridge: PluginBridge, kind: str, correlation_id: str = "", timeout: float = 5.0
 ) -> Envelope {
     if correlation_id {
         env = _wait_corr(bridge, kind, correlation_id, timeout=timeout);
@@ -279,7 +302,7 @@ def:pub _read_node_until(
 
 
 """Spawn the Node plugin host. Emits host_hello from the child."""
-def:pub _ui_queue(bridge: any) -> UiInteractionQueue {
+def:pub _ui_queue(bridge: PluginBridge) -> UiInteractionQueue {
     if bridge.ui_q is None {
         bridge.ui_q = new_ui_queue();
     }
@@ -287,7 +310,7 @@ def:pub _ui_queue(bridge: any) -> UiInteractionQueue {
 }
 
 
-def:pub _ui_enqueue_from_env(bridge: any, env: Envelope) {
+def:pub _ui_enqueue_from_env(bridge: PluginBridge, env: Envelope) {
     p = env.payload if env.payload is not None else {};
     req: dict[str, any] = {
         "corr": str(env.correlation_id or ""),
@@ -312,7 +335,7 @@ def:pub _ui_enqueue_from_env(bridge: any, env: Envelope) {
 
 
 def:pub _ui_send_response(
-    bridge: any, corr: str, status: str, value: any, reason: str = ""
+    bridge: PluginBridge, corr: str, status: str, value: any, reason: str = ""
 ) -> bool {
     payload: dict[str, any] = {"status": status};
     if value is not None {
@@ -321,7 +344,7 @@ def:pub _ui_send_response(
     if reason {
         payload["reason"] = reason;
     }
-    if bridge.host_kind == "node" and _node_alive(bridge) {
+    if bridge.host_kind == "node" and _node_alive_io(bridge) {
         try {
             _write_node(bridge, make_envelope(
                 kind="ui_response",
