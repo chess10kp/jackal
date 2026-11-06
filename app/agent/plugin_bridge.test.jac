@@ -22,6 +22,7 @@ import from .protocol {
     make_plugin_envelope,
 }
 import from .fake_host {
+    FakeUi,
     register_fake_command,
     register_fake_shortcut,
     register_fake_listener,
@@ -332,7 +333,8 @@ test "fake host command invoke round-trips with notifications" {
 
     def _upper(args: str, ctx: any) -> str {
         out = str(args).strip().upper();
-        ctx["ui"].notify("UPPER:" + out);
+        ui: FakeUi = ctx["ui"] as FakeUi;
+        ui.notify("UPPER:" + out);
         return out;
     }
 
@@ -358,7 +360,8 @@ test "fake host shortcut invoke fires handler with ui ctx" {
     fired: list[str] = [];
 
     def _toggle(ctx: any) -> str {
-        ctx["ui"].notify("TOGGLED");
+        ui: FakeUi = ctx["ui"] as FakeUi;
+        ui.notify("TOGGLED");
         fired.append("hit");
         return "plan mode on";
     }
@@ -555,8 +558,9 @@ test "fake host drains messages entries and ui events" {
     reg = create_registry();
 
     def _spill(args: str, ctx: any) -> str {
-        ctx["ui"].set_title("t1");
-        ctx["ui"].set_widget("w", "x");
+        ui: FakeUi = ctx["ui"] as FakeUi;
+        ui.set_title("t1");
+        ui.set_widget("w", "x");
         return "spilled";
     }
 
@@ -572,7 +576,7 @@ test "fake host drains messages entries and ui events" {
     assert traffic["messages"] == [{"role": "assistant", "content": "pushed note"}];
     assert len(traffic["entries"]) == 3;
     # Entries include the ui_event normalized from the command's UI calls.
-    entries: list[dict[str, any]] = list(traffic["entries"]);
+    entries: list[dict[str, any]] = traffic["entries"] as list[dict[str, any]];
     kinds: list[str] = [];
     for ent in entries {
         kinds.append(str(ent.get("type", "")));
@@ -603,11 +607,13 @@ test "fake host enforces active tools" {
 
     set_fake_active_tools(bridge, ["other_tool"]);
     r1 = invoke(reg, "t_only", {}, bridge);
-    assert r1.startswith("ERROR:") and "not active" in r1;
+    r1_text: str = str(r1);
+    assert r1_text.find("ERROR:") == 0 and r1_text.find("not active") >= 0;
 
     set_fake_active_tools(bridge, None);
     r2 = invoke(reg, "t_only", {}, bridge);
-    assert not r2.startswith("ERROR:");
+    r2_text: str = str(r2);
+    assert r2_text.find("ERROR:") != 0;
 }
 
 
@@ -626,7 +632,9 @@ test "fire_hook_data fake path captures verdicts and chains mutations" {
     ensure_host(bridge);
 
     def _mutator(data: dict[str, any], ctx: any) -> str {
-        data["input"]["text"] = data["input"]["text"].upper();
+        input_data: dict[str, any] = data["input"] as dict[str, any];
+        input_text: str = str(input_data["text"]);
+        input_data["text"] = input_text.upper();
         return "";
     }
 
@@ -657,11 +665,12 @@ test "tool_call_gate aggregates blocks and mutated args" {
     ensure_host(bridge);
 
     def _gate(data: dict[str, any], ctx: any) -> any {
-        if str(data["input"].get("command", "")).find("rm") >= 0 {
+        input_data: dict[str, any] = data["input"] as dict[str, any];
+        if str(input_data.get("command", "")).find("rm") >= 0 {
             return {"block": True, "reason": "danger", "terminate": True};
         }
         if data.get("toolName") == "echo_arg" {
-            data["input"]["text"] = "MUTATED";
+            input_data["text"] = "MUTATED";
         }
         return None;
     }
@@ -746,7 +755,8 @@ test "context_gate applies in-place edits and replacements non-destructively" {
     ensure_host(bridge);
 
     def _ctx_edit(data: dict[str, any], ctx: any) -> any {
-        data["messages"].append({"role": "user", "content": "[inject]"});
+        messages: list[dict[str, any]] = data["messages"] as list[dict[str, any]];
+        messages.append({"role": "user", "content": "[inject]"});
         return None;
     }
 
@@ -754,7 +764,7 @@ test "context_gate applies in-place edits and replacements non-destructively" {
         return {"messages": [{"role": "user", "content": "replaced"}]};
     }
 
-    history = [{"role": "user", "content": "hi"}];
+    history: list[dict[str, any]] = [{"role": "user", "content": "hi"}];
     register_fake_listener(bridge, "context", _ctx_edit);
     out1 = context_gate(bridge, history);
     assert len(out1) == 2;
@@ -865,7 +875,8 @@ test "prepare_provider_request applies edits and replacements" {
     ensure_host(bridge);
 
     def _mutator(data: dict[str, any], ctx: any) -> any {
-        data["body"]["injected"] = True;
+        body: dict[str, any] = data["body"] as dict[str, any];
+        body["injected"] = True;
         return None;
     }
 
@@ -883,9 +894,11 @@ test "prepare_provider_request applies edits and replacements" {
         {"Authorization": "Bearer k"},
         {"model": "sonnet-x", "messages": []},
     );
-    assert out["body"].get("injected") is True;
+    out_body: dict[str, any] = out["body"] as dict[str, any];
+    out_headers: dict[str, any] = out["headers"] as dict[str, any];
+    assert bool(out_body.get("injected", False));
     assert out["url"] == "https://proxy.example/v1/chat/completions";
-    assert out["headers"]["Authorization"] == "Bearer k";
+    assert out_headers["Authorization"] == "Bearer k";
 
     # No bridge -> identity passthrough.
     plain = prepare_provider_request(None, "m", "u", {}, {});
