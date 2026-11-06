@@ -21,16 +21,18 @@ setting status always refreshes completedAt (now when "completed",
 otherwise None); remove by index/id return None when not found; clear
 writes an empty array rather than deleting the file.
 
-Deliberate deviations: none functional. datetime/uuid are imported at
-module top instead of inside functions (the legacy code deferred them),
-and helpers take no implicit globals beyond the two constants below.
+Deliberate deviations: timestamps use the shared native civil-time
+formatter and retain the legacy ISO-8601 UTC representation. uuid is
+imported at module top instead of inside functions (the legacy code
+deferred it).
 """
 
 import os;
 import json;
 import uuid;
-import datetime;
+import time;
 import from .json_pretty { json_pretty }
+import from .sessions_core { _iso_from_ms }
 
 glob TASKS_FILE: str = "tasks.json",
      _NO_TASKS_LINE: str = "No tasks. Use /tasks add <title> or create_task.";
@@ -48,7 +50,10 @@ def generate_task_id() -> str {
 
 
 def _now_iso() -> str {
-    return datetime.datetime.now(datetime.timezone.utc).isoformat();
+    stamp: str = _iso_from_ms(int(time.time() * 1000));
+    # Preserve datetime.isoformat's UTC offset spelling and six fractional
+    # digits while using the native civil-time formatter.
+    return stamp[:23] + "000+00:00";
 }
 
 
@@ -68,10 +73,11 @@ def _is_task(value: any) -> bool {
 """All valid tasks from tasks.json; [] when missing, corrupt, or not a
 list (invalid entries are filtered out rather than failing the load)."""
 def:pub load_tasks(cwd: str) -> list[dict[str, any]] {
+    parsed: any = None;
     fh = None;
     try {
         fh = open(tasks_path(cwd), "r");
-        parsed = json.load(fh);
+        parsed = json.loads(fh.read());
     } except (OSError, ValueError) {
         return [];
     } finally {
@@ -251,7 +257,7 @@ def format_task_line(task: dict[str, any]) -> str {
     } elif status == "in_progress" {
         icon = "◐";
     }
-    desc = task.get("description");
+    desc: any = task.get("description");
     suffix: str = "";
     if isinstance(desc, str) and desc {
         suffix = " — " + desc;
