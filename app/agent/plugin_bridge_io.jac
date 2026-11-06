@@ -76,7 +76,7 @@ def:pub _dispatch_inbound(bridge: PluginBridge, env: Envelope) {
         return;
     }
     if env.kind == "ui_cancel" {
-        q0: any = bridge.ui_q;
+        q0: UiInteractionQueue | None = bridge.ui_q;
         if q0 is not None {
             q0.take(str(env.correlation_id));
         }
@@ -240,10 +240,10 @@ def:pub _wait_corr(
             }
             # Budget exhausted — grant a UI lease iff a correlated request
             # is still open (user think-time pauses the handler budget).
-            q: any = bridge.ui_q;
+            q: UiInteractionQueue | None = bridge.ui_q;
             has_pending_ui = False;
             if q is not None {
-                has_pending_ui = (q as UiInteractionQueue).has_open(correlation_id);
+                has_pending_ui = q.has_open(correlation_id);
             }
             if has_pending_ui {
                 waiter.ui_lease_start = time.monotonic();
