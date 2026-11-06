@@ -18,6 +18,8 @@ to the Jac checker, so this file funnels them through explicit locals or
 str()/dict() casts before use.
 """
 
+import subprocess;
+
 
 def _make_tmp() -> str {
     return tempfile.mkdtemp(prefix="jackal-skills-test-");
@@ -40,14 +42,16 @@ def _write_text(path: str, text: str) {
 }
 
 
-def _write_bytes_as_latin1(path: str, text: str) {
-    # Produces bytes that are INVALID utf-8 without b"" literals.
+def _write_invalid_utf8(path: str) {
     os.makedirs(_dir_name(path), exist_ok=True);
-    fh = open(path, "w", encoding="latin-1");
-    try {
-        fh.write(text);
-    } finally {
-        fh.close();
+    command = "printf '\\377\\376\\000not utf8' > \"$1\"";
+    result = subprocess.run(
+        ["bash", "-c", command, "jackal-skills-test", path],
+        capture_output=True,
+        text=True,
+    );
+    if result.returncode != 0 {
+        raise RuntimeError(str(result.stderr));
     }
 }
 
@@ -64,7 +68,7 @@ def _write_skill(dir_path: str, name: str, description: str,
 }
 
 
-def _names(result: dict[str, any]) -> list[str] {
+def _names(result: dict[str, list[dict[str, any]]]) -> list[str] {
     out: list[str] = [];
     items: list[dict[str, any]] = result["skills"];
     for item in items {
@@ -75,7 +79,9 @@ def _names(result: dict[str, any]) -> list[str] {
 }
 
 
-def _diag_types(result: dict[str, any], kind: str) -> list[dict[str, any]] {
+def _diag_types(
+    result: dict[str, list[dict[str, any]]], kind: str
+) -> list[dict[str, any]] {
     found: list[dict[str, any]] = [];
     diags: list[dict[str, any]] = result["diagnostics"];
     for d in diags {
@@ -201,9 +207,8 @@ test "malformed SKILL.md files produce warnings without crashing" {
         _write_skill(os.path.join(tree_base, "toolong"), long_name, "Too long name.");
         # Empty file.
         _write_text(os.path.join(tree_base, "emptyf", "SKILL.md"), "");
-        # Undecodable bytes (latin-1 written 0xFF/0xFE are invalid UTF-8).
-        _write_bytes_as_latin1(os.path.join(tree_base, "binary", "SKILL.md"),
-                               "\xff\xfe\x00not utf8");
+        # Undecodable bytes are ignored without aborting discovery.
+        _write_invalid_utf8(os.path.join(tree_base, "binary", "SKILL.md"));
         # Garbage frontmatter that never terminates.
         _write_text(os.path.join(tree_base, "garbled", "SKILL.md"),
                     "---\nname [broken: ===\nno closing delimiter ever");
@@ -467,8 +472,7 @@ test "load_skill_by_dir returns stripped bodies and empty on misses" {
         assert load_skill_by_dir("realone", package_root=tmp) == "Real body here.";
         assert load_skill_by_dir("missing", package_root=tmp) == "";
         # Corrupt bytes fall back to '' instead of raising.
-        _write_bytes_as_latin1(os.path.join(tmp, "pi", "skills", "corrupt", "SKILL.md"),
-                               "\xff\xfe\x00\xff");
+        _write_invalid_utf8(os.path.join(tmp, "pi", "skills", "corrupt", "SKILL.md"));
         assert load_skill_by_dir("corrupt", package_root=tmp) == "";
     } finally {
         _cleanup(tmp);

@@ -72,7 +72,7 @@ def:pub is_valid_file_path(file_path: str) -> bool {
 
 """{"start"} or {"start", "end"} for a `10` / `10-20` string; None when
 malformed, zero, negative, or reversed."""
-def:pub parse_line_range(range_str: str) -> dict[str, any] | None {
+def:pub parse_line_range(range_str: str) -> dict[str, int] | None {
     if not range_str {
         return None;
     }
@@ -85,7 +85,8 @@ def:pub parse_line_range(range_str: str) -> dict[str, any] | None {
         if line <= 0 {
             return None;
         }
-        return {"start": line};
+        result: dict[str, int] = {"start": line};
+        return result;
     }
     if len(parts) == 2 {
         if not parts[0].isdigit() or not parts[1].isdigit() {
@@ -96,7 +97,8 @@ def:pub parse_line_range(range_str: str) -> dict[str, any] | None {
         if start <= 0 or end < start {
             return None;
         }
-        return {"start": start, "end": end};
+        result: dict[str, int] = {"start": start, "end": end};
+        return result;
     }
     return None;
 }
@@ -156,11 +158,12 @@ def parse_mention_token(raw: str) -> dict[str, any] {
     if rng is None {
         return {"path": raw};
     }
-    return {
+    result: dict[str, any] = {
         "path": path_part,
         "startLine": rng["start"],
         "endLine": rng.get("end", rng["start"]),
     };
+    return result;
 }
 
 
@@ -229,12 +232,15 @@ def _safe_resolve(cwd: str, input_path: str) -> str {
 `mention` is a token without the leading `@`; `line_range` (when given)
 overrides any range embedded in the token. Returns (block, char_count).
 Raises OSError/ValueError for unreadable or escaping paths."""
-def:pub _load_file_slice(cwd: str, mention: str, line_range: any = None) -> tuple[str, int] {
+def:pub _load_file_slice(
+    cwd: str, mention: str, line_range: (dict[str, any] | None) = None
+) -> tuple[str, int] {
     token_start: any = None;
     token_end: any = None;
     if line_range is not None {
-        token_start = line_range.get("start");
-        token_end = line_range.get("end");
+        range_fields: dict[str, any] = line_range;
+        token_start = range_fields.get("start");
+        token_end = range_fields.get("end");
         if token_end is None {
             token_end = token_start;
         }
@@ -295,13 +301,16 @@ def _run_inline_command(cwd: str, command: str) -> str {
         return "Command failed: " + str(exc);
     }
     parts: list[str] = [];
-    if proc.stdout {
-        parts.append("stdout:\n" + proc.stdout);
+    stdout_text: str = str(proc.stdout) if proc.stdout else "";
+    stderr_text: str = str(proc.stderr) if proc.stderr else "";
+    exit_code: int = int(proc.returncode);
+    if stdout_text {
+        parts.append("stdout:\n" + stdout_text);
     }
-    if proc.stderr {
-        parts.append("stderr:\n" + proc.stderr);
+    if stderr_text {
+        parts.append("stderr:\n" + stderr_text);
     }
-    parts.append("exit=" + str(proc.returncode));
+    parts.append("exit=" + str(exit_code));
     return "\n".join(parts)[:_MAX_FILE_CHARS];
 }
 

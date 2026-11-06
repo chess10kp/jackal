@@ -28,7 +28,7 @@ def _cleanup(tmp: str) {
 
 def _write_file(path: str, text: str) {
     os.makedirs(os.path.dirname(path), exist_ok=True);
-    fh: any = open(path, "w");
+    fh = open(path, "w");
     try {
         fh.write(text);
     } finally {
@@ -38,7 +38,7 @@ def _write_file(path: str, text: str) {
 
 
 def _read_text(path: str) -> str {
-    fh: any = open(path, "r");
+    fh = open(path, "r");
     try {
         return fh.read();
     } finally {
