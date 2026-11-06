@@ -126,7 +126,7 @@ every tick and answers later via take(). Expired ones reap into element 2."""
     def take(corr: str) -> UiInteraction | None {
         self.lock.acquire();
         try {
-                r: any = self.by_corr.pop(corr, None);
+                r: UiInteraction | None = self.by_corr.pop(corr, None);
                 if r is not None {
                     self.records = [x for x in self.records if x.corr != corr];
                 }

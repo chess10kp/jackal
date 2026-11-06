@@ -80,7 +80,7 @@ test "respond takes by child corr; unknown corr is a no-op" {
     q = new_ui_queue();
     r = q.enqueue(_req());
     corr = r[1];
-    got: any = q.take(corr);
+    got: UiInteraction | None = q.take(corr);
     assert got is not None and got.method == "select";
     assert q.take(corr) is None;
 }
