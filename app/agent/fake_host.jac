@@ -19,6 +19,10 @@ import from .protocol {
 import from .fake_host_types {
     FAKE_HOST_CAPS,
     FAKE_COMPAT_TIER,
+    FakeCommandHandler,
+    FakeMarkdownTransformer,
+    FakeRenderer,
+    FakeShortcutHandler,
     FakePluginHost,
     create_fake_host,
 }
@@ -102,7 +106,7 @@ def:pub ensure_host(bridge: PluginBridge, host: FakePluginHost | None = None) ->
 def:pub register_fake_command(
     bridge: PluginBridge,
     name: str,
-    handler: any,
+    handler: Callable[[str, dict[str, any]], any],
     description: str = "",
     extension_id: str = "fake.commands",
 ) {
@@ -111,7 +115,7 @@ def:pub register_fake_command(
     if h is None {
         raise RuntimeError("plugin host unavailable");
     }
-    h.command_handlers[name] = {"handler": handler, "owner": extension_id};
+    h.command_handlers[name] = FakeCommandHandler(fn=handler, owner=extension_id);
     bridge.commands[name] = {
         "name": name,
         "description": description,
@@ -123,7 +127,7 @@ def:pub register_fake_command(
 def register_fake_shortcut(
     bridge: PluginBridge,
     key: str,
-    handler: any,
+    handler: Callable[[dict[str, any]], any],
     description: str = "",
     extension_id: str = "fake.shortcuts",
 ) {
@@ -132,7 +136,7 @@ def register_fake_shortcut(
     if h is None {
         raise RuntimeError("plugin host unavailable");
     }
-    h.shortcut_handlers[key] = {"handler": handler, "owner": extension_id};
+    h.shortcut_handlers[key] = FakeShortcutHandler(fn=handler, owner=extension_id);
     bridge.shortcuts[key] = {
         "key": key,
         "description": description,
@@ -162,7 +166,7 @@ def register_fake_listener(
 """Register a markdown transformer on the FAKE host (unit-test path)."""
 def register_fake_transformer(
     bridge: PluginBridge,
-    fn: any,
+    fn: Callable[[str, dict[str, any]], any],
     extension_id: str = "fake.xform",
 ) {
     ensure_host(bridge);
@@ -170,9 +174,10 @@ def register_fake_transformer(
     if h is None {
         raise RuntimeError("plugin host unavailable");
     }
-    transformer = {"fn": fn, "extension_id": extension_id};
-    h.md_transformers.append(transformer);
-    bridge.md_transformers.append(transformer);
+    h.md_transformers.append(FakeMarkdownTransformer(
+        fn=fn, extension_id=extension_id
+    ));
+    bridge.md_transformers.append({"extension_id": extension_id});
 }
 
 
@@ -184,9 +189,11 @@ def register_fake_provider(bridge: PluginBridge, cfg: dict[str, any], extension_
         raise ValueError("provider config requires a name");
     }
     h: FakePluginHost | None = bridge.host;
-    provider_cfg = dict(cfg);
+    provider_cfg: dict[str, any] = dict(cfg);
     if h is not None {
-        h.providers[name] = {**provider_cfg, "owner": extension_id};
+        owned_cfg: dict[str, any] = dict(provider_cfg);
+        owned_cfg["owner"] = extension_id;
+        h.providers[name] = owned_cfg;
     }
     provider_cfg["extension_id"] = extension_id;
     bridge.providers[name] = provider_cfg;
@@ -198,7 +205,7 @@ def register_fake_renderer(
     bridge: PluginBridge,
     kind: str,
     type: str,
-    fn: any,
+    fn: Callable[[any], any],
     extension_id: str = "fake.renderer",
 ) {
     ensure_host(bridge);
@@ -207,7 +214,7 @@ def register_fake_renderer(
         raise RuntimeError("plugin host unavailable");
     }
     table = h.message_renderers if kind != "entry" else h.entry_renderers;
-    table[str(type)] = {"fn": fn, "owner": extension_id};
+    table[str(type)] = FakeRenderer(fn=fn, owner=extension_id);
 }
 
 

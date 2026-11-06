@@ -1,8 +1,9 @@
 """Plugin bridge traffic buffers and pending extension controls."""
 
 import from .fake_host { FakePluginHost }
+import from .plugin_bridge_model { PluginBridge }
 
-def:pub _absorb_payload(bridge: any, payload: dict[str, any]) {
+def:pub _absorb_payload(bridge: PluginBridge, payload: dict[str, any]) {
     msgs: any = payload.get("messages", []);
     if isinstance(msgs, list) {
         for m in msgs {
@@ -42,10 +43,13 @@ def:pub _absorb_payload(bridge: any, payload: dict[str, any]) {
     provs: any = payload.get("providers", []);
     if isinstance(provs, list) {
         for p in provs {
-            if isinstance(p, dict) and p.get("name") {
-                cfg = dict(p);
-                cfg["extension_id"] = str(payload.get("id", ""));
-                bridge.providers[str(p.get("name"))] = cfg;
+            if isinstance(p, dict) {
+                provider: dict[str, any] = p as dict[str, any];
+                if "name" in provider and provider["name"] {
+                    cfg: dict[str, any] = dict(provider);
+                    cfg["extension_id"] = str(payload.get("id", ""));
+                    bridge.providers[str(provider["name"])] = cfg;
+                }
             }
         }
     }
@@ -87,7 +91,7 @@ def:pub _absorb_payload(bridge: any, payload: dict[str, any]) {
 
 """Shortcut bindings registered by loaded extensions (key -> meta dict with
 description + extension_id). Listed for host UIs; not yet bound to keys."""
-def:pub list_shortcuts(bridge: any | None) -> dict[str, any] {
+def:pub list_shortcuts(bridge: PluginBridge | None) -> dict[str, dict[str, any]] {
     if bridge is None {
         return {};
     }
@@ -96,7 +100,7 @@ def:pub list_shortcuts(bridge: any | None) -> dict[str, any] {
 
 
 """Labels set by loaded extensions via pi.setLabel (id -> meta dict)."""
-def:pub list_labels(bridge: any | None) -> dict[str, any] {
+def:pub list_labels(bridge: PluginBridge | None) -> dict[str, dict[str, any]] {
     if bridge is None {
         return {};
     }
@@ -108,7 +112,7 @@ def:pub list_labels(bridge: any | None) -> dict[str, any] {
 
 Returns {"model": str, "thinking_level": str} and clears both pendings so
 each request applies exactly once. Empty strings mean no request."""
-def:pub drain_model_requests(bridge: any | None) -> dict[str, any] {
+def:pub drain_model_requests(bridge: PluginBridge | None) -> dict[str, any] {
     out: dict[str, any] = {"model": "", "thinking_level": ""};
     if bridge is None {
         return out;
@@ -122,7 +126,7 @@ def:pub drain_model_requests(bridge: any | None) -> dict[str, any] {
 
 
 """Pull per-listener ui_events buckets out of hook results."""
-def:pub _absorb_pending_fake(bridge: any, h: FakePluginHost) {
+def:pub _absorb_pending_fake(bridge: PluginBridge, h: FakePluginHost) {
     if h.pending_messages {
         msgs = h.pending_messages;
         h.pending_messages = [];

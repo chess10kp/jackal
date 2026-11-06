@@ -11,7 +11,8 @@ import from .registry {
     unregister_extension_handle,
 }
 import from .fake_host { FakeUi, ensure_host, touch_bridge }
-import from .plugin_bridge_support { _path_abspath }
+import from .fake_host_types { FakeCommandHandler, FakeMarkdownTransformer, FakeRenderer, FakeShortcutHandler }
+import from .plugin_bridge_support { _bridge_path_abspath }
 import from .plugin_bridge_core {
     PluginBridge,
     _alloc_corr,
@@ -45,20 +46,20 @@ def:pub load_extension(
     names: list[str] = [];
     schemas: list[dict[str, any]] = [];
     for td in tool_defs {
-        t: any = td;
-        name = str(t.get("name", ""));
+        t: dict[str, any] = td;
+        name = str(t["name"]) if "name" in t else "";
         if not name {
             continue;
         }
         names.append(name);
-        raw_params: any = t.get("parameters", {});
+        raw_params: any = t["parameters"] if "parameters" in t else {};
         params: dict[str, any] = {};
         if isinstance(raw_params, dict) {
             params = raw_params;
         }
         schemas.append({
             "name": name,
-            "description": str(t.get("description", "")),
+            "description": str(t["description"]) if "description" in t else "",
             "parameters": params,
         });
         if name in handlers {
@@ -67,7 +68,7 @@ def:pub load_extension(
         register_js(
             reg,
             name=name,
-            description=str(t.get("description", "")),
+            description=str(t["description"]) if "description" in t else "",
             parameters=params,
             extension_id=extension_id,
         );
@@ -164,7 +165,7 @@ def:pub load_extension_path(
         _emit_host_status(bridge, "degraded", detail);
         raise RuntimeError(detail);
     }
-    abs_path = _path_abspath(path);
+    abs_path = _bridge_path_abspath(path);
     if not os.path.isfile(abs_path) {
         raise FileNotFoundError(f"extension module not found: {abs_path}");
     }
@@ -207,16 +208,16 @@ def:pub load_extension_path(
         _emit_host_status(bridge, "degraded", detail);
         raise RuntimeError(detail);
     }
-    tools = reply.payload.get("tools", []);
+    tools: list[dict[str, any]] = reply.payload["tools"] as list[dict[str, any]] if "tools" in reply.payload else [];
     names: list[str] = [];
     for td in tools {
-        t: any = td;
-        name = str(t.get("name", ""));
+        t: dict[str, any] = td;
+        name = str(t["name"]) if "name" in t else "";
         if not name {
             continue;
         }
         names.append(name);
-        raw_params: any = t.get("parameters", {});
+        raw_params: any = t["parameters"] if "parameters" in t else {};
         params: dict[str, any] = {};
         if isinstance(raw_params, dict) {
             params = raw_params;
@@ -224,21 +225,21 @@ def:pub load_extension_path(
         register_js(
             reg,
             name=name,
-            description=str(t.get("description", "")),
+            description=str(t["description"]) if "description" in t else "",
             parameters=params,
             extension_id=extension_id,
         );
     }
     # T2-partial: track registered commands so the session/UI can route them.
-    cmds: list[any] = reply.payload.get("commands", []);
+    cmds: list[dict[str, any]] = reply.payload["commands"] as list[dict[str, any]] if "commands" in reply.payload else [];
     if isinstance(cmds, list) {
         for cd in cmds {
-            c: any = cd;
-            cname = str(c.get("name", ""));
+            c: dict[str, any] = cd;
+            cname = str(c["name"]) if "name" in c else "";
             if cname {
                 bridge.commands[cname] = {
                     "name": cname,
-                    "description": str(c.get("description", "")),
+                    "description": str(c["description"]) if "description" in c else "",
                     "extension_id": extension_id,
                 };
             }
@@ -272,31 +273,34 @@ def:pub unload_extension(
     removed = unregister_extension(reg, extension_id);
     dead: list[str] = [];
     for n in list(bridge.commands.keys()) {
-        if bridge.commands[n].get("extension_id") == extension_id {
+        if "extension_id" in bridge.commands[n] and str(bridge.commands[n]["extension_id"]) == extension_id {
             dead.append(n);
         }
     }
     for n in dead {
         bridge.commands.pop(n, None);
     }
-    bridge.md_transformers = [
-        t for t in bridge.md_transformers
-        if t.get("extension_id") != extension_id
-    ];
+    kept_transformers: list[dict[str, any]] = [];
+    for transformer in bridge.md_transformers {
+        if not ("extension_id" in transformer) or str(transformer["extension_id"]) != extension_id {
+            kept_transformers.append(transformer);
+        }
+    }
+    bridge.md_transformers = kept_transformers;
     # No tuple unpacking in comprehensions: the Jac parser rejects
     # `for n, c in ...`, so mirror the dead-command loop above.
     for pn in list(bridge.providers.keys()) {
-        if bridge.providers[pn].get("extension_id") == extension_id {
+        if "extension_id" in bridge.providers[pn] and str(bridge.providers[pn]["extension_id"]) == extension_id {
             bridge.providers.pop(pn, None);
         }
     }
     for sk in list(bridge.shortcuts.keys()) {
-        if bridge.shortcuts[sk].get("extension_id") == extension_id {
+        if "extension_id" in bridge.shortcuts[sk] and str(bridge.shortcuts[sk]["extension_id"]) == extension_id {
             bridge.shortcuts.pop(sk, None);
         }
     }
     for lid in list(bridge.labels.keys()) {
-        if bridge.labels[lid].get("extension_id") == extension_id {
+        if "extension_id" in bridge.labels[lid] and str(bridge.labels[lid]["extension_id"]) == extension_id {
             bridge.labels.pop(lid, None);
         }
     }
@@ -321,27 +325,33 @@ def:pub unload_extension(
                 del h.handlers[name];
             }
         }
-        dead_cmds = [
-            n for n in list(h.command_handlers.keys())
-            if h.command_handlers[n].get("owner") == extension_id
-        ];
+        dead_cmds: list[str] = [];
+        for n in list(h.command_handlers.keys()) {
+            cmd_handler: FakeCommandHandler = h.command_handlers[n];
+            if cmd_handler.owner == extension_id {
+                dead_cmds.append(n);
+            }
+        }
         for n in dead_cmds {
             del h.command_handlers[n];
         }
-        h.md_transformers = [
-            t for t in h.md_transformers
-            if t.get("extension_id") != extension_id
-        ];
+        kept_fake_transformers: list[FakeMarkdownTransformer] = [];
+        for transformer in h.md_transformers {
+            if transformer.extension_id != extension_id {
+                kept_fake_transformers.append(transformer);
+            }
+        }
+        h.md_transformers = kept_fake_transformers;
         # Jac parser rejects tuple unpacking in comprehensions.
         for pn in list(h.providers.keys()) {
-            if h.providers[pn].get("owner") == extension_id {
+            if "owner" in h.providers[pn] and str(h.providers[pn]["owner"]) == extension_id {
                 h.providers.pop(pn, None);
             }
         }
         for table in (h.message_renderers, h.entry_renderers) {
             for rn in list(table.keys()) {
-                r: any = table[rn];
-                if isinstance(r, dict) and r.get("owner") == extension_id {
+                r: FakeRenderer = table[rn];
+                if r.owner == extension_id {
                     table.pop(rn, None);
                 }
             }
@@ -402,14 +412,14 @@ def:pub invoke_shortcut(bridge: PluginBridge, key: str, timeout: float = 10.0) -
     if h is None or not h.alive {
         return {"ok": False, "error": "plugin host unavailable"};
     }
-    shortcut_entry = h.shortcut_handlers.get(key);
+    shortcut_entry: FakeShortcutHandler | None = h.shortcut_handlers.get(key);
     if shortcut_entry is None {
         return {"ok": False, "error": f"unknown shortcut {key}"};
     }
     notifications: list[str] = [];
     try {
         ui = FakeUi(notifications, []);
-        result = shortcut_entry["handler"]({"ui": ui});
+        result = shortcut_entry.fn({"ui": ui});
         res_payload: dict[str, any] = {
             "ok": True,
             "result": "" if result is None else str(result),
@@ -515,14 +525,14 @@ def:pub invoke_command(
     if h is None or not h.alive {
         return {"ok": False, "error": "plugin host unavailable"};
     }
-    handler_entry = h.command_handlers.get(name);
+    handler_entry: FakeCommandHandler | None = h.command_handlers.get(name);
     if handler_entry is None {
         return {"ok": False, "error": f"unknown command {name}"};
     }
     notifications: list[str] = [];
     try {
         ui = FakeUi(notifications, []);
-        result = handler_entry["handler"](args, {"ui": ui});
+        result = handler_entry.fn(args, {"ui": ui});
         res_payload: dict[str, any] = {
             "ok": True,
             "result": "" if result is None else str(result),

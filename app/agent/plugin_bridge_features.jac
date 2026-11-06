@@ -54,7 +54,7 @@ def:pub transform_markdown(
     }
     for t in h.md_transformers {
         try {
-            out: dict[str, any] = t["fn"](md, mctx);
+            out: any = t.fn(md, mctx);
             if isinstance(out, str) {
                 md = out;
             }
@@ -139,18 +139,25 @@ def:pub resolve_ext_model(bridge: PluginBridge | None, model_id: str) -> dict[st
     model = parts[2];
     # Jac parser rejects `for name, cfg in ...` tuple unpacking.
     for name in bridge.providers {
-        cfg = bridge.providers[name];
-        if str(cfg.get("extension_id", "")) != ext_id {
+        cfg: dict[str, any] = bridge.providers[name];
+        if not ("extension_id" in cfg) or str(cfg["extension_id"]) != ext_id {
             continue;
         }
-        for m in cfg.get("models", []) or [] {
-            mid = m.get("id", "") if isinstance(m, dict) else str(m);
+        models: list[any] = cfg["models"] as list[any] if "models" in cfg else [];
+        for m in models {
+            mid = "";
+            if isinstance(m, dict) {
+                model_rec: dict[str, any] = m as dict[str, any];
+                mid = str(model_rec["id"]) if "id" in model_rec else "";
+            } elif isinstance(m, str) {
+                mid = m;
+            }
             if str(mid) == model {
                 return {
                     "provider": str(name),
                     "model": model,
-                    "base_url": str(cfg.get("base_url", "") or ""),
-                    "streaming": cfg.get("streaming", True) is not False,
+                    "base_url": str(cfg["base_url"]) if "base_url" in cfg else "",
+                    "streaming": cfg["streaming"] is not False if "streaming" in cfg else True,
                     "extension_id": ext_id,
                 };
             }
@@ -183,25 +190,25 @@ def:pub prepare_provider_request(
     } except Exception {
         return out;
     }
-    final = fired.get("data", {}) if isinstance(fired, dict) else {};
-    results = fired.get("results", []) if isinstance(fired, dict) else [];
+    final: dict[str, any] = fired["data"] as dict[str, any];
+    results: list[dict[str, any]] = fired["results"] as list[dict[str, any]];
     # In-place edits first (echoed working copy)...
     for key in ("url", "headers", "body") {
-        v: any = final.get(key) if isinstance(final, dict) else None;
+        v: any = final[key] if key in final else None;
         if v is not None {
             out[key] = v;
         }
     }
     # ...then explicit verdict replacements override.
-    for verdict in _ok_verdicts(results) {
-        v: any = verdict;
-        u = v.get("url");
+    verdicts: list[dict[str, any]] = _ok_verdicts(results);
+    for verdict in verdicts {
+        u = verdict["url"] if "url" in verdict else None;
         if isinstance(u, str) and u {
             out["url"] = u;
         }
         for key in ("headers", "body") {
-            if isinstance(v.get(key), dict) {
-                out[key] = v[key];
+            if key in verdict and isinstance(verdict[key], dict) {
+                out[key] = verdict[key];
             }
         }
     }
@@ -215,10 +222,23 @@ def:pub _fake_content_lines(out: any) -> list[str] {
         return [];
     }
     if isinstance(out, list) {
-        return [str(x) for x in out];
+        values: list[any] = out as list[any];
+        lines: list[str] = [];
+        for value in values {
+            lines.append(str(value));
+        }
+        return lines;
     }
-    if isinstance(out, dict) and isinstance(out.get("lines"), list) {
-        return [str(x) for x in out["lines"]];
+    if isinstance(out, dict) {
+        result_map: dict[str, any] = out as dict[str, any];
+        if "lines" in result_map and isinstance(result_map["lines"], list) {
+            values: list[any] = result_map["lines"] as list[any];
+            lines: list[str] = [];
+            for value in values {
+                lines.append(str(value));
+            }
+            return lines;
+        }
     }
     return [x for x in str(out).split("\n")];
 }
@@ -262,12 +282,12 @@ def:pub render_extension_block(
         return none_out;
     }
     table = h.message_renderers if kind != "entry" else h.entry_renderers;
-    renderer: any = table.get(str(type));
-    if renderer is None or not isinstance(renderer, dict) {
+    renderer = table.get(str(type));
+    if renderer is None {
         return none_out;
     }
     try {
-        out: any = renderer["fn"](payload);
+        out: any = renderer.fn(payload);
         return {"ok": True, "lines": _fake_content_lines(out)};
     } except Exception as e {
         text = "" if payload is None else str(payload);

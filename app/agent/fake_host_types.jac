@@ -23,20 +23,40 @@ glob FAKE_HOST_CAPS: list[str] = [
      ],
      FAKE_COMPAT_TIER: str = "T2-partial";
 
+obj:pub FakeMarkdownTransformer {
+    has fn: Callable[[str, dict[str, any]], any],
+        extension_id: str;
+}
+
+obj:pub FakeRenderer {
+    has fn: Callable[[any], any],
+        owner: str;
+}
+
+obj:pub FakeCommandHandler {
+    has fn: Callable[[str, dict[str, any]], any],
+        owner: str;
+}
+
+obj:pub FakeShortcutHandler {
+    has fn: Callable[[dict[str, any]], any],
+        owner: str;
+}
+
 
 obj:pub FakePluginHost {
     has handlers: dict[str, Callable[[dict[str, any]], any]] = {},
-        command_handlers: dict[str, any] = {},
-        shortcut_handlers: dict[str, any] = {},
+        command_handlers: dict[str, FakeCommandHandler] = {},
+        shortcut_handlers: dict[str, FakeShortcutHandler] = {},
         listeners: dict[str, list[Callable[[dict[str, any], dict[str, any]], any]]] = {},
-        md_transformers: list[dict[str, any]] = [],
+        md_transformers: list[FakeMarkdownTransformer] = [],
         pending_messages: list[dict[str, any]] = [],
         pending_entries: list[dict[str, any]] = [],
         active_tools: list[str] | None = None,
         session_name: str = "",
-        providers: dict[str, any] = {},
-        message_renderers: dict[str, any] = {},
-        entry_renderers: dict[str, any] = {},
+        providers: dict[str, dict[str, any]] = {},
+        message_renderers: dict[str, FakeRenderer] = {},
+        entry_renderers: dict[str, FakeRenderer] = {},
         extension_tools: dict[str, list[str]] = {},
         cancelled: set[str] = set(),
         node_version: str = "fake",
