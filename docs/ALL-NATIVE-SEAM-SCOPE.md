@@ -160,11 +160,16 @@ three affected annexes and `run.jac`/`subagents.jac` pass `jac check`.
 The build still ends before producing a seal: the staged app and the source
 tree both contribute `constraints/algebra.jac` under the same native unit
 prefix. This is tracked upstream in [jac#10623](https://github.com/jaseci-labs/jac/issues/10623).
-The current run reports 238 seam demotions, so the check is not closure
-evidence. The highest-impact app dependency groups remain plugin bridge I/O
-and callback typing, session lifecycle composition, imported registry calls,
-and native test-root accounting. Fix the link-plan identity collision first
-so subsequent full builds can produce trustworthy root closure evidence.
+
+Independent `--native --lib` builds now produce native libraries without seam
+demotions for the interaction queue (8 units), plugin bridge I/O (27), UI
+transport (32), hooks (32), extension features (33), extension loading (34),
+and registry (33). The fake host callbacks and correlation/UI records now
+have typed Jac layouts; extension event maps use typed access at the native
+boundary. These leaf builds do not prove the combined `main.jac` or TUI graph.
+The full build still has other agent/session and test-annex demotions, and its
+link-plan collision prevents current full-root accounting. Fix that collision
+and regenerate the root ledger before claiming zero demotions.
 
 ### Boundary map
 
