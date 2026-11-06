@@ -14,7 +14,7 @@ import sys;
 
 def _jac_launcher(repo_root: str) -> str {
     workspace = os.path.join(repo_root, "jac");
-    if os.path.isfile(workspace) and os.access(workspace, os.X_OK) {
+    if shutil.which(workspace) is not None {
         return workspace;
     }
     found = shutil.which("jac");
