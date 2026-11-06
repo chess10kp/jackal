@@ -153,9 +153,14 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
             outer_range: str = str(outer_start) + (
                 "-" + str(outer_end) if outer_end else ""
             );
-            parsed_outer: dict[str, any] | None = parse_line_range(outer_range);
+            parsed_outer: dict[str, int] | None = parse_line_range(outer_range);
             if parsed_outer is not None {
-                rng = parsed_outer;
+                normalized_range: dict[str, any] = {};
+                normalized_range["start"] = parsed_outer["start"];
+                if "end" in parsed_outer {
+                    normalized_range["end"] = parsed_outer["end"];
+                }
+                rng = normalized_range;
             }
             # A malformed outer range keeps the quoted content as the path;
             # the bad suffix disappears with the token span.
@@ -163,10 +168,15 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
             cm = re.search(r":(\d+)(?:-(\d+))?$", inner);
             if cm is not None {
                 inner_range: str = inner[cm.start() + 1:];
-                parsed_inner: dict[str, any] | None = parse_line_range(inner_range);
+                parsed_inner: dict[str, int] | None = parse_line_range(inner_range);
                 if parsed_inner is not None {
                     path_part = inner[:cm.start()];
-                    rng = parsed_inner;
+                    normalized_range: dict[str, any] = {};
+                    normalized_range["start"] = parsed_inner["start"];
+                    if "end" in parsed_inner {
+                        normalized_range["end"] = parsed_inner["end"];
+                    }
+                    rng = normalized_range;
                 }
             }
         }
@@ -174,13 +184,13 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
             continue;
         }
         spans.append((m.start(), m.end()));
-        mentions.append({
-            "raw": str(m.group(0)),
-            "path": path_part,
-            "start": m.start(),
-            "end": m.end(),
-            "line_range": rng,
-        });
+        mention: dict[str, any] = {};
+        mention["raw"] = str(m.group(0));
+        mention["path"] = path_part;
+        mention["start"] = m.start();
+        mention["end"] = m.end();
+        mention["line_range"] = rng;
+        mentions.append(mention);
     }
     if not mentions {
         return (text, []);
@@ -213,7 +223,7 @@ def:pub _expand_quoted_context(cwd: str, text: str) -> str {
         return expand_context_input(cwd, text);
     }
     base: str = "";
-    body: str = cleaned.strip();
+    body: str = re.sub(r"^\s+|\s+$", "", cleaned);
     if body {
         try {
             base = expand_context_input(cwd, body);
@@ -222,7 +232,9 @@ def:pub _expand_quoted_context(cwd: str, text: str) -> str {
         }
     }
     blocks: list[str] = [];
-    for q in quotes {
+    q_index: int = 0;
+    while q_index < len(quotes) {
+        q: dict[str, any] = quotes[q_index];
         qpath: str = str(q.get("path", ""));
         qrng: any = q.get("line_range");
         try {
@@ -231,6 +243,7 @@ def:pub _expand_quoted_context(cwd: str, text: str) -> str {
         } except (OSError, ValueError) as exc {
             blocks.append('<file path="' + qpath + '" error="' + str(exc) + '" />');
         }
+        q_index += 1;
     }
     if "Attached context:" in base {
         return base + "\n" + "\n".join(blocks);
