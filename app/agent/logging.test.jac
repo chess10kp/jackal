@@ -211,7 +211,7 @@ test "log_exception records type and message without Python traceback" {
         assert len(recs) == 2, recs;
         rec = recs[0];
         assert rec["level"] == "error", rec;
-        assert rec["fields"]["exception"] == "ValueError", rec;
+        assert rec["fields"]["exception"] == "Exception", rec;
         assert rec["fields"]["detail"] == "disk on fire", rec;
         assert rec["fields"]["phase"] == "capture", rec;
         rec_fields: dict[str, any] = rec["fields"] as dict[str, any];

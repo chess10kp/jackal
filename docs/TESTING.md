@@ -154,12 +154,14 @@ Swallowed `except` blocks still talk, but only when asked:
 
 ```bash
 JACKAL_LOG=1 JACKAL_LOG_LEVEL=debug ./jac test agent/checkpoints.test.jac
-# one JSON object per line in <cwd>/.jackal/logs/<date>-<pid>.jsonl
+# one JSON object per line in <cwd>/.jackal/logs/<process-start>-<pid>.jsonl
 ```
 
 `JACKAL_LOG=<path>` writes to one explicit sink instead (tests use this);
-unset or `JACKAL_LOG=0` is off. Records carry `ts level source msg pid` and
-optional `fields` (tool name, path, exception type/detail/traceback). The
+unset or `JACKAL_LOG=0` is off. Records carry `ts` (Unix epoch seconds),
+`level`, `source`, `msg`, `pid`, and optional `fields` (tool name, path,
+exception type and detail). Native exception records use the generic type
+`Exception` and omit Python tracebacks. The
 sink is shared by `agent/logging.jac` callers — checkpoint capture misses,
 store read failures, and tool-handler exceptions land there rather than
 disappearing.

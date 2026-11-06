@@ -8,7 +8,7 @@ is the sink those sites can call without giving up the contract.
 
 Enablement (opt-in; nothing is written unless asked for):
 
-    JACKAL_LOG=1          -> <cwd>/.jackal/logs/<date>-<pid>.jsonl
+    JACKAL_LOG=1          -> <cwd>/.jackal/logs/<process-start>-<pid>.jsonl
     JACKAL_LOG=/tmp/x.log -> that path (parent directories created)
     JACKAL_LOG=0|off      -> disabled (the default when unset)
     JACKAL_LOG_LEVEL      -> debug|info|warn|error (default: info)
@@ -24,7 +24,12 @@ One JSON object per line, keys: ts, level, source, msg, pid, and optional
 
 import os;
 import json;
-import datetime;
+import io;
+import time;
+import from c { def fopen(path: str, mode: str) -> int; }
+import from c { def fputs(s: str, stream: int) -> i32; }
+import from c { def fflush(stream: int) -> i32; }
+import from c { def fclose(stream: int) -> i32; }
 
 glob LOG_LEVELS: dict[str, int] = {
         "debug": 10,
@@ -43,7 +48,8 @@ glob LOG_LEVELS: dict[str, int] = {
      MAX_STRING_LEN: int = 400;
 
 glob _FALSEY: list[str] = ["0", "off", "false", "no", "none", ""],
-     _TRUTHY: list[str] = ["1", "on", "true", "yes"];
+     _TRUTHY: list[str] = ["1", "on", "true", "yes"],
+     _PROCESS_START: int = int(time.time());
 
 
 """The configured sink path, or "" when logging is disabled.
@@ -56,7 +62,7 @@ def log_sink() -> str {
         return "";
     }
     if low in _TRUTHY {
-        stamp: str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d");
+        stamp: str = str(_PROCESS_START);
         name: str = stamp + "-" + str(os.getpid()) + ".jsonl";
         return os.path.join(os.getcwd(), DEFAULT_LOG_DIR, name);
     }
@@ -181,25 +187,29 @@ def log_event(
             return False;
         }
         record: dict[str, any] = {
-            "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "ts": str(time.time()),
             "level": want if want in LOG_LEVELS else "info",
             "source": str(source),
             "msg": str(message),
             "pid": os.getpid(),
         };
         if fields is not None {
-            record["fields"] = safe_fields(fields);
+            record["fields"] = safe_fields(fields) as dict[str, any];
         }
         line: str = json.dumps(record, ensure_ascii=False);
         parent: str = os.path.dirname(sink);
         if parent and not os.path.isdir(parent) {
             os.makedirs(parent, exist_ok=True);
         }
-        fh: any = open(sink, "a", encoding="utf-8");
-        try {
-            fh.write(line + "\n");
-        } finally {
-            fh.close();
+        stream: int = fopen(sink, "a");
+        if stream == 0 {
+            return False;
+        }
+        write_status: int = int(fputs(line + "\n", stream));
+        flush_status: int = int(fflush(stream));
+        close_status: int = int(fclose(stream));
+        if write_status < 0 or flush_status < 0 or close_status < 0 {
+            return False;
         }
         return True;
     } except Exception {
@@ -209,8 +219,8 @@ def log_event(
 sem log_event = "Write one structured JSONL log record; never raises into the caller.";
 
 
-"""Record a caught exception without changing control flow. Safe outside an
-`except` block (traceback is then empty). `fields` is merged into the record."""
+"""Record a caught exception without changing control flow. `fields` is
+merged into the record; native logs store the message without a Python traceback."""
 def log_exception(
     source: str,
     exc: any,
@@ -227,11 +237,6 @@ def log_exception(
         kind: str = "Exception";
         detail: str = "";
         if exc is not None {
-            if isinstance(exc, ValueError) {
-                kind = "ValueError";
-            } elif isinstance(exc, OSError) {
-                kind = "OSError";
-            }
             detail = str(exc);
         }
         payload["exception"] = kind;
@@ -241,7 +246,7 @@ def log_exception(
         return False;
     }
 }
-sem log_exception = "Log a swallowed exception (type, message, traceback) at error level.";
+sem log_exception = "Log a swallowed exception's native type and message at error level.";
 
 
 def:pub log_debug(source: str, message: str, fields: dict[str, any] | None = None) -> bool {
@@ -261,9 +266,10 @@ Unreadable or malformed lines are skipped, never raised."""
 def read_log(path: str) -> list[dict[str, any]] {
     records: list[dict[str, any]] = [];
     try {
-        fh: any = open(path, "r", encoding="utf-8");
+        fh: io.FileIO = io.FileIO(path, "rb");
         try {
-            for line in fh.read().splitlines() {
+            contents: bytes = fh.read();
+            for line in contents.decode("utf-8", errors="replace").splitlines() {
                 text: str = line.strip();
                 if not text {
                     continue;
