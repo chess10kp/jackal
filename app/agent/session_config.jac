@@ -40,15 +40,15 @@ import from .session_state {
     model,
     thinking_level,
     mode,
-    _model_prefs,
-    _model_prefs_loaded,
     set_mode_state,
     get_mode_state,
     set_model_state,
     get_model_state,
     set_thinking_level_state,
     get_thinking_level_state,
-    adopt_model_prefs,
+    load_model_prefs_state,
+    record_model_pref_state,
+    model_prefs_state,
 }
 import from .session_plugins { plugins, get_plugin_bridge }
 import from .session_cwd { get_session_cwd }
@@ -1371,23 +1371,7 @@ def _model_prefs_path() -> str {
 
 """One-time defensive load of model_prefs.json (missing/corrupt -> {})."""
 def:pub _load_model_prefs() -> None {
-    if _model_prefs_loaded {
-        return;
-    }
-    path: str = _model_prefs_path();
-    if not os.path.isfile(path) {
-        return;
-    }
-    try {
-        fh: io.FileIO = io.FileIO(path, "rb");
-        raw_bytes: bytes = fh.readall();
-        fh.close();
-        raw: any = json.loads(raw_bytes.decode("utf-8"));
-        if isinstance(raw, dict) {
-            adopt_model_prefs(raw);
-        }
-    } except (OSError, ValueError) {
-    }
+    load_model_prefs_state(_model_prefs_path());
 }
 
 
@@ -1395,28 +1379,9 @@ def:pub _load_model_prefs() -> None {
 to <cwd>/.jackal/model_prefs.json best-effort. Never raises — a preference
 write must never break a successful switch."""
 def:pub record_model_pref(name: str) {
-    try {
-        _load_model_prefs();
-        _model_prefs["last"] = name;
-        _model_prefs[provider_for(name)] = name;
-        cwd: str = get_session_cwd();
-        if not cwd {
-            cwd = os.getcwd();
-        }
-        prefs_dir: str = os.path.join(
-            cwd, ".jackal"
-        );
-        os.makedirs(prefs_dir, exist_ok=True);
-        path: str = os.path.join(prefs_dir, "model_prefs.json");
-        fh: io.FileIO = io.FileIO(path, "wb");
-        try {
-            contents: str = json_pretty(json.dumps(_model_prefs, sort_keys=True));
-            fh.write((contents + "\n").encode("utf-8"));
-        } finally {
-            fh.close();
-        }
-    } except Exception {
-    }
+    record_model_pref_state(
+        name, provider_for(name), _model_prefs_path()
+    );
 }
 
 
@@ -1424,7 +1389,7 @@ def:pub record_model_pref(name: str) {
 For the TUI /model picker to preselect per-provider defaults."""
 def:pub model_preferences() -> dict[str, any] {
     _load_model_prefs();
-    return dict(_model_prefs);
+    return model_prefs_state();
 }
 
 

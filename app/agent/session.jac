@@ -14,15 +14,17 @@ import from .session_state {
     get_thinking_level_state,
     set_model_state,
     set_thinking_level_state,
+    record_model_pref_state,
 }
 import from .session_plugins { SessionPlugins, plugins, get_plugin_bridge }
+import from .session_cwd { get_session_cwd }
+import from .provider_routes { provider_for, credential_error }
 glob model: str = os.environ.get("JACKAL_MODEL", "openrouter/anthropic/claude-sonnet-5"),
      thinking_level: str = "";
 import from .session_config {
     set_mode,
     get_mode,
     model_preferences,
-    record_model_pref,
     clear_history,
     mcp_restart,
     mcp_restart_failed,
@@ -44,7 +46,12 @@ def:pub set_model(name: str) -> str {
     }
     set_model_state(name);
     model = name;
-    record_model_pref(name);
+    cwd: str = get_session_cwd();
+    if not cwd {
+        cwd = os.getcwd();
+    }
+    prefs_path: str = os.path.join(cwd, ".jackal", "model_prefs.json");
+    record_model_pref_state(name, provider_for(name), prefs_path);
     bridge: any = get_plugin_bridge();
     if bridge is not None {
         try {
@@ -125,8 +132,6 @@ import from .llm {
     make_transport,
     make_ext_transport,
     TurnCancel,
-    provider_for,
-    credential_error,
 }
 import from .compaction {
     load_project_config,

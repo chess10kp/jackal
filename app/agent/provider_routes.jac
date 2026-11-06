@@ -70,9 +70,11 @@ def:pub credential_error(model: str) -> str {
     try {
         provider: str = provider_for(model);
         if provider == "ext" { return ""; }
-        route: dict[str, any] | None = PROVIDER_ROUTES.get(provider);
-        if route is None { return ""; }
-        key_env: str = str(route.get("key_env", ""));
+        key_env: str = "";
+        if provider == "openrouter" { key_env = "OPENROUTER_API_KEY"; }
+        if provider == "deepseek" { key_env = "DEEPSEEK_API_KEY"; }
+        if provider == "zai" { key_env = "ZAI_API_KEY"; }
+        if provider == "openai_compat" { key_env = "OPENAI_API_KEY"; }
         if not key_env { return ""; }
         if os.getenv(key_env, "") { return ""; }
         fix: str = "set " + key_env;
