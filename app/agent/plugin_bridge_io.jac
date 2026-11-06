@@ -323,7 +323,7 @@ def:pub _ui_enqueue_from_env(bridge: PluginBridge, env: Envelope) {
         "options": p.get("options", []) if isinstance(p.get("options"), list) else [],
         "placeholder": str(p.get("placeholder", "")),
         "created": time.monotonic(),
-        "timeout_ms": float(p.get("timeout_ms", 30000.0)),
+        "timeout_ms": p.get("timeout_ms", 30000.0) as float,
     };
     q = _ui_queue(bridge);
     res = q.enqueue(req);
