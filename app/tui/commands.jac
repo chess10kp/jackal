@@ -268,7 +268,7 @@ def:pub _run_slash(app: LiveShell, line: str) -> str {
         # Inline skill expansion: the transcript keeps the typed command;
         # the model receives the <skill> block with args appended.
         try {
-            catalog: dict[str, any] = load_jackal_skills();
+            catalog: dict[str, list[dict[str, any]]] = load_jackal_skills();
         } except Exception as e {
             return "ERROR: failed to load skills: " + str(e);
         }
@@ -331,7 +331,7 @@ def _ui_open_modal(app: LiveShell, rec: dict[str, any]) -> bool {
 
 """Settle the modal: answer via the bridge and restore the prompt state."""
 def _ui_settle(app: LiveShell, value: any, use_cancel: bool = False) {
-    m: any = _ui_modal_state(app);
+    m: dict[str, any] | None = _ui_modal_state(app);
     if m is None {
         return;
     }
@@ -380,7 +380,7 @@ def _run_ext_command_async(app: LiveShell, name: str, args: str) -> str {
 
 
 def:pub _handle_ui_modal_key(app: LiveShell, key: str) {
-    m: any = _ui_modal_state(app);
+    m: dict[str, any] | None = _ui_modal_state(app);
     if m is None {
         return;
     }
@@ -396,7 +396,13 @@ def:pub _handle_ui_modal_key(app: LiveShell, key: str) {
         return;
     }
     if method == "select" {
-        options: list[any] = list(m.get("options", []));
+        options: list[any] = [];
+        raw_options: any = m.get("options", []);
+        if isinstance(raw_options, list) {
+            for option in raw_options {
+                options.append(option);
+            }
+        }
         filt = str(m.get("filter", ""));
         if key == "backspace" or key == "\x7f" {
             if filt {
