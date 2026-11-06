@@ -215,19 +215,33 @@ glob _QUOTED_MENTION_PATTERN: str = r'@"([^"]+)"(?::(\d+)(?:-(\d+))?)?';
 
 
 def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
-    options: list[str] = list(p.get("options", []));
-    ids: list[str] = list(p.get("ids", []));
+    options: list[str] = [];
+    raw_options: any = p.get("options", []);
+    if isinstance(raw_options, list) {
+        for item in raw_options {
+            options.append(str(item));
+        }
+    }
+    ids: list[str] = [];
+    raw_ids: any = p.get("ids", []);
+    if isinstance(raw_ids, list) {
+        for item in raw_ids {
+            ids.append(str(item));
+        }
+    }
     filt: str = str(p.get("filter", "")).strip().lower();
     if not filt {
         return (options, ids);
     }
     vis_options: list[str] = [];
     vis_ids: list[str] = [];
-    for i in range(len(options)) {
+    i: int = 0;
+    while i < len(options) {
         if filt in str(options[i]).lower() {
             vis_options.append(options[i]);
             vis_ids.append(str(ids[i]) if i < len(ids) else "");
         }
+        i += 1;
     }
     return (vis_options, vis_ids);
 }
@@ -239,7 +253,7 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
     for m in re.finditer(_QUOTED_MENTION_PATTERN, text) {
         inner: str = str(m.group(1));
         path_part: str = inner;
-        rng: dict[str, int] | None = None;
+        rng: dict[str, any] | None = None;
         outer_start: any = m.group(2);
         outer_end: any = m.group(3);
         if outer_start {
@@ -249,7 +263,12 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
             );
             parsed_outer: dict[str, int] | None = parse_line_range(outer_range);
             if parsed_outer is not None {
-                rng = parsed_outer;
+                normalized_range: dict[str, any] = {};
+                normalized_range["start"] = parsed_outer["start"];
+                if "end" in parsed_outer {
+                    normalized_range["end"] = parsed_outer["end"];
+                }
+                rng = normalized_range;
             }
             # A malformed outer range keeps the quoted content as the path;
             # the bad suffix disappears with the token span.
@@ -260,7 +279,12 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
                 parsed_inner: dict[str, int] | None = parse_line_range(inner_range);
                 if parsed_inner is not None {
                     path_part = inner[:cm.start()];
-                    rng = parsed_inner;
+                    normalized_range: dict[str, any] = {};
+                    normalized_range["start"] = parsed_inner["start"];
+                    if "end" in parsed_inner {
+                        normalized_range["end"] = parsed_inner["end"];
+                    }
+                    rng = normalized_range;
                 }
             }
         }
@@ -268,13 +292,13 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
             continue;
         }
         spans.append((m.start(), m.end()));
-        mentions.append({
-            "raw": str(m.group(0)),
-            "path": path_part,
-            "start": m.start(),
-            "end": m.end(),
-            "line_range": rng,
-        });
+        mention: dict[str, any] = {};
+        mention["raw"] = str(m.group(0));
+        mention["path"] = path_part;
+        mention["start"] = m.start();
+        mention["end"] = m.end();
+        mention["line_range"] = rng;
+        mentions.append(mention);
     }
     if not mentions {
         return (text, []);
@@ -298,7 +322,7 @@ def _expand_quoted_context(cwd: str, text: str) -> str {
         return expand_context_input(cwd, text);
     }
     base: str = "";
-    body: str = cleaned.strip();
+    body: str = re.sub(r"^\s+|\s+$", "", cleaned);
     if body {
         try {
             base = expand_context_input(cwd, body);
@@ -307,15 +331,18 @@ def _expand_quoted_context(cwd: str, text: str) -> str {
         }
     }
     blocks: list[str] = [];
-    for q in quotes {
-        qpath: str = str(q.get("path", ""));
-        qrng: any = q.get("line_range");
+    q_index: int = 0;
+    while q_index < len(quotes) {
+        q: dict[str, any] = quotes[q_index];
+        qpath: str = str(q["path"]);
+        qrng: any = q["line_range"];
         try {
             got: tuple[str, int] = _load_file_slice(cwd, qpath, qrng);
             blocks.append(got[0]);
         } except (OSError, ValueError) as exc {
             blocks.append('<file path="' + qpath + '" error="' + str(exc) + '" />');
         }
+        q_index += 1;
     }
     if "Attached context:" in base {
         return base + "\n" + "\n".join(blocks);
