@@ -231,73 +231,82 @@ def _subagent_tool(args: dict[str, any]) -> str {
 }
 
 
-def agent_tool_specs() -> list[ToolSpec] {
-    return [
-        make_tool_spec(
-            name="list_tasks",
-            description="Show the project task board (.jackal/tasks.json) with ids and statuses.",
-            parameters={"type": "object", "properties": {}, "required": []},
-            handler=_list_tasks_tool,
-        ),
-        make_tool_spec(
-            name="create_task",
-            description="Add a pending task to the task board. Use this to plan multi-step work and track progress; keep titles short and actionable.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string", "description": "Short task title."},
-                    "description": {"type": "string", "description": "Optional detail."},
-                },
-                "required": ["title"],
-            },
-            handler=_create_task_tool,
-        ),
-        make_tool_spec(
-            name="update_task",
-            description="Update a task's status (pending, in_progress, completed), title, or description. Mark one task in_progress while working on it and completed as soon as it is done.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "id": {"type": "string", "description": "Task id from list_tasks/create_task."},
-                    "status": {"type": "string", "enum": TASK_STATUSES},
-                    "title": {"type": "string"},
-                    "description": {"type": "string"},
-                },
-                "required": ["id"],
-            },
-            handler=_update_task_tool,
-        ),
-        make_tool_spec(
-            name="delete_task",
-            description="Remove a task from the board by id.",
-            parameters={
-                "type": "object",
-                "properties": {"id": {"type": "string", "description": "Task id."}},
-                "required": ["id"],
-            },
-            handler=_delete_task_tool,
-        ),
-        make_tool_spec(
-            name="subagent",
-            description=(
-                "Delegate a self-contained task (research, codebase search, focused edits) to a subagent "
-                "with a fresh context. It runs its own tool loop and returns only a final report, keeping "
-                "your context small. agent=\"general\" (default) or a named subagent from the project catalog. "
-                "Subagents cannot ask the user for approval."
-            ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "agent": {"type": "string", "description": "Subagent name (default \"general\")."},
-                    "task": {"type": "string", "description": "Complete, self-contained instructions including all context the subagent needs."},
-                },
-                "required": ["task"],
-            },
-            handler=_subagent_tool,
-        ),
-    ];
+def _parameter_schema(json_text: str) -> dict[str, any] {
+    parsed: any = json.loads(json_text);
+    return parsed as dict[str, any];
 }
 
+
+def agent_tool_specs() -> list[ToolSpec] {
+    specs: list[ToolSpec] = [];
+    list_task_parameters: dict[str, any] = _parameter_schema(
+        "{\"type\":\"object\",\"properties\":{},\"required\":[]}"
+    );
+    specs.append(make_tool_spec(
+        name="list_tasks",
+        description="Show the project task board (.jackal/tasks.json) with ids and statuses.",
+        parameters=list_task_parameters,
+        handler=_list_tasks_tool,
+    ));
+
+    create_task_parameters: dict[str, any] = _parameter_schema(
+        "{\"type\":\"object\",\"properties\":{"
+        + "\"title\":{\"type\":\"string\",\"description\":\"Short task title.\"},"
+        + "\"description\":{\"type\":\"string\",\"description\":\"Optional detail.\"}},"
+        + "\"required\":[\"title\"]}"
+    );
+    specs.append(make_tool_spec(
+        name="create_task",
+        description="Add a pending task to the task board. Use this to plan multi-step work and track progress; keep titles short and actionable.",
+        parameters=create_task_parameters,
+        handler=_create_task_tool,
+    ));
+
+    update_task_parameters: dict[str, any] = _parameter_schema(
+        "{\"type\":\"object\",\"properties\":{"
+        + "\"id\":{\"type\":\"string\",\"description\":\"Task id from list_tasks/create_task.\"},"
+        + "\"status\":{\"type\":\"string\",\"enum\":[\"pending\",\"in_progress\",\"completed\"]},"
+        + "\"title\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}},"
+        + "\"required\":[\"id\"]}"
+    );
+    specs.append(make_tool_spec(
+        name="update_task",
+        description="Update a task's status (pending, in_progress, completed), title, or description. Mark one task in_progress while working on it and completed as soon as it is done.",
+        parameters=update_task_parameters,
+        handler=_update_task_tool,
+    ));
+
+    delete_task_parameters: dict[str, any] = _parameter_schema(
+        "{\"type\":\"object\",\"properties\":{"
+        + "\"id\":{\"type\":\"string\",\"description\":\"Task id.\"}},"
+        + "\"required\":[\"id\"]}"
+    );
+    specs.append(make_tool_spec(
+        name="delete_task",
+        description="Remove a task from the board by id.",
+        parameters=delete_task_parameters,
+        handler=_delete_task_tool,
+    ));
+
+    subagent_parameters: dict[str, any] = _parameter_schema(
+        "{\"type\":\"object\",\"properties\":{"
+        + "\"agent\":{\"type\":\"string\",\"description\":\"Subagent name (default \\\"general\\\").\"},"
+        + "\"task\":{\"type\":\"string\",\"description\":\"Complete, self-contained instructions including all context the agent needs.\"}},"
+        + "\"required\":[\"task\"]}"
+    );
+    specs.append(make_tool_spec(
+        name="subagent",
+        description=(
+            "Delegate a self-contained task (research, codebase search, focused edits) to a subagent "
+            "with a fresh context. It runs its own tool loop and returns only a final report, keeping "
+            "your context small. agent=\"general\" (default) or a named subagent from the project catalog. "
+            "Subagents cannot ask the user for approval."
+        ),
+        parameters=subagent_parameters,
+        handler=_subagent_tool,
+    ));
+    return specs;
+}
 
 def register_agent_tools(reg: ToolRegistry) {
     for spec in agent_tool_specs() {
