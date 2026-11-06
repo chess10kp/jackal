@@ -61,14 +61,15 @@ test "tools/list maps to ToolSpec-shaped specs" {
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         specs = mcp_tool_specs(client);
         assert len(specs) == 3;
-        echo: any = None;
+        echo: dict[str, any] = {};
         for s in specs {
             if s["name"] == "echo" { echo = s; }
         }
-        assert echo is not None;
+        assert echo["name"] == "echo";
         assert echo["description"] == "Echo the given text back.";
-        props: any = echo["parameters"].get("properties");
-        assert isinstance(props, dict) and "text" in props;
+        parameters: dict[str, any] = echo["parameters"] as dict[str, any];
+        props: dict[str, any] = parameters["properties"] as dict[str, any];
+        assert "text" in props;
         # prefixed mapping avoids native-tool collisions
         prefixed = mcp_tool_specs(client, prefix="mcp_");
         names = [s["name"] for s in prefixed];
@@ -88,8 +89,11 @@ test "tools/list follows nextCursor pagination to exhaustion" {
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         res = mcp_list_tools(client, timeout_s=10.0);
         assert res["ok"] is True;
-        tools: any = res.get("tools", []);
-        names = [str(t.get("name", "")) for t in tools];
+        tools: list[dict[str, any]] = res["tools"] as list[dict[str, any]];
+        names: list[str] = [];
+        for tool in tools {
+            names.append(str(tool["name"]));
+        }
         # 5 tools across 3 pages (2+2+1) — no silent truncation.
         assert len(names) == 5;
         for i in range(5) {
@@ -110,10 +114,13 @@ test "server-to-client requests are answered, never buffered" {
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         res = mcp_list_tools(client, timeout_s=10.0);
         assert res["ok"] is True;
-        tools: any = res.get("tools", []);
+        tools: list[dict[str, any]] = res["tools"] as list[dict[str, any]];
         # The server names its only tool after what it observed: ok_ping
         # means the client answered sampling/roots with method errors.
-        names = [str(t.get("name", "")) for t in tools];
+        names: list[str] = [];
+        for tool in tools {
+            names.append(str(tool["name"]));
+        }
         assert "ok_ping" in names, names;
         # And the requests were never buffered as notifications.
         for note in client.notifications {
@@ -134,7 +141,8 @@ test "call_tool round trip through fake server" {
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         res = mcp_call_tool(client, "echo", {"text": "hello"}, timeout_s=10.0);
         assert res["ok"] is True;
-        assert res.get("is_error") is False;
+        is_error: bool = res["is_error"] as bool;
+        assert not is_error;
         assert res.get("result") == "echo:hello";
         # JSON-RPC-level error for unknown tool fails loud at the seam
         bad = mcp_call_tool(client, "nope", {}, timeout_s=10.0);
@@ -233,15 +241,16 @@ test "prompts list and get round trip" {
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         listed = mcp_list_prompts(client, timeout_s=10.0);
         assert listed["ok"] is True;
-        prompts: any = listed.get("prompts", []);
+        prompts: list[dict[str, any]] = listed["prompts"] as list[dict[str, any]];
         assert len(prompts) == 1;
         assert str(prompts[0]["name"]) == "greet";
         got = mcp_get_prompt(client, "greet", {"who": "jackal"}, timeout_s=10.0);
         assert got["ok"] is True;
         assert str(got.get("description", "")) == "A greeting";
-        msgs: any = got.get("messages", []);
+        msgs: list[dict[str, any]] = got["messages"] as list[dict[str, any]];
         assert len(msgs) == 1;
-        text: str = str(msgs[0].get("content", {}).get("text", ""));
+        content: dict[str, any] = msgs[0]["content"] as dict[str, any];
+        text: str = str(content["text"]);
         assert text == "Hello, jackal!", text;
         # unknown prompt -> honest error at the seam
         bad = mcp_get_prompt(client, "nope", {}, timeout_s=10.0);
