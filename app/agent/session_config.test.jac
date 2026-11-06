@@ -12,38 +12,34 @@ import tempfile;
 import shutil;
 
 
-def _write_project_cfg(base: str, cfg: dict[str, any]) {
+def _write_project_cfg(base: str, cfg_json: str) {
     os.makedirs(os.path.join(base, ".jackal", "sessions"), exist_ok=True);
-    fh: any = open(os.path.join(base, ".jackal", "config.json"), "w");
-    fh.write(json.dumps(cfg));
+    fh = open(os.path.join(base, ".jackal", "config.json"), "w");
+    fh.write(cfg_json);
     fh.close();
 }
 
 
 test "mcp server specs parse env, cwd, enabled, and timeout" {
-    cfg = {"mcp": {"servers": {
-        "full": {
-            "command": "uvx",
-            "args": ["some-server"],
-            "env": {"TOKEN": "abc", "N": 3},
-            "cwd": "/tmp/srv",
-            "timeout": 30,
-        },
-        "off": {"command": "true", "enabled": False},
-        "minimal": {"command": ["jac", "mcp"]},
-        "bad": {"args": ["no-command"]},
-    }}};
+    cfg: dict[str, any] = json.loads(
+        "{\"mcp\":{\"servers\":{"
+        + "\"full\":{\"command\":\"uvx\",\"args\":[\"some-server\"],"
+        + "\"env\":{\"TOKEN\":\"abc\",\"N\":3},\"cwd\":\"/tmp/srv\",\"timeout\":30},"
+        + "\"off\":{\"command\":\"true\",\"enabled\":false},"
+        + "\"minimal\":{\"command\":[\"jac\",\"mcp\"]},"
+        + "\"bad\":{\"args\":[\"no-command\"]}}}}"
+    ) as dict[str, any];
     specs = _mcp_server_specs(cfg);
     names = sorted(list(specs.keys()));
     assert names == ["full", "minimal", "off"];
-    full: any = specs["full"];
+    full: dict[str, any] = specs["full"];
     assert full["cmd"] == ["uvx", "some-server"];
     assert full["env"] == {"TOKEN": "abc", "N": "3"};
     assert full["cwd"] == "/tmp/srv";
     assert full["enabled"] is True;
     assert full["timeout"] == 30.0;
     assert specs["off"]["enabled"] is False;
-    minimal: any = specs["minimal"];
+    minimal: dict[str, any] = specs["minimal"];
     assert minimal["cmd"] == ["jac", "mcp"];
     assert minimal["env"] == {};
     assert minimal["cwd"] == "";
@@ -64,7 +60,7 @@ test "user-level config merges beneath the project config" {
     os.environ["JACKAL_AGENT_DIR"] = agent_dir;
     try {
         # User level: a user-only server and a shared server (user flavor).
-        fh: any = open(os.path.join(agent_dir, "config.json"), "w");
+        fh = open(os.path.join(agent_dir, "config.json"), "w");
         fh.write(json.dumps({"mcp": {"servers": {
             "useronly": {"command": "user-cmd"},
             "shared": {"command": "user-shared", "env": {"U": "1"}},
@@ -72,12 +68,13 @@ test "user-level config merges beneath the project config" {
         fh.close();
         # Project level: shared overrides wholesale; project-only added.
         proj = os.path.join(tmp_dir, "proj");
-        _write_project_cfg(proj, {"mcp": {"servers": {
-            "shared": {"command": "proj-shared", "cwd": "/w"},
-            "projonly": {"command": "proj-cmd"},
-        }}});
+        _write_project_cfg(
+            proj,
+            "{\"mcp\":{\"servers\":{\"shared\":{\"command\":\"proj-shared\","
+            + "\"cwd\":\"/w\"},\"projonly\":{\"command\":\"proj-cmd\"}}}}",
+        );
         eff = mcp_config(proj);
-        servers: any = eff["mcp"]["servers"];
+        servers: dict[str, any] = eff["mcp"]["servers"] as dict[str, any];
         snames = sorted(list(servers.keys()));
         assert snames == ["projonly", "shared", "useronly"];
         # project entry replaces the user entry wholesale (same name wins)
@@ -109,11 +106,9 @@ test "missing user config yields project-only mcp config" {
     os.environ["JACKAL_AGENT_DIR"] = agent_dir;
     try {
         proj = os.path.join(tmp_dir, "proj");
-        _write_project_cfg(proj, {"mcp": {"servers": {
-            "p": {"command": "pcmd"},
-        }}});
+        _write_project_cfg(proj, "{\"mcp\":{\"servers\":{\"p\":{\"command\":\"pcmd\"}}}}");
         eff = mcp_config(proj);
-        servers: any = eff["mcp"]["servers"];
+        servers: dict[str, any] = eff["mcp"]["servers"] as dict[str, any];
         assert sorted(list(servers.keys())) == ["p"];
     } finally {
         if old_env {
@@ -166,7 +161,7 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
     try {
         cmd = _refresh_server_cmd();
         started = mcp_start(client, cmd, timeout_s=10.0);
-        assert started.get("ok") is True, str(started.get("error", "no error"));
+        assert bool(started.get("ok")), str(started.get("error", "no error"));
         plugins.mcp_clients["t"] = client;
         plugins.mcp_specs["t"] = _spec_for(cmd);
         plugins.mcp_status["t"] = {"state": "connected", "error": "", "tools": 0, "cmd": cmd};
@@ -313,7 +308,10 @@ test "allow_tools and deny_tools gate registration (deny wins)" {
         assert not has_tool_handle(reg, "mcp_g_read_secret");
         assert not has_tool_handle(reg, "mcp_g_write_docs");
         assert int(stats["denied"]) == 2;
-        assert sorted([str(x) for x in stats["denied_names"]]) == ["read_secret", "write_docs"];
+        denied_names: list[str] = stats["denied_names"] as list[str];
+        denied_names_sorted: list[str] = [];
+        for denied_name in denied_names { denied_names_sorted.append(str(denied_name)); }
+        assert sorted(denied_names_sorted) == ["read_secret", "write_docs"];
     } finally {
         _reset_mcp_plugin_state();
     }
@@ -352,8 +350,9 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
         home_dir = os.path.join(tmp, "home");
         os.makedirs(home_dir);
         # hermetic: agent dir without config.json, import not disabled
-        os.environ["JACKAL_AGENT_DIR"] = os.path.join(tmp, "agent");
-        os.makedirs(os.environ["JACKAL_AGENT_DIR"], exist_ok=True);
+        agent_dir: str = os.path.join(tmp, "agent");
+        os.environ["JACKAL_AGENT_DIR"] = agent_dir;
+        os.makedirs(agent_dir, exist_ok=True);
         os.environ.pop("JACKAL_MCP_NO_IMPORT", None);
         src1 = os.path.join(tmp, "cursor.json");
         with open(src1, "w") as f {
@@ -378,8 +377,8 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
         );
         assert sorted(imported) == ["leg_off", "leg_one", "leg_two"], imported;
         # user config written with mapped entries
-        user_cfg: dict[str, any] = dict(json.load(open(os.path.join(home_dir, ".jackal", "config.json"))));
-        servers: dict[str, any] = dict(user_cfg["mcp"]["servers"]);
+        user_cfg: dict[str, any] = json.load(open(os.path.join(home_dir, ".jackal", "config.json"))) as dict[str, any];
+        servers: dict[str, any] = user_cfg["mcp"]["servers"] as dict[str, any];
         assert servers["leg_one"]["command"] == "uvx";
         assert servers["leg_one"]["args"] == ["srv-one"];
         assert servers["leg_off"]["enabled"] is False;
@@ -390,8 +389,8 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
         # one-time marker: a second call is a no-op
         again = mcp_import_legacy(home_dir=home_dir, sources=[src1, src2]);
         assert again == [];
-        user_cfg2: dict[str, any] = dict(json.load(open(os.path.join(home_dir, ".jackal", "config.json"))));
-        servers2: dict[str, any] = dict(user_cfg2["mcp"]["servers"]);
+        user_cfg2: dict[str, any] = json.load(open(os.path.join(home_dir, ".jackal", "config.json"))) as dict[str, any];
+        servers2: dict[str, any] = user_cfg2["mcp"]["servers"] as dict[str, any];
         assert "leg_web" not in servers2;
     } finally {
         if old_agent_dir {
@@ -416,8 +415,9 @@ test "legacy import respects JACKAL_MCP_NO_IMPORT and existing names" {
     try {
         home_dir = os.path.join(tmp, "home");
         os.makedirs(home_dir);
-        os.environ["JACKAL_AGENT_DIR"] = os.path.join(tmp, "agent");
-        os.makedirs(os.environ["JACKAL_AGENT_DIR"], exist_ok=True);
+        agent_dir: str = os.path.join(tmp, "agent");
+        os.environ["JACKAL_AGENT_DIR"] = agent_dir;
+        os.makedirs(agent_dir, exist_ok=True);
         os.environ.pop("JACKAL_MCP_NO_IMPORT", None);
         # pre-existing user config: its names are not re-imported/overwritten
         target = os.path.join(home_dir, ".jackal", "config.json");

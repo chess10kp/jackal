@@ -55,7 +55,7 @@ def:pub cancel_active_turn() -> bool {
 The bridge owns the authoritative set; this re-syncs from it so commands
 registered/unloaded after warm-up are reflected immediately.
 """
-def:pub list_commands() -> dict[str, any] {
+def:pub list_commands() -> dict[str, dict[str, any]] {
     b = plugins.bridge;
     if b is not None {
         plugins.commands = dict((b as PluginBridge).commands);
@@ -124,13 +124,13 @@ def:pub run_extension_shortcut(key: str) -> str {
 """Shortcut bindings registered by loaded extensions (key -> meta with
 extension_id + description). Listed for host UIs; the TUI input loop matches
 keypresses against these and fires them via run_extension_shortcut."""
-def:pub list_extension_shortcuts() -> dict[str, any] {
+def:pub list_extension_shortcuts() -> dict[str, dict[str, any]] {
     return list_shortcuts(plugins.bridge);
 }
 
 
 """Labels set by loaded extensions via pi.setLabel (id -> meta)."""
-def:pub list_extension_labels() -> dict[str, any] {
+def:pub list_extension_labels() -> dict[str, dict[str, any]] {
     return list_labels(plugins.bridge);
 }
 
@@ -139,7 +139,7 @@ def:pub list_extension_labels() -> dict[str, any] {
 harness's UI protocol."""
 def:pub json_event(kind: str, data: dict[str, any]) {
     line = json.dumps({"type": kind, **data});
-    out: any = sys.stdout;
+    out = sys.stdout;
     out.write(line + "\n");
     out.flush();
 }

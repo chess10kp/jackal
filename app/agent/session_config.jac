@@ -182,7 +182,7 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
                     headers[str(hk)] = str(hv);
                 }
             }
-            out[str(name)] = {
+            http_spec: dict[str, any] = {
                 "type": "http",
                 "cmd": [],
                 "url": url,
@@ -196,6 +196,7 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
                 "allow_tools": allow_tools,
                 "deny_tools": deny_tools,
             };
+            out[str(name)] = http_spec;
             continue;
         }
         cmd: any = ent_cfg.get("command");
@@ -210,7 +211,7 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
         if isinstance(extra, list) {
             parts.extend([str(a) for a in extra]);
         }
-        out[str(name)] = {
+        stdio_spec: dict[str, any] = {
             "type": "stdio",
             "cmd": parts,
             "url": "",
@@ -224,6 +225,7 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
             "allow_tools": allow_tools,
             "deny_tools": deny_tools,
         };
+        out[str(name)] = stdio_spec;
     }
     return out;
 }
@@ -378,7 +380,7 @@ def _load_json_dict(path: str) -> dict[str, any] {
             parsed = json.load(fh);
         }
         if isinstance(parsed, dict) {
-            out = parsed;
+            out = parsed as dict[str, any];
         }
     } except Exception {
     }
@@ -394,14 +396,23 @@ def mcp_config(cwd: str) -> dict[str, any] {
     proj: dict[str, any] = load_project_config(cwd);
     raw_u: any = user.get("mcp");
     raw_p: any = proj.get("mcp");
-    um: dict[str, any] = raw_u if isinstance(raw_u, dict) else {};
-    pm: dict[str, any] = raw_p if isinstance(raw_p, dict) else {};
-    merged: dict[str, any] = dict(um);
+    um: dict[str, any] = {};
+    if isinstance(raw_u, dict) { um = raw_u as dict[str, any]; }
+    pm: dict[str, any] = {};
+    if isinstance(raw_p, dict) { pm = raw_p as dict[str, any]; }
+    merged: dict[str, any] = {};
+    for (key, val) in um.items() {
+        merged[key] = val;
+    }
     for (key, val) in pm.items() {
         if key == "servers" and isinstance(val, dict) {
             raw_us: any = merged.get("servers");
-            us: dict[str, any] = raw_us if isinstance(raw_us, dict) else {};
-            servers: dict[str, any] = dict(us);
+            us: dict[str, any] = {};
+            if isinstance(raw_us, dict) { us = raw_us as dict[str, any]; }
+            servers: dict[str, any] = {};
+            for (server_name, server_cfg) in us.items() {
+                servers[server_name] = server_cfg;
+            }
             for (sname, sent) in val.items() {
                 servers[sname] = sent;
             }
@@ -410,7 +421,8 @@ def mcp_config(cwd: str) -> dict[str, any] {
             merged[key] = val;
         }
     }
-    return {"mcp": merged};
+    out: dict[str, any] = {"mcp": merged};
+    return out;
 }
 
 
@@ -480,9 +492,11 @@ def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] 
         }
         user_cfg: dict[str, any] = _load_json_dict(target);
         raw_um: any = user_cfg.get("mcp");
-        um: dict[str, any] = raw_um if isinstance(raw_um, dict) else {};
+        um: dict[str, any] = {};
+        if isinstance(raw_um, dict) { um = raw_um as dict[str, any]; }
         raw_us: any = um.get("servers");
-        us: dict[str, any] = raw_us if isinstance(raw_us, dict) else {};
+        us: dict[str, any] = {};
+        if isinstance(raw_us, dict) { us = raw_us as dict[str, any]; }
         cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
         proj_cfg: dict[str, any] = load_project_config(cwd);
         proj_specs: dict[str, dict[str, any]] = _mcp_server_specs(proj_cfg);

@@ -5,6 +5,7 @@ native module boundary independent of bridge and MCP object layouts.
 """
 
 import from .mcp { McpClient }
+import from .llm_loop { TurnCancel }
 
 
 obj:pub SessionPlugins {
@@ -23,9 +24,9 @@ obj:pub SessionPlugins {
         prompt_queue: list[str] = [],
         warm_future: any = None,
         wait_budget_s: float = 5.0,
-        commands: dict[str, any] = {},
+        commands: dict[str, dict[str, any]] = {},
         interactive_ui: bool = False,
-        active_cancel: any = None,
+        active_cancel: TurnCancel | None = None,
         mcp_clients: dict[str, McpClient] = {},
         mcp_specs: dict[str, dict[str, any]] = {},
         mcp_read_only: dict[str, list[str]] = {},
