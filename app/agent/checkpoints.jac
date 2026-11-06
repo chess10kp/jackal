@@ -1,15 +1,11 @@
 """Checkpoint store for the agent harness — conversation plus git-tracked
-file snapshots under <cwd>/.jackal/checkpoints/ (ported from
-lib/jac/workflow/_checkpoints_toolchain.py, the Python source of truth;
-src/workflow/checkpoints.ts is the bridge-delegating TS mirror and adds no
-logic of its own).
+file snapshots under <cwd>/.jackal/checkpoints/.
 
-Persistence layout written by this module (verified against the Python
-toolchain):
+Persistence layout written by this module:
 - One directory per checkpoint: `<cwd>/.jackal/checkpoints/<name>/`.
 - metadata.json — single JSON object, indent=2 plus trailing newline,
-  with exactly these keys: name, timestamp (ISO 8601 UTC from
-  datetime.isoformat()), messageCount, filesChanged (relative POSIX-style
+  with exactly these keys: name, timestamp (ISO 8601 UTC), messageCount,
+  filesChanged (relative POSIX-style
   paths of snapshotted files), provider ({name, model}), description
   (first non-empty user message trimmed to 80 chars, else "Empty
   conversation"), gitCommitHash (`git rev-parse HEAD` or null off-repo).
@@ -18,19 +14,16 @@ toolchain):
 - files/<rel-path> — raw UTF-8 file content per snapshotted project file,
   subdirectories preserved.
 
-Deviations from the source of truth: purely mechanical — dropped a no-op
-`-fallback` split in the generated-name formatter (isoformat never yields
-that substring) and file I/O uses open() instead of pathlib per app/
-house style. Git probing goes through Python subprocess, same as the
-toolchain. Raises ValueError on invalid/unknown/duplicate names and
-RuntimeError when a restore partially fails.
+File I/O uses open() and git probing uses the native subprocess runtime.
+Raises ValueError on invalid/unknown/duplicate names and RuntimeError when
+a restore partially fails.
 """
 
 import os;
 import json;
 import shutil;
 import subprocess;
-import datetime;
+import time;
 import from .logging { log_debug, log_warn, log_exception }
 import from .json_pretty { json_pretty }
 
@@ -90,10 +83,83 @@ def validate_checkpoint_name(name: str) -> dict[str, any] {
 
 """UTC timestamp shaped like the toolchain's generated names:
 checkpoint-YYYY-MM-DD-HH-MM-SS-microseconds+HH-MM."""
+def _two_digits(n: int) -> str {
+    return ("0" if n < 10 else "") + str(n);
+}
+
+
+def _four_digits(n: int) -> str {
+    if n < 10 {
+        return "000" + str(n);
+    }
+    if n < 100 {
+        return "00" + str(n);
+    }
+    if n < 1000 {
+        return "0" + str(n);
+    }
+    return str(n);
+}
+
+
+def _days_before_year(year: int) -> int {
+    prior: int = year - 1;
+    return prior * 365 + prior // 4 - prior // 100 + prior // 400;
+}
+
+
+def _days_from_ymd(year: int, month: int, day: int) -> int {
+    month_offsets: list[int] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    days: int = _days_before_year(year) - 719162 + month_offsets[month - 1] + day - 1;
+    if month > 2 and (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)) {
+        days += 1;
+    }
+    return days;
+}
+
+
+def _utc_timestamp(epoch: float) -> str {
+    whole_seconds: int = int(epoch);
+    days: int = whole_seconds // 86400;
+    seconds_in_day: int = whole_seconds - days * 86400;
+
+    # Gregorian civil date from days since 1970-01-01.
+    z: int = days + 719468;
+    era: int = z // 146097;
+    day_of_era: int = z - era * 146097;
+    year_of_era: int = (
+        day_of_era - day_of_era // 1460 + day_of_era // 36524 - day_of_era // 146096
+    ) // 365;
+    year: int = year_of_era + era * 400;
+    day_of_year: int = day_of_era - (365 * year_of_era + year_of_era // 4 - year_of_era // 100);
+    month_prime: int = (5 * day_of_year + 2) // 153;
+    day: int = day_of_year - (153 * month_prime + 2) // 5 + 1;
+    month: int = month_prime + (3 if month_prime < 10 else -9);
+    if month <= 2 {
+        year += 1;
+    }
+    hour: int = seconds_in_day // 3600;
+    minute: int = (seconds_in_day % 3600) // 60;
+    second: int = seconds_in_day % 60;
+    micros: int = int((epoch - whole_seconds) * 1000000);
+    fraction: str = str(micros);
+    while len(fraction) < 6 {
+        fraction = "0" + fraction;
+    }
+    return (
+        _four_digits(year) + "-" + _two_digits(month) + "-" + _two_digits(day)
+        + "T" + _two_digits(hour) + ":" + _two_digits(minute) + ":"
+        + _two_digits(second) + "." + fraction + "+00:00"
+    );
+}
+
+
 def _generate_checkpoint_name() -> str {
-    ts = datetime.datetime.now(datetime.timezone.utc).isoformat();
-    ts = ts.replace(":", "-").replace(".", "-").replace("T", "-");
-    return "checkpoint-" + ts;
+    stamp: str = _utc_timestamp(time.time());
+    return (
+        "checkpoint-" + stamp[:10] + "-" + stamp[11:13] + "-"
+        + stamp[14:16] + "-" + stamp[17:19] + "-" + stamp[20:26] + "+00-00"
+    );
 }
 
 
@@ -102,10 +168,10 @@ def _generate_description(messages: list[dict[str, any]]) -> str {
         if not isinstance(msg, dict) {
             continue;
         }
-        role = msg.get("role");
-        content = msg.get("content");
+        role: any = msg.get("role");
+        content: any = msg.get("content");
         if role == "user" and isinstance(content, str) and content.strip() {
-            text = content.strip();
+            text: str = content.strip();
             if len(text) > _DESCRIPTION_LENGTH {
                 return text[:_DESCRIPTION_LENGTH] + "...";
             }
@@ -130,7 +196,8 @@ def _git_commit_hash(cwd: str) -> str | None {
     if result.returncode != 0 {
         return None;
     }
-    return result.stdout.strip();
+    stdout_text: str = str(result.stdout);
+    return stdout_text.strip();
 }
 
 
@@ -149,11 +216,13 @@ def get_modified_files(cwd: str) -> list[str] {
         );
         mod_files: list[str] = [];
         if modified.returncode == 0 {
-            mod_files = [f for f in modified.stdout.strip().split("\n") if f];
+            modified_text: str = str(modified.stdout);
+            mod_files = [f for f in modified_text.strip().split("\n") if f];
         }
         untracked_files: list[str] = [];
         if untracked.returncode == 0 {
-            untracked_files = [f for f in untracked.stdout.strip().split("\n") if f];
+            untracked_text: str = str(untracked.stdout);
+            untracked_files = [f for f in untracked_text.strip().split("\n") if f];
         }
         seen: set[str] = set();
         for fp in mod_files + untracked_files {
@@ -185,7 +254,7 @@ def _capture_files(cwd: str, file_paths: list[str]) -> dict[str, str] {
     for fp in file_paths {
         try {
             abs_path: str = _resolve_rel(cwd, fp);
-            fh: any = open(abs_path, "r");
+            fh = open(abs_path, "r");
             try {
                 content = fh.read();
             } finally {
@@ -210,11 +279,13 @@ def _capture_files(cwd: str, file_paths: list[str]) -> dict[str, str] {
 def _dir_size(dir_path: str) -> int {
     total = 0;
     try {
-        for dir_entry in os.scandir(dir_path) {
-            if dir_entry.is_dir() {
-                total += _dir_size(dir_entry.path);
-            } elif dir_entry.is_file() {
-                total += dir_entry.stat().st_size;
+        entries: list[str] = os.listdir(dir_path);
+        for item_name in entries {
+            child_path: str = os.path.join(dir_path, item_name);
+            if os.path.isdir(child_path) {
+                total += _dir_size(child_path);
+            } elif os.path.isfile(child_path) {
+                total += os.path.getsize(child_path);
             }
         }
     } except OSError {}
@@ -278,7 +349,7 @@ def:pub create_checkpoint(
     files_to_snapshot: list[str] = modified_files if modified_files is not None else get_modified_files(cwd);
     file_snapshots = _capture_files(cwd, files_to_snapshot);
 
-    now = datetime.datetime.now(datetime.timezone.utc).isoformat();
+    now: str = _utc_timestamp(time.time());
     metadata = {
         "name": checkpoint_name,
         "timestamp": now,
@@ -305,7 +376,7 @@ def:pub create_checkpoint(
         for rel_path in file_snapshots {
             fp: str = os.path.join(files_dir, rel_path);
             os.makedirs(_path_dirname(fp), exist_ok=True);
-            fh: any = open(fp, "w");
+            fh = open(fp, "w");
             try {
                 fh.write(file_snapshots[rel_path]);
             } finally {
@@ -362,7 +433,19 @@ def:pub load_checkpoint(cwd: str, name: str) -> dict[str, any] {
 
 
 def _timestamp_key(item: dict[str, any]) -> str {
-    return str(item["metadata"].get("timestamp", ""));
+    metadata: dict[str, any] = item["metadata"];
+    timestamp: any = metadata.get("timestamp", "");
+    return str(timestamp);
+}
+
+
+def _insert_checkpoint(items: list[dict[str, any]], item: dict[str, any]) -> None {
+    key: str = _timestamp_key(item);
+    index: int = 0;
+    while index < len(items) and _timestamp_key(items[index]) >= key {
+        index += 1;
+    }
+    items.insert(index, item);
 }
 
 
@@ -396,7 +479,7 @@ def:pub list_checkpoints(cwd: str) -> list[dict[str, any]] {
         }
         try {
             metadata = _load_json_file(meta_path);
-            items.append({
+            _insert_checkpoint(items, {
                 "name": name_entry,
                 "metadata": metadata,
                 "sizeBytes": _dir_size(dir_path),
@@ -409,7 +492,7 @@ def:pub list_checkpoints(cwd: str) -> list[dict[str, any]] {
             );
         }
     }
-    return sorted(items, key=_timestamp_key, reverse=True);
+    return items;
 }
 
 
@@ -432,7 +515,7 @@ def:pub restore_checkpoint_files(cwd: str, snapshots: dict[str, str]) -> None {
         try {
             abs_path: str = _resolve_rel(cwd, str(rel_path));
             os.makedirs(_path_dirname(abs_path), exist_ok=True);
-            fh: any = open(abs_path, "w");
+            fh = open(abs_path, "w");
             try {
                 fh.write(snapshots[rel_path]);
             } finally {
@@ -464,10 +547,53 @@ def _changed_count(m: dict[str, any]) -> int {
 
 """Humanized age for an ISO timestamp: just now / N min(s) / N hr(s) /
 N day(s) ago / bare YYYY-MM-DD past a week."""
+def _timezone_offset_seconds(timestamp: str) -> int {
+    offset_at: int = -1;
+    index: int = 10;
+    while index < len(timestamp) {
+        if timestamp[index] == "+" or timestamp[index] == "-" {
+            offset_at = index;
+        }
+        index += 1;
+    }
+    if offset_at < 0 {
+        return 0;
+    }
+    suffix: str = timestamp[offset_at + 1:];
+    if len(suffix) < 2 {
+        return 0;
+    }
+    offset_hours: int = int(suffix[:2]);
+    offset_minutes: int = 0;
+    if len(suffix) >= 4 {
+        offset_minutes = int(suffix[3:5]) if suffix[2] == ":" else int(suffix[2:4]);
+    }
+    offset: int = offset_hours * 3600 + offset_minutes * 60;
+    return offset if timestamp[offset_at] == "+" else -offset;
+}
+
+
+def _timestamp_seconds(timestamp: str) -> int {
+    year: int = int(timestamp[:4]);
+    month: int = int(timestamp[5:7]);
+    day: int = int(timestamp[8:10]);
+    hour: int = int(timestamp[11:13]);
+    minute: int = int(timestamp[14:16]);
+    second: int = int(timestamp[17:19]);
+    local_seconds: int = _days_from_ymd(year, month, day) * 86400 + hour * 3600 + minute * 60 + second;
+    return local_seconds - _timezone_offset_seconds(timestamp);
+}
+
+
+def _iso_date(timestamp: str) -> str {
+    return timestamp[:10];
+}
+
+
 def format_relative_time(timestamp: str) -> str {
-    now = datetime.datetime.now(datetime.timezone.utc).timestamp();
-    t = datetime.datetime.fromisoformat(timestamp).timestamp();
-    diff_minutes = int((now - t) / 60);
+    now: int = int(time.time());
+    t: int = _timestamp_seconds(timestamp);
+    diff_minutes: int = (now - t) // 60;
     diff_hours = diff_minutes // 60;
     diff_days = diff_hours // 24;
 
@@ -483,7 +609,7 @@ def format_relative_time(timestamp: str) -> str {
     if diff_days < 7 {
         return _plural(diff_days, "day") + " ago";
     }
-    return datetime.datetime.fromisoformat(timestamp).strftime("%Y-%m-%d");
+    return _iso_date(timestamp);
 }
 
 
@@ -515,7 +641,8 @@ def format_checkpoint_list(items: list[dict[str, any]]) -> str {
     lines: list[str] = [];
     for item in items {
         m: dict[str, any] = item["metadata"];
-        when = datetime.datetime.fromisoformat(str(m["timestamp"])).strftime("%Y-%m-%d %H:%M");
+        stamp: str = str(m["timestamp"]);
+        when = _iso_date(stamp) + " " + stamp[11:13] + ":" + stamp[14:16];
         size_kb = _size_label(item.get("sizeBytes"));
         lines.append(
             "- " + str(m["name"]) + " (" + when + ", " + str(m["messageCount"])

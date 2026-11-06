@@ -171,6 +171,12 @@ The full build still has other agent/session and test-annex demotions, and its
 link-plan collision prevents current full-root accounting. Fix that collision
 and regenerate the root ledger before claiming zero demotions.
 
+The checkpoint store now also lowers as a 34-unit native library with no seam
+demotions, including its test annex. It uses the native clock and timestamp
+formatting path, typed file streams, recursive directory sizing, and explicit
+timestamp insertion ordering. This is leaf lowering evidence only; the test
+suite was not run and the app's root closure remains open.
+
 ### Boundary map
 
 The work crosses distinct contracts. A seam closes only when both sides of its

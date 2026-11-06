@@ -1,5 +1,4 @@
-"""Checkpoint store tests for agent/checkpoints.jac (ported from
-lib/jac/workflow/_checkpoints_toolchain.py).
+"""Checkpoint store tests for agent/checkpoints.jac.
 
 Covers: create with the documented .jackal/checkpoints/<name>/ layout,
 auto-generated timestamped names and duplicate rejection, every name
@@ -9,9 +8,9 @@ missing store files surfacing as ValueError/OSError, list ordering with
 sizeBytes and junk skipping, delete semantics, restore write-backs
 including nested paths and aggregated failure, a full modify -> snapshot
 -> modify -> restore git round trip, and the humanized formatting
-helpers. Uses Python tempfile dirs (cleaned up per test) and throwaway
-`git init` repos with local user config so no repo state is touched --
-never the real .jackal/checkpoints data.
+helpers. Uses native tempfile directories (cleaned up per test) and
+throwaway `git init` repos with local user config so no repo state is
+touched -- never the real .jackal/checkpoints data.
 """
 
 import os;
@@ -20,7 +19,7 @@ import re;
 import shutil;
 import subprocess;
 import tempfile;
-import datetime;
+import time;
 
 
 def _make_tmp() -> str {
@@ -41,7 +40,7 @@ def _cp_dir(tmp: str) -> str {
 def _write_file(base: str, rel: str, content: str) {
     path: str = os.path.join(base, rel);
     os.makedirs(str(os.path.dirname(path)), exist_ok=True);
-    fh: any = open(path, "w");
+    fh = open(path, "w");
     try {
         fh.write(content);
     } finally {
@@ -51,7 +50,7 @@ def _write_file(base: str, rel: str, content: str) {
 
 
 def _read_file(path: str) -> str {
-    fh: any = open(path, "r");
+    fh = open(path, "r");
     try {
         return fh.read();
     } finally {
@@ -61,7 +60,7 @@ def _read_file(path: str) -> str {
 
 
 def _read_raw(path: str) -> any {
-    fh: any = open(path, "r");
+    fh = open(path, "r");
     try {
         return json.load(fh);
     } finally {
@@ -102,8 +101,9 @@ def _msgs(*texts: str) -> list[dict[str, str]] {
 
 
 def _iso_ago(seconds: float = 0, minutes: float = 0, hours: float = 0, days: float = 0) -> str {
-    delta = datetime.timedelta(seconds=seconds, minutes=minutes, hours=hours, days=days);
-    return (datetime.datetime.now(datetime.timezone.utc) - delta).isoformat();
+    offset = seconds + minutes * 60 + hours * 3600 + days * 86400;
+    epoch: float = time.time() - offset;
+    return _utc_timestamp(epoch);
 }
 
 
@@ -134,13 +134,13 @@ test "create writes the documented layout and exact metadata keys" {
         conv_path = os.path.join(cp, "conversation.json");
         assert os.path.exists(meta_path) and os.path.exists(conv_path);
         raw_meta = _read_file(meta_path);
-        assert raw_meta.endswith("\n");
+        assert raw_meta[-1:] == "\n";
         assert '"name": "first"' in raw_meta;  # indent=2 signature
 
         stored_meta = _read_raw(meta_path);
         assert stored_meta == meta;
-        conv = _read_raw(conv_path);
-        assert set(conv.keys()) == {"messages"};
+        conv: dict[str, any] = _read_raw(conv_path);
+        assert len(conv) == 1 and "messages" in conv;
         assert conv["messages"] == msgs;
 
         assert os.path.exists(os.path.join(cp, "files", "src", "a.txt"));
@@ -256,10 +256,12 @@ test "gitCommitHash matches HEAD inside a repo and is null outside" {
     tmp = _make_tmp();
     try {
         repo = _init_git_repo(tmp);
-        head = subprocess.run(
+        head_result = subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=repo,
             capture_output=True, text=True, timeout=15,
-        ).stdout.strip();
+        );
+        head_text: str = str(head_result.stdout);
+        head: str = head_text.strip();
         meta = create_checkpoint(repo, [], "p", "m", name="in-repo");
         assert meta["gitCommitHash"] == head;
 
@@ -351,7 +353,9 @@ test "list orders newest first with sizes and skips junk entries" {
         m1 = create_checkpoint(tmp, [], "p", "m", name="oldest");
         m2 = create_checkpoint(tmp, [], "p", "m", name="middle");
         m3 = create_checkpoint(tmp, [], "p", "m", name="newest");
-        assert len({m1["timestamp"], m2["timestamp"], m3["timestamp"]}) == 3;
+        assert m1["timestamp"] != m2["timestamp"];
+        assert m1["timestamp"] != m3["timestamp"];
+        assert m2["timestamp"] != m3["timestamp"];
 
         # Junk: no metadata, corrupt metadata, and a plain file.
         os.makedirs(os.path.join(_cp_dir(tmp), "junk-empty"));
@@ -459,8 +463,9 @@ test "full git round trip: modify, snapshot, modify again, restore" {
         _write_file(repo, "extra.txt", "extra v1\n");        # untracked
 
         meta = create_checkpoint(repo, _msgs("save my work"), "prov", "model-z");
-        assert "base.txt" in meta["filesChanged"];
-        assert "extra.txt" in meta["filesChanged"];
+        files_changed: list[str] = meta["filesChanged"] as list[str];
+        assert "base.txt" in files_changed;
+        assert "extra.txt" in files_changed;
         snap_dir = os.path.join(_cp_dir(repo), str(meta["name"]));
         assert _read_file(os.path.join(snap_dir, "files", "base.txt")) == "base v2\n";
 
@@ -497,7 +502,7 @@ test "format_relative_time buckets deltas into humanized strings" {
 
 
 test "overlay rows render name, counts, time and size" {
-    item = {
+    item: dict[str, any] = {
         "metadata": {
             "name": "my-cp",
             "timestamp": "2026-01-01T00:00:00+00:00",
@@ -510,7 +515,15 @@ test "overlay rows render name, counts, time and size" {
     assert row.startswith("my-cp \u2014 4 msgs, 2 files \u2014 ");
     assert "(2KB)" in row;
 
-    no_size = {"metadata": dict(item["metadata"]), "sizeBytes": None};
+    no_size: dict[str, any] = {
+        "metadata": {
+            "name": item["metadata"]["name"],
+            "timestamp": item["metadata"]["timestamp"],
+            "messageCount": item["metadata"]["messageCount"],
+            "filesChanged": item["metadata"]["filesChanged"],
+        },
+        "sizeBytes": None,
+    };
     assert "(?)" in format_checkpoint_overlay_row(no_size);
 }
 
@@ -547,7 +560,7 @@ test "a swallowed capture failure is recorded in the debug log" {
         os.makedirs(project);
         snaps = _capture_files(project, ["missing.txt"]);
         assert snaps == {}, snaps;
-        fh: any = open(sink, "r");
+        fh = open(sink, "r");
         lines: list[str] = fh.read().splitlines();
         fh.close();
         records: list[dict[str, any]] = [json.loads(line) for line in lines if line.strip()];
