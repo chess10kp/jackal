@@ -37,11 +37,12 @@ the slices can be reviewed and landed independently:
 | [#10644](https://github.com/jaseci-labs/jac/pull/10644) | Match JacPython's native compile ABI |
 | [#10645](https://github.com/jaseci-labs/jac/pull/10645) | Sync sealed JIR with linked native interfaces |
 
-The earlier compiler closure PRs [#10604](https://github.com/jaseci-labs/jac/pull/10604)
-and [#10610](https://github.com/jaseci-labs/jac/pull/10610) are closed; their
-work is represented by the focused PRs above. Together the open slices account
-for the original change's non-generated source paths. They are review slices,
-not closure evidence for the Python-free toolchain.
+The oversized compiler closure PRs [#10604](https://github.com/jaseci-labs/jac/pull/10604),
+[#10610](https://github.com/jaseci-labs/jac/pull/10610), and
+[#10639](https://github.com/jaseci-labs/jac/pull/10639) are closed; their work
+is represented by the focused PRs above. Together the open slices account for
+the original changes' non-generated source paths. They are review slices, not
+closure evidence for the Python-free toolchain.
 
 ## Closure gates
 
