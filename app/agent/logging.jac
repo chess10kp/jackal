@@ -40,8 +40,7 @@ glob LOG_LEVELS: dict[str, int] = {
     DEFAULT_LEVEL: str = "info",
     MAX_FIELD_DEPTH: int = 3,
     MAX_FIELD_ITEMS: int = 20,
-    MAX_STRING_LEN: int = 400,
-    MAX_TRACEBACK_LEN: int = 4000;
+     MAX_STRING_LEN: int = 400;
 
 glob _FALSEY: list[str] = ["0", "off", "false", "no", "none", ""],
      _TRUTHY: list[str] = ["1", "on", "true", "yes"];
