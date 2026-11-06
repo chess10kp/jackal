@@ -85,7 +85,11 @@ test "approval modal: n denies and the model is told" {
         h.wait_for("ok, skipped");
         h.wait_idle();
         assert not h.exists("b.txt");
-        assert "denied" in h.calls()[1]["last"]["content"], h.dump();
+        calls: list[dict[str, any]] = h.calls();
+        last_call: dict[str, any] = calls[1];
+        last_request: dict[str, any] = last_call["last"];
+        response_text: str = str(last_request["content"]);
+        assert "denied" in response_text, h.dump();
     } finally {
         h.close();
     }

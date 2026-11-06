@@ -117,7 +117,7 @@ obj TuiHarness {
     def calls() -> list[dict[str, any]] {
         if not os.path.exists(self.log_path) { return []; }
         out: list[dict[str, any]] = [];
-        fh: any = open(self.log_path, "r", encoding="utf-8");
+        fh = open(self.log_path, "r", encoding="utf-8");
         for line in fh.read().splitlines() {
             if line.strip() { out.append(json.loads(line)); }
         }
@@ -126,7 +126,7 @@ obj TuiHarness {
     }
 
     def read(rel: str) -> str {
-        fh: any = open(os.path.join(self.project, rel), "r", encoding="utf-8");
+        fh = open(os.path.join(self.project, rel), "r", encoding="utf-8");
         txt: str = fh.read();
         fh.close();
         return txt;
@@ -188,13 +188,13 @@ def open_tui(
         for (rel, text) in files.items() {
             path: str = os.path.join(project, rel);
             os.makedirs(os.path.dirname(path), exist_ok=True);
-            fh: any = open(path, "w", encoding="utf-8");
+            fh = open(path, "w", encoding="utf-8");
             fh.write(text);
             fh.close();
         }
     }
     script_path: str = os.path.join(base, "script.json");
-    sf: any = open(script_path, "w", encoding="utf-8");
+    sf = open(script_path, "w", encoding="utf-8");
     sf.write(json.dumps(script if script is not None else []));
     sf.close();
     saved_env: dict[str, any] = {};
