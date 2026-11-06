@@ -1394,7 +1394,7 @@ def:pub _load_model_prefs() -> None {
 """Record the last model overall ("last") and per provider, then persist
 to <cwd>/.jackal/model_prefs.json best-effort. Never raises — a preference
 write must never break a successful switch."""
-def _record_model_pref(name: str) {
+def:pub record_model_pref(name: str) {
     try {
         _load_model_prefs();
         _model_prefs["last"] = name;
@@ -1441,7 +1441,7 @@ def:pub set_model(name: str) -> str {
         return err;
     }
     set_model_state(name);
-    _record_model_pref(name);
+    record_model_pref(name);
     b: any = get_plugin_bridge();
     if b is not None {
         try {

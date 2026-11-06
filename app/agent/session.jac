@@ -13,16 +13,16 @@ import from .session_state {
     get_model_state,
     get_thinking_level_state,
     set_model_state,
+    set_thinking_level_state,
 }
-import from .session_plugins { SessionPlugins, plugins }
+import from .session_plugins { SessionPlugins, plugins, get_plugin_bridge }
 glob model: str = os.environ.get("JACKAL_MODEL", "openrouter/anthropic/claude-sonnet-5"),
      thinking_level: str = "";
 import from .session_config {
     set_mode,
     get_mode,
     model_preferences,
-    set_model as _set_model,
-    set_thinking_level as _set_thinking_level,
+    record_model_pref,
     clear_history,
     mcp_restart,
     mcp_restart_failed,
@@ -38,19 +38,38 @@ import from .session_config {
 The exported scalar names are maintained by the facade setters for
 compatibility; new code should use these accessors for live state."""
 def:pub set_model(name: str) -> str {
-    result = _set_model(name);
-    if result == name {
-        model = name;
+    err = credential_error(name);
+    if err {
+        return err;
     }
-    return result;
+    set_model_state(name);
+    model = name;
+    record_model_pref(name);
+    bridge: any = get_plugin_bridge();
+    if bridge is not None {
+        try {
+            fire_hook(bridge as PluginBridge, "model_select", {"model": name});
+        } except Exception {
+        }
+    }
+    return get_model_state();
 }
 
 def:pub set_thinking_level(level: str) -> str {
-    result = _set_thinking_level(level);
-    if result == level {
-        thinking_level = level;
+    set_thinking_level_state(level);
+    thinking_level = level;
+    bridge: any = get_plugin_bridge();
+    if bridge is not None {
+        try {
+            fire_hook(
+                bridge as PluginBridge,
+                "thinking_level_select",
+                {"level": level}
+            );
+        } except Exception {
+        }
     }
-    return result;
+    return get_thinking_level_state();
 }
 
 def:pub get_model() -> str {
