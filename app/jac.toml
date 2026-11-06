@@ -228,6 +228,9 @@ default = "native"
 "agent.session_plugins" = "native"
 "agent.session_cwd" = "native"
 "agent.session" = "native"
+# Session boot seeds built-in tools through default_registry_handle; keep the
+# registry factory and its file/process tool handlers in the native graph.
+"agent.tools" = "native"
 # agent.mcp product functions use the native subprocess descriptors,
 # threading, and inherited-environment preservation. Keep the product target
 # native. Application preparation now honors the project's native default;
