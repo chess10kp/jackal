@@ -132,7 +132,9 @@ def:pub save_auth_file(path: str, data: dict[str, any]) -> bool {
         fh.write(json_pretty(json.dumps(data)));
         fh.write("\n");
         fh.close();
-        chmod(path, i32(0o600));
+        if chmod(path, i32(0o600)) != 0 {
+            return False;
+        }
         return True;
     } except OSError {
         return False;

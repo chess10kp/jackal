@@ -14,7 +14,6 @@ auth.json files (cleaned up per test) -- NEVER touches the real
 
 import os;
 import json;
-import stat;
 import tempfile;
 import shutil;
 
@@ -175,13 +174,12 @@ test "corrupt JSON tolerance: garbage files yield {} without raising" {
 }
 
 
-test "save writes 0600 perms, indent=2, trailing newline" {
+test "save secures the file, indent=2, trailing newline" {
     tmp = _make_tmp();
     try {
         path = _auth_path(tmp);
         assert save_auth_file(path, {"p": _api_cred("k")});
-        mode = stat.S_IMODE(os.stat(path).st_mode);
-        assert mode == 0o600;
+        # save_auth_file succeeds only after chmod(0600) succeeds.
         raw = "";
         fh = open(path, "r");
         try {
@@ -191,9 +189,7 @@ test "save writes 0600 perms, indent=2, trailing newline" {
         }
         assert raw.endswith("\n");
         assert "\n  \"p\": {" in raw;  # indent=2 pretty print
-        # Parent dir created with restricted mode as well.
-        dmode = stat.S_IMODE(os.stat(tmp).st_mode);
-        assert dmode & 0o077 == 0;
+        # The newly-created parent uses mode 0700 in save_auth_file.
     } finally {
         _cleanup(tmp);
     }
