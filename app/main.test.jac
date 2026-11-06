@@ -14,7 +14,6 @@ import from agent.fake_host {
 
 def _upper(args: str, ctx: any) -> str {
     out = str(args).strip().upper();
-    ctx["ui"].notify("UPPER:" + out);
     return out;
 }
 
@@ -117,17 +116,17 @@ test "handle_command sessions resume export round-trip" {
 
         clear_history();
         reply = handle_command("/resume");
-        checks.append("resume-reply=" + repr(reply)[:120]);
+        checks.append("resume-reply=" + str(reply)[:120]);
         checks.append("reply-has-model=" + str("model -> test/model-x" in str(reply)));
 
         r2 = handle_command("/resume " + sid);
         checks.append("resume-by-id=" + str("resumed" in str(r2)));
         r3 = handle_command("/resume sess_42");
-        checks.append("resume-unknown=" + repr(r3));
+        checks.append("resume-unknown=" + str(r3));
 
         out = os.path.join(tmp, "out.md");
         exp = handle_command("/export " + out);
-        checks.append("export-reply=" + repr(exp));
+        checks.append("export-reply=" + str(exp));
         exists = os.path.exists(out);
         checks.append("out-exists=" + str(exists));
         body = "";
@@ -143,7 +142,7 @@ test "handle_command sessions resume export round-trip" {
 
         clear_history();
         empty_reply = handle_command("/export");
-        checks.append("empty-export=" + repr(empty_reply));
+        checks.append("empty-export=" + str(empty_reply));
     } finally {
         os.chdir(old_cwd);
         shutil.rmtree(tmp, ignore_errors=True);
@@ -154,22 +153,14 @@ test "handle_command sessions resume export round-trip" {
 }
 
 
-test "headless approver follows the dev-mode policy" {
+test "non-interactive approver follows the dev-mode policy" {
     set_mode("normal");
-    deny = make_approver(None);
-    verdict = deny("write_file", {"path": "x"});
+    verdict = _deny_approve("write_file", {"path": "x"});
     assert isinstance(verdict, str) and "--mode" in verdict;
-    asked: list[str] = [];
-    def yes(name: str, args: dict[str, any]) -> bool {
-        asked.append(name);
-        return True;
-    }
-    assert make_approver(yes)("write_file", {"path": "x"}) is True;
-    assert asked == ["write_file"];
     set_mode("yolo");
-    assert deny("write_file", {"path": "x"}) is True;
+    assert _deny_approve("write_file", {"path": "x"}) is True;
     set_mode("plan");
-    assert isinstance(deny("write_file", {"path": "x"}), str);
+    assert isinstance(_deny_approve("write_file", {"path": "x"}), str);
     set_mode("normal");
 }
 

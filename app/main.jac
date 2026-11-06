@@ -17,7 +17,6 @@ import from _subprocess_native { sp_read }
 import from agent.session {
     cancel_active_turn,
     clear_history,
-    compact_now,
     drain_mcp_notices,
     get_history,
     get_mode,
@@ -33,7 +32,6 @@ import from agent.session {
     restore_history,
     restore_model,
     run_command,
-    run_turn,
     session_dispose,
     set_current_session_id,
     set_mode,
@@ -41,6 +39,7 @@ import from agent.session {
     set_thinking_level,
 }
 import from agent.session_lifecycle { session_boot_headless }
+import from agent.session_turn { compact_now, run_turn }
 import from agent.auth_env { hydrate_auth_environment, logout_provider }
 import from agent.cli { parse_cli, user_argv, combine_prompt, CLI_USAGE, CLI_VERSION }
 import from agent.modes { requires_approval, is_read_only_mode, read_only_mode_block_reason }
@@ -276,29 +275,72 @@ def resume_session(sid: str) -> str {
 """Mode-policy tool approver for headless frontends. `ask(name, args)`
 answers "confirm" verdicts; ask=None (non-interactive) denies them with a
 hint, so `-p` never runs a confirm-gated tool silently."""
-def make_approver(ask: any) -> any {
-    def approve(name: str, args: dict[str, any]) -> any {
-        cmd: str = "";
-        if isinstance(args, dict) { cmd = str(args.get("cmd", "")); }
-        mode: str = get_mode();
-        policy: str = requires_approval(mode, name, cmd);
-        if policy == "auto" { return True; }
-        if policy == "blocked" {
-            if is_read_only_mode(mode) {
-                return read_only_mode_block_reason(name, mode);
-            }
-            return "blocked in " + mode + " mode";
+def _approval_policy(name: str, args: dict[str, any]) -> str {
+    cmd: str = "";
+    if isinstance(args, dict) { cmd = str(args.get("cmd", "")); }
+    mode: str = get_mode();
+    policy: str = requires_approval(mode, name, cmd);
+    if policy == "auto" { return "allow"; }
+    if policy == "blocked" {
+        if is_read_only_mode(mode) {
+            return read_only_mode_block_reason(name, mode);
         }
-        if ask is None {
-            return (
-                "tool \"" + name + "\" needs approval in " + mode
-                + " mode; rerun with --mode auto-accept or --mode yolo"
-            );
-        }
-        if ask(name, args) { return True; }
-        return "denied by user";
+        return "blocked in " + mode + " mode";
     }
-    return approve;
+    return "";
+}
+
+
+def _deny_approve(name: str, args: dict[str, any]) -> any {
+    verdict: str = _approval_policy(name, args);
+    if verdict == "allow" { return True; }
+    if verdict { return verdict; }
+    mode: str = get_mode();
+    return (
+        "tool \"" + name + "\" needs approval in " + mode
+        + " mode; rerun with --mode auto-accept or --mode yolo"
+    );
+}
+
+
+def _term_approve(name: str, args: dict[str, any]) -> any {
+    verdict: str = _approval_policy(name, args);
+    if verdict == "allow" { return True; }
+    if verdict { return verdict; }
+    return True if term_ask(name, args) else "denied by user";
+}
+
+
+def _json_approve(name: str, args: dict[str, any]) -> any {
+    verdict: str = _approval_policy(name, args);
+    if verdict == "allow" { return True; }
+    if verdict { return verdict; }
+    return True if json_ask(name, args) else "denied by user";
+}
+
+
+obj _PrintState {
+    has format: str = "text",
+        errors: list[str] = [],
+        tools: int = 0,
+        secs: float = 0.0;
+}
+
+glob _print_state: _PrintState | None = None;
+
+
+def _print_event(kind: str, data: dict[str, any]) {
+    state: _PrintState | None = _print_state;
+    if state is None { return; }
+    if kind == "error" { state.errors.append(str(data.get("message", ""))); }
+    if kind == "tool_call" { state.tools += 1; }
+    if kind == "turn_end" { state.secs = data.get("secs", 0.0) as float; }
+    if state.format == "stream-json" {
+        json_event(kind, data);
+    } elif kind == "error" {
+        sys.stderr.write("[error] " + str(data.get("message", "")) + "\n");
+        sys.stderr.flush();
+    }
 }
 
 
@@ -336,12 +378,14 @@ def json_ask(name: str, args: dict[str, any]) -> bool {
         text_in: str = str(raw).strip();
         if not text_in { continue; }
         try {
-            req: any = json.loads(text_in);
+            parsed: any = json.loads(text_in);
         } except ValueError {
             json_event("error", {"message": "bad json: " + text_in[:80]});
             continue;
         }
-        if isinstance(req, dict) and str(req.get("type", "")) == "approval" {
+        if not isinstance(parsed, dict) { continue; }
+        req: dict[str, any] = parsed as dict[str, any];
+        if str(req.get("type", "")) == "approval" {
             return bool(req.get("approved", False));
         }
         json_event("error", {"message": "awaiting approval decision"});
@@ -372,33 +416,22 @@ def apply_cli_options(opts: dict[str, any]) -> str {
 return the process exit code (0 ok, 1 error)."""
 def run_print(prompt: str, opts: dict[str, any]) -> int {
     fmt: str = str(opts["output_format"]);
-    errors: list[str] = [];
-    stats: dict[str, any] = {"tools": 0, "secs": 0.0};
-
-    def on_event(kind: str, data: dict[str, any]) {
-        if kind == "error" { errors.append(str(data.get("message", ""))); }
-        if kind == "tool_call" { stats["tools"] = int(stats["tools"]) + 1; }
-        if kind == "turn_end" { stats["secs"] = data.get("secs", 0.0); }
-        if fmt == "stream-json" {
-            json_event(kind, data);
-        } elif kind == "error" {
-            sys.stderr.write("[error] " + str(data.get("message", "")) + "\n");
-            sys.stderr.flush();
-        }
-    }
+    state = _PrintState(format=fmt);
+    _print_state = state;
     max_turns: int = int(opts["max_turns"]) if opts["max_turns"] else 30;
     answer: str = "";
     try {
         answer = run_turn(
-            prompt, on_event, approve=make_approver(None), max_iters=max_turns,
+            prompt, _print_event, approve=_deny_approve, max_iters=max_turns,
         );
     } except KeyboardInterrupt {
-        errors.append("interrupted");
+        state.errors.append("interrupted");
     } except Exception as e {
-        errors.append(str(e));
+        state.errors.append(str(e));
         sys.stderr.write("[error] " + str(e) + "\n");
     }
-    is_error: bool = not answer and len(errors) > 0;
+    _print_state = None;
+    is_error: bool = not answer and len(state.errors) > 0;
     if fmt == "text" {
         if answer {
             sys.stdout.write(answer + ("" if answer.endswith("\n") else "\n"));
@@ -408,11 +441,11 @@ def run_print(prompt: str, opts: dict[str, any]) -> int {
         json_event("result", {
             "result": answer,
             "is_error": is_error,
-            "errors": errors,
+            "errors": state.errors,
             "session_id": str(plugins.session_id),
             "model": get_model(),
-            "num_tools": stats["tools"],
-            "duration_s": stats["secs"],
+            "num_tools": state.tools,
+            "duration_s": state.secs,
         });
     }
     return 1 if is_error else 0;
@@ -459,7 +492,6 @@ with entry:__main__ {
         sys.exit(code);
     }
     json_mode: bool = bool(opts["json"]);
-    approver: any = make_approver(json_ask if json_mode else term_ask);
     if json_mode {
         json_event("session_ready", {"model": get_model(), "cwd": os.getcwd()});
     } else {
@@ -467,7 +499,7 @@ with entry:__main__ {
         if prompt {
             print("\n> " + prompt);
             try {
-                run_turn(prompt, approve=approver);
+                run_turn(prompt, approve=_term_approve);
             } except KeyboardInterrupt {
                 print("\n[interrupted]");
             }
@@ -493,11 +525,16 @@ with entry:__main__ {
                 text_in: str = str(raw_line).strip();
                 if not text_in { continue; }
                 try {
-                    req: any = json.loads(text_in);
+                    parsed: any = json.loads(text_in);
                 } except ValueError {
                     json_event("error", {"message": "bad json: " + text_in[:80]});
                     continue;
                 }
+                if not isinstance(parsed, dict) {
+                    json_event("error", {"message": "request must be a JSON object"});
+                    continue;
+                }
+                req: dict[str, any] = parsed as dict[str, any];
                 text = str(req.get("text", ""));
                 kind = str(req.get("type", "user"));
             } else {
@@ -527,9 +564,9 @@ with entry:__main__ {
             }
             try {
                 if json_mode {
-                    run_turn(text, json_event, approve=approver);
+                    run_turn(text, json_event, approve=_json_approve);
                 } else {
-                    run_turn(text, approve=approver);
+                    run_turn(text, approve=_term_approve);
                 }
             } except KeyboardInterrupt {
                 if json_mode { json_event("error", {"message": "interrupted"}); }
