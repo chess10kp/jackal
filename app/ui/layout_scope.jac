@@ -4,11 +4,7 @@ This module owns scope validation and Layer overlay discovery. It is kept
 separate so the public layout module stays a small, stable pipeline seam.
 """
 
-import from ui.layout_types {
-    LayoutDiagnostic,
-    LayoutError,
-    LayoutSeverity,
-}
+import from ui.layout_types { LayoutDiagnostic, LayoutError, LayoutSeverity }
 import from ui.model {
     UiNode,
     UiContainer,
@@ -20,7 +16,6 @@ import from ui.model {
     ordered_children,
 }
 
-
 obj _ScopedNode {
     has target: UiNode,
         id_str: str = "",
@@ -31,22 +26,17 @@ obj _ScopedNode {
         z_index: int = 0;
 }
 
-
 obj _Scope {
     has order: list[_ScopedNode] = [],
         parent_of: dict[str, str] = {},
         error: LayoutDiagnostic | None = None;
 }
 
-
 def _topology_error(message: str) -> LayoutDiagnostic {
     return LayoutDiagnostic(
-        code=LayoutError.INVALID_TOPOLOGY,
-        severity=LayoutSeverity.ERROR,
-        message=message,
+        code=LayoutError.INVALID_TOPOLOGY, severity=LayoutSeverity.ERROR, message=message
     );
 }
-
 
 def _z_index_of(screen: Screen, overlay: Overlay) -> int {
     for e_ref in [edge screen ->:Layer:-> overlay] {
@@ -55,16 +45,13 @@ def _z_index_of(screen: Screen, overlay: Overlay) -> int {
     return 0;
 }
 
-
 def _scoped_jid_key(pair: _ScopedNode) -> str {
     return pair.id_str;
 }
 
-
 def _scoped_z_key(pair: _ScopedNode) -> int {
     return pair.z_index;
 }
-
 
 """Collect Layer-reached overlays owned by a Screen root.
 
@@ -81,19 +68,20 @@ def _collect_overlays(layout_root: UiNode, seen: dict[str, bool]) -> list[_Scope
             continue;
         }
         seen[oid] = True;
-        found.append(_ScopedNode(
-            target=ov,
-            id_str=oid,
-            key=str(ov.key),
-            is_overlay=True,
-            z_index=_z_index_of(layout_root, ov),
-        ));
+        found.append(
+            _ScopedNode(
+                target=ov,
+                id_str=oid,
+                key=str(ov.key),
+                is_overlay=True,
+                z_index=_z_index_of(layout_root, ov),
+            ),
+        );
     }
     found.sort(key=_scoped_jid_key);
     found.sort(key=_scoped_z_key);
     return found;
 }
-
 
 """Append parent's ordered children to the scope.
 
@@ -118,9 +106,7 @@ def _walk_children(
             }
             # Overlay-subtree walk reaching a Layer-reached node again
             # means it was also declared a Child of an overlay subtree.
-            scope.error = _topology_error(
-                "Layer overlay nested under another overlay: " + cid
-            );
+            scope.error = _topology_error("Layer overlay nested under another overlay: " + cid);
             return False;
         }
         if cid in seen {
@@ -136,11 +122,7 @@ def _walk_children(
             break;
         }
         scoped = _ScopedNode(
-            target=child,
-            id_str=cid,
-            key=str(child.key),
-            parent_id=parent_id,
-            rank=rank_val,
+            target=child, id_str=cid, key=str(child.key), parent_id=parent_id, rank=rank_val
         );
         scope.order.append(scoped);
         scope.parent_of[cid] = parent_id;
@@ -148,7 +130,6 @@ def _walk_children(
     }
     return True;
 }
-
 
 def _collect_scope(layout_root: UiNode) -> _Scope {
     scope = _Scope();
@@ -173,20 +154,12 @@ def _collect_scope(layout_root: UiNode) -> _Scope {
     while len(queue) {
         current = queue.pop(0);
         if len([current.target <-:Child:<-]) > 1 {
-            scope.error = _topology_error(
-                "node has multiple Child parents: " + current.id_str
-            );
+            scope.error = _topology_error("node has multiple Child parents: " + current.id_str);
             return scope;
         }
         if isinstance(current.target, UiContainer) {
             ok = _walk_children(
-                current.target,
-                current.id_str,
-                True,
-                overlay_ids,
-                seen,
-                scope,
-                queue,
+                current.target, current.id_str, True, overlay_ids, seen, scope, queue
             );
             if not ok {
                 return scope;
@@ -203,13 +176,7 @@ def _collect_scope(layout_root: UiNode) -> _Scope {
             # as a Child inside another overlay's subtree is a specific
             # topology error, not a generic revisit.
             ok = _walk_children(
-                current.target,
-                current.id_str,
-                False,
-                overlay_ids,
-                seen,
-                scope,
-                queue,
+                current.target, current.id_str, False, overlay_ids, seen, scope, queue
             );
             if not ok {
                 return scope;

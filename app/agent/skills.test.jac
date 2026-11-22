@@ -18,16 +18,13 @@ to the Jac checker, so this file funnels them through explicit locals or
 str()/dict() casts before use.
 """
 
-
 def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-skills-test-");
 }
 
-
 def _cleanup(tmp: str) {
     shutil.rmtree(tmp, ignore_errors=True);
 }
-
 
 def _write_text(path: str, text: str) {
     os.makedirs(_dir_name(path), exist_ok=True);
@@ -38,7 +35,6 @@ def _write_text(path: str, text: str) {
         fh.close();
     }
 }
-
 
 def _write_bytes_as_latin1(path: str, text: str) {
     # Produces bytes that are INVALID utf-8 without b"" literals.
@@ -51,9 +47,9 @@ def _write_bytes_as_latin1(path: str, text: str) {
     }
 }
 
-
-def _write_skill(dir_path: str, name: str, description: str,
-                 extra_fm: str = "", body: str = "Skill body text.") -> str {
+def _write_skill(
+    dir_path: str, name: str, description: str, extra_fm: str = "", body: str = "Skill body text."
+) -> str {
     fm = "name: " + name + "\ndescription: " + description;
     if extra_fm {
         fm += "\n" + extra_fm;
@@ -62,7 +58,6 @@ def _write_skill(dir_path: str, name: str, description: str,
     _write_text(path, "---\n" + fm + "\n---\n\n" + body + "\n");
     return path;
 }
-
 
 def _names(result: dict[str, list[dict[str, any]]]) -> list[str] {
     out: list[str] = [];
@@ -73,7 +68,6 @@ def _names(result: dict[str, list[dict[str, any]]]) -> list[str] {
     }
     return out;
 }
-
 
 def _diag_types(result: dict[str, list[dict[str, any]]], kind: str) -> list[dict[str, any]] {
     found: list[dict[str, any]] = [];
@@ -86,7 +80,6 @@ def _diag_types(result: dict[str, list[dict[str, any]]], kind: str) -> list[dict
     }
     return found;
 }
-
 
 test "discovery walk claims SKILL.md branches and skips hidden vendor dirs" {
     tmp = _make_tmp();
@@ -137,10 +130,8 @@ test "discovery walk claims SKILL.md branches and skips hidden vendor dirs" {
     }
 }
 
-
 test "frontmatter parser handles scalars, quoting, lists, and absence" {
-    doc = (
-        "---\n"
+    doc = ("---\n"
         "name: demo-skill\n"
         'quoted: "hello world"\n'
         "apostrophe: 'single quoted'\n"
@@ -150,8 +141,7 @@ test "frontmatter parser handles scalars, quoting, lists, and absence" {
         "  - first\n"
         "  - second\n"
         "---\n\n"
-        "Body line one.\n\nBody line two.\n"
-    );
+        "Body line one.\n\nBody line two.\n");
     parsed = parse_frontmatter(doc);
     fm: dict[str, any] = parsed[0];
     body: str = parsed[1];
@@ -184,7 +174,6 @@ test "frontmatter parser handles scalars, quoting, lists, and absence" {
     assert frontmatter_string(["a", "b"]) == "a, b";
 }
 
-
 test "malformed SKILL.md files produce warnings without crashing" {
     tmp = _make_tmp();
     try {
@@ -192,8 +181,10 @@ test "malformed SKILL.md files produce warnings without crashing" {
         os.makedirs(tree_base, exist_ok=True);
 
         # Missing description -> excluded with a warning diagnostic.
-        _write_text(os.path.join(tree_base, "nodesc", "SKILL.md"),
-                    "---\nname: nodesc\n---\n\nNo description here.\n");
+        _write_text(
+            os.path.join(tree_base, "nodesc", "SKILL.md"),
+            "---\nname: nodesc\n---\n\nNo description here.\n",
+        );
         # Invalid name characters -> warning but still loaded.
         _write_skill(os.path.join(tree_base, "badname"), "Bad Name!", "Still usable.");
         # Name exceeding the length cap.
@@ -202,11 +193,14 @@ test "malformed SKILL.md files produce warnings without crashing" {
         # Empty file.
         _write_text(os.path.join(tree_base, "emptyf", "SKILL.md"), "");
         # Undecodable bytes (latin-1 written 0xFF/0xFE are invalid UTF-8).
-        _write_bytes_as_latin1(os.path.join(tree_base, "binary", "SKILL.md"),
-                               "\xff\xfe\x00not utf8");
+        _write_bytes_as_latin1(
+            os.path.join(tree_base, "binary", "SKILL.md"), "\xff\xfe\x00not utf8"
+        );
         # Garbage frontmatter that never terminates.
-        _write_text(os.path.join(tree_base, "garbled", "SKILL.md"),
-                    "---\nname [broken: ===\nno closing delimiter ever");
+        _write_text(
+            os.path.join(tree_base, "garbled", "SKILL.md"),
+            "---\nname [broken: ===\nno closing delimiter ever",
+        );
         _write_skill(os.path.join(tree_base, "goodone"), "goodone", "Fine.");
 
         result: dict[str, list[dict[str, any]]] = load_skills_from_dir(tree_base, "path");
@@ -236,15 +230,13 @@ test "malformed SKILL.md files produce warnings without crashing" {
         }
 
         # The same tree through load_jackal_skills stays crash-free.
-        merged = load_jackal_skills(cwd=tmp, package_root=tmp,
-                                    agent_dir=os.path.join(tmp, "home"));
+        merged = load_jackal_skills(cwd=tmp, package_root=tmp, agent_dir=os.path.join(tmp, "home"));
         merged_skills: list[dict[str, any]] = merged["skills"];
         assert isinstance(merged_skills, list);
     } finally {
         _cleanup(tmp);
     }
 }
-
 
 test "load_jackal_skills merges roots with precedence, sorting, collisions" {
     tmp = _make_tmp();
@@ -259,15 +251,18 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
         home = os.path.join(tmp, "home");
         _write_skill(os.path.join(home, "skills", "beta"), "beta", "User beta.");
         dupe_user = _write_skill(
-            os.path.join(home, "skills", "dupe"), "dupe", "User dupe wins.",
+            os.path.join(home, "skills", "dupe"),
+            "dupe",
+            "User dupe wins.",
             extra_fm="disable-model-invocation: true",
         );
 
         proj = os.path.join(tmp, "proj");
-        _write_skill(os.path.join(proj, ".jackal", "skills", "gamma"),
-                     "gamma", "Project gamma.");
+        _write_skill(os.path.join(proj, ".jackal", "skills", "gamma"), "gamma", "Project gamma.");
 
-        result: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=proj, package_root=pkg, agent_dir=home);
+        result: dict[str, list[dict[str, any]]] = load_jackal_skills(
+            cwd=proj, package_root=pkg, agent_dir=home
+        );
         # Sorted by name across all roots.
         assert _names(result) == ["alpha", "beta", "dupe", "gamma", "zeta"];
 
@@ -299,7 +294,9 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
 
         # include_defaults=False loads only explicit paths.
         only_paths: dict[str, list[dict[str, any]]] = load_jackal_skills(
-            cwd=proj, package_root=pkg, agent_dir=home,
+            cwd=proj,
+            package_root=pkg,
+            agent_dir=home,
             include_defaults=False,
             skill_paths=[os.path.join(pkg, "pi", "skills", "alpha")],
         );
@@ -308,13 +305,14 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
         # Project skills dir discovered via walk-up from a nested cwd.
         nested_cwd = os.path.join(proj, "deep", "deeper");
         os.makedirs(nested_cwd, exist_ok=True);
-        walked_up: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=nested_cwd, package_root=pkg, agent_dir=home);
+        walked_up: dict[str, list[dict[str, any]]] = load_jackal_skills(
+            cwd=nested_cwd, package_root=pkg, agent_dir=home
+        );
         assert "gamma" in _names(walked_up);
     } finally {
         _cleanup(tmp);
     }
 }
-
 
 test "explicit skill_paths resolve relative, home, and error cases" {
     tmp = _make_tmp();
@@ -328,20 +326,24 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         _write_text(os.path.join(proj, "notmd.txt"), "plain text");
 
         # Relative directory resolves against cwd.
-        rel: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=proj, include_defaults=False, skill_paths=["local"]);
+        rel: dict[str, list[dict[str, any]]] = load_jackal_skills(
+            cwd=proj, include_defaults=False, skill_paths=["local"]
+        );
         assert _names(rel) == ["local-one"];
         rel_items: list[dict[str, any]] = rel["skills"];
         rel0: dict[str, any] = rel_items[0];
         assert str(rel0["filePath"]) == target;
 
         # Single .md file loads directly; duplicate paths dedup by realpath.
-        solo: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=proj, include_defaults=False,
-                                  skill_paths=["standalone.md", str(single_md)]);
+        solo: dict[str, list[dict[str, any]]] = load_jackal_skills(
+            cwd=proj, include_defaults=False, skill_paths=["standalone.md", str(single_md)]
+        );
         assert _names(solo) == ["standalone"];
 
         # Errors become diagnostics: missing path and non-markdown file.
-        errs = load_jackal_skills(cwd=proj, include_defaults=False,
-                                  skill_paths=["missing-dir", "notmd.txt"]);
+        errs = load_jackal_skills(
+            cwd=proj, include_defaults=False, skill_paths=["missing-dir", "notmd.txt"]
+        );
         assert errs["skills"] == [];
         msgs: list[str] = [];
         err_diags: list[dict[str, any]] = errs["diagnostics"];
@@ -355,9 +357,13 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         # Paths under the user roots get tagged accordingly.
         home = os.path.join(tmp, "home");
         _write_skill(os.path.join(home, "skills", "homed"), "homed", "From home.");
-        tagged = load_jackal_skills(cwd=proj, package_root=proj, agent_dir=home,
-                                    include_defaults=False,
-                                    skill_paths=[os.path.join(home, "skills", "homed")]);
+        tagged = load_jackal_skills(
+            cwd=proj,
+            package_root=proj,
+            agent_dir=home,
+            include_defaults=False,
+            skill_paths=[os.path.join(home, "skills", "homed")],
+        );
         tagged_items: list[dict[str, any]] = tagged["skills"];
         tag0: dict[str, any] = tagged_items[0];
         assert str(tag0["source"]) == "user";
@@ -366,8 +372,9 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         old_home = os.environ.get("HOME");
         os.environ["HOME"] = home;
         try {
-            tilded: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=proj, include_defaults=False,
-                                        skill_paths=["~/skills/homed"]);
+            tilded: dict[str, list[dict[str, any]]] = load_jackal_skills(
+                cwd=proj, include_defaults=False, skill_paths=["~/skills/homed"]
+            );
             assert _names(tilded) == ["homed"];
         } finally {
             if old_home is None {
@@ -380,7 +387,6 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         _cleanup(tmp);
     }
 }
-
 
 test "format_skills_for_prompt escapes xml and honors the disable flag" {
     tmp = _make_tmp();
@@ -422,7 +428,6 @@ test "format_skills_for_prompt escapes xml and honors the disable flag" {
     }
 }
 
-
 test "expand_skill_command inlines the referenced skill body" {
     tmp = _make_tmp();
     try {
@@ -458,23 +463,26 @@ test "expand_skill_command inlines the referenced skill body" {
     }
 }
 
-
 test "load_skill_by_dir returns stripped bodies and empty on misses" {
     tmp = _make_tmp();
     try {
-        _write_skill(os.path.join(tmp, "pi", "skills", "realone"), "realone",
-                     "Real one.", body="Real body here.");
+        _write_skill(
+            os.path.join(tmp, "pi", "skills", "realone"),
+            "realone",
+            "Real one.",
+            body="Real body here.",
+        );
         assert load_skill_by_dir("realone", package_root=tmp) == "Real body here.";
         assert load_skill_by_dir("missing", package_root=tmp) == "";
         # Corrupt bytes fall back to '' instead of raising.
-        _write_bytes_as_latin1(os.path.join(tmp, "pi", "skills", "corrupt", "SKILL.md"),
-                               "\xff\xfe\x00\xff");
+        _write_bytes_as_latin1(
+            os.path.join(tmp, "pi", "skills", "corrupt", "SKILL.md"), "\xff\xfe\x00\xff"
+        );
         assert load_skill_by_dir("corrupt", package_root=tmp) == "";
     } finally {
         _cleanup(tmp);
     }
 }
-
 
 test "skill_read_allowlist yields absolute files and rooted base dirs" {
     tmp = _make_tmp();
@@ -482,12 +490,22 @@ test "skill_read_allowlist yields absolute files and rooted base dirs" {
         p1 = _write_skill(os.path.join(tmp, "one"), "one", "One.");
         p2 = _write_skill(os.path.join(tmp, "two"), "two", "Two.");
         skills: list[dict[str, any]] = [
-            {"name": "one", "description": "One.", "filePath": p1,
-             "baseDir": _dir_name(p1), "source": "builtin",
-             "disableModelInvocation": False},
-            {"name": "two", "description": "Two.", "filePath": p2,
-             "baseDir": _dir_name(p2), "source": "user",
-             "disableModelInvocation": True},
+            {
+                "name": "one",
+                "description": "One.",
+                "filePath": p1,
+                "baseDir": _dir_name(p1),
+                "source": "builtin",
+                "disableModelInvocation": False,
+            },
+            {
+                "name": "two",
+                "description": "Two.",
+                "filePath": p2,
+                "baseDir": _dir_name(p2),
+                "source": "user",
+                "disableModelInvocation": True,
+            },
         ];
         allow = skill_read_allowlist(skills);
         files: list[str] = allow["files"];
@@ -498,7 +516,6 @@ test "skill_read_allowlist yields absolute files and rooted base dirs" {
         _cleanup(tmp);
     }
 }
-
 
 test "real jackal catalog under pi/skills parses read-only" {
     # Locate the repo root by walking up from the cwd looking for pi/skills.
@@ -524,8 +541,7 @@ test "real jackal catalog under pi/skills parses read-only" {
         # Read-only smoke: real builtin catalog, empty user/home roots, cwd
         # pointed away from any project skills dir.
         result = load_jackal_skills(
-            cwd=tmp, package_root=repo,
-            agent_dir=os.path.join(tmp, "home"),
+            cwd=tmp, package_root=repo, agent_dir=os.path.join(tmp, "home")
         );
         items: list[dict[str, any]] = result["skills"];
         # The repo ships ~26 built-in skills; be robust to small drift.

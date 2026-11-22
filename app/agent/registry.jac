@@ -5,12 +5,8 @@ contribute without a second source of truth. Native tools keep local handlers;
 js tools carry schema only and dispatch through a PluginBridge.
 """
 
-import from .tool_spec {
-    ToolSpec,
-    make_tool_spec,
-}
+import from .tool_spec { ToolSpec, make_tool_spec }
 import from .logging { log_exception }
-
 
 obj RegisteredTool {
     has name: str = "",
@@ -22,16 +18,13 @@ obj RegisteredTool {
         handler: Callable[[dict[str, any]], str] | None = None;
 }
 
-
 obj ToolRegistry {
     has tools: dict[str, RegisteredTool] = {};
 }
 
-
 def create_registry -> ToolRegistry {
     return ToolRegistry();
 }
-
 
 """Register or replace a native tool with a local dict-ABI handler."""
 def register_native(
@@ -59,14 +52,9 @@ def register_native(
     return ent;
 }
 
-
 """Register or replace a js-origin tool (schema only; invoke via bridge)."""
 def register_js(
-    reg: ToolRegistry,
-    name: str,
-    description: str,
-    parameters: dict[str, any],
-    extension_id: str,
+    reg: ToolRegistry, name: str, description: str, parameters: dict[str, any], extension_id: str
 ) -> RegisteredTool {
     if not name {
         raise ValueError("tool name must not be empty");
@@ -86,21 +74,13 @@ def register_js(
     return ent;
 }
 
-
 """Seed the registry from an existing ToolSpec (native)."""
 def register_native_spec(reg: ToolRegistry, spec: ToolSpec) -> RegisteredTool {
     if spec.handler is None {
         raise ValueError("native ToolSpec requires a handler");
     }
-    return register_native(
-        reg,
-        spec.name,
-        spec.description,
-        spec.parameters,
-        spec.handler,
-    );
+    return register_native(reg, spec.name, spec.description, spec.parameters, spec.handler);
 }
-
 
 def get_tool(reg: ToolRegistry, name: str) -> RegisteredTool | None {
     if name in reg.tools {
@@ -109,7 +89,6 @@ def get_tool(reg: ToolRegistry, name: str) -> RegisteredTool | None {
     return None;
 }
 
-
 def unregister(reg: ToolRegistry, name: str) -> bool {
     if name in reg.tools {
         del reg.tools[name];
@@ -117,7 +96,6 @@ def unregister(reg: ToolRegistry, name: str) -> bool {
     }
     return False;
 }
-
 
 """Drop every tool contributed by one extension. Returns count removed."""
 def unregister_extension(reg: ToolRegistry, extension_id: str) -> int {
@@ -133,7 +111,6 @@ def unregister_extension(reg: ToolRegistry, extension_id: str) -> int {
     return len(doomed);
 }
 
-
 """ToolSpecs for react_loop. Js entries have handler=None (invoke via bridge)."""
 def as_tool_specs(reg: ToolRegistry) -> list[ToolSpec] {
     out: list[ToolSpec] = [];
@@ -144,12 +121,11 @@ def as_tool_specs(reg: ToolRegistry) -> list[ToolSpec] {
                 description=ent.description,
                 parameters=ent.parameters,
                 handler=ent.handler,
-            )
+            ),
         );
     }
     return out;
 }
-
 
 """OpenAI-shape tool defs for the model (schema only, any origin)."""
 def openai_tools(reg: ToolRegistry) -> list[dict[str, any]] {
@@ -167,16 +143,13 @@ def openai_tools(reg: ToolRegistry) -> list[dict[str, any]] {
     return defs;
 }
 
-
 """Invoke a registered tool.
 
 Native: call handler(args), where args is the decoded argument dictionary.
 Js: require `bridge` with invoke_js_tool(bridge, name, args) -> str.
 Unknown / missing handler / missing bridge -> ERROR string (loop-safe).
 """
-def invoke(
-    reg: ToolRegistry, name: str, args: dict[str, any], bridge: any = None
-) -> str {
+def invoke(reg: ToolRegistry, name: str, args: dict[str, any], bridge: any = None) -> str {
     ent = get_tool(reg, name);
     if ent is None {
         return f"ERROR: unknown tool {name}";

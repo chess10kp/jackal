@@ -2,7 +2,6 @@
 
 import from ui.terminal { synchronized_write }
 
-
 test "start enables paste and alternate screen; stop restores" {
     term = VirtualTerminal(columns=40, rows=12);
     assert term.restored;
@@ -20,14 +19,9 @@ test "start enables paste and alternate screen; stop restores" {
     assert term.cursor_visible;
 }
 
-
 test "inject queues input and invokes callback" {
     seen: list[str] = [];
-    term = VirtualTerminal(
-        columns=20,
-        rows=5,
-        on_input=lambda (data: str) -> None { seen.append(data) },
-    );
+    term = VirtualTerminal(columns=20, rows=5, on_input=lambda (data: str) { seen.append(data) });
     term.start();
     term.inject("abc");
     term.inject("\x1b[A");
@@ -39,13 +33,10 @@ test "inject queues input and invokes callback" {
     term.stop();
 }
 
-
 test "inject_resize updates size and notifies" {
     sizes: list[tuple[int, int]] = [];
     term = VirtualTerminal(
-        columns=80,
-        rows=24,
-        on_resize=lambda (c: int, r: int) -> None { sizes.append((c, r)) },
+        columns=80, rows=24, on_resize=lambda (c: int, r: int) { sizes.append((c, r)) }
     );
     term.inject_resize(100, 30);
     assert term.columns == 100;
@@ -54,12 +45,9 @@ test "inject_resize updates size and notifies" {
     assert len(term.capture_cells()) == 30;
 }
 
-
 test "inject_sigint restores terminal" {
     hits = [0];
-    term = VirtualTerminal(
-        on_interrupt=lambda -> None { hits[0] = hits[0] + 1; },
-    );
+    term = VirtualTerminal(on_interrupt=lambda { hits[0] = hits[0] + 1; });
     term.start();
     assert not term.restored;
     term.inject_sigint();
@@ -68,16 +56,15 @@ test "inject_sigint restores terminal" {
     assert term.interrupt_count == 1;
 }
 
-
 test "exception exit path still restores" {
     term = VirtualTerminal(columns=10, rows=4);
     failed = False;
     try {
         term.run_with_exception_guard(
-            lambda (t: VirtualTerminal) -> None {
+            lambda (t: VirtualTerminal) {
                 t.write("hi");
                 raise ValueError("boom");
-            }
+            },
         );
     } except ValueError {
         failed = True;
@@ -87,7 +74,6 @@ test "exception exit path still restores" {
     assert term.exception_exits == 1;
 }
 
-
 test "normal exit path restores via stop" {
     term = VirtualTerminal();
     term.start();
@@ -95,7 +81,6 @@ test "normal exit path restores via stop" {
     term.stop();
     assert term.restored;
 }
-
 
 test "write updates cell capture for printable text" {
     term = VirtualTerminal(columns=10, rows=3);
@@ -107,7 +92,6 @@ test "write updates cell capture for printable text" {
     assert rows[0].startswith("Hi");
     term.stop();
 }
-
 
 test "SGR sequences consumed without polluting cells" {
     term = VirtualTerminal(columns=10, rows=3);
@@ -121,7 +105,6 @@ test "SGR sequences consumed without polluting cells" {
     assert len(rows[0].rstrip()) == 4;
     term.stop();
 }
-
 
 test "synchronized_write emits begin and end markers" {
     term = VirtualTerminal();

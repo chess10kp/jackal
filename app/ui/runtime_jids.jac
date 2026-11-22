@@ -13,7 +13,6 @@ across the boundary.
 
 import from ui.osp_walk { ui_jids_reachable_from_nodes }
 
-
 """One-hop enumeration of persistent root's edges as seed handles.
 
 Covers both directions: the BFS itself walks `-->` and `<--`, so seeds
@@ -29,7 +28,6 @@ def ui_persistent_root_seeds -> list[any] {
     return seeds;
 }
 
-
 """BFS from Jac persistent root across all edge types; return UI jids found."""
 def ui_jids_reachable_from_persistent_root(ui_jids: set[str]) -> list[str] {
     found: list[str] = [];
@@ -37,10 +35,7 @@ def ui_jids_reachable_from_persistent_root(ui_jids: set[str]) -> list[str] {
     if root_jid in ui_jids {
         found.append(root_jid);
     }
-    for reachable_jid in ui_jids_reachable_from_nodes(
-        ui_persistent_root_seeds(),
-        ui_jids,
-    ) {
+    for reachable_jid in ui_jids_reachable_from_nodes(ui_persistent_root_seeds(), ui_jids) {
         if reachable_jid not in found {
             found.append(reachable_jid);
         }

@@ -34,11 +34,9 @@ glob MAX_CATALOG_MODELS: int = 256;
 only by _merge_catalog_result/refresh_model_catalog."""
 glob _CATALOG_CACHE: dict[str, dict[str, any]] = {};
 
-
 def _now_ms -> int {
     return int(time.time() * 1000);
 }
-
 
 """Read the env TTL override once per call (tests and power users both win).
 Invalid/negative values fall back to the default window."""
@@ -57,7 +55,6 @@ def _ttl_ms -> int {
     }
     return val;
 }
-
 
 """Parse an OpenAI-compatible models payload into a clean id list.
 
@@ -91,7 +88,6 @@ def _parse_models_payload(payload: any) -> list[str] {
     return out;
 }
 
-
 """True when a cache entry is still inside the freshness window. A missing
 entry is never fresh; `now_ms`/`ttl_ms` injected for tests."""
 def _entry_is_fresh(cached: dict[str, any] | None, now_ms: int, ttl_ms: int) -> bool {
@@ -109,7 +105,6 @@ def _entry_is_fresh(cached: dict[str, any] | None, now_ms: int, ttl_ms: int) -> 
     return now_ms - fetched < ttl_ms;
 }
 
-
 """Merge one fetch outcome into the cache and return what the picker shows.
 
 Semantics (fx parity):
@@ -117,7 +112,9 @@ Semantics (fx parity):
   fetch failed/empty          -> serve last-good cache if any
   nothing cached yet          -> serve the static route hints
 Pure over its inputs; writes the module cache."""
-def _merge_catalog_result(provider: str, fetched: list[str], fallback: list[str], now_ms: int) -> list[str] {
+def _merge_catalog_result(
+    provider: str, fetched: list[str], fallback: list[str], now_ms: int
+) -> list[str] {
     if fetched {
         _CATALOG_CACHE[provider] = {"models": list(fetched), "fetched_ms": now_ms};
         return list(fetched);
@@ -131,7 +128,6 @@ def _merge_catalog_result(provider: str, fetched: list[str], fallback: list[str]
     }
     return list(fallback);
 }
-
 
 """Static `models` hints for a route ("" provider -> [])."""
 def _static_models(route: dict[str, any] | None) -> list[str] {
@@ -151,7 +147,6 @@ def _static_models(route: dict[str, any] | None) -> list[str] {
     return out;
 }
 
-
 """True when a route's base_url marks a local/no-network provider."""
 def _is_local_route(route: dict[str, any] | None) -> bool {
     if route is None {
@@ -160,7 +155,6 @@ def _is_local_route(route: dict[str, any] | None) -> bool {
     base = str(route.get("base_url", ""));
     return base.startswith("local://") or not base;
 }
-
 
 """GET `{base_url}/models` for one route and parse the payload.
 
@@ -195,7 +189,6 @@ def _fetch_route_models(route: dict[str, any]) -> list[str] {
     }
 }
 
-
 """Return provider catalog immediately: cached ids or static hints. Stale/missing
 catalogs refresh in the background; unknown providers get []. Never raises."""
 def catalog_models(provider: str) -> list[str] {
@@ -219,16 +212,14 @@ def catalog_models(provider: str) -> list[str] {
     return _static_models(route);
 }
 
-
 """Fire-and-forget warm of every fetchable route. Called from the TUI boot
 seam right after credentials are hydrated so `/model` opens with live
 catalogs already cached (fx's preload thread, in flow form)."""
-def warm_model_catalog  {
+def warm_model_catalog {
     for prov in PROVIDER_ROUTES {
         _schedule_catalog_refresh(str(prov));
     }
 }
-
 
 """Force-refresh every fetchable route. Returns {provider: model_count}
 mirroring what the picker would show (a failed fetch contributes its
@@ -243,9 +234,7 @@ def refresh_model_catalog -> dict[str, int] {
             continue;
         }
         fetched = _fetch_route_models(route);
-        shown = _merge_catalog_result(
-            provider, fetched, _static_models(route), _now_ms()
-        );
+        shown = _merge_catalog_result(provider, fetched, _static_models(route), _now_ms());
         counts[provider] = len(shown);
     }
     return counts;
@@ -259,8 +248,7 @@ def _refresh_one(provider: str) {
             fetched: list[str] = _fetch_route_models(route);
             _merge_catalog_result(provider, fetched, _static_models(route), _now_ms());
         }
-    } except Exception {
-    } finally {
+    } except Exception {} finally {
         _CATALOG_REFRESHING.pop(provider, None);
     }
 }

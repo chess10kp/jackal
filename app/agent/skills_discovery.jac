@@ -20,9 +20,7 @@ import from .skills_support {
     _warning,
 }
 
-
 # ============================ directory walk =============================
-
 
 """Recursive discovery under *dir_path*.
 
@@ -44,7 +42,7 @@ def _load_skills_from_dir(
     if not os.path.isdir(dir_path) {
         return empty;
     }
-    base = root_dir if root_dir else dir_path;
+    base = root_dir or dir_path;
     rules: list[str] = list(ignore_rules) if ignore_rules else [];
     rules.extend(_load_ignore_rules(base, dir_path));
 
@@ -106,15 +104,12 @@ def _load_skills_from_dir(
     return {"skills": skills, "diagnostics": diagnostics};
 }
 
-
 """Public single-directory load."""
 def load_skills_from_dir(dir_path: str, source: str) -> dict[str, list[dict[str, any]]] {
     return _load_skills_from_dir(dir_path, source, True);
 }
 
-
 # ======================= roots, paths, precedence ========================
-
 
 """Nearest ancestor dir (walked up from cwd) holding .jackal/skills, else ''."""
 def _find_project_skills_dir(cwd: str) -> str {
@@ -133,7 +128,6 @@ def _find_project_skills_dir(cwd: str) -> str {
     return "";
 }
 
-
 def _normalize_path(p: str) -> str {
     trimmed = p.strip();
     home = _user_home();
@@ -149,7 +143,6 @@ def _normalize_path(p: str) -> str {
     return trimmed;
 }
 
-
 def _resolve_skill_path(p: str, cwd: str) -> str {
     normalized = _normalize_path(p);
     if _is_abs(normalized) {
@@ -157,7 +150,6 @@ def _resolve_skill_path(p: str, cwd: str) -> str {
     }
     return _abs_path(os.path.join(cwd, normalized));
 }
-
 
 def _path_under(target: str, base_root: str) -> bool {
     if not base_root {
@@ -170,7 +162,6 @@ def _path_under(target: str, base_root: str) -> bool {
     return target.startswith(nr + os.sep);
 }
 
-
 def _get_source(rp: str, user_dir: str, proj_dir: str) -> str {
     if _path_under(rp, user_dir) {
         return "user";
@@ -181,10 +172,14 @@ def _get_source(rp: str, user_dir: str, proj_dir: str) -> str {
     return "path";
 }
 
-
 """Merge one load result: realpath dedup, later-root-wins collisions."""
-def _add_loaded(result: dict[str, list[dict[str, any]]], skill_map: dict[str, dict[str, any]], real_paths: set[str],
-                all_diags: list[dict[str, any]], collision_diags: list[dict[str, any]]) {
+def _add_loaded(
+    result: dict[str, list[dict[str, any]]],
+    skill_map: dict[str, dict[str, any]],
+    real_paths: set[str],
+    all_diags: list[dict[str, any]],
+    collision_diags: list[dict[str, any]],
+) {
     res_diags: list[dict[str, any]] = result["diagnostics"];
     all_diags.extend(res_diags);
     res_skills: list[dict[str, any]] = result["skills"];
@@ -211,7 +206,6 @@ def _add_loaded(result: dict[str, list[dict[str, any]]], skill_map: dict[str, di
     }
 }
 
-
 def _resolve_package_root -> str {
     env = os.environ.get("JACKAL_AGENT_DIR");
     if env and os.path.isdir(os.path.join(env, "pi", "skills")) {
@@ -224,11 +218,9 @@ def _resolve_package_root -> str {
     return os.getcwd();
 }
 
-
 def _skill_sort_key(skill: dict[str, any]) -> str {
     return str(skill.get("name", ""));
 }
-
 
 """Load every visible skill for a session, merged and name-sorted.
 
@@ -245,9 +237,9 @@ def load_jackal_skills(
     skill_paths: list[str] | None = None,
     include_defaults: bool = True,
 ) -> dict[str, list[dict[str, any]]] {
-    base_cwd = cwd if cwd else os.getcwd();
-    pkg_root = package_root if package_root else _resolve_package_root();
-    home_dir = agent_dir if agent_dir else os.path.join(_user_home(), ".jackal");
+    base_cwd = cwd or os.getcwd();
+    pkg_root = package_root or _resolve_package_root();
+    home_dir = agent_dir or os.path.join(_user_home(), ".jackal");
     paths: list[str] = skill_paths if skill_paths is not None else [];
 
     skill_map: dict[str, dict[str, any]] = {};
@@ -261,16 +253,25 @@ def load_jackal_skills(
     if include_defaults {
         _add_loaded(
             _load_skills_from_dir(os.path.join(pkg_root, "pi", "skills"), "builtin"),
-            skill_map, real_paths, all_diags, collision_diags,
+            skill_map,
+            real_paths,
+            all_diags,
+            collision_diags,
         );
         _add_loaded(
             _load_skills_from_dir(user_skills_dir, "user"),
-            skill_map, real_paths, all_diags, collision_diags,
+            skill_map,
+            real_paths,
+            all_diags,
+            collision_diags,
         );
         if project_skills_dir {
             _add_loaded(
                 _load_skills_from_dir(project_skills_dir, "project"),
-                skill_map, real_paths, all_diags, collision_diags,
+                skill_map,
+                real_paths,
+                all_diags,
+                collision_diags,
             );
         }
     }
@@ -286,14 +287,20 @@ def load_jackal_skills(
             if os.path.isdir(rp) {
                 _add_loaded(
                     _load_skills_from_dir(rp, source),
-                    skill_map, real_paths, all_diags, collision_diags,
+                    skill_map,
+                    real_paths,
+                    all_diags,
+                    collision_diags,
                 );
             } elif os.path.isfile(rp) and rp.endswith(".md") {
                 (skill, diag) = _load_skill_from_file(rp, source);
                 if skill is not None {
                     _add_loaded(
                         {"skills": [skill], "diagnostics": diag},
-                        skill_map, real_paths, all_diags, collision_diags,
+                        skill_map,
+                        real_paths,
+                        all_diags,
+                        collision_diags,
                     );
                 } else {
                     all_diags.extend(diag);

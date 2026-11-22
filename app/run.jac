@@ -17,7 +17,7 @@ def _jac_launcher(repo_root: str) -> str {
         return workspace;
     }
     found = shutil.which("jac");
-    return found if found else "jac";
+    return found or "jac";
 }
 
 with entry:__main__ {

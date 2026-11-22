@@ -156,7 +156,7 @@ def _invoke_tool_fake(bridge: PluginBridge, name: str, args: dict[str, any]) -> 
     if ok {
         payload["result"] = result;
     } else {
-        payload["error"] = err if err else "invoke failed";
+        payload["error"] = err or "invoke failed";
     }
     bridge.inbox.append(
         make_envelope(

@@ -48,8 +48,8 @@ glob EPSILON: float = 1e-8;
 
 # Bounds sentinels for PartitionRequest.minimums/maximums (full-length
 # parallel lists; entries at the sentinels mean "unbounded" on that side).
-glob _NO_MIN: float = -1e308;
-glob _NO_MAX: float = 1e308;
+glob _NO_MIN: float = -1e308,
+     _NO_MAX: float = 1e308;
 
 """Largest-remainder request for one flow partition along one axis."""
 obj PartitionRequest {

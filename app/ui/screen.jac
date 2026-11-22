@@ -31,23 +31,11 @@ import from ui.runtime {
     register_capability,
 }
 
-import from ui.bindings {
-    subscribe,
-}
+import from ui.bindings { subscribe }
 
-import from ui.events {
-    SendPrompt,
-    InsertText,
-    Submit,
-    Cancel,
-    dispatch_event,
-}
+import from ui.events { SendPrompt, InsertText, Submit, Cancel, dispatch_event }
 
-import from ui.editor {
-    editor_insert,
-    editor_submit,
-    AblePrompt,
-}
+import from ui.editor { editor_insert, editor_submit, AblePrompt }
 
 import from ui.layout_types {
     AxisSize,
@@ -59,7 +47,6 @@ import from ui.layout_types {
     set_spec,
 }
 
-
 obj ShellScreen {
     has screen: MainScreen,
         header: Header,
@@ -69,7 +56,6 @@ obj ShellScreen {
         approval: ApprovalOverlay | None = None;
 }
 
-
 obj ShellIdSnapshot {
     has screen_id: str,
         header_id: str,
@@ -78,9 +64,7 @@ obj ShellIdSnapshot {
         prompt_id: str;
 }
 
-
 glob _SHELL_BY_SESSION: dict[str, ShellScreen] = {};
-
 
 """Build MainScreen(Header, TranscriptView, Status, Prompt) under ui_root once."""
 def build_main_shell(session: UiSession) -> ShellScreen {
@@ -110,28 +94,17 @@ def build_main_shell(session: UiSession) -> ShellScreen {
     set_focus(session, prompt);
 
     shell = ShellScreen(
-        screen=screen,
-        header=header,
-        transcript=transcript,
-        status=status,
-        prompt=prompt,
+        screen=screen, header=header, transcript=transcript, status=status, prompt=prompt
     );
     _SHELL_BY_SESSION[root_id] = shell;
     return shell;
 }
 
-
 """Wire default shell contracts: transcript binding + prompt cursor capability."""
 def install_shell_contracts(session: UiSession, shell: ShellScreen, binding_name: str) {
-    subscribe(
-        session.bindings,
-        binding_name,
-        node_id(shell.transcript),
-        "TranscriptChanged",
-    );
+    subscribe(session.bindings, binding_name, node_id(shell.transcript), "TranscriptChanged");
     register_capability(session, node_id(shell.prompt), "cursor");
 }
-
 
 """Snapshot stable jids for shell regions (for stability assertions)."""
 def shell_ids(shell: ShellScreen) -> ShellIdSnapshot {
@@ -144,7 +117,6 @@ def shell_ids(shell: ShellScreen) -> ShellIdSnapshot {
     );
 }
 
-
 """Insert text into the focused prompt draft (walker ability path)."""
 def shell_insert_text(session: UiSession, shell: ShellScreen, text: str) {
     event = InsertText(text=text);
@@ -153,7 +125,6 @@ def shell_insert_text(session: UiSession, shell: ShellScreen, text: str) {
         editor_insert(shell.prompt, text);
     }
 }
-
 
 """Submit the prompt draft; returns host effects (e.g. SendPrompt)."""
 def shell_submit(session: UiSession, shell: ShellScreen) -> list[any] {
@@ -165,7 +136,6 @@ def shell_submit(session: UiSession, shell: ShellScreen) -> list[any] {
     text = editor_submit(shell.prompt);
     return [SendPrompt(text=text)];
 }
-
 
 """Cancel in-progress edit / turn from the shell."""
 def shell_cancel(session: UiSession, shell: ShellScreen) {
@@ -179,12 +149,8 @@ def shell_cancel(session: UiSession, shell: ShellScreen) {
     }
 }
 
-
 """Open the modal ApprovalOverlay for the shell."""
-def shell_open_approval(
-    session: UiSession,
-    shell: ShellScreen,
-) -> OverlayOpenResult {
+def shell_open_approval(session: UiSession, shell: ShellScreen) -> OverlayOpenResult {
     if shell.approval is not None {
         return open_modal_overlay(
             session, shell.screen, shell.approval, initial_focus=shell.approval
@@ -194,22 +160,14 @@ def shell_open_approval(
     append_child_session(session, shell.screen, approval);
     track_node(session, approval);
     shell.approval = approval;
-    return open_modal_overlay(
-        session, shell.screen, approval, initial_focus=approval, z_index=10
-    );
+    return open_modal_overlay(session, shell.screen, approval, initial_focus=approval, z_index=10);
 }
 
-
 """Close the approval overlay and restore shell focus."""
-def shell_close_approval(
-    session: UiSession,
-    shell: ShellScreen,
-) -> OverlayCloseResult {
+def shell_close_approval(session: UiSession, shell: ShellScreen) -> OverlayCloseResult {
     if shell.approval is None {
         return OverlayCloseResult(
-            restored_focus_id=session.focus_id,
-            damage=OverlayBounds(),
-            overlay_id="",
+            restored_focus_id=session.focus_id, damage=OverlayBounds(), overlay_id=""
         );
     }
     approval = shell.approval;
@@ -217,24 +175,15 @@ def shell_close_approval(
     return close_overlay(session, approval);
 }
 
-
 """Apply a terminal resize to shell layout contracts / content wrap."""
-def shell_resize(
-    session: UiSession,
-    shell: ShellScreen,
-    columns: int,
-    rows: int,
-) {
+def shell_resize(session: UiSession, shell: ShellScreen, columns: int, rows: int) {
     _ = shell;
     if columns < 1 or rows < 1 {
         raise ValueError("resize requires positive columns and rows");
     }
     session.graph_revision += 1;
-    session.event_queue.append(
-        make_session_event("resize", {"columns": columns, "rows": rows})
-    );
+    session.event_queue.append(make_session_event("resize", {"columns": columns, "rows": rows}));
 }
-
 
 # ----------------------------------------------------------------------
 # Permanent layout configuration (LAYOUT-ENGINE-PLAN §4 invariant 9).
@@ -244,21 +193,17 @@ def _fill -> AxisSize {
     return AxisSize(mode=SizeMode.FILL);
 }
 
-
 def _fixed(n: float) -> AxisSize {
     return AxisSize(mode=SizeMode.FIXED, preferred=n);
 }
-
 
 def _grow(weight: float) -> AxisSize {
     return AxisSize(mode=SizeMode.GROW, grow_weight=weight);
 }
 
-
 def _spec(width: AxisSize, height: AxisSize) -> LayoutSpec {
     return LayoutSpec(width=width, height=height);
 }
-
 
 """Install the permanent layout specs for the main shell (plan §4
 invariant 9): screen fills the root viewport; header/status/prompt keep
@@ -267,10 +212,7 @@ Mirrors the contracts gates.jac sets on the legacy engine so parity is
 testable at the M6 cutover.
 
 Returns the diagnostics of every failed set_spec; empty means success."""
-def configure_main_shell_layout(
-    state: LayoutState,
-    shell: ShellScreen,
-) -> list[LayoutDiagnostic] {
+def configure_main_shell_layout(state: LayoutState, shell: ShellScreen) -> list[LayoutDiagnostic] {
     failures: list[LayoutDiagnostic] = [];
 
     targets: list[UiNode] = [
@@ -301,9 +243,7 @@ def configure_main_shell_layout(
     # 20x4 fixed box.
     if shell.approval is not None {
         r = set_spec(
-            state,
-            shell.approval,
-            LayoutSpec(width=fixed_axis(20.0), height=fixed_axis(4.0)),
+            state, shell.approval, LayoutSpec(width=fixed_axis(20.0), height=fixed_axis(4.0))
         );
         if not r.ok {
             for d in r.diagnostics {

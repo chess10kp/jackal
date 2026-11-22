@@ -367,7 +367,6 @@ test "unknown tool yields error result without crashing" {
 }
 
 test "react loop invokes js tool via registry bridge" {
-
     def _js_echo(text: str) -> str {
         return "JS:" + text;
     }
@@ -403,7 +402,6 @@ test "react loop invokes js tool via registry bridge" {
 }
 
 test "react loop honors tool_call block verdicts from a plugin bridge" {
-
     def _block_no_terminate(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"block": True, "reason": "policy"};
     }
@@ -425,7 +423,6 @@ test "react loop honors tool_call block verdicts from a plugin bridge" {
 }
 
 test "react loop stops early on terminating block verdict" {
-
     def _terminate_block(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"block": True, "reason": "dangerous command", "terminate": True};
     }
@@ -447,7 +444,6 @@ test "react loop stops early on terminating block verdict" {
 }
 
 test "make_ext_transport wires provider config without network" {
-
     bridge = create_bridge("p10-transport");
     register_fake_provider(
         bridge, {"name": "acme", "models": ["sonnet-x"], "base_url": "https://acme.example/v1"}
@@ -467,7 +463,6 @@ test "make_ext_transport wires provider config without network" {
 }
 
 test "react loop applies tool_result rewrites from a plugin bridge" {
-
     def _rewrite(data: dict[str, any], ctx: any) -> dict[str, any] | None {
         # Sees the latest content; appends a marker (middleware chain).
         if data.get("toolName") == "echo" {
@@ -513,7 +508,6 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
 }
 
 test "react loop skips tool execution when cancelled during the gate" {
-
     # TurnCancel is module-level in this file.
     cancel = TurnCancel();
 
@@ -573,7 +567,6 @@ test "make_transport wires hook_bridge through every provider branch" {
 }
 
 test "make_ext_transport attaches the hook bridge" {
-
     bridge = create_bridge("apr-ext");
     register_fake_provider(
         bridge, {"name": "acme", "models": ["sonnet-x"], "base_url": "https://acme.example/v1"}
@@ -585,7 +578,6 @@ test "make_ext_transport attaches the hook bridge" {
 }
 
 test "_notify_response fires after_provider_response with status and headers" {
-
     bridge = create_bridge("apr-notify");
     seen: list[dict[str, any]] = [];
     def _capture(data: dict[str, any], ctx: any) -> str {
@@ -612,7 +604,6 @@ test "_notify_response fires after_provider_response with status and headers" {
 }
 
 test "_open_stream fires hook before the first delta from a live SSE server" {
-
     order: list[str] = [];
     def _mark(data: dict[str, any], ctx: any) -> str {
         order.append("hook:" + str(data.get("status")));
@@ -645,7 +636,6 @@ test "_open_stream fires hook before the first delta from a live SSE server" {
 }
 
 test "_open_stream fires the hook even when the provider answers non-200" {
-
     statuses: list[int] = [];
     def _cap(data: dict[str, any], ctx: any) -> str {
         statuses.append(int(data.get("status", 0)));
@@ -686,7 +676,6 @@ import from .fake_host { register_fake_listener }
 import os;
 
 test "after_provider_response refires per retry attempt through react_loop" {
-
     statuses: list[int] = [];
     def _cap(data: dict[str, any], ctx: any) -> str {
         statuses.append(int(data.get("status", 0)));

@@ -11,7 +11,6 @@ import json;
 import tempfile;
 import shutil;
 
-
 obj _Weird {
     has label: str = "weird";
 
@@ -19,7 +18,6 @@ obj _Weird {
         return "<weird object>";
     }
 }
-
 
 """Run `body` with the given env vars applied, restoring the old values."""
 def _with_env(env: dict[str, str], body: any) -> any {
@@ -41,7 +39,6 @@ def _with_env(env: dict[str, str], body: any) -> any {
     }
 }
 
-
 test "logging is off by default and writes nothing" {
     def body -> bool {
         return log_event("error", "test", "should not appear");
@@ -51,7 +48,6 @@ test "logging is off by default and writes nothing" {
     assert log_sink() == "";
     assert not log_enabled("error");
 }
-
 
 test "explicit sink path writes one JSON object per event" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-test-");
@@ -80,7 +76,6 @@ test "explicit sink path writes one JSON object per event" {
     }
 }
 
-
 test "JACKAL_LOG=1 uses the per-process .jackal/logs file" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-default-");
     cwd = os.getcwd();
@@ -103,12 +98,11 @@ test "JACKAL_LOG=1 uses the per-process .jackal/logs file" {
     }
 }
 
-
 test "level threshold filters lower-severity records" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-level-");
     try {
         sink = os.path.join(tmp, "l.jsonl");
-        def body -> None {
+        def body {
             log_debug("x", "debug line");
             log_info("x", "info line");
             log_warn("x", "warn line");
@@ -121,7 +115,6 @@ test "level threshold filters lower-severity records" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "unknown level names do not disable or crash logging" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-badlevel-");
@@ -139,7 +132,6 @@ test "unknown level names do not disable or crash logging" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "unserializable payloads are projected, not raised" {
     fields = {
@@ -170,7 +162,6 @@ test "unserializable payloads are projected, not raised" {
     }
 }
 
-
 test "an unusable sink path is a no-op, not an exception" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-badsink-");
     try {
@@ -189,7 +180,6 @@ test "an unusable sink path is a no-op, not an exception" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "log_exception records type, message and traceback, and never raises" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-exc-");
@@ -222,7 +212,6 @@ test "log_exception records type, message and traceback, and never raises" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "read_log skips malformed lines and missing files" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-read-");

@@ -8,18 +8,8 @@ import os;
 import time;
 
 import from .tools { default_registry }
-import from .registry {
-    create_registry,
-    get_tool,
-    invoke,
-    as_tool_specs,
-    register_native,
-}
-import from .protocol {
-    is_plugin_kind,
-    is_ui_kind,
-    make_plugin_envelope,
-}
+import from .registry { create_registry, get_tool, invoke, as_tool_specs, register_native }
+import from .protocol { is_plugin_kind, is_ui_kind, make_plugin_envelope }
 import from .fake_host {
     register_fake_command,
     register_fake_shortcut,
@@ -35,16 +25,13 @@ import from .fake_host {
 import threading;
 import json;
 
-
 def _echo(text: str) -> str {
     return "JS:" + text;
 }
 
-
 def _tool_echo(args: dict[str, any]) -> str {
     return _echo(str(args.get("text", "")));
 }
-
 
 test "ensure_host emits host_hello and is lazy" {
     bridge = create_bridge("s1");
@@ -57,7 +44,6 @@ test "ensure_host emits host_hello and is lazy" {
     ensure_host(bridge);
     assert drain_inbox(bridge) == [];
 }
-
 
 test "load_extension registers js tools and invoke round-trips" {
     bridge = create_bridge("s-load");
@@ -75,7 +61,7 @@ test "load_extension registers js tools and invoke round-trips" {
                     "properties": {"text": {"type": "string"}},
                     "required": ["text"],
                 },
-            }
+            },
         ],
         {"echo": _echo},
     );
@@ -92,7 +78,6 @@ test "load_extension registers js tools and invoke round-trips" {
     kinds2 = drain_inbox(bridge);
     assert "tool_result" in kinds2;
 }
-
 
 test "default_registry is native-only until extension loads" {
     reg = default_registry();
@@ -113,7 +98,6 @@ test "default_registry is native-only until extension loads" {
     assert invoke(reg, "echo", {"text": "x"}, bridge) == "JS:x";
 }
 
-
 test "unload_extension removes js tools only" {
     bridge = create_bridge("s-un");
     reg = default_registry();
@@ -130,7 +114,6 @@ test "unload_extension removes js tools only" {
     assert get_tool(reg, "read_file") is not None;
 }
 
-
 test "dispose_bridge marks host dead" {
     bridge = create_bridge("s-dis");
     ensure_host(bridge);
@@ -139,7 +122,6 @@ test "dispose_bridge marks host dead" {
     kinds = drain_inbox(bridge);
     assert "host_goodbye" in kinds;
 }
-
 
 test "plugin and ui kind helpers partition the seam" {
     assert is_ui_kind("text_delta");
@@ -166,7 +148,6 @@ test "plugin and ui kind helpers partition the seam" {
     assert raised;
 }
 
-
 test "node host load stub_echo and invoke round-trip" {
     bridge = create_bridge("s-node");
     reg = create_registry();
@@ -192,7 +173,6 @@ test "node host load stub_echo and invoke round-trip" {
     assert bridge.proc is None;
 }
 
-
 test "cold path never spawns node until ensure_node_host" {
     bridge = create_bridge("s-cold");
     assert bridge.proc is None;
@@ -202,7 +182,6 @@ test "cold path never spawns node until ensure_node_host" {
     assert bridge.proc is None;
     dispose_bridge(bridge);
 }
-
 
 test "maybe_reap_idle reaps node host and emits host_status" {
     bridge = create_bridge("s-reap");
@@ -219,7 +198,6 @@ test "maybe_reap_idle reaps node host and emits host_status" {
     assert "host_status" in kinds;
 }
 
-
 test "host_status marks degraded when node dies" {
     bridge = create_bridge("s-deg");
     ensure_node_host(bridge);
@@ -232,7 +210,6 @@ test "host_status marks degraded when node dies" {
     kinds = drain_inbox(bridge);
     assert "host_status" in kinds;
 }
-
 
 test "node host loads real Pi greet extension" {
     bridge = create_bridge("s-pi");
@@ -249,13 +226,11 @@ test "node host loads real Pi greet extension" {
     dispose_bridge(bridge);
 }
 
-
 test "resolve_node_bin returns executable path" {
     bin = resolve_node_bin();
     assert bin;
     assert "node" in bin;
 }
-
 
 test "host_hello advertises compat tier and caps" {
     bridge = create_bridge("s-caps");
@@ -266,7 +241,6 @@ test "host_hello advertises compat tier and caps" {
     dispose_bridge(bridge);
 }
 
-
 test "load_extension_path rejects unsupported requires" {
     bridge = create_bridge("s-req");
     reg = create_registry();
@@ -276,22 +250,17 @@ test "load_extension_path rejects unsupported requires" {
     # to real caps; events remains local-only by design).
     raised = False;
     try {
-        load_extension_path(
-            bridge, reg, "stub.echo", stub, requires=["events"]
-        );
+        load_extension_path(bridge, reg, "stub.echo", stub, requires=["events"]);
     } except RuntimeError {
         raised = True;
     }
     assert raised;
 
     # "renderers" is now a REAL cap — must load cleanly.
-    names = load_extension_path(
-        bridge, reg, "stub.echo", stub, requires=["renderers"]
-    );
+    names = load_extension_path(bridge, reg, "stub.echo", stub, requires=["renderers"]);
     assert "echo" in names;
     dispose_bridge(bridge);
 }
-
 
 test "tool_cancel aborts slow Pi tool" {
     bridge = create_bridge("s-cancel");
@@ -304,9 +273,7 @@ test "tool_cancel aborts slow Pi tool" {
     box: dict[str, str] = {"result": ""};
 
     def _run {
-        box["result"] = invoke(
-            reg, "slow_echo", {"text": "x", "ms": 2000}, bridge
-        );
+        box["result"] = invoke(reg, "slow_echo", {"text": "x", "ms": 2000}, bridge);
     }
 
     t = threading.Thread(target=_run, daemon=True);
@@ -319,7 +286,6 @@ test "tool_cancel aborts slow Pi tool" {
     assert "cancel" in box["result"] or "ERROR" in box["result"];
     dispose_bridge(bridge);
 }
-
 
 # ===================== T2-partial: commands + hooks =====================
 
@@ -347,7 +313,6 @@ test "fake host command invoke round-trips with notifications" {
     assert "unknown command" in missing["error"];
 }
 
-
 test "fake host shortcut invoke fires handler with ui ctx" {
     bridge = create_bridge("s-sc");
 
@@ -373,7 +338,6 @@ test "fake host shortcut invoke fires handler with ui ctx" {
     assert missing["ok"] is False;
     assert "unknown shortcut" in missing["error"];
 }
-
 
 test "fake host hook fire runs listeners serially and isolates errors" {
     bridge = create_bridge("s-hook");
@@ -409,7 +373,6 @@ test "fake host hook fire runs listeners serially and isolates errors" {
     assert fire_hook(bridge, "unknown_event", {}) == [];
 }
 
-
 test "unload_extension drops bridge commands for the extension" {
     bridge = create_bridge("s-unload");
     reg = create_registry();
@@ -425,7 +388,6 @@ test "unload_extension drops bridge commands for the extension" {
     assert "xcmd" not in bridge.commands;
     assert "ycmd" in bridge.commands;
 }
-
 
 test "node host loads stub_commands fixture: commands tracked, cmd_invoke round-trips" {
     bridge = create_bridge("s-t2-node");
@@ -448,7 +410,6 @@ test "node host loads stub_commands fixture: commands tracked, cmd_invoke round-
     dispose_bridge(bridge);
 }
 
-
 test "node host fires lifecycle hooks through the bridge" {
     bridge = create_bridge("s-t2-hook");
     reg = create_registry();
@@ -467,7 +428,6 @@ test "node host fires lifecycle hooks through the bridge" {
 
     dispose_bridge(bridge);
 }
-
 
 # ===================== T2b: markdown transformers =====================
 
@@ -515,16 +475,13 @@ test "fake host transformer chain runs in order and isolates errors" {
     assert res4 == {"ok": True, "markdown": "raw"};
 }
 
-
 test "node host transforms markdown through the bridge" {
     bridge = create_bridge("s-t2b-node");
     reg = create_registry();
     ensure_node_host(bridge);
     load_extension_path(bridge, reg, "stub.commands", resolve_stub_commands());
 
-    res = transform_markdown(
-        bridge, "code:\n```py\nx=1\n```", message_type="assistant"
-    );
+    res = transform_markdown(bridge, "code:\n```py\nx=1\n```", message_type="assistant");
     assert res["ok"] is True;
     # stub_commands replaces ``` with ≡≡≡ (display-only chain over the wire).
     assert "≡≡≡" in res["markdown"];
@@ -539,7 +496,6 @@ test "node host transforms markdown through the bridge" {
     dispose_bridge(bare);
     dispose_bridge(bridge);
 }
-
 
 # ===================== B1: extension traffic + control =====================
 
@@ -577,7 +533,6 @@ test "fake host drains messages entries and ui events" {
     assert traffic2 == {"messages": [], "entries": []};
 }
 
-
 test "fake host enforces active tools" {
     bridge = create_bridge("s-b1-active");
     reg = create_registry();
@@ -590,7 +545,13 @@ test "fake host enforces active tools" {
         bridge,
         reg,
         "b1.tools",
-        [{"name": "t_only", "description": "probe", "parameters": {"type": "object", "properties": {}}}],
+        [
+            {
+                "name": "t_only",
+                "description": "probe",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        ],
         {"t_only": _noop},
     );
 
@@ -603,14 +564,12 @@ test "fake host enforces active tools" {
     assert not r2.startswith("ERROR:");
 }
 
-
 test "session name round-trips on the bridge" {
     bridge = create_bridge("s-b1-name");
     ok = set_session_name(bridge, "my-session");
     assert ok is True;
     assert fake_session_name(bridge) == "my-session";
 }
-
 
 # ===================== batch-2 events + structured verdicts =====================
 
@@ -632,9 +591,7 @@ test "fire_hook_data fake path captures verdicts and chains mutations" {
     register_fake_listener(bridge, "tool_call", _mutator);
     register_fake_listener(bridge, "tool_call", _verdict);
 
-    fired = fire_hook_data(
-        bridge, "tool_call", {"toolName": "echo_arg", "input": {"text": "hi"}}
-    );
+    fired = fire_hook_data(bridge, "tool_call", {"toolName": "echo_arg", "input": {"text": "hi"}});
     results = fired["results"];
     final = fired["data"];
     assert len(results) == 2;
@@ -643,7 +600,6 @@ test "fire_hook_data fake path captures verdicts and chains mutations" {
     assert final["input"]["text"] == "HI";
     dispose_bridge(bridge);
 }
-
 
 test "tool_call_gate aggregates blocks and mutated args" {
     bridge = create_bridge("s-b2-gate");
@@ -676,7 +632,6 @@ test "tool_call_gate aggregates blocks and mutated args" {
     dispose_bridge(bridge);
 }
 
-
 test "input_gate handles and transforms" {
     bridge = create_bridge("s-b2-input");
     ensure_host(bridge);
@@ -702,7 +657,6 @@ test "input_gate handles and transforms" {
     assert input_gate(None, "x")["action"] == "continue";
     dispose_bridge(bridge);
 }
-
 
 test "input transforms chain across handlers on the fake host" {
     bridge = create_bridge("s-b2-chain");
@@ -732,7 +686,6 @@ test "input transforms chain across handlers on the fake host" {
     assert r["text"] == "HI-CHAINED";
     dispose_bridge(bridge);
 }
-
 
 test "context_gate applies in-place edits and replacements non-destructively" {
     bridge = create_bridge("s-b2-ctx");
@@ -766,7 +719,6 @@ test "context_gate applies in-place edits and replacements non-destructively" {
     dispose_bridge(bridge);
 }
 
-
 test "agent_start_gate collects systemPrompt and message" {
     bridge = create_bridge("s-b2-agent");
     ensure_host(bridge);
@@ -782,7 +734,6 @@ test "agent_start_gate collects systemPrompt and message" {
     assert agent_start_gate(None, "p") == {"message": "", "systemPrompt": ""};
     dispose_bridge(bridge);
 }
-
 
 test "node host echoes structured verdicts and mutated working data" {
     bridge = create_bridge("s-b2-node");
@@ -824,16 +775,18 @@ test "node host echoes structured verdicts and mutated working data" {
     dispose_bridge(bridge);
 }
 
-
 # ============================ P10: provider seam ============================
 
 test "register_fake_provider feeds resolve_ext_model" {
     bridge = create_bridge("s-p10-fake");
-    register_fake_provider(bridge, {
-        "name": "acme",
-        "models": ["sonnet-x", {"id": "opus-y", "name": "Opus Y"}],
-        "base_url": "https://acme.example/v1",
-    });
+    register_fake_provider(
+        bridge,
+        {
+            "name": "acme",
+            "models": ["sonnet-x", {"id": "opus-y", "name": "Opus Y"}],
+            "base_url": "https://acme.example/v1",
+        },
+    );
 
     c1 = resolve_ext_model(bridge, "ext/fake.provider/sonnet-x");
     assert c1 is not None;
@@ -851,7 +804,6 @@ test "register_fake_provider feeds resolve_ext_model" {
     assert resolve_ext_model(None, "ext/a/b") is None;
     dispose_bridge(bridge);
 }
-
 
 test "prepare_provider_request applies edits and replacements" {
     bridge = create_bridge("s-p10-prep");
@@ -886,7 +838,6 @@ test "prepare_provider_request applies edits and replacements" {
     dispose_bridge(bridge);
 }
 
-
 test "node host ext_loaded carries providers and unload drops them" {
     bridge = create_bridge("s-p10-node");
     reg = create_registry();
@@ -911,7 +862,6 @@ test "node host ext_loaded carries providers and unload drops them" {
     assert resolve_ext_model(bridge, "ext/pi.provider/sonnet-x") is None;
     dispose_bridge(bridge);
 }
-
 
 # ============================ P11: renderers ============================
 
@@ -952,7 +902,6 @@ test "fake-host renderer normalizes to native content lines" {
     dispose_bridge(bridge);
 }
 
-
 test "node host renders message and entry blocks over the wire" {
     bridge = create_bridge("s-p11-node");
     reg = create_registry();
@@ -980,7 +929,6 @@ test "node host renders message and entry blocks over the wire" {
     assert r4["ok"] is False;
     dispose_bridge(bridge);
 }
-
 
 # ===================== tool_result result-rewriting =====================
 
@@ -1014,7 +962,6 @@ test "tool_result_gate chains patches and echoes latest content" {
     dispose_bridge(bridge);
 }
 
-
 test "node host applies tool_result rewrites over the wire" {
     bridge = create_bridge("s-tres-node");
     reg = create_registry();
@@ -1034,7 +981,6 @@ test "node host applies tool_result rewrites over the wire" {
     assert g2["result"] == "ok";
     dispose_bridge(bridge);
 }
-
 
 # ===================== kind-aware correlation (P12 prereq) =====================
 
@@ -1072,7 +1018,6 @@ test "interleaved sibling traffic does not wake or consume the wrong waiter" {
     dispose_bridge(bridge);
 }
 
-
 test "wait-time registration records expectation for direct callers" {
     bridge = create_bridge("s-kind2");
     ensure_host(bridge);
@@ -1088,7 +1033,6 @@ test "wait-time registration records expectation for direct callers" {
     assert "corr-k2" in bridge.pending;
     dispose_bridge(bridge);
 }
-
 
 # ===================== P12 slice 2: interaction queue routing =====================
 
@@ -1149,7 +1093,6 @@ test "dispatch routes ui_request/ui_cancel into the interaction queue" {
     dispose_bridge(bridge);
 }
 
-
 test "cancel_all_ui drains and expires auto-cancel" {
     bridge = create_bridge("s-p12-drain");
     ensure_host(bridge);
@@ -1175,11 +1118,7 @@ test "cancel_all_ui drains and expires auto-cancel" {
     # Expiry path: enqueue with a tiny timeout, poll after it lapses.
     env2 = make_plugin_envelope(
         kind="ui_request",
-        payload={
-            "parent_correlation_id": "exp",
-            "method": "input",
-            "timeout_ms": 1.0,
-        },
+        payload={"parent_correlation_id": "exp", "method": "input", "timeout_ms": 1.0},
         session_id=bridge.session_id,
         correlation_id="exp-child",
     );
@@ -1198,7 +1137,9 @@ test "node host sends builtins on ext_load and getAllTools sees them" {
     ensure_node_host(bridge);
     drain_inbox(bridge);
     # Seed a native builtin so the catalog is non-empty on the wire.
-    register_native(reg, "read_file", "Read a file", {"type": "object", "properties": {}}, _tool_echo);
+    register_native(
+        reg, "read_file", "Read a file", {"type": "object", "properties": {}}, _tool_echo
+    );
     load_extension_path(bridge, reg, "ctx.probe", resolve_pi_ctx_probe());
 
     ctx_report = invoke(reg, "probe_ctx", {}, bridge);
@@ -1228,7 +1169,6 @@ test "node host sends builtins on ext_load and getAllTools sees them" {
 
     dispose_bridge(bridge);
 }
-
 
 test "tool execute ui ctx: notify rides tool_result notifications, setStatus rides ui_events" {
     bridge = create_bridge("s-t2-toolui");

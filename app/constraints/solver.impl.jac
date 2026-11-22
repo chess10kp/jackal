@@ -81,21 +81,21 @@ def _journal_get_var_symbol(s: Solver, v: Variable, jnl: MutationJournal | None 
     return symbol;
 }
 
-def _journal_insert_row(s: Solver, symbol: int, row: Row, jnl: MutationJournal) -> None {
+def _journal_insert_row(s: Solver, symbol: int, row: Row, jnl: MutationJournal) {
     if (symbol not in jnl.inserted_rows and symbol not in jnl.row_snapshots) {
         jnl.inserted_rows.append(symbol);
     }
     s.rows[symbol] = row;
 }
 
-def _journal_touch_row(s: Solver, symbol: int, jnl: MutationJournal) -> None {
+def _journal_touch_row(s: Solver, symbol: int, jnl: MutationJournal) {
     rows: dict[int, Row] = s.rows;
     if (symbol in rows and symbol not in jnl.row_snapshots and symbol not in jnl.inserted_rows) {
         jnl.row_snapshots[symbol] = rows[symbol].clone();
     }
 }
 
-def _journal_touch_objective(s: Solver, jnl: MutationJournal) -> None {
+def _journal_touch_objective(s: Solver, jnl: MutationJournal) {
     if jnl.objective_snapshot is None {
         jnl.objective_snapshot = s.objective.clone();
     }
@@ -106,7 +106,7 @@ def _journal_pop_row(s: Solver, symbol: int, jnl: MutationJournal) -> Row {
     return s.rows.pop(symbol);
 }
 
-def _journal_rollback(s: Solver, jnl: MutationJournal) -> None {
+def _journal_rollback(s: Solver, jnl: MutationJournal) {
     rows: dict[int, Row] = s.rows;
     # 1. Drop rows created during the operation.
     for symbol in reversed(jnl.inserted_rows) {
@@ -205,28 +205,26 @@ def _solver_create_row(s: Solver, c: Constraint, tag: Tag, jnl: MutationJournal)
             row.insert_symbol(error, -coeff);
             _solver_add_objective(s, error, strength_weight(c.strength), jnl);
         }
+    } elif c.strength == StrengthTier.REQUIRED {
+        # Required equality: a dummy marker keeps the basis restricted.
+        dummy = _journal_new_symbol_journaled(s, SymbolKind.DUMMY, jnl);
+        tag.marker = dummy;
+        row.insert_symbol(dummy);
     } else {
-        if c.strength == StrengthTier.REQUIRED {
-            # Required equality: a dummy marker keeps the basis restricted.
-            dummy = _journal_new_symbol_journaled(s, SymbolKind.DUMMY, jnl);
-            tag.marker = dummy;
-            row.insert_symbol(dummy);
-        } else {
-            # A soft equality needs two non-negative error
-            # directions: v == eplus - eminus, i.e. v - eplus +
-            # eminus = 0 (kiwi OP_EQ soft case). The marker keeps a
-            # NEGATIVE coefficient so chooseSubject can pick it as
-            # pivot subject when no external symbol is available.
-            plus = _journal_new_symbol_journaled(s, SymbolKind.ERROR, jnl);
-            minus = _journal_new_symbol_journaled(s, SymbolKind.ERROR, jnl);
-            tag.marker = plus;
-            tag.other = minus;
-            row.insert_symbol(plus, -1.0);
-            row.insert_symbol(minus, 1.0);
-            weight = strength_weight(c.strength);
-            _solver_add_objective(s, plus, weight, jnl);
-            _solver_add_objective(s, minus, weight, jnl);
-        }
+        # A soft equality needs two non-negative error
+        # directions: v == eplus - eminus, i.e. v - eplus +
+        # eminus = 0 (kiwi OP_EQ soft case). The marker keeps a
+        # NEGATIVE coefficient so chooseSubject can pick it as
+        # pivot subject when no external symbol is available.
+        plus = _journal_new_symbol_journaled(s, SymbolKind.ERROR, jnl);
+        minus = _journal_new_symbol_journaled(s, SymbolKind.ERROR, jnl);
+        tag.marker = plus;
+        tag.other = minus;
+        row.insert_symbol(plus, -1.0);
+        row.insert_symbol(minus, 1.0);
+        weight = strength_weight(c.strength);
+        _solver_add_objective(s, plus, weight, jnl);
+        _solver_add_objective(s, minus, weight, jnl);
     }
     if row.constant < 0.0 {
         row.reverse_sign();
@@ -310,7 +308,7 @@ def _solver_add_with_artificial_variable(s: Solver, row: Row, jnl: MutationJourn
 
 def _solver_substitute(
     s: Solver, symbol: int, row: Row, jnl: MutationJournal, extra: Row | None = None
-) -> None {
+) {
     for row_symbol in sorted(s.rows.keys()) {
         _journal_touch_row(s, row_symbol, jnl);
         r = s.rows[row_symbol];
@@ -338,7 +336,7 @@ def _solver_substitute(
     }
 }
 
-def _solver_add_objective(s: Solver, symbol: int, weight: LexWeight, jnl: MutationJournal) -> None {
+def _solver_add_objective(s: Solver, symbol: int, weight: LexWeight, jnl: MutationJournal) {
     if lex_is_zero(weight) {
         return;
     }
@@ -420,7 +418,7 @@ def _solver_pivot(
     jnl: MutationJournal,
     extra: Row | None = None,
     reinsert: bool = True,
-) -> None {
+) {
     row = _journal_pop_row(s, leaving, jnl);
     row.solve_for_symbols(leaving, entering);
     _solver_substitute(s, entering, row, jnl, extra);
@@ -535,7 +533,7 @@ def _solver_remove_core(
 
 def _solver_remove_constraint_effects(
     s: Solver, tag: Tag, strength: StrengthTier, jnl: MutationJournal
-) -> None {
+) {
     weight = strength_weight(strength);
     if lex_is_zero(weight) {
         return;
@@ -548,9 +546,7 @@ def _solver_remove_constraint_effects(
     }
 }
 
-def _solver_remove_marker_effects(
-    s: Solver, marker: int, weight: LexWeight, jnl: MutationJournal
-) -> None {
+def _solver_remove_marker_effects(s: Solver, marker: int, weight: LexWeight, jnl: MutationJournal) {
     _journal_touch_objective(s, jnl);
     row = s.rows.get(marker);
     if row is not None {
@@ -646,9 +642,7 @@ def _solver_dual_ratio_less(s: Solver, w1: LexWeight, c1: float, w2: LexWeight, 
     return lex_compare(lex_scale(w1, c2), lex_scale(w2, c1)) < 0;
 }
 
-def _solver_apply_suggestion(
-    s: Solver, info: EditInfo, delta: float, jnl: MutationJournal
-) -> None {
+def _solver_apply_suggestion(s: Solver, info: EditInfo, delta: float, jnl: MutationJournal) {
     marker = s.cns[info.key].marker;
     other = s.cns[info.key].other;
     row = s.rows.get(marker);
@@ -682,7 +676,7 @@ def _solver_apply_suggestion(
     }
 }
 
-def _solver_adopt(s: Solver, bundle: Solver) -> None {
+def _solver_adopt(s: Solver, bundle: Solver) {
     s.rows = bundle.rows;
     s.kinds = bundle.kinds;
     s.var_symbols = bundle.var_symbols;

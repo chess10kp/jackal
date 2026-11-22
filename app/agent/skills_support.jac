@@ -9,20 +9,16 @@ import os;
 import re;
 import fnmatch;
 
-
 glob MAX_NAME_LENGTH: int = 64,
      MAX_DESCRIPTION_LENGTH: int = 1024,
      IGNORE_FILE_NAMES: list[str] = [".gitignore", ".ignore", ".fdignore"];
 
-
 # ============================ path shims =================================
-
 
 """str-typed shims over os.path stubs that require PathLike/LiteralString."""
 def _base_name(p: str) -> str {
     return p.replace(os.sep, "/").rsplit("/", 1)[-1];
 }
-
 
 def _dir_name(p: str) -> str {
     s = p.replace(os.sep, "/");
@@ -36,16 +32,13 @@ def _dir_name(p: str) -> str {
     return s[:idx];
 }
 
-
 def _rel_path(target: str, start: str) -> str {
     return str(os.path.relpath(target, start));
 }
 
-
 def _abs_path(p: str) -> str {
     return str(os.path.abspath(p));
 }
-
 
 """Realpath canonicalization with abspath fallback."""
 def _canonical(p: str) -> str {
@@ -56,29 +49,25 @@ def _canonical(p: str) -> str {
     }
 }
 
-
 def _is_abs(p: str) -> bool {
     return bool(os.path.isabs(p));
 }
-
 
 def _user_home -> str {
     tilde: any = "~";
     return str(os.path.expanduser(tilde));
 }
 
-
 # ============================== frontmatter ==============================
-
 
 def _parse_scalar(value: str) -> any {
     trimmed = value.strip();
     if not trimmed {
         return "";
     }
-    if (trimmed.startswith('"') and trimmed.endswith('"')) or (
-        trimmed.startswith("'") and trimmed.endswith("'")
-    ) {
+    if (trimmed.startswith('"') and trimmed.endswith('"'))
+        or (trimmed.startswith("'") and trimmed.endswith("'"))
+    {
         return trimmed[1:-1];
     }
     if trimmed.startswith("[") and trimmed.endswith("]") {
@@ -97,7 +86,6 @@ def _parse_scalar(value: str) -> any {
     }
     return trimmed;
 }
-
 
 """Parse --- delimited YAML-like frontmatter; returns (metadata, body).
 
@@ -150,7 +138,6 @@ def parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
     return (fm, body);
 }
 
-
 """Coerce a frontmatter value to display text (lists join with ', ')."""
 def frontmatter_string(value: any) -> str | None {
     if value is None {
@@ -166,9 +153,7 @@ def frontmatter_string(value: any) -> str | None {
     return str(value);
 }
 
-
 # ========================= gitignore-lite matching ========================
-
 
 """Parse gitignore content, prefixing with *prefix* for sub-dir rules."""
 def _gitignore_parse_rules(content: str, prefix: str) -> list[str] {
@@ -199,7 +184,6 @@ def _gitignore_parse_rules(content: str, prefix: str) -> list[str] {
     return rules;
 }
 
-
 """Load ignore rules from *subdir* relative to *root_dir*."""
 def _load_ignore_rules(root_dir: str, subdir: str) -> list[str] {
     rel = _rel_path(subdir, root_dir).replace(os.sep, "/");
@@ -225,7 +209,6 @@ def _load_ignore_rules(root_dir: str, subdir: str) -> list[str] {
     return rules;
 }
 
-
 """Minimal gitignore-style match; True when *path* should be ignored."""
 def _match_ignore_pattern(path: str, rules: list[str]) -> bool {
     result = False;
@@ -247,19 +230,15 @@ def _match_ignore_pattern(path: str, rules: list[str]) -> bool {
             if fnmatch.fnmatch(path, pattern) {
                 result = not negated;
             }
-        } else {
-            # Match basename.
-            if fnmatch.fnmatch(_base_name(path), pattern) {
-                result = not negated;
-            }
+        } elif # Match basename.
+        fnmatch.fnmatch(_base_name(path), pattern) {
+            result = not negated;
         }
     }
     return result;
 }
 
-
 # ============================== validation ===============================
-
 
 def _validate_name(name: str) -> list[str] {
     errors: list[str] = [];
@@ -267,7 +246,9 @@ def _validate_name(name: str) -> list[str] {
         errors.append(f"name exceeds {MAX_NAME_LENGTH} characters ({len(name)})");
     }
     if re.fullmatch(r"[a-z0-9-]+", name) is None {
-        errors.append("name contains invalid characters (must be lowercase a-z, 0-9, hyphens only)");
+        errors.append(
+            "name contains invalid characters (must be lowercase a-z, 0-9, hyphens only)"
+        );
     }
     if name.startswith("-") or name.endswith("-") {
         errors.append("name must not start or end with a hyphen");
@@ -277,7 +258,6 @@ def _validate_name(name: str) -> list[str] {
     }
     return errors;
 }
-
 
 def _validate_description(description: str | None) -> list[str] {
     errors: list[str] = [];
@@ -291,20 +271,18 @@ def _validate_description(description: str | None) -> list[str] {
     return errors;
 }
 
-
 # =========================== single skill load ===========================
-
 
 def _warning(message: str, path: str) -> dict[str, any] {
     return {"type": "warning", "message": message, "path": path, "collision": None};
 }
 
-
 """Load one SKILL.md into a skill dict; (None, warnings) when unusable.
 
 Missing descriptions exclude the skill (after recording the warning);
 bad names warn but keep the skill, mirroring the legacy loader."""
-def _load_skill_from_file(file_path: str, source: str) -> tuple[dict[str, any] | None, list[dict[str, any]]] {
+def _load_skill_from_file(file_path: str, source: str) -> tuple[dict[str, any]
+    | None, list[dict[str, any]]] {
     diagnostics: list[dict[str, any]] = [];
     result: dict[str, any] | None = None;
     try {

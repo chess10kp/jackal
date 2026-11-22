@@ -113,7 +113,7 @@ def coalesce_text_deltas(a: Envelope, b: Envelope) -> Envelope {
         kind="text_delta",
         payload={"text": left + right},
         session_id=a.session_id,
-        request_id=b.request_id if b.request_id else a.request_id,
+        request_id=b.request_id or a.request_id,
         turn_id=a.turn_id,
         tool_id=a.tool_id,
         sequence=seq,

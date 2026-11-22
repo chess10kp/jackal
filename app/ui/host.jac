@@ -66,11 +66,11 @@ def run_host_tick(
         if loop.normalizer.buffer == "\x1b" {
             loop.normalizer.arm_esc(clock);
         }
-    } else {
-        # Still allow ESC timeout to fire when idle.
-        if loop.normalizer.buffer == "\x1b" and loop.normalizer.esc_armed_at_ms < 0.0 {
-            loop.normalizer.arm_esc(clock);
-        }
+    } elif # Still allow ESC timeout to fire when idle.
+    loop.normalizer.buffer == "\x1b"
+        and loop.normalizer.esc_armed_at_ms < 0.0
+    {
+        loop.normalizer.arm_esc(clock);
     }
 
     esc_events = loop.normalizer.flush_esc_timeout(clock);

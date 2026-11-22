@@ -6,12 +6,10 @@ import from .auth_display { validate_provider_entry, validate_model_entry }
 
 # ── Login flow state machine (from _auth_flow_toolchain.py) ─────────────
 
-
 """Initial flow state: the idle step."""
 def initial_auth_flow_state -> dict[str, any] {
     return {"step": {"kind": "idle"}};
 }
-
 
 """copy.deepcopy over dict[str, any] cannot dispatch on `any` values
 natively; the flow state is JSON-shaped, so an explicit recursive copy is
@@ -34,7 +32,6 @@ def _deep_copy(value: any) -> any {
     return value;
 }
 
-
 """Steps that block on user input (prompt/manual_code/select/api_key_input).
 The UI layer attaches promise resolvers to these; cancel mid-flow means
 abandoning such a step and returning to idle."""
@@ -44,13 +41,14 @@ def step_is_pending(state: dict[str, any]) -> bool {
     return kind in ["prompt", "manual_code", "select", "api_key_input"];
 }
 
-
 """Pure transition table for the login flow. Actions:
 open_provider_picker, open_model_picker, set_logging_in, set_browser_auth,
 set_prompt, set_manual_code, set_select, set_api_key_input, set_logged_in,
 set_error, set_idle, update_query, update_provider_filter, cancel, reset.
 Unknown actions return an unchanged copy. Never mutates current_state."""
-def transition_auth_flow(current_state: dict[str, any], action: str, payload: dict[str, any] | None = None) -> dict[str, any] {
+def transition_auth_flow(
+    current_state: dict[str, any], action: str, payload: dict[str, any] | None = None
+) -> dict[str, any] {
     p = payload if payload is not None else {};
     step: dict[str, any] = current_state.get("step", {});
 
@@ -75,14 +73,19 @@ def transition_auth_flow(current_state: dict[str, any], action: str, payload: di
                 valid.append(v);
             }
         }
-        return {"step": {"kind": "model_picker", "models": valid,
-                         "providerFilter": None, "query": ""}};
+        return {
+            "step": {"kind": "model_picker", "models": valid, "providerFilter": None, "query": ""},
+        };
     }
 
     if action == "set_logging_in" {
-        return {"step": {"kind": "logging_in",
-                         "providerId": p.get("providerId", ""),
-                         "status": p.get("status", "")}};
+        return {
+            "step": {
+                "kind": "logging_in",
+                "providerId": p.get("providerId", ""),
+                "status": p.get("status", ""),
+            },
+        };
     }
 
     if action == "set_browser_auth" {
@@ -98,33 +101,43 @@ def transition_auth_flow(current_state: dict[str, any], action: str, payload: di
     }
 
     if action == "set_prompt" {
-        return {"step": {"kind": "prompt",
-                         "providerId": p.get("providerId", ""),
-                         "message": p.get("message", ""),
-                         "placeholder": p.get("placeholder", "")}};
+        return {
+            "step": {
+                "kind": "prompt",
+                "providerId": p.get("providerId", ""),
+                "message": p.get("message", ""),
+                "placeholder": p.get("placeholder", ""),
+            },
+        };
     }
 
     if action == "set_manual_code" {
-        return {"step": {"kind": "manual_code",
-                         "providerId": p.get("providerId", "")}};
+        return {"step": {"kind": "manual_code", "providerId": p.get("providerId", "")}};
     }
 
     if action == "set_select" {
-        return {"step": {"kind": "select",
-                         "providerId": p.get("providerId", ""),
-                         "message": p.get("message", ""),
-                         "options": p.get("options", [])}};
+        return {
+            "step": {
+                "kind": "select",
+                "providerId": p.get("providerId", ""),
+                "message": p.get("message", ""),
+                "options": p.get("options", []),
+            },
+        };
     }
 
     if action == "set_api_key_input" {
-        return {"step": {"kind": "api_key_input",
-                         "providerId": p.get("providerId", "")}};
+        return {"step": {"kind": "api_key_input", "providerId": p.get("providerId", "")}};
     }
 
     if action == "set_logged_in" {
-        return {"step": {"kind": "logged_in",
-                         "providerId": p.get("providerId", ""),
-                         "nextStep": p.get("nextStep", "done")}};
+        return {
+            "step": {
+                "kind": "logged_in",
+                "providerId": p.get("providerId", ""),
+                "nextStep": p.get("nextStep", "done"),
+            },
+        };
     }
 
     if action == "set_error" {

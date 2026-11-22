@@ -4,21 +4,29 @@ import from tui.state { LiveShell }
 import from tui.core { _push_turn, _meter }
 import from tui.picker_base { _open_picker, _close_picker }
 import from agent.llm { PROVIDER_ROUTES, provider_for }
-import from agent.session {
-    get_history, restore_history, get_model,
-}
+import from agent.session { get_history, restore_history, get_model }
 import from agent.auth {
-    load_auth_file, save_auth_file, resolve_auth_path, credential_set,
-    stored_api_key, get_auth_status, transition_auth_flow,
-    initial_auth_flow_state, format_provider_label, oauth_start_login,
+    load_auth_file,
+    save_auth_file,
+    resolve_auth_path,
+    credential_set,
+    stored_api_key,
+    get_auth_status,
+    transition_auth_flow,
+    initial_auth_flow_state,
+    format_provider_label,
+    oauth_start_login,
 }
 import from agent.auth_env { hydrate_auth_environment, note_hydrated }
 import from agent.tasks { load_tasks, format_tasks_list, task_counts }
 import from agent.sessions { list_sessions }
 import from ui.transcript { apply_transcript_revision }
 import from agent.checkpoints {
-    create_checkpoint, list_checkpoints, load_checkpoint,
-    restore_checkpoint_files, format_checkpoint_overlay_row,
+    create_checkpoint,
+    list_checkpoints,
+    load_checkpoint,
+    restore_checkpoint_files,
+    format_checkpoint_overlay_row,
 }
 import from agent.skills { load_jackal_skills }
 import from tui.context { _skills_picker_entries }
@@ -41,9 +49,7 @@ def _login_provider_entries -> dict[str, any] {
             continue;
         }
         status = get_auth_status(
-            provider_id,
-            stored,
-            env_api_key=os.environ.get(key_env, "") if key_env else "",
+            provider_id, stored, env_api_key=os.environ.get(key_env, "") if key_env else ""
         );
         item = {
             "id": provider_id,
@@ -58,18 +64,21 @@ def _login_provider_entries -> dict[str, any] {
     return {"rows": rows, "ids": ids, "stored": stored};
 }
 
-
 """Apply stored API keys to the environment (see agent.auth_env)."""
-def _hydrate_auth_environment  {
+def _hydrate_auth_environment {
     hydrate_auth_environment();
 }
-
 
 def _login_error(app: LiveShell, message: str) {
     app.auth_flow = transition_auth_flow(
         app.auth_flow,
         "set_error",
-        {"message": message, "providerId": _picker_state(app).get("providerId", "") if _picker_state(app) is not None else ""},
+        {
+            "message": message,
+            "providerId": _picker_state(app).get("providerId", "")
+                if _picker_state(app) is not None
+                else "",
+        },
     );
     if _picker_state(app) is not None {
         _close_picker(app);
@@ -77,7 +86,6 @@ def _login_error(app: LiveShell, message: str) {
     _push_turn(app, "tool", "login error: " + message);
     app.dirty = True;
 }
-
 
 def _cancel_login(app: LiveShell) {
     app.auth_flow = transition_auth_flow(app.auth_flow, "cancel");
@@ -87,7 +95,6 @@ def _cancel_login(app: LiveShell) {
     _push_turn(app, "tool", "login cancelled");
     app.dirty = True;
 }
-
 
 def _start_login_provider(app: LiveShell, provider_id: str) {
     entries = _login_provider_entries();
@@ -108,17 +115,14 @@ def _start_login_provider(app: LiveShell, provider_id: str) {
     auth_type = str(found.get("authType", "api_key" if key_env else "env"));
     app.auth_data = stored;
     app.auth_flow = transition_auth_flow(
-        app.auth_flow,
-        "set_logging_in",
-        {"providerId": provider_id, "status": "starting"},
+        app.auth_flow, "set_logging_in", {"providerId": provider_id, "status": "starting"}
     );
     if auth_type == "oauth" {
         result = oauth_start_login(provider_id);
         detail = str(result.get("detail", "") or "") if isinstance(result, dict) else "";
         _login_error(
             app,
-            "OAuth login is unavailable in the native runtime"
-            + (": " + detail if detail else ""),
+            "OAuth login is unavailable in the native runtime" + (": " + detail if detail else ""),
         );
         return;
     }
@@ -136,9 +140,7 @@ def _start_login_provider(app: LiveShell, provider_id: str) {
     _picker_state(app)["keyEnv"] = key_env;
     _picker_state(app)["draft"] = "";
     app.auth_flow = transition_auth_flow(
-        app.auth_flow,
-        "set_api_key_input",
-        {"providerId": provider_id},
+        app.auth_flow, "set_api_key_input", {"providerId": provider_id}
     );
     app.dirty = True;
 }
@@ -162,9 +164,7 @@ def _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
         note_hydrated(key_env);
     }
     app.auth_flow = transition_auth_flow(
-        app.auth_flow,
-        "set_logged_in",
-        {"providerId": provider_id, "nextStep": "done"},
+        app.auth_flow, "set_logged_in", {"providerId": provider_id, "nextStep": "done"}
     );
     if _picker_state(app) is not None {
         _close_picker(app);
@@ -172,6 +172,7 @@ def _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
     _push_turn(app, "tool", "logged in to " + provider_id + "; credentials saved to " + path);
     app.dirty = True;
 }
+
 """Open /login's provider picker. An optional provider argument skips the
 picker while retaining the same state machine and input overlay."""
 def _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
@@ -201,22 +202,22 @@ def _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
     app.auth_flow = transition_auth_flow(
         initial_auth_flow_state(),
         "open_provider_picker",
-        {"providers": [
-            {
-                "id": ids[i],
-                "displayName": ids[i],
-                "authType": "api_key",
-                "configured": False,
-                "modelCount": 0,
-            }
-            for i in range(len(ids))
-        ]},
+        {
+            "providers": [
+                {
+                    "id": ids[i],
+                    "displayName": ids[i],
+                    "authType": "api_key",
+                    "configured": False,
+                    "modelCount": 0,
+                }
+                for i in range(len(ids))
+            ],
+        },
     );
     app.dirty = True;
     return "";
-
 }
-
 
 """Resume-picker rows from list_sessions(cwd): label "id  name", payload id."""
 def _open_resume_picker(app: LiveShell) -> str {
@@ -239,7 +240,6 @@ def _open_resume_picker(app: LiveShell) -> str {
     return "";
 }
 
-
 """TASKS picker rows: a completion-meter summary line, then the rendered
 board from format_tasks_list (counts header, divider rule, one row per
 task). Row ids: "__header__" for non-selectable lines, the task index as
@@ -254,8 +254,14 @@ def _task_picker_entries(cwd: str) -> dict[str, any] {
     total: int = int(counts["pending"]) + int(counts["in_progress"]) + int(counts["completed"]);
     ratio: float = float(counts["completed"]) / float(total) if total else 0.0;
     rows: list[str] = [
-        str(total) + " tasks  " + _meter(ratio, 14) + "  "
-        + str(counts["completed"]) + "/" + str(total) + " done"
+        str(total)
+            + " tasks  "
+            + _meter(ratio, 14)
+            + "  "
+            + str(counts["completed"])
+            + "/"
+            + str(total)
+            + " done",
     ];
     ids: list[str] = ["__header__"];
     idx = 0;
@@ -273,7 +279,6 @@ def _task_picker_entries(cwd: str) -> dict[str, any] {
     return {"rows": rows, "ids": ids};
 }
 
-
 """CHECKPOINTS picker rows via list_checkpoints (newest first), one
 format_checkpoint_overlay_row line per checkpoint; ids are names. Pure
 over cwd — replicated in tui/overlays.test.jac (keep in sync)."""
@@ -287,6 +292,7 @@ def _checkpoint_picker_entries(cwd: str) -> dict[str, any] {
     }
     return {"rows": rows, "ids": ids};
 }
+
 """Open the SKILLS catalog overlay; enter inserts `/skill:name ` into the
 draft (submitting it inlines the skill body via expand_skill_command)."""
 def _open_skills_picker(app: LiveShell) -> str {
@@ -317,7 +323,6 @@ def _open_skills_picker(app: LiveShell) -> str {
     return "";
 }
 
-
 """Open the read-only tasks overlay; enter on a task echoes the full
 rendered board into the transcript."""
 def _open_tasks_picker(app: LiveShell) -> str {
@@ -328,7 +333,6 @@ def _open_tasks_picker(app: LiveShell) -> str {
     }
     return "";
 }
-
 
 """Open the checkpoints overlay for browse/restore."""
 def _open_checkpoints_picker(app: LiveShell) -> str {
@@ -342,7 +346,6 @@ def _open_checkpoints_picker(app: LiveShell) -> str {
     }
     return "";
 }
-
 
 """Snapshot the current conversation plus working-tree changes into a new
 named checkpoint (/checkpoint NAME). Provider/model come from the active
@@ -360,11 +363,15 @@ def _create_checkpoint_now(app: LiveShell, name: str) -> str {
     n_files = len(files_changed) if isinstance(files_changed, list) else 0;
     app.dirty = True;
     return (
-        "checkpoint '" + str(meta.get("name", name)) + "' saved ("
-        + str(len(hist)) + " msgs, " + str(n_files) + " files)"
+        "checkpoint '"
+        + str(meta.get("name", name))
+        + "' saved ("
+        + str(len(hist))
+        + " msgs, "
+        + str(n_files)
+        + " files)"
     );
 }
-
 
 """Restore a checkpoint: write its file snapshots back under cwd, swap the
 agent history for the stored conversation, and repaint the transcript.

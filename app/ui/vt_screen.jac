@@ -11,17 +11,35 @@ ui/emulated_terminal.jac keeps its surface.
 
 import from ui.width { grapheme_width }
 
-glob _FG_NAMES: list[str] = [
-    "black", "red", "green", "brown", "blue", "magenta", "cyan", "white",
-];
-glob _BRIGHT_NAMES: list[str] = [
-    "brightblack", "brightred", "brightgreen", "brightbrown",
-    "brightblue", "brightmagenta", "brightcyan", "brightwhite",
-];
-glob _BASE16_HEX: list[str] = [
-    "000000", "cd0000", "00cd00", "cdcd00", "0000ee", "cd00cd", "00cdcd", "e5e5e5",
-    "7f7f7f", "ff0000", "00ff00", "ffff00", "5c5cff", "ff00ff", "00ffff", "ffffff",
-];
+glob _FG_NAMES: list[str] = ["black", "red", "green", "brown", "blue", "magenta", "cyan", "white"],
+     _BRIGHT_NAMES: list[str] = [
+         "brightblack",
+         "brightred",
+         "brightgreen",
+         "brightbrown",
+         "brightblue",
+         "brightmagenta",
+         "brightcyan",
+         "brightwhite",
+     ],
+     _BASE16_HEX: list[str] = [
+         "000000",
+         "cd0000",
+         "00cd00",
+         "cdcd00",
+         "0000ee",
+         "cd00cd",
+         "00cdcd",
+         "e5e5e5",
+         "7f7f7f",
+         "ff0000",
+         "00ff00",
+         "ffff00",
+         "5c5cff",
+         "ff00ff",
+         "00ffff",
+         "ffffff",
+     ];
 
 obj VtCell {
     has data: str = " ",
@@ -86,8 +104,13 @@ obj VtScreen {
     def _blank -> VtCell {
         a: VtCell = self.attrs;
         return VtCell(
-            data=" ", fg=a.fg, bg=a.bg, bold=False, italics=False,
-            underscore=False, reverse=a.reverse,
+            data=" ",
+            fg=a.fg,
+            bg=a.bg,
+            bold=False,
+            italics=False,
+            underscore=False,
+            reverse=a.reverse,
         );
     }
 
@@ -232,7 +255,11 @@ obj VtScreen {
         if w <= 0 {
             # Zero-width (combining mark, ZWJ, variation selector): attach
             # to the previously drawn cell, as pyte does.
-            if self.last_y >= 0 and self.last_y < self.rows and self.last_x >= 0 and self.last_x < self.columns {
+            if self.last_y >= 0
+                and self.last_y < self.rows
+                and self.last_x >= 0
+                and self.last_x < self.columns
+            {
                 cell: VtCell = self.buffer[self.last_y][self.last_x];
                 cell.data = cell.data + ch;
             }
@@ -245,15 +272,25 @@ obj VtScreen {
         a: VtCell = self.attrs;
         line: list[VtCell] = self.buffer[self.cursor_y];
         line[self.cursor_x] = VtCell(
-            data=ch, fg=a.fg, bg=a.bg, bold=a.bold, italics=a.italics,
-            underscore=a.underscore, reverse=a.reverse,
+            data=ch,
+            fg=a.fg,
+            bg=a.bg,
+            bold=a.bold,
+            italics=a.italics,
+            underscore=a.underscore,
+            reverse=a.reverse,
         );
         self.last_x = self.cursor_x;
         self.last_y = self.cursor_y;
         if w == 2 and self.cursor_x + 1 < self.columns {
             line[self.cursor_x + 1] = VtCell(
-                data="", fg=a.fg, bg=a.bg, bold=a.bold, italics=a.italics,
-                underscore=a.underscore, reverse=a.reverse,
+                data="",
+                fg=a.fg,
+                bg=a.bg,
+                bold=a.bold,
+                italics=a.italics,
+                underscore=a.underscore,
+                reverse=a.reverse,
             );
         }
         # pyte parks the cursor at `columns` (pending wrap) after the last cell.
@@ -385,7 +422,8 @@ obj VtScreen {
                     color = _color256(params[i + 2] % 256);
                     i += 2;
                 } elif params[i + 1] == 2 and i + 4 < len(params) {
-                    color = _hex2(params[i + 2] % 256) + _hex2(params[i + 3] % 256)
+                    color = _hex2(params[i + 2] % 256)
+                        + _hex2(params[i + 3] % 256)
                         + _hex2(params[i + 4] % 256);
                     i += 4;
                 } else {
@@ -440,7 +478,9 @@ obj VtScreen {
             floor_y: int = self.scroll_top if self.cursor_y >= self.scroll_top else 0;
             self.cursor_y = max(floor_y, self.cursor_y - n);
         } elif final == "B" or final == "e" {
-            ceil_y: int = self.scroll_bottom if self.cursor_y <= self.scroll_bottom else self.rows - 1;
+            ceil_y: int = self.scroll_bottom
+                if self.cursor_y <= self.scroll_bottom
+                else self.rows - 1;
             self.cursor_y = min(ceil_y, self.cursor_y + n);
         } elif final == "C" or final == "a" {
             self.cursor_x = min(self.columns - 1, self.cursor_x + n);
@@ -509,8 +549,13 @@ obj VtScreen {
         self.saved_y = self.cursor_y;
         a: VtCell = self.attrs;
         self.saved_attrs = VtCell(
-            data=" ", fg=a.fg, bg=a.bg, bold=a.bold, italics=a.italics,
-            underscore=a.underscore, reverse=a.reverse,
+            data=" ",
+            fg=a.fg,
+            bg=a.bg,
+            bold=a.bold,
+            italics=a.italics,
+            underscore=a.underscore,
+            reverse=a.reverse,
         );
     }
 
@@ -519,8 +564,13 @@ obj VtScreen {
         self.cursor_y = self.saved_y;
         s: VtCell = self.saved_attrs;
         self.attrs = VtCell(
-            data=" ", fg=s.fg, bg=s.bg, bold=s.bold, italics=s.italics,
-            underscore=s.underscore, reverse=s.reverse,
+            data=" ",
+            fg=s.fg,
+            bg=s.bg,
+            bold=s.bold,
+            italics=s.italics,
+            underscore=s.underscore,
+            reverse=s.reverse,
         );
         self._clamp_cursor();
     }

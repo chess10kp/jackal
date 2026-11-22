@@ -4,10 +4,7 @@ VirtualTerminal scenarios: first paint, resize mid-stream, cancel, restore.
 Run: `JACPATH=. jac run ui/n1_acceptance.jac` or `jac test ui/n1_acceptance.jac`.
 """
 
-import from ui.runtime {
-    create_session,
-    dispose_session,
-}
+import from ui.runtime { create_session, dispose_session }
 
 import from ui.renderer {
     create_renderer,
@@ -18,32 +15,15 @@ import from ui.renderer {
     Renderer,
 }
 
-import from ui.layout_types {
-    LayoutSpec,
-    fill_axis,
-    fixed_axis,
-    grow_axis,
-}
+import from ui.layout_types { LayoutSpec, fill_axis, fixed_axis, grow_axis }
 
-import from ui.virtual_terminal {
-    VirtualTerminal,
-}
+import from ui.virtual_terminal { VirtualTerminal }
 
-import from ui.terminal {
-    ProcessTerminal,
-}
+import from ui.terminal { ProcessTerminal }
 
-import from ui.input {
-    InputNormalizer,
-    KeyEvent,
-}
+import from ui.input { InputNormalizer, KeyEvent }
 
-import from ui.host {
-    create_host_loop,
-    run_host_tick,
-    note_interrupt,
-    host_events_to_effects,
-}
+import from ui.host { create_host_loop, run_host_tick, note_interrupt, host_events_to_effects }
 
 import from ui.screen {
     build_main_shell,
@@ -54,13 +34,7 @@ import from ui.screen {
     ShellScreen,
 }
 
-import from agent.protocol {
-    create_adapter,
-    make_envelope,
-    enqueue,
-    drain_and_drive,
-}
-
+import from agent.protocol { create_adapter, make_envelope, enqueue, drain_and_drive }
 
 obj N1Result {
     has name: str = "",
@@ -68,49 +42,28 @@ obj N1Result {
         detail: str = "";
 }
 
-
 def _check(name: str, ok: bool, detail: str = "") -> N1Result {
     return N1Result(name=name, ok=ok, detail=detail);
 }
 
-
-def _wire_shell_content(
-    renderer: Renderer, shell: ShellScreen, transcript: str, prompt: str
-) {
+def _wire_shell_content(renderer: Renderer, shell: ShellScreen, transcript: str, prompt: str) {
     # Mirror screen.jac configure_main_shell_layout: screen fills the
     # renderer's viewport; header/status keep fixed 1-row, prompt 2-row;
     # transcript grows with vertical scroll.
-    set_node_contract(
-        renderer,
-        shell.screen,
-        LayoutSpec(width=fill_axis(), height=fill_axis()),
-    );
-    set_node_contract(
-        renderer,
-        shell.header,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(1)),
-    );
+    set_node_contract(renderer, shell.screen, LayoutSpec(width=fill_axis(), height=fill_axis()));
+    set_node_contract(renderer, shell.header, LayoutSpec(width=fill_axis(), height=fixed_axis(1)));
     set_node_contract(
         renderer,
         shell.transcript,
         LayoutSpec(width=fill_axis(), height=grow_axis(1.0), scroll_vertical=True),
     );
-    set_node_contract(
-        renderer,
-        shell.status,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(1)),
-    );
-    set_node_contract(
-        renderer,
-        shell.prompt,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(2)),
-    );
+    set_node_contract(renderer, shell.status, LayoutSpec(width=fill_axis(), height=fixed_axis(1)));
+    set_node_contract(renderer, shell.prompt, LayoutSpec(width=fill_axis(), height=fixed_axis(2)));
     set_node_content(renderer, shell.header, ["Jackal"]);
     set_node_content(renderer, shell.transcript, [transcript] if transcript else [""]);
     set_node_content(renderer, shell.status, ["ready"]);
     set_node_content(renderer, shell.prompt, ["> " + prompt]);
 }
-
 
 def scenario_first_paint_no_full_clear -> N1Result {
     handle = create_session();
@@ -123,14 +76,11 @@ def scenario_first_paint_no_full_clear -> N1Result {
     term.clear_writes();
     frame = render_frame(renderer, shell.screen, term);
     ok = (
-        frame.used_full_clear == False
-        and frame.sync_wrapped == True
-        and frame.cells_written > 0
+        frame.used_full_clear == False and frame.sync_wrapped == True and frame.cells_written > 0
     );
     dispose_session(session);
     return _check("first_paint_no_full_clear", ok, "cells=" + str(frame.cells_written));
 }
-
 
 def scenario_resize_mid_stream -> N1Result {
     handle = create_session();
@@ -152,7 +102,6 @@ def scenario_resize_mid_stream -> N1Result {
     return _check("resize_mid_stream_preserves_ids", ok);
 }
 
-
 def scenario_cancel_clears_draft -> N1Result {
     handle = create_session();
     session = handle.session;
@@ -164,23 +113,18 @@ def scenario_cancel_clears_draft -> N1Result {
     return _check("cancel_clears_draft", ok);
 }
 
-
 def scenario_protocol_cancel_drive -> N1Result {
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
     adapter = create_adapter("n1");
     enqueue(
-        adapter.queue,
-        make_envelope(kind="status", payload={"phase": "streaming"}, turn_id="t1"),
+        adapter.queue, make_envelope(kind="status", payload={"phase": "streaming"}, turn_id="t1")
     );
     enqueue(
         adapter.queue,
         make_envelope(
-            kind="turn_cancelled",
-            turn_id="t1",
-            correlation_id="t1",
-            payload={"reason": "ctrl-c"},
+            kind="turn_cancelled", turn_id="t1", correlation_id="t1", payload={"reason": "ctrl-c"}
         ),
     );
     drain_and_drive(adapter, shell);
@@ -188,7 +132,6 @@ def scenario_protocol_cancel_drive -> N1Result {
     dispose_session(session);
     return _check("protocol_cancel_drive", ok, "phase=" + shell.status.phase);
 }
-
 
 def scenario_esc_timeout -> N1Result {
     norm = InputNormalizer();
@@ -203,7 +146,6 @@ def scenario_esc_timeout -> N1Result {
     ok = early == [] and len(late) == 1 and (late[0] as KeyEvent).key == "escape";
     return _check("esc_timeout_policy", ok);
 }
-
 
 def scenario_host_interrupt_effect -> N1Result {
     loop = create_host_loop();
@@ -223,7 +165,6 @@ def scenario_host_interrupt_effect -> N1Result {
     return _check("host_interrupt_maps_to_cancel", ok);
 }
 
-
 def scenario_restore_idempotent -> N1Result {
     # ProcessTerminal.restore without a TTY start must still be safe.
     term = ProcessTerminal();
@@ -232,7 +173,6 @@ def scenario_restore_idempotent -> N1Result {
     ok = term.restored == True;
     return _check("process_terminal_restore_idempotent", ok);
 }
-
 
 def scenario_process_terminal_flag_restore -> N1Result {
     # Simulate mid-session flags (no TTY start) and assert stop tears them down.
@@ -257,7 +197,6 @@ def scenario_process_terminal_flag_restore -> N1Result {
     return _check("process_terminal_flag_restore", ok);
 }
 
-
 def scenario_pty_soak_virtual -> N1Result {
     # Multi-frame soak: stream + resize + host interrupt + restore.
     handle = create_session();
@@ -281,15 +220,10 @@ def scenario_pty_soak_virtual -> N1Result {
         }
         chunk = "stream-" + str(i);
         enqueue(
-            adapter.queue,
-            make_envelope(
-                kind="text_delta",
-                payload={"text": chunk},
-                turn_id="t1",
-            ),
+            adapter.queue, make_envelope(kind="text_delta", payload={"text": chunk}, turn_id="t1")
         );
         drain_and_drive(adapter, shell);
-        transcript = adapter.stream_buf if adapter.stream_buf else chunk;
+        transcript = adapter.stream_buf or chunk;
         _wire_shell_content(renderer, shell, transcript, "draft");
         mark_semantic_dirty(renderer, shell.transcript);
         frame = render_frame(renderer, shell.screen, term);
@@ -306,9 +240,7 @@ def scenario_pty_soak_virtual -> N1Result {
         }
     }
     note_interrupt(loop);
-    effects = host_events_to_effects(
-        run_host_tick(loop, term, 0.0, now_ms=9999.0)
-    );
+    effects = host_events_to_effects(run_host_tick(loop, term, 0.0, now_ms=9999.0));
     has_cancel = False;
     for e in effects {
         if e.get("kind") == "cancel" {
@@ -330,15 +262,9 @@ def scenario_pty_soak_virtual -> N1Result {
     return _check(
         "pty_soak_virtual",
         ok,
-        "frames="
-        + str(frames)
-        + " clears="
-        + str(full_clears)
-        + " max_cells="
-        + str(max_cells),
+        "frames=" + str(frames) + " clears=" + str(full_clears) + " max_cells=" + str(max_cells),
     );
 }
-
 
 def scenario_second_frame_retained -> N1Result {
     handle = create_session();
@@ -365,7 +291,6 @@ def scenario_second_frame_retained -> N1Result {
     );
 }
 
-
 def run_n1_acceptance -> bool {
     results: list[N1Result] = [
         scenario_first_paint_no_full_clear(),
@@ -391,11 +316,9 @@ def run_n1_acceptance -> bool {
     return all_ok;
 }
 
-
 test "n1 acceptance suite passes" {
     assert run_n1_acceptance();
 }
-
 
 with entry {
     ok = run_n1_acceptance();

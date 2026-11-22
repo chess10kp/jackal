@@ -4,15 +4,8 @@ The public module re-exports these declarations together with registry
 lifecycle operations. Keeping the data model independent avoids import cycles.
 """
 
-import from constraints.algebra {
-    StrengthTier,
-    is_finite,
-}
-import from ui.model {
-    UiNode,
-    node_id,
-}
-
+import from constraints.algebra { StrengthTier, is_finite }
+import from ui.model { UiNode, node_id }
 
 """Axis-aligned terminal rectangle in cell coordinates (origin top-left)."""
 obj Rect {
@@ -34,12 +27,7 @@ obj Rect {
     }
 
     def contains_point(col: int, row: int) -> bool {
-        return (
-            col >= self.x
-            and col < self.right()
-            and row >= self.y
-            and row < self.bottom()
-        );
+        return (col >= self.x and col < self.right() and row >= self.y and row < self.bottom());
     }
 
     def intersects(other: Rect) -> bool {
@@ -55,21 +43,14 @@ obj Rect {
     }
 
     def copy -> Rect {
-        return Rect(
-            x=self.x,
-            y=self.y,
-            width=self.width,
-            height=self.height,
-        );
+        return Rect(x=self.x, y=self.y, width=self.width, height=self.height);
     }
 }
-
 
 obj Size {
     has width: int = 0,
         height: int = 0;
 }
-
 
 def rect_union(a: Rect, b: Rect) -> Rect {
     if a.is_empty() {
@@ -85,11 +66,11 @@ def rect_union(a: Rect, b: Rect) -> Rect {
     return Rect(x=x0, y=y0, width=x1 - x0, height=y1 - y0);
 }
 
-
 enum Axis {
     HORIZONTAL = "horizontal",
     VERTICAL = "vertical",
 }
+
 enum SizeMode {
     FIXED = "fixed",
     INTRINSIC = "intrinsic",
@@ -97,12 +78,14 @@ enum SizeMode {
     FILL = "fill",
     GROW = "grow",
 }
+
 enum Align {
     START = "start",
     CENTER = "center",
     END = "end",
     STRETCH = "stretch",
 }
+
 enum OverlayAnchor {
     CENTER = "center",
     TOP = "top",
@@ -110,7 +93,6 @@ enum OverlayAnchor {
     LEFT = "left",
     RIGHT = "right",
 }
-
 
 """Per-axis sizing policy (plan §4.1)."""
 obj AxisSize {
@@ -120,7 +102,6 @@ obj AxisSize {
         maximum: float | None = None,
         grow_weight: float = 0.0;
 }
-
 
 """Permanent node layout spec (plan §4.1).
 
@@ -135,11 +116,11 @@ obj LayoutSpec {
         overlay_anchor: OverlayAnchor | None = None;
 }
 
-
 enum LayoutSeverity {
     WARNING = "warning",
     ERROR = "error",
 }
+
 enum LayoutError {
     INVALID_SPEC = "invalid_spec",
     INVALID_RELATION = "invalid_relation",
@@ -152,17 +133,14 @@ enum LayoutError {
     INTERNAL_INVARIANT = "internal_invariant",
 }
 
-
 obj Viewport {
     has columns: int,
         rows: int;
 }
 
-
 obj RelationHandle {
     has id: int;
 }
-
 
 obj LayoutDiagnostic {
     has code: LayoutError,
@@ -171,7 +149,6 @@ obj LayoutDiagnostic {
         node_ids: list[str] = [],
         provenance: list[str] = [];
 }
-
 
 obj FrameEntry {
     has measured: Size,
@@ -183,7 +160,6 @@ obj FrameEntry {
         max_scroll_offset: int = 0;
 }
 
-
 obj LayoutFrame {
     has generation: int,
         viewport: Viewport,
@@ -191,20 +167,17 @@ obj LayoutFrame {
         overlay_ids: list[str];
 }
 
-
 obj MutationResult {
     has ok: bool,
         relation_handle: RelationHandle | None = None,
         diagnostics: list[LayoutDiagnostic] = [];
 }
 
-
 obj LayoutResult {
     has ok: bool,
         frame: LayoutFrame | None = None,
         diagnostics: list[LayoutDiagnostic] = [];
 }
-
 
 enum LayoutRelationKind {
     LEFT_OF = "left_of",
@@ -216,7 +189,6 @@ enum LayoutRelationKind {
     ALIGN_CENTER = "align_center",
     SAME_SIZE = "same_size",
 }
-
 
 """Process-local spatial relation between two live nodes (plan §4.1).
 
@@ -233,14 +205,12 @@ obj LayoutRelation {
         strength: StrengthTier = StrengthTier.REQUIRED;
 }
 
-
 """Registered content for one node (plan §4 invariant 6)."""
 obj ContentEntry {
     has lines: list[str],
         content_revision: int,
         style_revision: int;
 }
-
 
 """Cached wrapped lines for one node at one integer width (plan §7.1
 step 4). One entry per node — revisions are monotonic, so older wraps
@@ -251,7 +221,6 @@ obj MeasureEntry {
         style_revision: int,
         lines: list[str];
 }
-
 
 """Permanent layout registry (plan §4).
 
@@ -267,7 +236,6 @@ obj LayoutState {
         scroll_requests: dict[str, int] = {},
         last_frame: LayoutFrame | None = None;
 }
-
 
 # ----------------------------------------------------------------------
 # Spec construction helpers (axis sugar over AxisSize).

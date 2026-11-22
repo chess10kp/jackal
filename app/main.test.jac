@@ -59,7 +59,6 @@ test "handle_command routes slash args into extension commands" {
 }
 
 test "session_boot dispose round trip (no extensions)" {
-
     # Empty cwd -> no .jackal/extensions.json -> idle phase, bridge is None.
     tmp = tempfile.mkdtemp(prefix="jackal-main-boot-");
     old_cwd = os.getcwd();
@@ -79,7 +78,6 @@ test "session_boot dispose round trip (no extensions)" {
 }
 
 test "handle_command sessions resume export round-trip" {
-
     tmp = tempfile.mkdtemp(prefix="jackal-main-sess-");
     old_cwd = os.getcwd();
     os.chdir(tmp);

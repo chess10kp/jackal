@@ -6,23 +6,23 @@ declarations directly, with no import line.
 
 # --- component effect functions (plain functions, no closures needed) -----
 
-def model_apply(ctx: EffectContext, fiber: Fiber) -> None {
+def model_apply(ctx: EffectContext, fiber: Fiber) {
     ctx.put("model", "claude-sonnet-5");
     ctx.put("model.health", "ok");
 }
 
-def tools_apply(ctx: EffectContext, fiber: Fiber) -> None {
+def tools_apply(ctx: EffectContext, fiber: Fiber) {
     m = ctx.get("model");
     ctx.put("tools.read", "read_file(" + str(m) + ")");
     ctx.put("tools.edit", "edit_file");
 }
 
-def render_apply(ctx: EffectContext, fiber: Fiber) -> None {
+def render_apply(ctx: EffectContext, fiber: Fiber) {
     ctx.put("renderer", "plain");
     ctx.put("slash./render", "render_v1");
 }
 
-def render_v2_apply(ctx: EffectContext, fiber: Fiber) -> None {
+def render_v2_apply(ctx: EffectContext, fiber: Fiber) {
     ctx.put("renderer", "ansi");
     ctx.put("slash./render", "render_v2");
 }

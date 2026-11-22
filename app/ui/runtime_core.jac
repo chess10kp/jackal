@@ -20,31 +20,19 @@ import from ui.model {
     ordered_children,
 }
 
-import from ui.mutation {
-    append_child,
-    dispose_subtree,
-    MutationResult,
-}
+import from ui.mutation { append_child, dispose_subtree, MutationResult }
 
-import from ui.bindings {
-    BindingRegistry,
-    clear_bindings,
-    find_orphan_bindings,
-    is_empty,
-}
-
+import from ui.bindings { BindingRegistry, clear_bindings, find_orphan_bindings, is_empty }
 
 obj RendererState {
-    has layout: dict[str, dict[str, int]] = {};
-    has damage: list[dict[str, int]] = [];
-    has cursor_holder_id: str = "";
+    has layout: dict[str, dict[str, int]] = {},
+        damage: list[dict[str, int]] = [],
+        cursor_holder_id: str = "";
 }
-
 
 obj CapabilityRegistry {
     has by_node: dict[str, list[str]] = {};
 }
-
 
 obj InvalidationRecord {
     has node_id: str,
@@ -52,13 +40,11 @@ obj InvalidationRecord {
         reason: str;
 }
 
-
 """Queued UI session event (resize, ...) for consumers to drain."""
 obj SessionEventRecord {
-    has kind: str = "";
-    has payload: dict[str, int] = {};
+    has kind: str = "",
+        payload: dict[str, int] = {};
 }
-
 
 """Native factory seam: server modules (ui.screen) cannot construct a
 native-pinned obj class directly, so they build records through this call."""
@@ -66,34 +52,30 @@ def make_session_event(kind: str, payload: dict[str, int]) -> SessionEventRecord
     return SessionEventRecord(kind=kind, payload=payload);
 }
 
-
 obj UiSession {
-    has bindings: BindingRegistry;
-    has renderer: RendererState;
-    has capabilities: CapabilityRegistry;
-    has ui_root: UiSessionRoot | None = None;
-    has current_screen: Screen | None = None;
-    has focus_id: str = "";
-    has saved_focus_id: str = "";
-    has graph_revision: int = 0;
-    has disposed: bool = False;
-    has invalidation_journal: list[InvalidationRecord] = [];
-    has event_queue: list[SessionEventRecord] = [];
-    has tracked_node_ids: set[str] = set();
+    has bindings: BindingRegistry,
+        renderer: RendererState,
+        capabilities: CapabilityRegistry,
+        ui_root: UiSessionRoot | None = None,
+        current_screen: Screen | None = None,
+        focus_id: str = "",
+        saved_focus_id: str = "",
+        graph_revision: int = 0,
+        disposed: bool = False,
+        invalidation_journal: list[InvalidationRecord] = [],
+        event_queue: list[SessionEventRecord] = [],
+        tracked_node_ids: set[str] = set();
 }
-
 
 obj SessionLeak {
     has kind: str,
         detail: str;
 }
 
-
 obj UiSessionHandle {
-    has session: UiSession;
-    has ui_root_id: str;
+    has session: UiSession,
+        ui_root_id: str;
 }
-
 
 def create_session -> UiSessionHandle {
     ui_root = UiSessionRoot(key="session");
@@ -107,11 +89,9 @@ def create_session -> UiSessionHandle {
     return UiSessionHandle(session=session, ui_root_id=node_id(ui_root));
 }
 
-
 def track_node(session: UiSession, n: UiNode) {
     session.tracked_node_ids.add(node_id(n));
 }
-
 
 def is_reachable_from_root(session: UiSession, n: UiNode) -> bool {
     if session.disposed or session.ui_root is None {
@@ -131,46 +111,30 @@ def is_reachable_from_root(session: UiSession, n: UiNode) -> bool {
     return False;
 }
 
-
 def assert_mutation_parent(session: UiSession, parent: UiContainer) {
     if session.disposed {
         raise ValueError("UiSession is disposed");
     }
     if not is_reachable_from_root(session, parent) {
-        raise ValueError(
-            "Mutation parent is not reachable from UiSessionRoot: "
-            + parent.key
-        );
+        raise ValueError("Mutation parent is not reachable from UiSessionRoot: " + parent.key);
     }
 }
 
-
-def append_child_session(
-    session: UiSession,
-    parent: UiContainer,
-    child: UiNode,
-) -> MutationResult {
+def append_child_session(session: UiSession, parent: UiContainer, child: UiNode) -> MutationResult {
     assert_mutation_parent(session, parent);
     result = append_child(parent, child);
     track_node(session, child);
     session.graph_revision += result.graph_revision;
     if result.layout_root_id {
-        record_invalidation(
-            session,
-            node_id(child),
-            result.layout_root_id,
-            "append_child",
-        );
+        record_invalidation(session, node_id(child), result.layout_root_id, "append_child");
     }
     return result;
 }
-
 
 def set_current_screen(session: UiSession, screen: Screen) {
     session.current_screen = screen;
     track_node(session, screen);
 }
-
 
 def set_focus(session: UiSession, n: UiNode | None) {
     if n is None {
@@ -180,7 +144,6 @@ def set_focus(session: UiSession, n: UiNode | None) {
     session.focus_id = node_id(n);
 }
 
-
 def register_capability(session: UiSession, node_id_str: str, cap_name: str) {
     if node_id_str not in session.capabilities.by_node {
         session.capabilities.by_node[node_id_str] = [];
@@ -188,39 +151,25 @@ def register_capability(session: UiSession, node_id_str: str, cap_name: str) {
     session.capabilities.by_node[node_id_str].append(cap_name);
 }
 
-
 def release_capabilities(session: UiSession, node_id_str: str) {
     if node_id_str in session.capabilities.by_node {
         del session.capabilities.by_node[node_id_str];
     }
 }
 
-
-def record_invalidation(
-    session: UiSession,
-    node_id_str: str,
-    layout_root_id: str,
-    reason: str,
-) {
+def record_invalidation(session: UiSession, node_id_str: str, layout_root_id: str, reason: str) {
     session.invalidation_journal.append(
-        InvalidationRecord(
-            node_id=node_id_str,
-            layout_root_id=layout_root_id,
-            reason=reason,
-        )
+        InvalidationRecord(node_id=node_id_str, layout_root_id=layout_root_id, reason=reason)
     );
 }
-
 
 # ui_jids_reachable_from_persistent_root moved to ui/runtime_jids.jac:
 # its `root` access is a PERSIST placement blocker that would mark this
 # whole module non-native and erase UiSession as a signature type.
 
-
 def _endpoint_tracked(session: UiSession, n: UiNode) -> bool {
     return node_id(n) in session.tracked_node_ids;
 }
-
 
 def _collect_stale_edges(session: UiSession) -> list[str] {
     stale: list[str] = [];
@@ -233,12 +182,7 @@ def _collect_stale_edges(session: UiSession) -> list[str] {
         if isinstance(current, UiContainer) {
             for child in ordered_children(current) {
                 if not _endpoint_tracked(session, child) {
-                    stale.append(
-                        "Child:"
-                        + node_id(current)
-                        + "->"
-                        + node_id(child)
-                    );
+                    stale.append("Child:" + node_id(current) + "->" + node_id(child));
                 }
                 stack.append(child);
             }
@@ -255,9 +199,7 @@ def _collect_stale_edges(session: UiSession) -> list[str] {
         }
         for target in [current ->:FocusNext:->] {
             if not _endpoint_tracked(session, target) {
-                stale.append(
-                    "FocusNext:" + node_id(current) + "->" + node_id(target)
-                );
+                stale.append("FocusNext:" + node_id(current) + "->" + node_id(target));
             }
         }
         for target in [current ->:Layer:->] {
@@ -268,7 +210,6 @@ def _collect_stale_edges(session: UiSession) -> list[str] {
     }
     return stale;
 }
-
 
 def _find_node_by_jid(n: UiNode, target_jid: str) -> UiNode | None {
     if node_id(n) == target_jid {
@@ -285,62 +226,32 @@ def _find_node_by_jid(n: UiNode, target_jid: str) -> UiNode | None {
     return None;
 }
 
-
 def validate_session(session: UiSession) -> list[SessionLeak] {
     if session.disposed {
         return [];
     }
     leaks: list[SessionLeak] = [];
-    for binding in find_orphan_bindings(
-        session.bindings,
-        session.tracked_node_ids,
-    ) {
-        leaks.append(
-            SessionLeak(
-                kind="orphan_binding",
-                detail=binding.target_id,
-            )
-        );
+    for binding in find_orphan_bindings(session.bindings, session.tracked_node_ids) {
+        leaks.append(SessionLeak(kind="orphan_binding", detail=binding.target_id));
     }
     if session.focus_id and session.focus_id not in session.tracked_node_ids {
-        leaks.append(
-            SessionLeak(
-                kind="invalid_focus",
-                detail=session.focus_id,
-            )
-        );
+        leaks.append(SessionLeak(kind="invalid_focus", detail=session.focus_id));
     }
     for cap_node_id in session.capabilities.by_node {
         if cap_node_id not in session.tracked_node_ids {
-            leaks.append(
-                SessionLeak(
-                    kind="unreleased_capability",
-                    detail=cap_node_id,
-                )
-            );
+            leaks.append(SessionLeak(kind="unreleased_capability", detail=cap_node_id));
         }
     }
     for layout_id in session.renderer.layout {
         if layout_id not in session.tracked_node_ids {
-            leaks.append(
-                SessionLeak(
-                    kind="stale_renderer_layout",
-                    detail=layout_id,
-                )
-            );
+            leaks.append(SessionLeak(kind="stale_renderer_layout", detail=layout_id));
         }
     }
     for edge_detail in _collect_stale_edges(session) {
-        leaks.append(
-            SessionLeak(
-                kind="stale_edge",
-                detail=edge_detail,
-            )
-        );
+        leaks.append(SessionLeak(kind="stale_edge", detail=edge_detail));
     }
     return leaks;
 }
-
 
 def dispose_session(session: UiSession) {
     if session.disposed {
@@ -363,7 +274,6 @@ def dispose_session(session: UiSession) {
     }
     session.tracked_node_ids.clear();
 }
-
 
 def get_focus_node(session: UiSession) -> UiNode | None {
     if session.disposed or session.ui_root is None or not session.focus_id {

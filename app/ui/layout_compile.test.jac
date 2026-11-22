@@ -7,12 +7,8 @@ warning without frame failure, overlay centering, determinism, and the
 D23 contract (intrinsic drift never turns a frame unsatisfiable).
 """
 
-import from constraints.algebra {
-    StrengthTier,
-}
-import from constraints.solver {
-    Solver,
-}
+import from constraints.algebra { StrengthTier }
+import from constraints.solver { Solver }
 import from ui.layout_types {
     Axis,
     AxisSize,
@@ -29,17 +25,7 @@ import from ui.layout_types {
     create_layout_state,
     set_spec,
 }
-import from ui.model {
-    Child,
-    Header,
-    MainScreen,
-    Prompt,
-    Status,
-    TranscriptView,
-    UiNode,
-    node_id,
-}
-
+import from ui.model { Child, Header, MainScreen, Prompt, Status, TranscriptView, UiNode, node_id }
 
 """Narrow CompileResult.solver for the type checker (fails loudly on
 an unsuccessful compile instead of returning a None solver)."""
@@ -51,26 +37,21 @@ def _solver_of(r: CompileResult) -> Solver {
     return s;
 }
 
-
 def _fill -> AxisSize {
     return AxisSize(mode=SizeMode.FILL);
 }
-
 
 def _fixed(n: float) -> AxisSize {
     return AxisSize(mode=SizeMode.FIXED, preferred=n);
 }
 
-
 def _grow(weight: float) -> AxisSize {
     return AxisSize(mode=SizeMode.GROW, grow_weight=weight);
 }
 
-
 def _intrinsic -> AxisSize {
     return AxisSize(mode=SizeMode.INTRINSIC);
 }
-
 
 obj _ShellFixture {
     has state: LayoutState,
@@ -80,7 +61,6 @@ obj _ShellFixture {
         status: Status,
         prompt: Prompt;
 }
-
 
 """Build the legacy-parity shell: header(1) / transcript(grow) /
 status(1) / prompt(2) under a MainScreen, specs registered in state."""
@@ -98,11 +78,7 @@ def _shell_state(columns: int = 80, rows: int = 24) -> _ShellFixture {
     state = create_layout_state(columns, rows);
     set_spec(state, screen, LayoutSpec(width=_fill(), height=_fill()));
     set_spec(state, header, LayoutSpec(width=_fill(), height=_fixed(1.0)));
-    set_spec(
-        state,
-        transcript,
-        LayoutSpec(width=_fill(), height=_grow(1.0), scroll_vertical=True),
-    );
+    set_spec(state, transcript, LayoutSpec(width=_fill(), height=_grow(1.0), scroll_vertical=True));
     set_spec(state, status, LayoutSpec(width=_fill(), height=_fixed(1.0)));
     set_spec(state, prompt, LayoutSpec(width=_fill(), height=_fixed(2.0)));
     return _ShellFixture(
@@ -114,7 +90,6 @@ def _shell_state(columns: int = 80, rows: int = 24) -> _ShellFixture {
         prompt=prompt,
     );
 }
-
 
 test "root pins to viewport and grow child absorbs the remainder" {
     m = _shell_state();
@@ -145,7 +120,6 @@ test "root pins to viewport and grow child absorbs the remainder" {
     assert snap.values[edges.right.id] == 80.0;
 }
 
-
 test "every generated constraint carries provenance with template and node" {
     m = _shell_state();
     r = compile_layout(m.state, m.screen, Viewport(columns=80, rows=24));
@@ -166,7 +140,6 @@ test "every generated constraint carries provenance with template and node" {
     }
 }
 
-
 test "scoped node without a spec is rejected as INVALID_SPEC" {
     m = _shell_state();
     stranger = Prompt(key="stranger");
@@ -175,7 +148,6 @@ test "scoped node without a spec is rejected as INVALID_SPEC" {
     assert not r.ok;
     assert r.diagnostics[0].code == LayoutError.INVALID_SPEC;
 }
-
 
 test "relation endpoint outside scope is rejected as OUT_OF_SCOPE" {
     m = _shell_state();
@@ -200,7 +172,6 @@ test "relation endpoint outside scope is rejected as OUT_OF_SCOPE" {
     }
     assert "out_of_scope" in codes;
 }
-
 
 test "relation owner that is not the direct parent is INVALID_TOPOLOGY" {
     m = _shell_state();
@@ -227,21 +198,12 @@ test "relation owner that is not the direct parent is INVALID_TOPOLOGY" {
     assert False;  # INVALID_TOPOLOGY diagnostic missing
 }
 
-
 test "conflicting REQUIRED relation makes compilation unsatisfiable" {
     m = _shell_state();
     # Distinct fixed widths plus a REQUIRED same-width relation is a
     # direct contradiction.
-    set_spec(
-        m.state,
-        m.header,
-        LayoutSpec(width=_fixed(30.0), height=_fixed(1.0)),
-    );
-    set_spec(
-        m.state,
-        m.status,
-        LayoutSpec(width=_fixed(45.0), height=_fixed(1.0)),
-    );
+    set_spec(m.state, m.header, LayoutSpec(width=_fixed(30.0), height=_fixed(1.0)));
+    set_spec(m.state, m.status, LayoutSpec(width=_fixed(45.0), height=_fixed(1.0)));
     rel = LayoutRelation(
         owner_id=node_id(m.screen),
         source_id=node_id(m.header),
@@ -255,25 +217,19 @@ test "conflicting REQUIRED relation makes compilation unsatisfiable" {
     assert hr.ok;
     r = compile_layout(st, m.screen, Viewport(columns=80, rows=24));
     assert not r.ok;
-    unsat = [
-        d for d in r.diagnostics if d.code == LayoutError.UNSATISFIABLE
-    ];
+    unsat = [d for d in r.diagnostics if d.code == LayoutError.UNSATISFIABLE];
     assert len(unsat) == 1;
     assert len(unsat[0].provenance) >= 1;
 }
 
-
 test "overflow keeps the frame satisfiable and attaches a WARNING" {
     m = _shell_state(rows=3);  # 3 rows cannot hold 1+1+2 fixed rows.
     r = compile_layout(m.state, m.screen, Viewport(columns=80, rows=3));
-    overflow = [
-        d for d in r.diagnostics if d.code == LayoutError.OVERFLOW
-    ];
+    overflow = [d for d in r.diagnostics if d.code == LayoutError.OVERFLOW];
     assert len(overflow) == 1;
     assert overflow[0].severity == LayoutSeverity.WARNING;
     assert r.ok;  # Warned clipped frame, not an error (plan §6.2 step 3).
 }
-
 
 test "intrinsic natural drift never turns the frame unsatisfiable (D23)" {
     screen = MainScreen(key="main");
@@ -284,10 +240,7 @@ test "intrinsic natural drift never turns the frame unsatisfiable (D23)" {
 
     state = create_layout_state(40, 10);
     set_spec(state, screen, LayoutSpec(width=_fill(), height=_fill()));
-    set_spec(
-        state, text,
-        LayoutSpec(width=_fill(), height=_intrinsic()),
-    );
+    set_spec(state, text, LayoutSpec(width=_fill(), height=_intrinsic()));
     set_spec(state, filler, LayoutSpec(width=_fill(), height=_grow(1.0)));
 
     # Natural HEIGHT wildly exceeds the viewport: the WEAK preference
@@ -295,10 +248,7 @@ test "intrinsic natural drift never turns the frame unsatisfiable (D23)" {
     # solvable (hard-claim-only split, decision D23).
     naturals: dict[str, Size] = {};
     naturals[node_id(text)] = Size(width=40, height=500);
-    r = compile_layout(
-        state, screen, Viewport(columns=40, rows=10),
-        natural_sizes=naturals,
-    );
+    r = compile_layout(state, screen, Viewport(columns=40, rows=10), natural_sizes=naturals);
     assert r.ok;
     for d in r.diagnostics {
         assert d.code != LayoutError.UNSATISFIABLE;
@@ -307,14 +257,9 @@ test "intrinsic natural drift never turns the frame unsatisfiable (D23)" {
     tedges = r.nodes[node_id(text)];
     fedges = r.nodes[node_id(filler)];
     # Text collapsed to zero rows; filler took the whole column.
-    assert (
-        snap.values[tedges.bottom.id] - snap.values[tedges.top.id]
-    ) < 1e-6;
-    assert (
-        snap.values[fedges.bottom.id] - snap.values[fedges.top.id]
-    ) == 10.0;
+    assert (snap.values[tedges.bottom.id] - snap.values[tedges.top.id]) < 1e-6;
+    assert (snap.values[fedges.bottom.id] - snap.values[fedges.top.id]) == 10.0;
 }
-
 
 test "compilation is deterministic across runs" {
     a = _shell_state();

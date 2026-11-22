@@ -144,7 +144,10 @@ test "legacy mcp.json import attaches imported servers with a notice" {
             f.write(
                 json.dumps({
                     "mcpServers": {
-                        "leg": {"command": _fixture_python(), "args": [fixture_path("fake_mcp.py")]},
+                        "leg": {
+                            "command": _fixture_python(),
+                            "args": [fixture_path("fake_mcp.py")],
+                        },
                     },
                 }),
             );

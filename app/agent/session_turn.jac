@@ -4,14 +4,25 @@ import sys;
 import os;
 import time;
 
-import from .session_state { history, show_stats, plugins, _t0, _n_tools, reset_turn_stats, bump_tool_count, get_model_state, get_thinking_level_state, get_mode_state }
-import from .session_config { set_model, set_thinking_level, _apply_pending_model_requests, wait_mcp_ready }
-import from .llm {
-    react_loop,
-    make_transport,
-    make_ext_transport,
-    TurnCancel,
+import from .session_state {
+    history,
+    show_stats,
+    plugins,
+    _t0,
+    _n_tools,
+    reset_turn_stats,
+    bump_tool_count,
+    get_model_state,
+    get_thinking_level_state,
+    get_mode_state,
 }
+import from .session_config {
+    set_model,
+    set_thinking_level,
+    _apply_pending_model_requests,
+    wait_mcp_ready,
+}
+import from .llm { react_loop, make_transport, make_ext_transport, TurnCancel }
 import from .compaction {
     load_project_config,
     resolve_auto_compact_config,
@@ -35,7 +46,6 @@ import from .plugin_bridge {
 import from .tools { default_registry }
 import from .sessions { save_session, new_session_id, is_valid_session_id }
 import from .session_lifecycle { session_boot, wait_extensions_ready }
-
 
 def render_event(kind: str, data: dict[str, any]) {
     out: any = sys.stdout;
@@ -65,30 +75,28 @@ def render_event(kind: str, data: dict[str, any]) {
     }
 }
 
-
-
-
 def relay_tool_hooks(bridge: PluginBridge | None, inner: any) -> any {
     if bridge is None {
         return inner;
     }
     def relayed(kind: str, data: dict[str, any]) {
         if kind == "tool_call" {
-            fire_hook(bridge, "tool_execution_start", {
-                "tool": str(data.get("tool", "")),
-                "args": data.get("args", {}),
-            });
+            fire_hook(
+                bridge,
+                "tool_execution_start",
+                {"tool": str(data.get("tool", "")), "args": data.get("args", {})},
+            );
         } elif kind == "tool_result" {
-            fire_hook(bridge, "tool_execution_end", {
-                "tool": str(data.get("tool", "")),
-                "result": str(data.get("result", ""))[:2000],
-            });
+            fire_hook(
+                bridge,
+                "tool_execution_end",
+                {"tool": str(data.get("tool", "")), "result": str(data.get("result", ""))[:2000]},
+            );
         }
         inner(kind, data);
     }
     return relayed;
 }
-
 
 """Best-effort application of extension traffic pushed during a turn.
 
@@ -104,7 +112,10 @@ def _apply_extension_traffic(bridge: PluginBridge | None, on_event: any) {
         traffic: dict[str, any] = drain_extension_traffic(bridge);
         msgs: list[dict[str, any]] = traffic["messages"];
         for m in msgs {
-            history.append({"role": str(m.get("role", "user")), "content": str(m.get("content", ""))});
+            history.append({
+                "role": str(m.get("role", "user")),
+                "content": str(m.get("content", "")),
+            });
         }
         raw_entries: list[dict[str, any]] = traffic["entries"];
         for e in raw_entries {
@@ -119,14 +130,11 @@ def _apply_extension_traffic(bridge: PluginBridge | None, on_event: any) {
                 if r.get("ok") and r.get("lines") {
                     ent["lines"] = r["lines"];
                 }
-            } except Exception {
-            }
+            } except Exception {}
             on_event("entry", ent);
         }
-    } except Exception {
-    }
+    } except Exception {}
 }
-
 
 """Index where the kept tail starts: `len(msgs) - keep_tail`, moved earlier
 so the tail never opens with a tool result orphaned from the assistant
@@ -139,17 +147,14 @@ def compaction_cut(msgs: list[dict[str, any]], keep_tail: int, floor: int = 0) -
     return cut;
 }
 
-
 """Compact the live history: leading system prompt kept, everything before
 the tail summarized (LLM when strategy="llm" and a key is available, else
 mechanical). Returns {"ok", "before", "after", "strategy"} or {"ok": False,
 "reason"}. `force` skips the threshold gate (manual /compact)."""
 def compact_history(bridge: PluginBridge | None = None, force: bool = False) -> dict[str, any] {
-    cwd = plugins.cwd if plugins.cwd else os.getcwd();
+    cwd = plugins.cwd or os.getcwd();
     raw_cfg = load_project_config(cwd);
-    cfg = resolve_auto_compact_config(
-        raw_cfg, str(raw_cfg.get("compactStrategy", ""))
-    );
+    cfg = resolve_auto_compact_config(raw_cfg, str(raw_cfg.get("compactStrategy", "")));
     if not force {
         ctx_override: any = None;
         env_max: str = os.environ.get("JACKAL_CONTEXT_MAX", "");
@@ -162,17 +167,20 @@ def compact_history(bridge: PluginBridge | None = None, force: bool = False) -> 
         }
     }
     kt: int = int(cfg.get("keepTail", 12));
-    if force { kt = min(kt, 4); }
+    if force {
+        kt = min(kt, 4);
+    }
     floor: int = 1 if history and str(history[0].get("role", "")) == "system" else 0;
     cut: int = compaction_cut(history, kt, floor);
     if cut <= floor {
         return {"ok": False, "reason": "nothing to compact"};
     }
     if bridge is not None {
-        results = fire_hook(bridge as PluginBridge, "session_before_compact", {
-            "messages_count": len(history),
-            "manual": force,
-        });
+        results = fire_hook(
+            bridge as PluginBridge,
+            "session_before_compact",
+            {"messages_count": len(history), "manual": force},
+        );
         for r in results {
             v: any = r.get("verdict") if isinstance(r, dict) else None;
             if isinstance(v, dict) and v.get("block") {
@@ -192,7 +200,9 @@ def compact_history(bridge: PluginBridge | None = None, force: bool = False) -> 
         }
     }
     compacted: list[dict[str, any]] = [];
-    if floor == 1 { compacted.append(history[0]); }
+    if floor == 1 {
+        compacted.append(history[0]);
+    }
     compacted.append({"role": "user", "content": summary_text});
     for m in history[cut:] {
         compacted.append(m);
@@ -203,15 +213,14 @@ def compact_history(bridge: PluginBridge | None = None, force: bool = False) -> 
         history.append(m);
     }
     if bridge is not None {
-        fire_hook(bridge as PluginBridge, "session_after_compact", {
-            "before": count_before,
-            "after": len(history),
-            "strategy": strategy,
-        });
+        fire_hook(
+            bridge as PluginBridge,
+            "session_after_compact",
+            {"before": count_before, "after": len(history), "strategy": strategy},
+        );
     }
     return {"ok": True, "before": count_before, "after": len(history), "strategy": strategy};
 }
-
 
 """Best-effort auto-compaction when the context threshold is crossed (checked
 after the user message lands). Never raises — compaction failure must not
@@ -219,10 +228,8 @@ break the turn."""
 def _maybe_auto_compact(bridge: PluginBridge | None) {
     try {
         compact_history(bridge, False);
-    } except Exception {
-    }
+    } except Exception {}
 }
-
 
 """Manual compaction (/compact): status line for the UI."""
 def compact_now -> str {
@@ -235,11 +242,15 @@ def compact_now -> str {
         return "nothing compacted (" + str(res.get("reason", "")) + ")";
     }
     return (
-        "compacted " + str(res["before"]) + " -> " + str(res["after"])
-        + " messages (" + str(res["strategy"]) + ")"
+        "compacted "
+        + str(res["before"])
+        + " -> "
+        + str(res["after"])
+        + " messages ("
+        + str(res["strategy"])
+        + ")"
     );
 }
-
 
 """Seed or refresh the session system prompt for the active dev mode."""
 def _ensure_mode_system_prompt {
@@ -264,16 +275,12 @@ def _ensure_mode_system_prompt {
     }
 }
 
-
 def run_turn(
-    message: str,
-    on_event: any = render_event,
-    approve: any = None,
-    max_iters: int = 30,
+    message: str, on_event: any = render_event, approve: any = None, max_iters: int = 30
 ) -> str {
     # Auto-boot with no decls if never booted (native-only path).
     if plugins.reg is None {
-        session_boot(plugins.session_id, plugins.cwd if plugins.cwd else os.getcwd(), []);
+        session_boot(plugins.session_id, plugins.cwd or os.getcwd(), []);
     }
     st = wait_extensions_ready();
     # MCP servers attach in background flows; give them a bounded window so
@@ -324,7 +331,9 @@ def run_turn(
     transport: any = None;
     if get_model_state().startswith("ext/") {
         try {
-            transport = make_ext_transport(bridge as PluginBridge, get_model_state(), thinking=get_thinking_level_state());
+            transport = make_ext_transport(
+                bridge as PluginBridge, get_model_state(), thinking=get_thinking_level_state()
+            );
         } except Exception {
             transport = None;
         }
@@ -336,7 +345,9 @@ def run_turn(
         }
     }
     if transport is None {
-        transport = make_transport(get_model_state(), get_thinking_level_state(), hook_bridge=bridge);
+        transport = make_transport(
+            get_model_state(), get_thinking_level_state(), hook_bridge=bridge
+        );
     }
     reset_turn_stats(time.time());
     # T2-partial lifecycle hooks — best-effort, never fatal.
@@ -377,8 +388,14 @@ def run_turn(
     try {
         reg = plugins.reg if plugins.reg is not None else default_registry();
         answer = react_loop(
-            history, [], transport, relay_tool_hooks(bridge, on_event),
-            max_iters=max_iters, reg=reg, bridge=bridge, cancel=turn_cancel,
+            history,
+            [],
+            transport,
+            relay_tool_hooks(bridge, on_event),
+            max_iters=max_iters,
+            reg=reg,
+            bridge=bridge,
+            cancel=turn_cancel,
             approve=approve,
         );
     } finally {
@@ -388,15 +405,12 @@ def run_turn(
             # replacement lasts for this turn's LLM calls only.
             try {
                 history[sys_idx]["content"] = saved_sys;
-            } except Exception {
-            }
+            } except Exception {}
         }
         if on_event is render_event {
             sys.stdout.write("\n");
             if show_stats {
-                sys.stdout.write(
-                    f"  [{time.time() - _t0:.1f}s - {_n_tools} tools]\n"
-                );
+                sys.stdout.write(f"  [{time.time() - _t0:.1f}s - {_n_tools} tools]\n");
             }
             sys.stdout.flush();
         } else {
@@ -404,11 +418,9 @@ def run_turn(
         }
         if bridge is not None {
             b2 = bridge as PluginBridge;
-            fire_hook(b2, "turn_end", {
-                "secs": time.time() - _t0,
-                "tools": _n_tools,
-                "answer": answer,
-            });
+            fire_hook(
+                b2, "turn_end", {"secs": time.time() - _t0, "tools": _n_tools, "answer": answer}
+            );
             fire_hook(b2, "agent_end", {"answer": answer});
             fire_hook(b2, "agent_settled", {});
             _apply_extension_traffic(b2, on_event);
@@ -419,13 +431,8 @@ def run_turn(
             if not is_valid_session_id(plugins.session_id) {
                 plugins.session_id = new_session_id();
             }
-            save_session(
-                plugins.cwd if plugins.cwd else os.getcwd(),
-                history,
-                session_id=plugins.session_id,
-            );
-        } except Exception {
-        }
+            save_session(plugins.cwd or os.getcwd(), history, session_id=plugins.session_id);
+        } except Exception {}
     }
     # T2b: display-only markdown transformer chain over the complete answer,
     # surfaced as a `message` event for JSON/UI clients (term mode ignores it
@@ -446,17 +453,17 @@ def run_turn(
                     {"role": "assistant", "content": shown},
                 );
                 if mr.get("ok") and mr.get("lines") {
-                    on_event("entry", {
-                        "type": "extension_render",
-                        "render_type": "assistant",
-                        "lines": mr["lines"],
-                    });
+                    on_event(
+                        "entry",
+                        {
+                            "type": "extension_render",
+                            "render_type": "assistant",
+                            "lines": mr["lines"],
+                        },
+                    );
                 }
-            } except Exception {
-            }
+            } except Exception {}
         }
     }
     return answer;
 }
-
-

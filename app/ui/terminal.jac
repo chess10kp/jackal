@@ -31,18 +31,16 @@ import tty;
 import fcntl;
 import struct;
 
-
-glob ESC = "\x1b";
-glob ENABLE_BRACKETED_PASTE = "\x1b[?2004h";
-glob DISABLE_BRACKETED_PASTE = "\x1b[?2004l";
-glob ENTER_ALT_SCREEN = "\x1b[?1049h";
-glob LEAVE_ALT_SCREEN = "\x1b[?1049l";
-glob SYNC_BEGIN = "\x1b[?2026h";
-glob SYNC_END = "\x1b[?2026l";
-glob HIDE_CURSOR = "\x1b[?25l";
-glob SHOW_CURSOR = "\x1b[?25h";
-glob CLEAR_SCREEN = "\x1b[2J\x1b[H";
-
+glob ESC = "\x1b",
+     ENABLE_BRACKETED_PASTE = "\x1b[?2004h",
+     DISABLE_BRACKETED_PASTE = "\x1b[?2004l",
+     ENTER_ALT_SCREEN = "\x1b[?1049h",
+     LEAVE_ALT_SCREEN = "\x1b[?1049l",
+     SYNC_BEGIN = "\x1b[?2026h",
+     SYNC_END = "\x1b[?2026l",
+     HIDE_CURSOR = "\x1b[?25l",
+     SHOW_CURSOR = "\x1b[?25h",
+     CLEAR_SCREEN = "\x1b[2J\x1b[H";
 
 """Minimal terminal capability surface used by the renderer and host loop."""
 obj Terminal {
@@ -66,76 +64,75 @@ obj Terminal {
         return "";
     }
 
-    def write(data: str) -> None {
+    def write(data: str) {
         raise NotImplementedError("Terminal.write");
     }
 
-    def start -> None {
+    def start {
         raise NotImplementedError("Terminal.start");
     }
 
-    def stop -> None {
+    def stop {
         raise NotImplementedError("Terminal.stop");
     }
 
-    def enter_alternate_screen -> None {
+    def enter_alternate_screen {
         self.write(ENTER_ALT_SCREEN);
         self.alternate_screen = True;
     }
 
-    def leave_alternate_screen -> None {
+    def leave_alternate_screen {
         self.write(LEAVE_ALT_SCREEN);
         self.alternate_screen = False;
     }
 
-    def begin_synchronized_update -> None {
+    def begin_synchronized_update {
         self.write(SYNC_BEGIN);
         self.sync_active = True;
     }
 
-    def end_synchronized_update -> None {
+    def end_synchronized_update {
         self.write(SYNC_END);
         self.sync_active = False;
     }
 
-    def hide_cursor -> None {
+    def hide_cursor {
         self.write(HIDE_CURSOR);
         self.cursor_visible = False;
     }
 
-    def show_cursor -> None {
+    def show_cursor {
         self.write(SHOW_CURSOR);
         self.cursor_visible = True;
     }
 
-    def clear_screen -> None {
+    def clear_screen {
         self.write(CLEAR_SCREEN);
     }
 
-    def enable_bracketed_paste -> None {
+    def enable_bracketed_paste {
         self.write(ENABLE_BRACKETED_PASTE);
         self.bracketed_paste = True;
     }
 
-    def disable_bracketed_paste -> None {
+    def disable_bracketed_paste {
         self.write(DISABLE_BRACKETED_PASTE);
         self.bracketed_paste = False;
     }
 
-    def set_title(title: str) -> None {
+    def set_title(title: str) {
         self.write(f"\x1b]0;{title}\x07");
     }
 
-    def move_cursor(row: int, col: int) -> None {
+    def move_cursor(row: int, col: int) {
         self.write(f"\x1b[{row};{col}H");
     }
 
     """Restore host terminal modes. Safe to call more than once."""
-    def restore -> None {
+    def restore {
         self.stop();
     }
 }
-
 
 def _ioctl_winsize(fd: int) -> tuple[int, int] | None {
     try {
@@ -144,11 +141,9 @@ def _ioctl_winsize(fd: int) -> tuple[int, int] | None {
         if rows > 0 and cols > 0 {
             return (cols, rows);
         }
-    } except Exception {
-    }
+    } except Exception {}
     return None;
 }
-
 
 """Incremental UTF-8 decoder holding split multibyte sequences across reads.
 
@@ -159,7 +154,7 @@ U+FFFD replacement characters without losing the surrounding text.
 obj Utf8StreamDecoder {
     has _pending: bytes = b"";
 
-    def init  {}
+    def init {}
 
     def feed(data: bytes) -> str {
         buf: bytes = self._pending;
@@ -257,7 +252,6 @@ obj Utf8StreamDecoder {
     }
 }
 
-
 def read_terminal_size(fallback_cols: int = 80, fallback_rows: int = 24) -> tuple[int, int] {
     # literal fds: stream.fileno() is a union-method call that can't lower
     # natively (jac#10536); ioctl on a bad fd just fails inside _ioctl_winsize
@@ -279,7 +273,6 @@ def read_terminal_size(fallback_cols: int = 80, fallback_rows: int = 24) -> tupl
     }
     return (cols, rows);
 }
-
 
 """POSIX process terminal using termios raw mode and signal-driven resize."""
 obj ProcessTerminal(Terminal) {
@@ -320,7 +313,7 @@ obj ProcessTerminal(Terminal) {
         self.restored = True;
     }
 
-    def write(data: str) -> None {
+    def write(data: str) {
         if not data {
             return;
         }
@@ -328,7 +321,7 @@ obj ProcessTerminal(Terminal) {
         sys.stdout.flush();
     }
 
-    def _refresh_size  {
+    def _refresh_size {
         (cols, rows) = read_terminal_size(self.columns, self.rows);
         changed = cols != self.columns or rows != self.rows;
         self.columns = cols;
@@ -363,7 +356,7 @@ obj ProcessTerminal(Terminal) {
         }
     }
 
-    def start -> None {
+    def start {
         if self.started {
             return;
         }
@@ -395,7 +388,7 @@ obj ProcessTerminal(Terminal) {
         }
     }
 
-    def stop -> None {
+    def stop {
         if self.restored and not self.started {
             return;
         }
@@ -412,41 +405,35 @@ obj ProcessTerminal(Terminal) {
             if not self.cursor_visible {
                 self.show_cursor();
             }
-        } except Exception {
-        }
+        } except Exception {}
         if self._old_handler is not None {
             try {
                 signal.signal(signal.SIGWINCH as int, self._old_handler);
-            } except Exception {
-            }
+            } except Exception {}
             self._old_handler = None;
         }
         if self._old_sigint is not None {
             try {
                 signal.signal(signal.SIGINT as int, self._old_sigint);
-            } except Exception {
-            }
+            } except Exception {}
             self._old_sigint = None;
         }
         if self._old_sigterm is not None {
             try {
                 signal.signal(signal.SIGTERM as int, self._old_sigterm);
-            } except Exception {
-            }
+            } except Exception {}
             self._old_sigterm = None;
         }
         if self._old_sighup is not None {
             try {
                 signal.signal(signal.SIGHUP as int, self._old_sighup);
-            } except Exception {
-            }
+            } except Exception {}
             self._old_sighup = None;
         }
         if self._old_attrs is not None and self._fd >= 0 {
             try {
                 termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_attrs);
-            } except Exception {
-            }
+            } except Exception {}
             self._old_attrs = None;
         }
         self.started = False;
@@ -487,7 +474,6 @@ obj ProcessTerminal(Terminal) {
         return text;
     }
 }
-
 
 """Emit one synchronized write: begin sync, body, end sync."""
 def synchronized_write(term: Terminal, data: str) {

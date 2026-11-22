@@ -6,27 +6,14 @@ define acceptance.
 
 import from time { perf_counter }
 
-import from ui.model {
-    MainScreen,
-    ordered_child_keys,
-}
+import from ui.model { MainScreen, ordered_child_keys }
 
-import from ui.runtime {
-    create_session,
-    dispose_session,
-}
-import from ui.runtime_jids {
-    ui_jids_reachable_from_persistent_root,
-}
+import from ui.runtime { create_session, dispose_session }
+import from ui.runtime_jids { ui_jids_reachable_from_persistent_root }
 
-import from ui.bindings {
-    is_empty,
-}
+import from ui.bindings { is_empty }
 
-import from ui.events {
-    InsertText,
-    dispatch_event,
-}
+import from ui.events { InsertText, dispatch_event }
 
 import from ui.screen {
     build_main_shell,
@@ -38,34 +25,15 @@ import from ui.screen {
     shell_resize,
 }
 
-import from ui.renderer {
-    create_renderer,
-    render_frame,
-    set_node_content,
-}
+import from ui.renderer { create_renderer, render_frame, set_node_content }
 
-import from ui.virtual_terminal {
-    VirtualTerminal,
-}
+import from ui.virtual_terminal { VirtualTerminal }
 
-import from ui.markup {
-    lower_markup,
-    default_shell_registry,
-    register_tag,
-    create_tag_registry,
-}
+import from ui.markup { lower_markup, default_shell_registry, register_tag, create_tag_registry }
 
-import from ui.progress_bar {
-    ProgressBar,
-    SetProgress,
-    render_progress,
-    register_progress_markup,
-}
+import from ui.progress_bar { ProgressBar, SetProgress, render_progress, register_progress_markup }
 
-import from ui.inspect {
-    validate_invariants,
-}
-
+import from ui.inspect { validate_invariants }
 
 obj Gate4Report {
     has nodes_queried: int = 0,
@@ -74,7 +42,6 @@ obj Gate4Report {
         full_frame_cells: int = 0,
         retained_cells: int = 0;
 }
-
 
 """Gate 1 — Detached graph lifecycle: no UI jids from persistent root; dispose cleans."""
 def run_gate1_detached_lifecycle -> bool {
@@ -114,7 +81,6 @@ def run_gate1_detached_lifecycle -> bool {
     return True;
 }
 
-
 """Gate 3 — Real layout and damage across shell scenarios."""
 def run_gate3_layout_damage -> bool {
     handle = create_session();
@@ -141,7 +107,6 @@ def run_gate3_layout_damage -> bool {
     dispose_session(session);
     return findings == [];
 }
-
 
 """Gate 4 — Invalidation benchmark numbers (nodes, cells, latency)."""
 def run_gate4_invalidation_bench -> Gate4Report {
@@ -182,7 +147,6 @@ def run_gate4_invalidation_bench -> Gate4Report {
     return metrics;
 }
 
-
 """Gate 5 — External ProgressBar package without framework-source edits."""
 def run_gate5_external_widget -> bool {
     bar = ProgressBar(key="p", value=0.0);
@@ -215,7 +179,6 @@ def run_gate5_external_widget -> bool {
     }
     return isinstance(result.graph_root, ProgressBar);
 }
-
 
 """Gate 6 — Authoring scale: dozens of regions via markup, no manual ranks."""
 def run_gate6_authoring_scale -> bool {

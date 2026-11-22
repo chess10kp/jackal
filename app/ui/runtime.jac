@@ -19,18 +19,9 @@ import from ui.model {
     ordered_children,
 }
 
-import from ui.mutation {
-    append_child,
-    dispose_subtree,
-    MutationResult,
-}
+import from ui.mutation { append_child, dispose_subtree, MutationResult }
 
-import from ui.bindings {
-    BindingRegistry,
-    clear_bindings,
-    find_orphan_bindings,
-    is_empty,
-}
+import from ui.bindings { BindingRegistry, clear_bindings, find_orphan_bindings, is_empty }
 
 import from ui.runtime_core {
     RendererState,
@@ -56,10 +47,7 @@ import from ui.runtime_core {
     get_focus_node,
 }
 
-
 """Unit 7 — focus order, layer z-order, and modal overlay lifecycle."""
-
-
 obj OverlayBounds {
     has x: int = 0,
         y: int = 0,
@@ -71,13 +59,11 @@ obj OverlayBounds {
     }
 }
 
-
 obj OverlayOpenResult {
     has overlay_id: str,
         saved_focus_id: str,
         initial_focus_id: str;
 }
-
 
 obj OverlayCloseResult {
     has restored_focus_id: str,
@@ -85,12 +71,10 @@ obj OverlayCloseResult {
         overlay_id: str;
 }
 
-
 obj RankedOverlay {
     has z_index: int,
         overlay: Overlay;
 }
-
 
 def _layer_z(screen: Screen, overlay: Overlay) -> int {
     for layer_edge in [edge screen ->:Layer:-> overlay] {
@@ -99,32 +83,23 @@ def _layer_z(screen: Screen, overlay: Overlay) -> int {
     return 0;
 }
 
-
 def _ranked_overlay_asc(pair: RankedOverlay) -> int {
     return pair.z_index;
 }
-
 
 def _ranked_overlay_desc(pair: RankedOverlay) -> int {
     return -pair.z_index;
 }
 
-
 def _layer_pairs(screen: Screen) -> list[RankedOverlay] {
     pairs: list[RankedOverlay] = [];
     for candidate in [screen ->:Layer:->] {
         if isinstance(candidate, Overlay) {
-            pairs.append(
-                RankedOverlay(
-                    z_index=_layer_z(screen, candidate),
-                    overlay=candidate,
-                )
-            );
+            pairs.append(RankedOverlay(z_index=_layer_z(screen, candidate), overlay=candidate));
         }
     }
     return pairs;
 }
-
 
 """Paint order: ascending z_index (OSPUI.md §17)."""
 def layers_paint_order(screen: Screen) -> list[Overlay] {
@@ -133,14 +108,12 @@ def layers_paint_order(screen: Screen) -> list[Overlay] {
     return [p.overlay for p in pairs];
 }
 
-
 """Input targeting order: descending z_index (OSPUI.md §17)."""
 def layers_input_order(screen: Screen) -> list[Overlay] {
     pairs = _layer_pairs(screen);
     pairs.sort(key=_ranked_overlay_desc);
     return [p.overlay for p in pairs];
 }
-
 
 def _collect_focusable(n: UiNode) -> list[UiNode] {
     out: list[UiNode] = [];
@@ -160,7 +133,6 @@ def _collect_focusable(n: UiNode) -> list[UiNode] {
     return out;
 }
 
-
 def _collect_subtree_ids(n: UiNode) -> list[str] {
     ids: list[str] = [node_id(n)];
     if isinstance(n, UiContainer) {
@@ -172,7 +144,6 @@ def _collect_subtree_ids(n: UiNode) -> list[str] {
     }
     return ids;
 }
-
 
 """Ordered focusable nodes under screen: containment walk + FocusNext overrides."""
 def focus_order(session: UiSession, screen: Screen) -> list[UiNode] {
@@ -206,12 +177,8 @@ def focus_order(session: UiSession, screen: Screen) -> list[UiNode] {
     return ordered;
 }
 
-
 """Advance focus along focus_order, honoring FocusNext overrides."""
-def advance_focus(
-    session: UiSession,
-    direction: str = "next",
-) -> UiNode | None {
+def advance_focus(session: UiSession, direction: str = "next") -> UiNode | None {
     screen = session.current_screen;
     if screen is None {
         return None;
@@ -246,7 +213,6 @@ def advance_focus(
     return target;
 }
 
-
 """Open a modal overlay: Layer edge, save focus, trap input, focus initial."""
 def open_modal_overlay(
     session: UiSession,
@@ -279,18 +245,12 @@ def open_modal_overlay(
     track_node(session, target);
     set_focus(session, target);
     return OverlayOpenResult(
-        overlay_id=node_id(overlay),
-        saved_focus_id=saved,
-        initial_focus_id=node_id(target),
+        overlay_id=node_id(overlay), saved_focus_id=saved, initial_focus_id=node_id(target)
     );
 }
 
-
 """Close overlay: dispose subtree, restore focus, report damage bounds."""
-def close_overlay(
-    session: UiSession,
-    overlay: Overlay,
-) -> OverlayCloseResult {
+def close_overlay(session: UiSession, overlay: Overlay) -> OverlayCloseResult {
     overlay_id = node_id(overlay);
     damage = OverlayBounds(x=0, y=0, width=0, height=0);
     layout_entry = session.renderer.layout.get(overlay_id);
@@ -330,9 +290,5 @@ def close_overlay(
         }
     }
     session.graph_revision += 1;
-    return OverlayCloseResult(
-        restored_focus_id=restored,
-        damage=damage,
-        overlay_id=overlay_id,
-    );
+    return OverlayCloseResult(restored_focus_id=restored, damage=damage, overlay_id=overlay_id);
 }

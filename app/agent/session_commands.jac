@@ -14,11 +14,9 @@ import from .plugin_bridge {
 }
 import from .sessions { new_session_id }
 
-
 def get_history -> list[dict[str, any]] {
     return list(history);
 }
-
 
 """Replace in-memory history with a loaded transcript (restore flow)."""
 def restore_history(msgs: list[dict[str, any]]) {
@@ -30,11 +28,9 @@ def restore_history(msgs: list[dict[str, any]]) {
     }
 }
 
-
 def set_current_session_id(sid: str) {
-    plugins.session_id = sid if sid else new_session_id();
+    plugins.session_id = sid or new_session_id();
 }
-
 
 """Request cooperative abort of the active turn (if any). Safe to call from
 the UI thread while run_turn is streaming. Returns True when a live turn was
@@ -48,7 +44,6 @@ def cancel_active_turn -> bool {
     return False;
 }
 
-
 """Extension commands visible to the shell/UI (name -> description meta).
 
 The bridge owns the authoritative set; this re-syncs from it so commands
@@ -61,7 +56,6 @@ def list_commands -> dict[str, any] {
     }
     return dict(plugins.commands);
 }
-
 
 """Invoke an extension command through the plugin bridge.
 
@@ -91,7 +85,6 @@ def run_command(name: str, args: str = "") -> str {
     return "\n".join(lines);
 }
 
-
 """Fire an extension keyboard shortcut by key (TUI keybinding path).
 
 Returns a display string: handler notifications + result, or an ERROR line.
@@ -119,7 +112,6 @@ def run_extension_shortcut(key: str) -> str {
     return "\n".join(lines);
 }
 
-
 """Shortcut bindings registered by loaded extensions (key -> meta with
 extension_id + description). Listed for host UIs; the TUI input loop matches
 keypresses against these and fires them via run_extension_shortcut."""
@@ -127,12 +119,10 @@ def list_extension_shortcuts -> dict[str, any] {
     return list_shortcuts(plugins.bridge);
 }
 
-
 """Labels set by loaded extensions via pi.setLabel (id -> meta)."""
 def list_extension_labels -> dict[str, any] {
     return list_labels(plugins.bridge);
 }
-
 
 """JSONL event sink: one serialized event per line on stdout. This IS the
 harness's UI protocol."""

@@ -6,26 +6,47 @@ import from tui.state { LiveShell, SLASH_BUILTINS }
 import from tui.core { _push_turn }
 import from tui.picker_base { _open_picker }
 import from tui.picker_actions {
-    _open_login_picker, _open_resume_picker,
-    _open_tasks_picker, _open_checkpoints_picker, _create_checkpoint_now,
+    _open_login_picker,
+    _open_resume_picker,
+    _open_tasks_picker,
+    _open_checkpoints_picker,
+    _create_checkpoint_now,
     _open_skills_picker,
 }
 import from tui.context { _open_explorer_picker }
 import from tui.mcp { _mcp_window_state }
-import from tui.windows {  _picker_state,  _ui_modal_state,  _close_top_window, _open_window }
+import from tui.windows { _picker_state, _ui_modal_state, _close_top_window, _open_window }
 import from tui.runtime { _begin_assistant_reply }
 import from agent.session {
-    clear_history, get_history, restore_history, list_commands,
-    run_command, list_extension_shortcuts, run_extension_shortcut, plugins,
-    new_session_id, set_model, get_model, cancel_active_turn,
-    compact_now, set_mode, set_current_session_id,
-    mcp_restart, mcp_restart_failed, mcp_prompt, mcp_resources, mcp_configured_specs,
+    clear_history,
+    get_history,
+    restore_history,
+    list_commands,
+    run_command,
+    list_extension_shortcuts,
+    run_extension_shortcut,
+    plugins,
+    new_session_id,
+    set_model,
+    get_model,
+    cancel_active_turn,
+    compact_now,
+    set_mode,
+    set_current_session_id,
+    mcp_restart,
+    mcp_restart_failed,
+    mcp_prompt,
+    mcp_resources,
+    mcp_configured_specs,
 }
 import from agent.modes { DEV_MODES }
 import from agent.compaction { compute_context_usage }
 import from agent.auth_env { logout_provider, stored_providers }
 import from agent.sessions {
-    list_sessions, get_session_record, export_session, save_session,
+    list_sessions,
+    get_session_record,
+    export_session,
+    save_session,
     is_valid_session_id,
 }
 import from agent.skills { load_jackal_skills, expand_skill_command }
@@ -58,7 +79,6 @@ def _resume_session(app: LiveShell, sid: str) -> str {
     app.dirty = True;
     return "resumed " + sid + " (" + str(len(msgs)) + " messages)";
 }
-
 
 """Slash commands handled locally by the TUI (same set as the line REPL).
 Returns a display string; "" when the command produced no output."""
@@ -99,10 +119,15 @@ def _run_slash(app: LiveShell, line: str) -> str {
         env_max: str = os.environ.get("JACKAL_CONTEXT_MAX", "");
         usage = compute_context_usage(get_history(), int(env_max) if env_max.isdigit() else None);
         return (
-            "context: ~" + str(usage.get("used", 0)) + " / "
-            + str(usage.get("max", 0)) + " tokens ("
-            + str(usage.get("percent", 0)) + "%) · "
-            + str(len(get_history())) + " messages · /compact to shrink"
+            "context: ~"
+            + str(usage.get("used", 0))
+            + " / "
+            + str(usage.get("max", 0))
+            + " tokens ("
+            + str(usage.get("percent", 0))
+            + "%) · "
+            + str(len(get_history()))
+            + " messages · /compact to shrink"
         );
     }
     if line == "/mode" or line.startswith("/mode ") {
@@ -159,7 +184,7 @@ def _run_slash(app: LiveShell, line: str) -> str {
     }
     if line.startswith("/export") {
         arg = line[len("/export"):].strip();
-        path = arg if arg else "jackal-transcript.md";
+        path = arg or "jackal-transcript.md";
         hist = get_history();
         has_content = False;
         for m in hist {
@@ -192,7 +217,15 @@ def _run_slash(app: LiveShell, line: str) -> str {
         lines: list[str] = ["extension shortcuts:"];
         for key in scs {
             meta: dict[str, any] = scs[key] if isinstance(scs[key], dict) else {};
-            lines.append("  " + str(key) + " — " + str(meta.get("description", "") or "") + " (" + str(meta.get("extension_id", "") or "") + ")");
+            lines.append(
+                "  "
+                    + str(key)
+                    + " — "
+                    + str(meta.get("description", "") or "")
+                    + " ("
+                    + str(meta.get("extension_id", "") or "")
+                    + ")",
+            );
         }
         return "\n".join(lines);
     }
@@ -212,7 +245,9 @@ def _run_slash(app: LiveShell, line: str) -> str {
         name = line[len("/model"):].strip();
         if not name {
             cur = get_model();
-            return "current model: " + cur + " — type '/model ' then \u2191\u2193 to pick (tab completes, enter sets)";
+            return "current model: "
+                + cur
+                + " — type '/model ' then \u2191\u2193 to pick (tab completes, enter sets)";
         }
         return "model -> " + set_model(name);
     }
@@ -298,7 +333,6 @@ def _run_slash(app: LiveShell, line: str) -> str {
     return "";
 }
 
-
 # ==================== P12: extension ui modal ====================
 
 """Open the foreground extension-UI modal (one at a time; approval owns the
@@ -315,9 +349,7 @@ def _ui_open_modal(app: LiveShell, rec: dict[str, any]) -> bool {
     if not _open_window(
         app,
         WindowState(
-            spec=WindowSpec(title="? [ui] " + method.upper(), width=46),
-            kind="ui_modal",
-            payload=m,
+            spec=WindowSpec(title="? [ui] " + method.upper(), width=46), kind="ui_modal", payload=m
         ),
     ) {
         return False;
@@ -327,7 +359,6 @@ def _ui_open_modal(app: LiveShell, rec: dict[str, any]) -> bool {
     app.dirty = True;
     return True;
 }
-
 
 """Settle the modal: answer via the bridge and restore the prompt state."""
 def _ui_settle(app: LiveShell, value: any, use_cancel: bool = False) {
@@ -354,7 +385,6 @@ def _ui_settle(app: LiveShell, value: any, use_cancel: bool = False) {
     app.dirty = True;
 }
 
-
 """Run an extension command on a daemon worker; completion arrives via
 app.cmd_q and is rendered by _tick_cmd. Returns "" (output is async)."""
 def _run_ext_command_async(app: LiveShell, name: str, args: str) -> str {
@@ -377,7 +407,6 @@ def _run_ext_command_async(app: LiveShell, name: str, args: str) -> str {
     app.dirty = True;
     return "";
 }
-
 
 def _handle_ui_modal_key(app: LiveShell, key: str) {
     m: any = _ui_modal_state(app);
@@ -462,11 +491,12 @@ def _handle_ui_modal_key(app: LiveShell, key: str) {
     }
 }
 
-
 """Poll the bridge interaction queue; open the oldest request as a modal."""
 def _tick_ui_modal(app: LiveShell) {
-    if _ui_modal_state(app) is not None or _picker_state(app) is not None
-        or app.shell.approval is not None {
+    if _ui_modal_state(app) is not None
+        or _picker_state(app) is not None
+        or app.shell.approval is not None
+    {
         return;
     }
     b = plugins.bridge;
@@ -479,13 +509,10 @@ def _tick_ui_modal(app: LiveShell) {
     }
 }
 
-
 """MCP STATUS window glue: live data + restart action (tui/window API).
 
 tui/mcp.jac stays pure over (specs, status); only this module touches the
 agent facade, so the MCP annex tests run without agent.session imports."""
-
-
 def _mcp_current_specs -> dict[str, list[str]] {
     specs: dict[str, list[str]] = {};
     try {
@@ -496,13 +523,11 @@ def _mcp_current_specs -> dict[str, list[str]] {
     return specs;
 }
 
-
 def _mcp_window_refresh(app: LiveShell, win: any) {
     entries = _mcp_window_state(_mcp_current_specs(), plugins.mcp_status);
     win.rows = entries.rows;
     win.ids = entries.ids;
 }
-
 
 def _mcp_window_action(app: LiveShell, win: any, action: str) -> str {
     if action != "restart" {
@@ -518,7 +543,6 @@ def _mcp_window_action(app: LiveShell, win: any, action: str) -> str {
     }
     return mcp_restart(name);
 }
-
 
 """Open the MCP status window; esc/q closes, r restarts the cursor row."""
 def _open_mcp_window(app: LiveShell) -> str {

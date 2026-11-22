@@ -27,25 +27,24 @@ import json;
 import datetime;
 
 glob LOG_LEVELS: dict[str, int] = {
-        "debug": 10,
-        "info": 20,
-        "warn": 30,
-        "warning": 30,
-        "error": 40,
-        "off": 100,
-    },
-    LOG_ENV: str = "JACKAL_LOG",
-    LEVEL_ENV: str = "JACKAL_LOG_LEVEL",
-    DEFAULT_LOG_DIR: str = ".jackal/logs",
-    DEFAULT_LEVEL: str = "info",
-    MAX_FIELD_DEPTH: int = 3,
-    MAX_FIELD_ITEMS: int = 20,
-    MAX_STRING_LEN: int = 400,
-    MAX_TRACEBACK_LEN: int = 4000;
+         "debug": 10,
+         "info": 20,
+         "warn": 30,
+         "warning": 30,
+         "error": 40,
+         "off": 100,
+     },
+     LOG_ENV: str = "JACKAL_LOG",
+     LEVEL_ENV: str = "JACKAL_LOG_LEVEL",
+     DEFAULT_LOG_DIR: str = ".jackal/logs",
+     DEFAULT_LEVEL: str = "info",
+     MAX_FIELD_DEPTH: int = 3,
+     MAX_FIELD_ITEMS: int = 20,
+     MAX_STRING_LEN: int = 400,
+     MAX_TRACEBACK_LEN: int = 4000;
 
 glob _FALSEY: list[str] = ["0", "off", "false", "no", "none", ""],
      _TRUTHY: list[str] = ["1", "on", "true", "yes"];
-
 
 """The configured sink path, or "" when logging is disabled.
 `JACKAL_LOG=1` (or on/true/yes) means the default per-process file under
@@ -67,8 +66,8 @@ def log_sink -> str {
     }
     return expanded;
 }
-sem log_sink = "Resolve the JSONL sink path from JACKAL_LOG; empty means disabled.";
 
+sem log_sink = "Resolve the JSONL sink path from JACKAL_LOG; empty means disabled.";
 
 """Numeric threshold from JACKAL_LOG_LEVEL (default `info`). Unknown values
 fall back to `info` rather than disabling logging silently."""
@@ -79,8 +78,8 @@ def log_threshold -> int {
     }
     return LOG_LEVELS[DEFAULT_LEVEL];
 }
-sem log_threshold = "Numeric severity threshold for the env-configured log level.";
 
+sem log_threshold = "Numeric severity threshold for the env-configured log level.";
 
 """True when at least one record at `level` would be written."""
 def log_enabled(level: str = "info") -> bool {
@@ -92,8 +91,8 @@ def log_enabled(level: str = "info") -> bool {
     sev: int = LOG_LEVELS[want] if want in LOG_LEVELS else LOG_LEVELS["info"];
     return sev >= log_threshold();
 }
-sem log_enabled = "Cheap pre-check for callers that would build an expensive payload.";
 
+sem log_enabled = "Cheap pre-check for callers that would build an expensive payload.";
 
 """Coerce a caller payload into JSON-safe primitives (bounded depth/size).
 Never raises: unknown objects become their repr, truncated."""
@@ -146,8 +145,8 @@ def safe_fields(value: any, depth: int = 0) -> any {
         return "<unloggable>";
     }
 }
-sem safe_fields = "Best-effort JSON-safe projection of arbitrary logging payloads.";
 
+sem safe_fields = "Best-effort JSON-safe projection of arbitrary logging payloads.";
 
 """Short, safe repr for leaf values the logger does not understand."""
 def _short_repr(value: any) -> str {
@@ -162,15 +161,9 @@ def _short_repr(value: any) -> str {
     }
 }
 
-
 """Append one JSONL record. Total function: returns False when the record was
 not written (disabled, below threshold, or any I/O error)."""
-def log_event(
-    level: str,
-    source: str,
-    message: str,
-    fields: dict[str, any] | None = None,
-) -> bool {
+def log_event(level: str, source: str, message: str, fields: dict[str, any] | None = None) -> bool {
     try {
         sink: str = log_sink();
         if not sink {
@@ -207,8 +200,8 @@ def log_event(
         return False;
     }
 }
-sem log_event = "Write one structured JSONL log record; never raises into the caller.";
 
+sem log_event = "Write one structured JSONL log record; never raises into the caller.";
 
 """Native traceback text (CPython `format_exc` shape) from `exc.__traceback__`."""
 def _format_tb(exc: any) -> str {
@@ -223,23 +216,16 @@ def _format_tb(exc: any) -> str {
     lines: list[str] = ["Traceback (most recent call last):"];
     while frame is not None {
         code: any = frame.tb_frame.f_code;
-        lines.append(
-            f'  File "{code.co_filename}", line {frame.tb_lineno}, in {code.co_name}'
-        );
+        lines.append(f'  File "{code.co_filename}", line {frame.tb_lineno}, in {code.co_name}');
         frame = frame.tb_next;
     }
     lines.append(type(e).__name__ + ": " + str(e));
     return "\n".join(lines) + "\n";
 }
 
-
 """Record a caught exception without changing control flow. Safe outside an
 `except` block (traceback is then empty). `fields` is merged into the record."""
-def log_exception(
-    source: str,
-    exc: any,
-    fields: dict[str, any] | None = None,
-) -> bool {
+def log_exception(source: str, exc: any, fields: dict[str, any] | None = None) -> bool {
     try {
         payload: dict[str, any] = {};
         if fields is not None {
@@ -281,8 +267,8 @@ def log_exception(
         return False;
     }
 }
-sem log_exception = "Log a swallowed exception (type, message, traceback) at error level.";
 
+sem log_exception = "Log a swallowed exception (type, message, traceback) at error level.";
 
 def log_debug(source: str, message: str, fields: dict[str, any] | None = None) -> bool {
     return log_event("debug", source, message, fields);
@@ -325,4 +311,5 @@ def read_log(path: str) -> list[dict[str, any]] {
     }
     return records;
 }
+
 sem read_log = "Parse a JSONL log file into records, skipping malformed lines.";

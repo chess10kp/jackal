@@ -22,21 +22,17 @@ import subprocess;
 import tempfile;
 import datetime;
 
-
 def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-checkpoints-test-");
 }
-
 
 def _cleanup(tmp: str) {
     shutil.rmtree(tmp, ignore_errors=True);
 }
 
-
 def _cp_dir(tmp: str) -> str {
     return os.path.join(tmp, ".jackal", "checkpoints");
 }
-
 
 def _write_file(base: str, rel: str, content: str) {
     path: str = os.path.join(base, rel);
@@ -49,7 +45,6 @@ def _write_file(base: str, rel: str, content: str) {
     }
 }
 
-
 def _read_file(path: str) -> str {
     fh: any = open(path, "r");
     try {
@@ -58,7 +53,6 @@ def _read_file(path: str) -> str {
         fh.close();
     }
 }
-
 
 def _read_raw(path: str) -> any {
     fh: any = open(path, "r");
@@ -69,13 +63,9 @@ def _read_raw(path: str) -> any {
     }
 }
 
-
 def _git(args: list[str], repo: str) {
-    subprocess.run(
-        ["git"] + args, cwd=repo, capture_output=True, text=True, timeout=15,
-    );
+    subprocess.run(["git"] + args, cwd=repo, capture_output=True, text=True, timeout=15);
 }
-
 
 """Throwaway repo under tmp/repo with local identity and one commit."""
 def _init_git_repo(tmp: str) -> str {
@@ -90,7 +80,6 @@ def _init_git_repo(tmp: str) -> str {
     return repo;
 }
 
-
 def _msgs(*texts: str) -> list[dict[str, any]] {
     out: list[dict[str, any]] = [];
     for t in texts {
@@ -100,12 +89,10 @@ def _msgs(*texts: str) -> list[dict[str, any]] {
     return out;
 }
 
-
 def _iso_ago(seconds: float = 0, minutes: float = 0, hours: float = 0, days: float = 0) -> str {
     delta = datetime.timedelta(seconds=seconds, minutes=minutes, hours=hours, days=days);
     return (datetime.datetime.now(datetime.timezone.utc) - delta).isoformat();
 }
-
 
 test "create writes the documented layout and exact metadata keys" {
     tmp = _make_tmp();
@@ -114,13 +101,22 @@ test "create writes the documented layout and exact metadata keys" {
         _write_file(tmp, "lib/deep/b.txt", "beta");
         msgs: list[dict[str, any]] = _msgs("hello there");
         meta = create_checkpoint(
-            tmp, msgs, "prov", "model-x", name="first",
+            tmp,
+            msgs,
+            "prov",
+            "model-x",
+            name="first",
             modified_files=["src/a.txt", "lib/deep/b.txt"],
         );
         assert isinstance(meta, dict);
         assert set(meta.keys()) == {
-            "name", "timestamp", "messageCount", "filesChanged",
-            "provider", "description", "gitCommitHash",
+            "name",
+            "timestamp",
+            "messageCount",
+            "filesChanged",
+            "provider",
+            "description",
+            "gitCommitHash",
         };
         assert meta["name"] == "first";
         assert meta["messageCount"] == len(msgs);
@@ -150,7 +146,6 @@ test "create writes the documented layout and exact metadata keys" {
     }
 }
 
-
 test "create auto-generates timestamped names and rejects duplicates" {
     tmp = _make_tmp();
     try {
@@ -175,7 +170,6 @@ test "create auto-generates timestamped names and rejects duplicates" {
         _cleanup(tmp);
     }
 }
-
 
 test "validate_checkpoint_name covers every rejection branch" {
     cases: list[tuple[str, str]] = [
@@ -202,7 +196,6 @@ test "validate_checkpoint_name covers every rejection branch" {
     assert ok.get("error") is None;
 }
 
-
 test "description uses the first user message and truncates at 80 chars" {
     long_text = "y" * 120;
     tmp = _make_tmp();
@@ -218,10 +211,13 @@ test "description uses the first user message and truncates at 80 chars" {
         short = create_checkpoint(tmp2, [{"role": "user", "content": "  precise ask  "}], "p", "m");
         assert short["description"] == "precise ask";
 
-        none_user = create_checkpoint(tmp2, [
-            {"role": "system", "content": "sys"},
-            {"role": "assistant", "content": "hi"},
-        ], "p", "m", name="second-desc");
+        none_user = create_checkpoint(
+            tmp2,
+            [{"role": "system", "content": "sys"}, {"role": "assistant", "content": "hi"}],
+            "p",
+            "m",
+            name="second-desc",
+        );
         assert none_user["description"] == "Empty conversation";
 
         empty = create_checkpoint(tmp2, [], "p", "m", name="third-desc");
@@ -230,7 +226,6 @@ test "description uses the first user message and truncates at 80 chars" {
         _cleanup(tmp2);
     }
 }
-
 
 test "get_modified_files lists tracked edits and untracked files" {
     tmp = _make_tmp();
@@ -251,14 +246,12 @@ test "get_modified_files lists tracked edits and untracked files" {
     }
 }
 
-
 test "gitCommitHash matches HEAD inside a repo and is null outside" {
     tmp = _make_tmp();
     try {
         repo = _init_git_repo(tmp);
         head = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=repo,
-            capture_output=True, text=True, timeout=15,
+            ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, timeout=15
         ).stdout.strip();
         meta = create_checkpoint(repo, [], "p", "m", name="in-repo");
         assert meta["gitCommitHash"] == head;
@@ -270,16 +263,12 @@ test "gitCommitHash matches HEAD inside a repo and is null outside" {
     }
 }
 
-
 test "load round trips metadata, conversation and file snapshots" {
     tmp = _make_tmp();
     try {
         msgs: list[dict[str, any]] = _msgs("round trip");
         _write_file(tmp, "a.txt", "content-a");
-        create_checkpoint(
-            tmp, msgs, "prov", "model-y", name="snap",
-            modified_files=["a.txt"],
-        );
+        create_checkpoint(tmp, msgs, "prov", "model-y", name="snap", modified_files=["a.txt"]);
 
         data = load_checkpoint(tmp, "snap");
         assert data["metadata"]["name"] == "snap";
@@ -290,7 +279,6 @@ test "load round trips metadata, conversation and file snapshots" {
         _cleanup(tmp);
     }
 }
-
 
 test "load raises for unknown names and corrupt or missing store files" {
     tmp = _make_tmp();
@@ -328,13 +316,11 @@ test "load raises for unknown names and corrupt or missing store files" {
     }
 }
 
-
 test "load skips snapshot files that vanished from disk" {
     tmp = _make_tmp();
     try {
         _write_file(tmp, "gone.txt", "was here");
-        create_checkpoint(tmp, [], "p", "m", name="partial",
-                          modified_files=["gone.txt"]);
+        create_checkpoint(tmp, [], "p", "m", name="partial", modified_files=["gone.txt"]);
         os.remove(os.path.join(_cp_dir(tmp), "partial", "files", "gone.txt"));
         data = load_checkpoint(tmp, "partial");
         assert data["fileSnapshots"] == {};
@@ -343,7 +329,6 @@ test "load skips snapshot files that vanished from disk" {
         _cleanup(tmp);
     }
 }
-
 
 test "list orders newest first with sizes and skips junk entries" {
     tmp = _make_tmp();
@@ -379,7 +364,6 @@ test "list orders newest first with sizes and skips junk entries" {
     }
 }
 
-
 test "delete removes the directory and unknown deletes raise" {
     tmp = _make_tmp();
     try {
@@ -411,14 +395,12 @@ test "delete removes the directory and unknown deletes raise" {
     }
 }
 
-
 test "restore writes snapshots back including nested directories" {
     tmp = _make_tmp();
     try {
-        restore_checkpoint_files(tmp, {
-            "top.txt": "restored-top",
-            "deep/nested/f.txt": "restored-deep",
-        });
+        restore_checkpoint_files(
+            tmp, {"top.txt": "restored-top", "deep/nested/f.txt": "restored-deep"}
+        );
         assert _read_file(os.path.join(tmp, "top.txt")) == "restored-top";
         assert _read_file(os.path.join(tmp, "deep", "nested", "f.txt")) == "restored-deep";
 
@@ -430,7 +412,6 @@ test "restore writes snapshots back including nested directories" {
         _cleanup(tmp);
     }
 }
-
 
 test "restore aggregates per-file failures into one RuntimeError" {
     tmp = _make_tmp();
@@ -450,13 +431,12 @@ test "restore aggregates per-file failures into one RuntimeError" {
     }
 }
 
-
 test "full git round trip: modify, snapshot, modify again, restore" {
     tmp = _make_tmp();
     try {
         repo = _init_git_repo(tmp);
-        _write_file(repo, "base.txt", "base v2\n");          # tracked edit
-        _write_file(repo, "extra.txt", "extra v1\n");        # untracked
+        _write_file(repo, "base.txt", "base v2\n");  # tracked edit
+        _write_file(repo, "extra.txt", "extra v1\n");  # untracked
 
         meta = create_checkpoint(repo, _msgs("save my work"), "prov", "model-z");
         assert "base.txt" in meta["filesChanged"];
@@ -482,7 +462,6 @@ test "full git round trip: modify, snapshot, modify again, restore" {
     }
 }
 
-
 test "format_relative_time buckets deltas into humanized strings" {
     assert format_relative_time(_iso_ago(seconds=10)) == "just now";
     assert format_relative_time(_iso_ago(minutes=1)) == "1 min ago";
@@ -494,7 +473,6 @@ test "format_relative_time buckets deltas into humanized strings" {
     assert format_relative_time(stamp)[:4] != "just";  # bare date fallback
     assert re.match(r"\d{4}-\d{2}-\d{2}$", format_relative_time(stamp)) is not None;
 }
-
 
 test "overlay rows render name, counts, time and size" {
     item = {
@@ -514,23 +492,23 @@ test "overlay rows render name, counts, time and size" {
     assert "(?)" in format_checkpoint_overlay_row(no_size);
 }
 
-
 test "format_checkpoint_list prints header lines or the empty-state hint" {
     assert format_checkpoint_list([]) == "No checkpoints. Use /checkpoint create [name].";
-    items = [{
-        "metadata": {
-            "name": "cp-1",
-            "timestamp": "2026-01-01T12:30:45+00:00",
-            "messageCount": 7,
-            "filesChanged": ["x"],
+    items = [
+        {
+            "metadata": {
+                "name": "cp-1",
+                "timestamp": "2026-01-01T12:30:45+00:00",
+                "messageCount": 7,
+                "filesChanged": ["x"],
+            },
+            "sizeBytes": 1024,
         },
-        "sizeBytes": 1024,
-    }];
+    ];
     out = format_checkpoint_list(items);
     assert out.startswith("Checkpoints:\n");
     assert "- cp-1 (2026-01-01 12:30, 7 msgs, 1 files, 1KB)" in out;
 }
-
 
 test "a swallowed capture failure is recorded in the debug log" {
     # The toolchain skips unreadable files silently; checkpoints must still

@@ -15,16 +15,13 @@ import os;
 import tempfile;
 import shutil;
 
-
 def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-context-input-test-");
 }
 
-
 def _cleanup(tmp: str) {
     shutil.rmtree(tmp, ignore_errors=True);
 }
-
 
 def _write_file(path: str, text: str) {
     os.makedirs(os.path.dirname(path), exist_ok=True);
@@ -36,7 +33,6 @@ def _write_file(path: str, text: str) {
     }
 }
 
-
 def _read_text(path: str) -> str {
     fh: any = open(path, "r");
     try {
@@ -46,9 +42,7 @@ def _read_text(path: str) -> str {
     }
 }
 
-
 # ============================== path validation ==============================
-
 
 test "is_valid_file_path rejects traversal, absolute, drive, NUL, blank" {
     assert is_valid_file_path("src/app.py");
@@ -65,9 +59,7 @@ test "is_valid_file_path rejects traversal, absolute, drive, NUL, blank" {
     assert not is_valid_file_path("bad\0name");
 }
 
-
 # ============================== line range parsing ==============================
-
 
 test "parse_line_range accepts single lines and ranges" {
     assert parse_line_range("10") == {"start": 10};
@@ -79,15 +71,13 @@ test "parse_line_range rejects malformed, zero, and reversed ranges" {
     assert parse_line_range("") is None;
     assert parse_line_range("abc") is None;
     assert parse_line_range("0") is None;
-    assert parse_line_range("5-3") is None;      # reversed
-    assert parse_line_range("0-4") is None;      # zero start
-    assert parse_line_range("-3") is None;       # empty first part
-    assert parse_line_range("1-2-3") is None;    # three parts
+    assert parse_line_range("5-3") is None;  # reversed
+    assert parse_line_range("0-4") is None;  # zero start
+    assert parse_line_range("-3") is None;  # empty first part
+    assert parse_line_range("1-2-3") is None;  # three parts
 }
 
-
 # ============================== mention extraction ==============================
-
 
 test "parse_file_mentions extracts multiple mentions in order" {
     text = "look at @src/app.py then @README.md:10-20 and @lib/main.jac:3";
@@ -127,14 +117,16 @@ test "parse_file_mentions skips invalid paths and bad ranges" {
     assert [str(m["file_path"]) for m in parse_file_mentions("@x\0y @ok.jac")] == ["ok.jac"];
 }
 
-
 # ============================== token + cursor parsing ==============================
-
 
 test "parse_mention_token splits path from range suffix" {
     assert parse_mention_token("app.py") == {"path": "app.py"};
     assert parse_mention_token("app.py:12") == {"path": "app.py", "startLine": 12, "endLine": 12};
-    assert parse_mention_token("app.py:12-30") == {"path": "app.py", "startLine": 12, "endLine": 30};
+    assert parse_mention_token("app.py:12-30") == {
+        "path": "app.py",
+        "startLine": 12,
+        "endLine": 30,
+    };
     # Last colon wins; earlier colons stay part of the path.
     assert parse_mention_token("a:b:7") == {"path": "a:b", "startLine": 7, "endLine": 7};
     # No leading colon content or non-numeric range: raw passthrough.
@@ -142,7 +134,6 @@ test "parse_mention_token splits path from range suffix" {
     assert parse_mention_token("file:x") == {"path": "file:x"};
     assert parse_mention_token("f:5-3") == {"path": "f:5-3"};
 }
-
 
 test "get_current_file_mention scans around the cursor for autocomplete" {
     text = "see @src/ma and more";
@@ -170,16 +161,15 @@ test "get_current_file_mention scans around the cursor for autocomplete" {
     assert tail["end"] == len("hello @notes.md");
 }
 
-
 # ============================== expansion: passthrough ==============================
-
 
 test "expand_context_input passes through text without mentions or commands" {
     tmp = _make_tmp();
     try {
         assert expand_context_input(tmp, "") == "";
         assert expand_context_input(tmp, "   ") == "   ";
-        assert expand_context_input(tmp, "plain question about jac?") == "plain question about jac?";
+        assert expand_context_input(tmp, "plain question about jac?")
+            == "plain question about jac?";
         # A bare ! with no command also passes through.
         assert expand_context_input(tmp, "!") == "!";
         assert expand_context_input(tmp, "!   ") == "!   ";
@@ -188,9 +178,7 @@ test "expand_context_input passes through text without mentions or commands" {
     }
 }
 
-
 # ============================== expansion: file blocks ==============================
-
 
 test "expand_context_input wraps a whole file in a fenced file block" {
     tmp = _make_tmp();
@@ -198,9 +186,7 @@ test "expand_context_input wraps a whole file in a fenced file block" {
         _write_file(os.path.join(tmp, "hello.txt"), "alpha\nbeta\n");
         out = expand_context_input(tmp, "explain @hello.txt please");
         expected_block = '<file path="hello.txt">\n```\nalpha\nbeta\n\n```\n</file>';
-        assert out == (
-            "explain @hello.txt please\n\nAttached context:\n" + expected_block
-        );
+        assert out == ("explain @hello.txt please\n\nAttached context:\n" + expected_block);
     } finally {
         _cleanup(tmp);
     }
@@ -321,9 +307,7 @@ test "expand_context_input handles several files end-to-end in one prompt" {
     }
 }
 
-
 # ============================== expansion: !commands ==============================
-
 
 test "expand_context_input runs echo-only commands into command_output blocks" {
     tmp = _make_tmp();

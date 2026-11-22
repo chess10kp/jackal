@@ -19,21 +19,17 @@ import time;
 import tempfile;
 import shutil;
 
-
 def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-tasks-test-");
 }
-
 
 def _cleanup(tmp: str) {
     shutil.rmtree(tmp, ignore_errors=True);
 }
 
-
 def _tasks_path(tmp: str) -> str {
     return os.path.join(tmp, ".jackal", "tasks.json");
 }
-
 
 def _read_raw(path: str) -> any {
     fh = open(path, "r");
@@ -43,7 +39,6 @@ def _read_raw(path: str) -> any {
         fh.close();
     }
 }
-
 
 def _write_text(path: str, text: str) {
     # Parent dir must already exist (callers create it).
@@ -55,14 +50,10 @@ def _write_text(path: str, text: str) {
     }
 }
 
-
 def _is_iso_utc(value: str) -> bool {
     # datetime.now(timezone.utc).isoformat() shape: 2026-05-23T13:38:24.261023+00:00
-    return re.match(
-        r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?\+00:00$", value
-    ) is not None;
+    return re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?\+00:00$", value) is not None;
 }
-
 
 test "save writes tasks.json as an indent=2 array with camelCase keys" {
     tmp = _make_tmp();
@@ -86,7 +77,14 @@ test "save writes tasks.json as an indent=2 array with camelCase keys" {
         raw = _read_raw(path);
         assert isinstance(raw, list) and len(raw) == 1;
         ent: dict[str, any] = raw[0];
-        assert set(ent.keys()) == {"id", "title", "description", "status", "createdAt", "updatedAt"};
+        assert set(ent.keys()) == {
+            "id",
+            "title",
+            "description",
+            "status",
+            "createdAt",
+            "updatedAt",
+        };
         assert ent["id"] == task["id"];
         assert ent["title"] == "ship the port";
         assert ent["description"] is None;  # blank description coalesces to null
@@ -99,7 +97,6 @@ test "save writes tasks.json as an indent=2 array with camelCase keys" {
         _cleanup(tmp);
     }
 }
-
 
 test "load returns [] for missing dir, missing file, corrupt json, non-list" {
     tmp = _make_tmp();
@@ -120,15 +117,19 @@ test "load returns [] for missing dir, missing file, corrupt json, non-list" {
     }
 }
 
-
 test "load filters entries that miss required fields or have wrong types" {
     tmp = _make_tmp();
     try {
         good = add_task(tmp, "real task");
         raw: any = _read_raw(_tasks_path(tmp));
         raw.insert(0, {"id": "abc12345"});  # missing fields
-        raw.append({"id": 7, "title": "num id", "status": "pending",
-                    "createdAt": "x", "updatedAt": "y"});  # wrong id type
+        raw.append({
+            "id": 7,
+            "title": "num id",
+            "status": "pending",
+            "createdAt": "x",
+            "updatedAt": "y",
+        });  # wrong id type
         raw.append("just a string");  # not a dict
         fh = open(_tasks_path(tmp), "w");
         try {
@@ -144,7 +145,6 @@ test "load filters entries that miss required fields or have wrong types" {
         _cleanup(tmp);
     }
 }
-
 
 test "add_task strips inputs, keeps description when given, appends in order" {
     tmp = _make_tmp();
@@ -174,7 +174,6 @@ test "add_task strips inputs, keeps description when given, appends in order" {
     }
 }
 
-
 test "remove by index honors bounds and shifts remaining tasks" {
     tmp = _make_tmp();
     try {
@@ -199,7 +198,6 @@ test "remove by index honors bounds and shifts remaining tasks" {
     }
 }
 
-
 test "remove by id matches first occurrence and None when unknown" {
     tmp = _make_tmp();
     try {
@@ -214,7 +212,6 @@ test "remove by id matches first occurrence and None when unknown" {
         _cleanup(tmp);
     }
 }
-
 
 test "update_tasks sets completedAt on completed and clears it otherwise" {
     tmp = _make_tmp();
@@ -257,7 +254,6 @@ test "update_tasks sets completedAt on completed and clears it otherwise" {
     }
 }
 
-
 test "update_tasks edits title/description, bumps updatedAt, skips unknown ids" {
     tmp = _make_tmp();
     try {
@@ -265,10 +261,13 @@ test "update_tasks edits title/description, bumps updatedAt, skips unknown ids" 
         before_updated: str = str(a["updatedAt"]);
         time.sleep(0.01);
 
-        result = update_tasks(tmp, [
-            {"id": a["id"], "title": "after", "description": "new blurb"},
-            {"id": "no-such-id", "status": "completed"},
-        ]);
+        result = update_tasks(
+            tmp,
+            [
+                {"id": a["id"], "title": "after", "description": "new blurb"},
+                {"id": "no-such-id", "status": "completed"},
+            ],
+        );
         assert len(result) == 1;
         assert result[0]["title"] == "after";
         assert result[0]["description"] == "new blurb";
@@ -284,7 +283,6 @@ test "update_tasks edits title/description, bumps updatedAt, skips unknown ids" 
     }
 }
 
-
 test "clear_tasks writes an empty array instead of deleting the file" {
     tmp = _make_tmp();
     try {
@@ -297,7 +295,6 @@ test "clear_tasks writes an empty array instead of deleting the file" {
         _cleanup(tmp);
     }
 }
-
 
 test "task_counts buckets by status and ignores foreign statuses" {
     tmp = _make_tmp();
@@ -312,8 +309,13 @@ test "task_counts buckets by status and ignores foreign statuses" {
         assert counts == {"pending": 1, "in_progress": 1, "completed": 1};
 
         raw: any = _read_raw(_tasks_path(tmp));
-        raw.append({"id": "ffffffff", "title": "weird", "status": "cancelled",
-                    "createdAt": "t", "updatedAt": "t"});
+        raw.append({
+            "id": "ffffffff",
+            "title": "weird",
+            "status": "cancelled",
+            "createdAt": "t",
+            "updatedAt": "t",
+        });
         assert task_counts(raw)["pending"] == 1;
         assert task_counts([]) == {"pending": 0, "in_progress": 0, "completed": 0};
     } finally {
@@ -321,12 +323,17 @@ test "task_counts buckets by status and ignores foreign statuses" {
     }
 }
 
-
 test "format_task_line picks icons per status and renders optional blurb" {
     tmp = _make_tmp();
     try {
-        plain: dict[str, any] = {"id": "aaaa1111", "title": "plain", "description": None,
-                       "status": "pending", "createdAt": "t", "updatedAt": "t"};
+        plain: dict[str, any] = {
+            "id": "aaaa1111",
+            "title": "plain",
+            "description": None,
+            "status": "pending",
+            "createdAt": "t",
+            "updatedAt": "t",
+        };
         running: dict[str, any] = dict(plain);
         running["status"] = "in_progress";
         done: dict[str, any] = dict(plain);
@@ -347,7 +354,6 @@ test "format_task_line picks icons per status and renders optional blurb" {
         _cleanup(tmp);
     }
 }
-
 
 test "format_tasks_list renders header with counts or the empty hint" {
     tmp = _make_tmp();
@@ -374,7 +380,6 @@ test "format_tasks_list renders header with counts or the empty hint" {
     }
 }
 
-
 test "store survives reopen: every op reads fresh state from disk" {
     tmp = _make_tmp();
     try {
@@ -383,8 +388,14 @@ test "store survives reopen: every op reads fresh state from disk" {
         add_task(tmp, "two");
         # Simulate another process appending directly to the file.
         raw: any = _read_raw(_tasks_path(tmp));
-        raw.append({"id": "deadbeef", "title": "external", "description": None,
-                    "status": "pending", "createdAt": "t", "updatedAt": "t"});
+        raw.append({
+            "id": "deadbeef",
+            "title": "external",
+            "description": None,
+            "status": "pending",
+            "createdAt": "t",
+            "updatedAt": "t",
+        });
         fh = open(_tasks_path(tmp), "w");
         try {
             json.dump(raw, fh, indent=2);

@@ -13,10 +13,7 @@ side-effect free. Abort paths drain the queue via cancel_all or
 expire_older_than.
 """
 
-import from .modes {
-    requires_approval,
-}
-
+import from .modes { requires_approval }
 
 obj PendingApproval {
     has id: str = "",
@@ -26,17 +23,14 @@ obj PendingApproval {
         created_at: float = 0.0;
 }
 
-
 obj ApprovalQueue {
     has items: list[PendingApproval] = [],
         next_seq: int = 1;
 }
 
-
 def create_queue -> ApprovalQueue {
     return ApprovalQueue();
 }
-
 
 """Consult modes.requires_approval; enqueue only when confirmation is needed.
 
@@ -67,7 +61,6 @@ def request_approval(
     return {"decision": "pending", "id": pa.id};
 }
 
-
 """Resolve or deny a pending request by correlation id.
 
 Returns {"id", "approved"} on success, or an error dict when the id is
@@ -89,7 +82,6 @@ def resolve(queue: ApprovalQueue, id: str, approved: bool) -> dict[str, any] {
     return {"id": id, "approved": approved};
 }
 
-
 """Head of the queue (oldest pending request), or None when empty."""
 def pending(queue: ApprovalQueue) -> PendingApproval | None {
     if len(queue.items) == 0 {
@@ -98,14 +90,12 @@ def pending(queue: ApprovalQueue) -> PendingApproval | None {
     return queue.items[0];
 }
 
-
 """Drop every pending request without resolving; returns count dropped."""
 def cancel_all(queue: ApprovalQueue) -> int {
     n = len(queue.items);
     queue.items.clear();
     return n;
 }
-
 
 """Drop requests older than max_age_ms relative to now_ms; returns count.
 

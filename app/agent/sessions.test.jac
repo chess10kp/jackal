@@ -17,16 +17,13 @@ import tempfile;
 import shutil;
 import time;
 
-
 def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-sessions-test-");
 }
 
-
 def _cleanup(tmp: str) {
     shutil.rmtree(tmp, ignore_errors=True);
 }
-
 
 def _hist(*exchanges: str) -> list[dict[str, any]] {
     out: list[dict[str, any]] = [{"role": "system", "content": "sys prompt"}];
@@ -37,7 +34,6 @@ def _hist(*exchanges: str) -> list[dict[str, any]] {
     return out;
 }
 
-
 def _read_raw(path: str) -> any {
     fh = open(path, "r");
     try {
@@ -46,7 +42,6 @@ def _read_raw(path: str) -> any {
         fh.close();
     }
 }
-
 
 def _write_text(path: str, text: str) {
     # any-typed alias: native checker binds os.path.dirname to PathLike.
@@ -59,11 +54,9 @@ def _write_text(path: str, text: str) {
     }
 }
 
-
 def _is_iso_z(value: str) -> bool {
     return re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$", value) is not None;
 }
-
 
 test "save then load round-trips the legacy six-key record" {
     tmp = _make_tmp();
@@ -77,7 +70,14 @@ test "save then load round-trips the legacy six-key record" {
         assert meta["path"].endswith(".json");
 
         raw = _read_raw(meta["path"]);
-        assert set(raw.keys()) == {"sessionId", "sessionName", "cwd", "createdAt", "updatedAt", "messages"};
+        assert set(raw.keys()) == {
+            "sessionId",
+            "sessionName",
+            "cwd",
+            "createdAt",
+            "updatedAt",
+            "messages",
+        };
         assert raw["sessionId"] == meta["id"];
         assert raw["sessionName"] == "new session";
         assert raw["cwd"] == tmp;
@@ -102,7 +102,6 @@ test "save then load round-trips the legacy six-key record" {
     }
 }
 
-
 test "legacy fixture file loads and lists exactly like the real runtime wrote it" {
     tmp = _make_tmp();
     try {
@@ -114,7 +113,10 @@ test "legacy fixture file loads and lists exactly like the real runtime wrote it
         _write_text(os.path.join(sdir, "index.json"), index_fixture);
 
         loaded = load_session(tmp, "sess_1779521512249");
-        assert loaded == [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}];
+        assert loaded == [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hello"},
+        ];
 
         entries = list_sessions(tmp);
         assert len(entries) == 1;
@@ -131,7 +133,14 @@ test "legacy fixture file loads and lists exactly like the real runtime wrote it
         hist: list[dict[str, any]] = [{"role": "user", "content": "ours"}];
         meta = save_session(tmp, hist, name="renamed by us");
         ours = _read_raw(meta["path"]);
-        assert set(ours.keys()) == {"sessionId", "sessionName", "cwd", "createdAt", "updatedAt", "messages"};
+        assert set(ours.keys()) == {
+            "sessionId",
+            "sessionName",
+            "cwd",
+            "createdAt",
+            "updatedAt",
+            "messages",
+        };
         assert ours["messages"] == hist;
         assert load_session(tmp, str(meta["id"])) == hist;
     } finally {
@@ -139,14 +148,15 @@ test "legacy fixture file loads and lists exactly like the real runtime wrote it
     }
 }
 
-
 test "list_sessions merges index and directory scan newest first with counts" {
     tmp = _make_tmp();
     try {
         m1 = save_session(tmp, _hist("first"), name="oldest chat");
         m2 = save_session(tmp, _hist("second"), name="newest chat");
         # Orphan transcript absent from the index, stamped oldest.
-        orphan = '{"sessionId": "sess_111111111111", "sessionName": "orphan scan", "cwd": "' + tmp + '", "createdAt": "2026-01-01T00:00:00.000Z", "updatedAt": "2026-01-01T00:00:00.000Z", "messages": [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}, {"role": "user", "content": "c"}]}';
+        orphan = '{"sessionId": "sess_111111111111", "sessionName": "orphan scan", "cwd": "'
+            + tmp
+            + '", "createdAt": "2026-01-01T00:00:00.000Z", "updatedAt": "2026-01-01T00:00:00.000Z", "messages": [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}, {"role": "user", "content": "c"}]}';
         _write_text(os.path.join(_sessions_dir(tmp), "sess_111111111111.json"), orphan);
 
         entries = list_sessions(tmp);
@@ -172,7 +182,6 @@ test "list_sessions merges index and directory scan newest first with counts" {
         _cleanup(tmp);
     }
 }
-
 
 test "rename updates BOTH transcript sessionName and index name" {
     tmp = _make_tmp();
@@ -204,7 +213,6 @@ test "rename updates BOTH transcript sessionName and index name" {
     }
 }
 
-
 test "delete removes transcript and index entry" {
     tmp = _make_tmp();
     try {
@@ -232,14 +240,18 @@ test "delete removes transcript and index entry" {
     }
 }
 
-
 test "corrupt and non-record transcript files are skipped without crashing" {
     tmp = _make_tmp();
     try {
         good = save_session(tmp, _hist("good"), name="good one");
-        _write_text(os.path.join(_sessions_dir(tmp), "sess_123456789012.json"), "{this is not json at all");
+        _write_text(
+            os.path.join(_sessions_dir(tmp), "sess_123456789012.json"), "{this is not json at all"
+        );
         _write_text(os.path.join(_sessions_dir(tmp), "sess_123456789013.json"), "[1, 2, 3]");
-        _write_text(os.path.join(_sessions_dir(tmp), "sess_123456789014.json"), '{"sessionId": "other-id", "sessionName": "mismatch", "cwd": "x", "updatedAt": "2026-01-01T00:00:00.000Z", "messages": []}');
+        _write_text(
+            os.path.join(_sessions_dir(tmp), "sess_123456789014.json"),
+            '{"sessionId": "other-id", "sessionName": "mismatch", "cwd": "x", "updatedAt": "2026-01-01T00:00:00.000Z", "messages": []}',
+        );
         _write_text(os.path.join(_sessions_dir(tmp), "not-a-session.txt"), "ignored");
 
         entries = list_sessions(tmp);
@@ -252,7 +264,6 @@ test "corrupt and non-record transcript files are skipped without crashing" {
         _cleanup(tmp);
     }
 }
-
 
 test "missing or corrupt index falls back to scan and gets rebuilt" {
     tmp = _make_tmp();
@@ -280,7 +291,6 @@ test "missing or corrupt index falls back to scan and gets rebuilt" {
         _cleanup(tmp);
     }
 }
-
 
 test "ids are sess_<epoch_ms> digits-only and never collide within a millisecond" {
     tmp = _make_tmp();
@@ -313,7 +323,6 @@ test "ids are sess_<epoch_ms> digits-only and never collide within a millisecond
     }
 }
 
-
 test "latest_session_id resolves the most recently saved session" {
     tmp = _make_tmp();
     try {
@@ -333,7 +342,6 @@ test "latest_session_id resolves the most recently saved session" {
     }
 }
 
-
 test "model ref persists as optional seventh key and stays byte-compatible without one" {
     tmp = _make_tmp();
     try {
@@ -341,14 +349,23 @@ test "model ref persists as optional seventh key and stays byte-compatible witho
         meta = save_session(tmp, _hist("a"), name="plain");
         raw = _read_raw(meta["path"]);
         assert set(raw.keys()) == {
-            "sessionId", "sessionName", "cwd", "createdAt", "updatedAt",
+            "sessionId",
+            "sessionName",
+            "cwd",
+            "createdAt",
+            "updatedAt",
             "messages",
         };
         assert meta["model"] == "";
 
         # With model -> seventh key present; re-save without arg keeps it.
-        m2 = save_session(tmp, _hist("b"), name="with-model",
-                          session_id=str(meta["id"]), model="openrouter/anthropic/claude-sonnet-5");
+        m2 = save_session(
+            tmp,
+            _hist("b"),
+            name="with-model",
+            session_id=str(meta["id"]),
+            model="openrouter/anthropic/claude-sonnet-5",
+        );
         assert m2["model"] == "openrouter/anthropic/claude-sonnet-5";
         rec = get_session_record(tmp, str(m2["id"]));
         assert rec is not None;
@@ -361,7 +378,6 @@ test "model ref persists as optional seventh key and stays byte-compatible witho
         _cleanup(tmp);
     }
 }
-
 
 test "get_session_record returns None for unknown or invalid ids" {
     tmp = _make_tmp();
@@ -377,7 +393,6 @@ test "get_session_record returns None for unknown or invalid ids" {
     }
 }
 
-
 test "export_session writes readable markdown from a transcript" {
     tmp = _make_tmp();
     out_path = os.path.join(tmp, "export", "out.md");
@@ -385,15 +400,23 @@ test "export_session writes readable markdown from a transcript" {
         hist = [
             {"role": "system", "content": "hidden system prompt"},
             {"role": "user", "content": "list the files"},
-            {"role": "assistant", "content": "", "tool_calls": [
-                {"id": "c1", "type": "function",
-                 "function": {"name": "list_dir", "arguments": "{\"path\": \".\"}"}},
-            ]},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "c1",
+                        "type": "function",
+                        "function": {"name": "list_dir", "arguments": "{\"path\": \".\"}"},
+                    },
+                ],
+            },
             {"role": "tool", "tool_call_id": "c1", "content": "src/\napp.jac"},
             {"role": "assistant", "content": "here they are"},
         ];
-        meta = save_session(tmp, hist, name="probe run",
-                            model="openrouter/anthropic/claude-sonnet-5");
+        meta = save_session(
+            tmp, hist, name="probe run", model="openrouter/anthropic/claude-sonnet-5"
+        );
         assert export_session(tmp, str(meta["id"]), out_path);
         text: any = "";
         fh = open(out_path, "r");
@@ -421,9 +444,7 @@ test "export_session writes readable markdown from a transcript" {
     }
 }
 
-
 # ============================== retention prune ==============================
-
 
 def _backdate_transcript(tmp: str, session_id: str, updated_iso: str) {
     # Rewrite a saved transcript's updatedAt to an arbitrary ISO stamp.
@@ -456,7 +477,6 @@ def _backdate_transcript(tmp: str, session_id: str, updated_iso: str) {
     }
 }
 
-
 test "prune_sessions is disabled when both limits are zero" {
     tmp = _make_tmp();
     try {
@@ -467,7 +487,6 @@ test "prune_sessions is disabled when both limits are zero" {
         _cleanup(tmp);
     }
 }
-
 
 test "prune_sessions keeps newest N and rewrites the index" {
     tmp = _make_tmp();
@@ -486,16 +505,13 @@ test "prune_sessions keeps newest N and rewrites the index" {
         idx = _read_raw(os.path.join(_sessions_dir(tmp), "index.json"));
         assert [str(e["id"]) for e in idx] == [ids[2]];
         for sid in ids[:2] {
-            assert not os.path.exists(
-                os.path.join(_sessions_dir(tmp), sid + ".json")
-            );
+            assert not os.path.exists(os.path.join(_sessions_dir(tmp), sid + ".json"));
         }
         assert os.path.exists(os.path.join(_sessions_dir(tmp), ids[2] + ".json"));
     } finally {
         _cleanup(tmp);
     }
 }
-
 
 test "prune_sessions deletes sessions older than retention_days" {
     tmp = _make_tmp();
@@ -509,17 +525,12 @@ test "prune_sessions deletes sessions older than retention_days" {
         assert prune_sessions(tmp, retention_days=30) == 1;
         remaining = list_sessions(tmp);
         assert [str(e["id"]) for e in remaining] == [new_id];
-        assert not os.path.exists(
-            os.path.join(_sessions_dir(tmp), old_id + ".json")
-        );
-        assert os.path.exists(
-            os.path.join(_sessions_dir(tmp), new_id + ".json")
-        );
+        assert not os.path.exists(os.path.join(_sessions_dir(tmp), old_id + ".json"));
+        assert os.path.exists(os.path.join(_sessions_dir(tmp), new_id + ".json"));
     } finally {
         _cleanup(tmp);
     }
 }
-
 
 test "prune_sessions combines age and count limits safely on junk timestamps" {
     tmp = _make_tmp();

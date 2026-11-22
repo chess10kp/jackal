@@ -19,12 +19,10 @@ enum SolveError {
     INTERNAL_INVARIANT = "internal_invariant",
 }
 
-
 """Opaque reference to one accepted constraint in one Solver."""
 obj ConstraintHandle {
     has id: int;
 }
-
 
 """Immutable-by-convention view of solver state (plan §5.4).
 
@@ -36,7 +34,6 @@ obj SolverSnapshot {
         # variable id -> value
         values: dict[int, float] = {};
 }
-
 
 obj SolveResult {
     has ok: bool = True,

@@ -1,16 +1,16 @@
 """Plugin bridge path and envelope support."""
 
-import os;import shutil;import from .protocol { Envelope, make_envelope }
+import os;
+import shutil;
+import from .protocol { Envelope, make_envelope }
 
 def _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
-
 def _path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
 }
-
 
 """Resolve plugin_host/host.mjs from cwd (app/ or repo root)."""
 def resolve_host_mjs(explicit: str = "") -> str {
@@ -35,7 +35,6 @@ def resolve_host_mjs(explicit: str = "") -> str {
     raise FileNotFoundError("plugin_host/host.mjs not found (run from app/ or repo root)");
 }
 
-
 """Resolve fixtures/stub_echo.mjs beside the host."""
 def resolve_stub_echo(explicit: str = "") -> str {
     if explicit {
@@ -51,6 +50,7 @@ def resolve_stub_echo(explicit: str = "") -> str {
     }
     return path;
 }
+
 def resolve_pi_greet(explicit: str = "") -> str {
     if explicit {
         if os.path.isfile(explicit) {
@@ -65,7 +65,6 @@ def resolve_pi_greet(explicit: str = "") -> str {
     }
     return path;
 }
-
 
 def resolve_pi_ctx_probe(explicit: str = "") -> str {
     if explicit {
@@ -112,7 +111,6 @@ def resolve_pi_gated(explicit: str = "") -> str {
     return path;
 }
 
-
 """Resolve Node binary for the sidecar (P5 packaging).
 
 Order:
@@ -141,16 +139,13 @@ def resolve_node_bin(explicit: str = "") -> str {
                 return p;
             }
         }
-    } except FileNotFoundError {
-    }
+    } except FileNotFoundError {}
     which = shutil.which("node");
     if which {
         return which;
     }
     return "node";
 }
-
-
 
 def envelope_to_dict(env: Envelope) -> dict[str, any] {
     return {
@@ -165,7 +160,6 @@ def envelope_to_dict(env: Envelope) -> dict[str, any] {
         "payload": env.payload if env.payload is not None else {},
     };
 }
-
 
 def envelope_from_dict(data: dict[str, any]) -> Envelope {
     raw_payload: any = data.get("payload", {});
@@ -185,4 +179,3 @@ def envelope_from_dict(data: dict[str, any]) -> Envelope {
         version=int(data.get("version", 1)),
     );
 }
-

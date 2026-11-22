@@ -23,12 +23,7 @@ import from constraints.algebra {
     strength_weight,
     term,
 }
-import from constraints.results {
-    ConstraintHandle,
-    SolveError,
-    SolveResult,
-    SolverSnapshot,
-}
+import from constraints.results { ConstraintHandle, SolveError, SolveResult, SolverSnapshot }
 
 enum SymbolKind {
     INVALID = "invalid",
@@ -38,25 +33,23 @@ enum SymbolKind {
     DUMMY = "dummy",
 }
 
-
 obj Tag {
     has marker: int = 0,
         other: int = 0;
 }
 
-
 obj Row {
     has constant: float = 0.0,
         cells: dict[int, float] = {};
 
-    def insert_symbol(symbol: int, coefficient: float = 1.0) -> None {
+    def insert_symbol(symbol: int, coefficient: float = 1.0) {
         self.cells[symbol] = self.cells.get(symbol, 0.0) + coefficient;
         if near_zero(self.cells[symbol]) {
             self.cells.pop(symbol);
         }
     }
 
-    def insert_row(other: Row, coefficient: float = 1.0) -> None {
+    def insert_row(other: Row, coefficient: float = 1.0) {
         self.constant += other.constant * coefficient;
         for symbol in sorted(other.cells.keys()) {
             coeff = other.cells[symbol] * coefficient;
@@ -66,13 +59,13 @@ obj Row {
         }
     }
 
-    def remove_symbol(symbol: int) -> None {
+    def remove_symbol(symbol: int) {
         if symbol in self.cells {
             self.cells.pop(symbol);
         }
     }
 
-    def reverse_sign -> None {
+    def reverse_sign {
         self.constant = -self.constant;
         for symbol in sorted(self.cells.keys()) {
             self.cells[symbol] = -self.cells[symbol];
@@ -81,7 +74,7 @@ obj Row {
 
     """a * x + rest = 0  =>  x = (-1/a) * rest - constant/a.
     The target symbol must exist in cells (kiwi solveFor)."""
-    def solve_for(symbol: int) -> None {
+    def solve_for(symbol: int) {
         coeff = -1.0 / self.cells[symbol];
         self.cells.pop(symbol);
         self.constant *= coeff;
@@ -91,7 +84,7 @@ obj Row {
     }
 
     """Solve so `lhs` enters and `rhs` leaves (kiwi solveFor lhs, rhs)."""
-    def solve_for_symbols(lhs: int, rhs: int) -> None {
+    def solve_for_symbols(lhs: int, rhs: int) {
         self.insert_symbol(lhs, -1.0);
         self.solve_for(rhs);
     }
@@ -114,7 +107,7 @@ obj Row {
         return r;
     }
 
-    def substitute(symbol: int, row: Row) -> None {
+    def substitute(symbol: int, row: Row) {
         if symbol not in self.cells {
             return;
         }
@@ -123,12 +116,11 @@ obj Row {
     }
 }
 
-
 obj CostRow {
     has constant: LexWeight = LexWeight(),
         cells: dict[int, LexWeight] = {};
 
-    def insert_symbol(symbol: int, coefficient: LexWeight) -> None {
+    def insert_symbol(symbol: int, coefficient: LexWeight) {
         if lex_is_zero(coefficient) {
             return;
         }
@@ -141,41 +133,35 @@ obj CostRow {
         }
     }
 
-    def insert_row(other: Row, coefficient: LexWeight) -> None {
-        self.constant = lex_add(
-            self.constant,
-            lex_scale(coefficient, other.constant),
-        );
+    def insert_row(other: Row, coefficient: LexWeight) {
+        self.constant = lex_add(self.constant, lex_scale(coefficient, other.constant));
         for symbol in sorted(other.cells.keys()) {
-            self.insert_symbol(
-                symbol,
-                lex_scale(coefficient, other.cells[symbol]),
-            );
+            self.insert_symbol(symbol, lex_scale(coefficient, other.cells[symbol]));
         }
     }
 
-    def remove_symbol(symbol: int) -> None {
+    def remove_symbol(symbol: int) {
         if symbol in self.cells {
             self.cells.pop(symbol);
         }
     }
 
     def clone -> CostRow {
-        copy = CostRow(constant=LexWeight(tiers=[
-            self.constant.tiers[0],
-            self.constant.tiers[1],
-            self.constant.tiers[2],
-        ]));
+        copy = CostRow(
+            constant=LexWeight(
+                tiers=[self.constant.tiers[0], self.constant.tiers[1], self.constant.tiers[2]]
+            ),
+        );
         for symbol in sorted(self.cells.keys()) {
             weight = self.cells[symbol];
-            copy.cells[symbol] = LexWeight(tiers=[
-                weight.tiers[0], weight.tiers[1], weight.tiers[2],
-            ]);
+            copy.cells[symbol] = LexWeight(
+                tiers=[weight.tiers[0], weight.tiers[1], weight.tiers[2]]
+            );
         }
         return copy;
     }
 
-    def substitute(symbol: int, row: Row) -> None {
+    def substitute(symbol: int, row: Row) {
         coefficient = self.cells.get(symbol);
         if coefficient is None {
             return;
@@ -184,7 +170,6 @@ obj CostRow {
         self.insert_row(row, coefficient);
     }
 }
-
 
 obj MutationJournal {
     has id_tick_start: int = 0,
@@ -202,7 +187,6 @@ obj MutationJournal {
         infeasible_start: int = 0;
 }
 
-
 obj StoredConstraint {
     has expression: Expression,
         relation: Relation,
@@ -211,11 +195,9 @@ obj StoredConstraint {
         content_key: str = "";
 }
 
-
 obj EditInfo {
     has var_id: int,
         key: str,
         handle: ConstraintHandle,
         constant: float = 0.0;
 }
-

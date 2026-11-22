@@ -40,7 +40,7 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
     # Transcript shows the RAW user line (mirrors the legacy shells);
     # model_text — when different — is the context-expanded payload
     # (@file blocks / !cmd output) actually sent downstream.
-    payload = model_text if model_text else user_text;
+    payload = model_text or user_text;
     _push_turn(app, "user", user_text);
     app.phase = "streaming";
     app.stream_full = "";
@@ -107,7 +107,7 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
 }
 
 def _finish_stream(app: LiveShell, final_body: str) {
-    body = final_body if final_body else app.stream_full;
+    body = final_body or app.stream_full;
     if not body.strip() {
         body = "(no response)";
     }

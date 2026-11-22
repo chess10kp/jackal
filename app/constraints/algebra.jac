@@ -14,11 +14,9 @@ differential oracle — adapted to Jac data objects.
 
 glob EPSILON: float = 1e-8;
 
-
 def near_zero(value: float) -> bool {
     return abs(value) < EPSILON;
 }
-
 
 def is_finite(x: float) -> bool {
     # No math import: NaN is the only value not equal to itself, and the
@@ -26,13 +24,11 @@ def is_finite(x: float) -> bool {
     return x == x and x < 1e308 and x > -1e308;
 }
 
-
-def require_finite(x: float) -> None {
+def require_finite(x: float) {
     if not is_finite(x) {
         raise ValueError("non-finite value rejected at constraint interface");
     }
 }
-
 
 enum Relation {
     LEQ = "leq",
@@ -40,14 +36,12 @@ enum Relation {
     GEQ = "geq",
 }
 
-
 enum StrengthTier {
     REQUIRED = "required",
     STRONG = "strong",
     MEDIUM = "medium",
     WEAK = "weak",
 }
-
 
 # M2 objective coefficients are symbolic lexicographic vectors rather than
 # Kiwi's scalar 1e6/1e3/1 encoding.  A higher tier always dominates every
@@ -57,35 +51,24 @@ obj LexWeight {
     has tiers: list[float] = [0.0, 0.0, 0.0];
 }
 
-
 def lex_zero -> LexWeight {
     return LexWeight(tiers=[0.0, 0.0, 0.0]);
 }
 
-
 def lex_add(a: LexWeight, b: LexWeight) -> LexWeight {
-    return LexWeight(tiers=[
-        a.tiers[0] + b.tiers[0],
-        a.tiers[1] + b.tiers[1],
-        a.tiers[2] + b.tiers[2],
-    ]);
+    return LexWeight(
+        tiers=[a.tiers[0] + b.tiers[0], a.tiers[1] + b.tiers[1], a.tiers[2] + b.tiers[2]]
+    );
 }
-
 
 def lex_neg(a: LexWeight) -> LexWeight {
     return LexWeight(tiers=[-a.tiers[0], -a.tiers[1], -a.tiers[2]]);
 }
 
-
 def lex_scale(a: LexWeight, factor: float) -> LexWeight {
     require_finite(factor);
-    return LexWeight(tiers=[
-        a.tiers[0] * factor,
-        a.tiers[1] * factor,
-        a.tiers[2] * factor,
-    ]);
+    return LexWeight(tiers=[a.tiers[0] * factor, a.tiers[1] * factor, a.tiers[2] * factor]);
 }
-
 
 # Return -1, 0, or 1 by the first differing tier (strong, medium, weak).
 def lex_compare(a: LexWeight, b: LexWeight) -> int {
@@ -98,16 +81,13 @@ def lex_compare(a: LexWeight, b: LexWeight) -> int {
     return 0;
 }
 
-
 def lex_is_zero(a: LexWeight) -> bool {
     return lex_compare(a, lex_zero()) == 0;
 }
 
-
 def lex_is_negative(a: LexWeight) -> bool {
     return lex_compare(a, lex_zero()) < 0;
 }
-
 
 # REQUIRED is deliberately absent: hard constraints never enter the cost row.
 def strength_weight(strength: StrengthTier) -> LexWeight {
@@ -123,30 +103,25 @@ def strength_weight(strength: StrengthTier) -> LexWeight {
     return lex_zero();
 }
 
-
 obj Variable {
     has id: int;
 }
-
 
 obj Term {
     has variable: Variable,
         coefficient: float;
 }
 
-
 obj Expression {
     has terms: list[Term] = [],
         constant: float = 0.0;
 }
-
 
 obj Constraint {
     has expression: Expression,
         relation: Relation,
         strength: StrengthTier;
 }
-
 
 """Combine duplicate variables, drop near-zero coefficients, order by id."""
 def normalize_expression(e: Expression) -> Expression {
@@ -170,22 +145,16 @@ def normalize_expression(e: Expression) -> Expression {
     return Expression(terms=terms, constant=e.constant);
 }
 
-
 def term(v: Variable, coefficient: float = 1.0) -> Expression {
     return Expression(terms=[Term(variable=v, coefficient=coefficient)]);
 }
 
-
 """Combine two expressions; Jac objects do not overload `+`."""
 def add_expressions(a: Expression, b: Expression) -> Expression {
     return normalize_expression(
-        Expression(
-            terms=a.terms + b.terms,
-            constant=a.constant + b.constant,
-        )
+        Expression(terms=a.terms + b.terms, constant=a.constant + b.constant)
     );
 }
-
 
 """Deterministic content key for duplicate detection (plan §5.4).
 
@@ -204,11 +173,8 @@ def constraint_key(c: Constraint) -> str {
     return ";".join(parts);
 }
 
-
 def eq(expr: Expression) -> Constraint {
     return Constraint(
-        expression=normalize_expression(expr),
-        relation=Relation.EQ,
-        strength=StrengthTier.REQUIRED,
+        expression=normalize_expression(expr), relation=Relation.EQ, strength=StrengthTier.REQUIRED
     );
 }

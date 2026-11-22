@@ -69,6 +69,7 @@ def restore_model(name: str) -> str {
 def get_thinking_level -> str {
     return get_thinking_level_state();
 }
+
 import from .session_lifecycle {
     session_boot,
     wait_extensions_ready,
@@ -140,13 +141,7 @@ import from .plugin_bridge {
     fire_project_trust,
 }
 import from .registry { ToolRegistry, register_native, get_tool }
-import from .mcp {
-    McpClient,
-    create_mcp_client,
-    mcp_start,
-    mcp_list_tools,
-    mcp_stop,
-}
+import from .mcp { McpClient, create_mcp_client, mcp_start, mcp_list_tools, mcp_stop }
 import from .extensions {
     ExtensionDecl,
     ExtensionStatus,

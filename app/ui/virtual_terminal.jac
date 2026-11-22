@@ -19,12 +19,10 @@ import from ui.terminal {
     CLEAR_SCREEN,
 }
 
-
 obj Cell {
     has ch: str = " ",
         style: str = "";
 }
-
 
 obj VirtualTerminal(Terminal) {
     has writes: list[str] = [],
@@ -69,7 +67,7 @@ obj VirtualTerminal(Terminal) {
         self._reset_cells();
     }
 
-    def _reset_cells  {
+    def _reset_cells {
         grid: list[list[Cell]] = [];
         for _r in range(self.rows) {
             row: list[Cell] = [];
@@ -83,7 +81,7 @@ obj VirtualTerminal(Terminal) {
         self.cursor_col = 0;
     }
 
-    def write(data: str) -> None {
+    def write(data: str) {
         if not data {
             return;
         }
@@ -95,11 +93,11 @@ obj VirtualTerminal(Terminal) {
     Terminal.move_cursor dispatches self.write, which the seal-time checker
     refuses across the native/Python shadow boundary (E5089) and demotes the
     whole module to the server codespace."""
-    def move_cursor(row: int, col: int) -> None {
+    def move_cursor(row: int, col: int) {
         self.write(f"\x1b[{row};{col}H");
     }
 
-    def start -> None {
+    def start {
         if self.started {
             return;
         }
@@ -110,7 +108,7 @@ obj VirtualTerminal(Terminal) {
         self.restored = False;
     }
 
-    def stop -> None {
+    def stop {
         if self.restored and not self.started {
             return;
         }
@@ -151,7 +149,7 @@ obj VirtualTerminal(Terminal) {
     }
 
     """Simulate SIGINT: restore then invoke interrupt callback."""
-    def inject_sigint  {
+    def inject_sigint {
         self.interrupt_count += 1;
         self.restore();
         if self.on_interrupt is not None {
@@ -199,7 +197,7 @@ obj VirtualTerminal(Terminal) {
         return "".join(self.writes);
     }
 
-    def clear_writes  {
+    def clear_writes {
         self.writes = [];
     }
 

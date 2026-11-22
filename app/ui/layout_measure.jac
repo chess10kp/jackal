@@ -44,10 +44,10 @@ def natural_width(lines: list[str]) -> int {
 # by node id. Replaces the previous MeasureEntry obj, which failed to
 # lower natively (E5092) because the signature type 'MeasureEntry'
 # could not be lowered.
-glob _CACHE_WIDTH: dict[str, int] = {};
-glob _CACHE_CONTENT_REV: dict[str, int] = {};
-glob _CACHE_STYLE_REV: dict[str, int] = {};
-glob _CACHE_LINES: dict[str, list[str]] = {};
+glob _CACHE_WIDTH: dict[str, int] = {},
+     _CACHE_CONTENT_REV: dict[str, int] = {},
+     _CACHE_STYLE_REV: dict[str, int] = {},
+     _CACHE_LINES: dict[str, list[str]] = {};
 
 def _cache_valid(
     cached_width: int,

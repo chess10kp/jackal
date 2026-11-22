@@ -30,7 +30,6 @@ import from .extensions {
 }
 import from .mcp { McpClient, mcp_stop }
 
-
 def extensions_status -> ExtensionStatus {
     st = ExtensionStatus(
         phase=plugins.phase,
@@ -49,7 +48,6 @@ def extensions_status -> ExtensionStatus {
     st.label = extensions_label(st);
     return st;
 }
-
 
 """Warm Node sidecar and load sidecar decls (runs under flow)."""
 def _warm_sidecar(base_cwd: str) {
@@ -71,12 +69,7 @@ def _warm_sidecar(base_cwd: str) {
         for d in decls {
             path = resolve_decl_path(d, base_cwd);
             load_extension_path(
-                bridge,
-                reg,
-                d.id,
-                path,
-                requires=d.requires,
-                has_ui=plugins.interactive_ui,
+                bridge, reg, d.id, path, requires=d.requires, has_ui=plugins.interactive_ui
             );
             plugins.loaded += 1;
             plugins.phase = "loading";
@@ -88,15 +81,12 @@ def _warm_sidecar(base_cwd: str) {
         # T2-partial: mirror extension commands for the shell/UI layer.
         plugins.commands.update(bridge.commands);
         # Lifecycle hook: session is fully loaded (best-effort, never fatal).
-        fire_hook(bridge as PluginBridge, "session_start", {
-            "session_id": plugins.session_id,
-        });
+        fire_hook(bridge as PluginBridge, "session_start", {"session_id": plugins.session_id});
         # Pi lifecycle: project_trust fires once per boot right after
         # session_start. Best-effort — fire_project_trust never raises.
         try {
             fire_project_trust(bridge as PluginBridge, base_cwd);
-        } except Exception {
-        }
+        } except Exception {}
         # Lifecycle hook: surface discovered resource dirs once after load
         # (skills/prompts conventions; absent dirs are simply not listed).
         res_paths: list[str] = [];
@@ -110,9 +100,7 @@ def _warm_sidecar(base_cwd: str) {
                 res_paths.append(cand);
             }
         }
-        fire_hook(bridge as PluginBridge, "resources_discover", {
-            "paths": res_paths,
-        });
+        fire_hook(bridge as PluginBridge, "resources_discover", {"paths": res_paths});
     } except Exception as e {
         plugins.phase = "degraded";
         plugins.detail = str(e);
@@ -124,7 +112,6 @@ def _warm_sidecar(base_cwd: str) {
         }
     }
 }
-
 
 """Boot session plugins: first-frame clock + parallel sidecar when declared.
 
@@ -138,9 +125,9 @@ def session_boot(
     interactive_ui: bool = False,
 ) -> ExtensionStatus {
     requested_mode: str = os.environ.get("JACKAL_MODE", "");
-    set_mode(requested_mode if requested_mode else "normal");
-    plugins.session_id = sid if sid else "session";
-    plugins.cwd = cwd if cwd else os.getcwd();
+    set_mode(requested_mode or "normal");
+    plugins.session_id = sid or "session";
+    plugins.cwd = cwd or os.getcwd();
     plugins.interactive_ui = interactive_ui;
     plugins.wait_budget_s = wait_budget_s;
     plugins.t_interactive = time.time();
@@ -191,8 +178,7 @@ def session_boot(
     plugins.mcp_owned.clear();
     try {
         _attach_mcp_servers();
-    } except Exception {
-    }
+    } except Exception {}
 
     # Model prefs: cheap defensive read so model_preferences()/set_model see
     # the project's remembered per-provider models; missing/corrupt is fine.
@@ -216,7 +202,6 @@ def session_boot(
     plugins.warm_future = flow _warm_sidecar(warm_cwd);
     return extensions_status();
 }
-
 
 """Block until extensions ready or wait budget expires (before model request)."""
 def wait_extensions_ready(timeout_s: float = -1.0) -> ExtensionStatus {
@@ -257,13 +242,11 @@ def wait_extensions_ready(timeout_s: float = -1.0) -> ExtensionStatus {
     return extensions_status();
 }
 
-
 """Queue a user prompt while extensions are still loading."""
 def enqueue_prompt(message: str) -> int {
     plugins.prompt_queue.append(message);
     return len(plugins.prompt_queue);
 }
-
 
 def drain_prompt_queue -> list[str] {
     out: list[str] = list(plugins.prompt_queue);
@@ -271,22 +254,19 @@ def drain_prompt_queue -> list[str] {
     return out;
 }
 
-
 def session_dispose {
     wf = plugins.warm_future;
     if wf is not None {
         try {
             wait wf;
-        } except Exception {
-        }
+        } except Exception {}
         plugins.warm_future = None;
     }
     # Stop any MCP server subprocesses (including ones mid-handshake).
     for (_mc_name, mc) in plugins.mcp_clients.items() {
         try {
             mcp_stop(mc);
-        } except Exception {
-        }
+        } except Exception {}
     }
     plugins.mcp_clients.clear();
     plugins.mcp_tools = 0;
@@ -300,8 +280,7 @@ def session_dispose {
         # Pi lifecycle: extensions get session_shutdown before teardown.
         try {
             fire_hook(b as PluginBridge, "session_shutdown", {});
-        } except Exception {
-        }
+        } except Exception {}
         dispose_bridge(b as PluginBridge);
         plugins.bridge = None;
     }
@@ -312,4 +291,3 @@ def session_dispose {
     plugins.total = 0;
     plugins.commands.clear();
 }
-

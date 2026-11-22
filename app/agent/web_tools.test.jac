@@ -8,7 +8,6 @@ JACKAL_SKIP_NET_TESTS=1 or a 3s TCP probe to the search host fails, so CI
 never depends on egress.
 """
 
-
 def _canned_page -> str {
     parts: list[str] = [];
     parts.append("<html><head><title>Canned Page</title>");
@@ -20,7 +19,6 @@ def _canned_page -> str {
     parts.append("</body></html>");
     return "".join(parts);
 }
-
 
 def _start_server(body_text: str) -> int {
     # Raw-socket HTTP server on 127.0.0.1:0 serving one canned body;
@@ -37,7 +35,7 @@ def _start_server(body_text: str) -> int {
         + f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n"
     ).encode("utf-8");
 
-    def runner -> None {
+    def runner {
         srv.settimeout(15);
         served = 0;
         while served < 8 {
@@ -52,20 +50,17 @@ def _start_server(body_text: str) -> int {
                 conn.recv(65536);
                 conn.sendall(head + body);
                 conn.close();
-            } except Exception {
-            }
+            } except Exception {}
             served += 1;
         }
         try {
             srv.close();
-        } except Exception {
-        }
+        } except Exception {}
     }
 
     threading.Thread(target=runner, daemon=True).start();
     return port;
 }
-
 
 def _egress_available -> bool {
     try {
@@ -77,9 +72,15 @@ def _egress_available -> bool {
     }
 }
 
-
 test "validate_web_url rejects non-http schemes and garbage" {
-    for bad in ["file:///etc/passwd", "ftp://example.com/x", "javascript:alert(1)", "", "   ", "not-a-url"] {
+    for bad in [
+        "file:///etc/passwd",
+        "ftp://example.com/x",
+        "javascript:alert(1)",
+        "",
+        "   ",
+        "not-a-url",
+    ] {
         res = validate_web_url(bad);
         assert str(res[0]) == "";
         assert len(str(res[1])) > 0;
@@ -88,7 +89,6 @@ test "validate_web_url rejects non-http schemes and garbage" {
     assert str(good[1]) == "";
     assert str(good[0]) == "https://example.com/page?q=1";
 }
-
 
 test "truncate_result appends marker only past cap" {
     short = truncate_result("hello");
@@ -100,7 +100,6 @@ test "truncate_result appends marker only past cap" {
     assert cut.startswith("x" * 10);
 }
 
-
 test "strip_html removes scripts styles comments and tags" {
     page = _canned_page();
     text = strip_html(page);
@@ -111,7 +110,6 @@ test "strip_html removes scripts styles comments and tags" {
     assert "color: red" not in text;
     assert "<" not in text;
 }
-
 
 test "web_fetch renders local canned page over real http" {
     port = _start_server(_canned_page());
@@ -133,7 +131,6 @@ test "web_fetch renders local canned page over real http" {
         }
     }
 }
-
 
 test "validate_web_url blocks loopback private and metadata targets" {
     blocked = [
@@ -164,7 +161,6 @@ test "validate_web_url blocks loopback private and metadata targets" {
     assert str(ok[1]) == "", str(ok);
 }
 
-
 test "the private-host escape hatch only relaxes the guard when set" {
     old = os.environ.get("JACKAL_ALLOW_PRIVATE_HOSTS");
     try {
@@ -183,7 +179,6 @@ test "the private-host escape hatch only relaxes the guard when set" {
     assert not private_hosts_allowed();
 }
 
-
 test "web_fetch refuses a blocked URL without touching the network" {
     out = web_fetch("http://169.254.169.254/latest/meta-data/");
     parsed = json.loads(out);
@@ -193,7 +188,6 @@ test "web_fetch refuses a blocked URL without touching the network" {
     parsed2 = json.loads(web_fetch("http://127.0.0.1:1/"));
     assert parsed2.get("ok") is False, str(parsed2);
 }
-
 
 test "resolved-address guard rejects loopback names and unresolvable hosts" {
     try {
@@ -214,7 +208,6 @@ test "resolved-address guard rejects loopback names and unresolvable hosts" {
     }
 }
 
-
 test "web_fetch fails loud with json error on bad scheme" {
     out = web_fetch("file:///etc/passwd");
     parsed = json.loads(out);
@@ -222,13 +215,11 @@ test "web_fetch fails loud with json error on bad scheme" {
     assert "http(s)" in str(parsed.get("error", ""));
 }
 
-
 test "web_search fails loud on empty query without network" {
     out = web_search("");
     parsed = json.loads(out);
     assert parsed.get("ok") is False;
 }
-
 
 test "duckduckgo search returns formatted results when egress available" {
     net_off = os.environ.get("JACKAL_SKIP_NET_TESTS") == "1";
@@ -240,6 +231,8 @@ test "duckduckgo search returns formatted results when egress available" {
         }
         # Either formatted results or a graceful {"ok": false} JSON error -
         # never an exception across the seam.
-        assert out.startswith("1.") or out == "No results found." or json.loads(out).get("ok") is False;
+        assert out.startswith("1.")
+            or out == "No results found."
+            or json.loads(out).get("ok") is False;
     }
 }

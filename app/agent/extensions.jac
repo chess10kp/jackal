@@ -92,7 +92,7 @@ def decls_from_json(data: any) -> list[ExtensionDecl] {
 
 """Walk up from cwd for .jackal/extensions.json or .jackal with extensions key."""
 def load_extension_decls(cwd: str = "") -> list[ExtensionDecl] {
-    start = cwd if cwd else os.getcwd();
+    start = cwd or os.getcwd();
     cur = _path_abspath(start);
     while True {
         ext_path = os.path.join(cur, ".jackal", "extensions.json");

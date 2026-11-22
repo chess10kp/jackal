@@ -119,7 +119,7 @@ def handle_command(line: str) -> str | None {
     }
     if line.startswith("/export") {
         arg = line[len("/export"):].strip();
-        path = arg if arg else "jackal-transcript.md";
+        path = arg or "jackal-transcript.md";
         hist = _session.get_history();
         has_content = False;
         for m in hist {

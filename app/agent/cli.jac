@@ -9,8 +9,7 @@ glob CLI_VERSION: str = "0.1.0";
 
 glob OUTPUT_FORMATS: list[str] = ["text", "json", "stream-json"];
 
-glob CLI_USAGE: str = (
-    "usage: jackal [options] [prompt...]\n"
+glob CLI_USAGE: str = ("usage: jackal [options] [prompt...]\n"
     "\n"
     "Interactive line REPL by default; pass -p for a one-shot run.\n"
     "\n"
@@ -26,8 +25,7 @@ glob CLI_USAGE: str = (
     "  -r, --resume ID          resume a saved session by id\n"
     "  --max-turns N            cap tool-loop iterations per prompt (default 30)\n"
     "  -h, --help               show this help\n"
-    "  -V, --version            print the version"
-);
+    "  -V, --version            print the version");
 
 """Flags that consume the following argv element."""
 glob _VALUE_FLAGS: dict[str, str] = {
@@ -40,7 +38,6 @@ glob _VALUE_FLAGS: dict[str, str] = {
     "--resume": "resume",
     "--max-turns": "max_turns",
 };
-
 
 """User arguments from a raw sys.argv under `jac run main.jac -- ARGS`:
 everything after the entry script, minus one leading "--" separator."""
@@ -60,7 +57,6 @@ def user_argv(raw: list[str]) -> list[str] {
     return out;
 }
 
-
 """Default option set: every key parse_cli may fill."""
 def default_cli_options -> dict[str, any] {
     return {
@@ -79,7 +75,6 @@ def default_cli_options -> dict[str, any] {
         "error": "",
     };
 }
-
 
 """Parse argv (without the program name). Unknown flags and bad values set
 `error`; positional words join into `prompt`. `--` ends flag parsing."""
@@ -138,7 +133,6 @@ def parse_cli(argv: list[str]) -> dict[str, any] {
     return _validate(opts);
 }
 
-
 def _validate(opts: dict[str, any]) -> dict[str, any] {
     fmt: str = str(opts["output_format"]);
     if fmt not in OUTPUT_FORMATS {
@@ -170,7 +164,6 @@ def _validate(opts: dict[str, any]) -> dict[str, any] {
     return opts;
 }
 
-
 """Combine the argv prompt with piped stdin text (stdin appended after a
 blank line, matching `cat file | jackal -p "summarize"`)."""
 def combine_prompt(arg_prompt: str, stdin_text: str) -> str {
@@ -178,5 +171,5 @@ def combine_prompt(arg_prompt: str, stdin_text: str) -> str {
     if arg_prompt and piped {
         return arg_prompt + "\n\n" + piped;
     }
-    return arg_prompt if arg_prompt else piped;
+    return arg_prompt or piped;
 }

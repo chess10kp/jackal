@@ -57,13 +57,11 @@ def _emit_relation(
         } else {
             terms = [_t(s.top), _t(s.bottom), _t(tgt.top, -1.0), _t(tgt.bottom, -1.0)];
         }
+    } elif # SAME_SIZE
+    horizontal_axis {
+        terms = [_t(s.right), _t(s.left, -1.0), _t(tgt.right, -1.0), _t(tgt.left, 1.0)];
     } else {
-        # SAME_SIZE
-        if horizontal_axis {
-            terms = [_t(s.right), _t(s.left, -1.0), _t(tgt.right, -1.0), _t(tgt.left, 1.0)];
-        } else {
-            terms = [_t(s.bottom), _t(s.top, -1.0), _t(tgt.bottom, -1.0), _t(tgt.top, 1.0)];
-        }
+        terms = [_t(s.bottom), _t(s.top, -1.0), _t(tgt.bottom, -1.0), _t(tgt.top, 1.0)];
     }
 
     return _emit(result, _expr(terms, constant), Relation.EQ, rel.strength, prov);

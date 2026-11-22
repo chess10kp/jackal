@@ -19,8 +19,6 @@ object; no realms/isolation or interception yet; provisions are unique per
 active fiber (enforced lightly); no async/inertia - deactivation is eager.
 """
 
-
-
 """An accumulator element: an inverse action plus the coeffect keys it
 retracts when run (used for dependency-notification after recovery)."""
 obj Inverse {
@@ -32,7 +30,7 @@ obj Inverse {
         args: list[any] = [],
         keys: list[str] = [];
 
-    def run -> None {
+    def run {
         # optional callables can't be invoked natively (jac#10539); rebind
         f = self.fn;
         if f is not None {
@@ -41,7 +39,6 @@ obj Inverse {
         }
     }
 }
-
 
 """A component instantiation: coeffect spec + provision + effect function.
 
@@ -59,21 +56,22 @@ obj Fiber {
 
     def satisfied(ctx: EffectContext) -> bool {
         for k in self.inject {
-            if not ctx.has_key(k) { return False; }
+            if not ctx.has_key(k) {
+                return False;
+            }
         }
         return True;
     }
 }
 
-
 """The unified context: coeffect store + per-fiber inverse accumulators."""
 obj EffectContext {
     has store: dict[str, object] = {},
-         registry: dict[str, Fiber] = {},
-         frames: dict[str, list[Inverse]] = {},
-         root_frame: list[Inverse] = [],
-         current_fiber: str = "",
-         verbose: bool = False;
+        registry: dict[str, Fiber] = {},
+        frames: dict[str, list[Inverse]] = {},
+        root_frame: list[Inverse] = [],
+        current_fiber: str = "",
+        verbose: bool = False;
 
     def has_key(key: str) -> bool {
         return key in self.store;
@@ -83,13 +81,15 @@ obj EffectContext {
         return self.store.get(key);
     }
 
-    def _log(msg: str) -> None {
-        if self.verbose { print("  [cordis] " + msg); }
+    def _log(msg: str) {
+        if self.verbose {
+            print("  [cordis] " + msg);
+        }
     }
 
     """put(k, v) is an effect function on the coeffect store (Def. 23):
     it extends the store and returns/tracks the restriction as inverse."""
-    def put(key: str, value: object) -> None {
+    def put(key: str, value: object) {
         if key in self.store {
             raise ValueError("coeffect key already provided: " + key);
         }
@@ -100,13 +100,13 @@ obj EffectContext {
     }
 
     """Inverse of put: restrict the store (then notify)."""
-    def unset(key: str) -> None {
+    def unset(key: str) {
         self.store.pop(key, None);
         self._notify([key]);
     }
 
     """Record an inverse into the acting fiber's accumulator (or root)."""
-    def _record(inv: Inverse) -> None {
+    def _record(inv: Inverse) {
         if self.current_fiber {
             frame: list[Inverse] | None = self.frames.get(self.current_fiber);
             if frame is None {
@@ -120,10 +120,14 @@ obj EffectContext {
     }
 
     """Generic revertible effect: run fn, track inverse (Alg. 1 shape)."""
-    def effect(fn: Callable, args: list[any], inverse: Callable, inv_args: list[any], keys: list[str] = []) -> None {
+    def effect(
+        fn: Callable, args: list[any], inverse: Callable, inv_args: list[any], keys: list[str] = []
+    ) {
         fn(*args);
         self._record(Inverse(fn=inverse, args=inv_args, keys=keys));
-        if keys { self._notify(keys); }
+        if keys {
+            self._notify(keys);
+        }
     }
 
     """Instantiate a component as a fiber. Registers it; activates only if
@@ -137,9 +141,7 @@ obj EffectContext {
             for other_name in self.registry {
                 other = self.registry[other_name];
                 if other.active and k in other.provide {
-                    raise ValueError(
-                        "provision conflict on " + k + ": " + other_name
-                    );
+                    raise ValueError("provision conflict on " + k + ": " + other_name);
                 }
             }
         }
@@ -151,9 +153,11 @@ obj EffectContext {
 
     """Withdraw a fiber: recover ALL of its effects LIFO, drop it from the
     registry, then let dependents react (they saw it stop providing)."""
-    def unload(name: str) -> None {
+    def unload(name: str) {
         fiber = self.registry.get(name);
-        if fiber is None { return; }
+        if fiber is None {
+            return;
+        }
         del self.registry[name];
         self._recover_frame(name);
         self._refresh();
@@ -167,7 +171,7 @@ obj EffectContext {
     }
 
     """Apply a fiber's accumulated inverses LIFO; deactivate on the way."""
-    def _recover_frame(name: str) -> None {
+    def _recover_frame(name: str) {
         frame: list[Inverse] = self.frames.pop(name, []);
         fiber = self.registry.get(name);
         while frame {
@@ -175,11 +179,13 @@ obj EffectContext {
             self._log("  revert " + name + ": " + str(inv.keys));
             inv.run();
         }
-        if fiber is not None { fiber.active = False; }
+        if fiber is not None {
+            fiber.active = False;
+        }
     }
 
     """Re-classify every fiber's satisfaction to a fixpoint (quiescence)."""
-    def _refresh -> None {
+    def _refresh {
         for _pass in range(32) {
             flipped = False;
             for name in list(self.registry.keys()) {
@@ -193,14 +199,18 @@ obj EffectContext {
                     flipped = True;
                 }
             }
-            if not flipped { break; }
+            if not flipped {
+                break;
+            }
         }
     }
 
     """Run the fiber's effect function under per-fiber tracking."""
-    def _activate(name: str) -> None {
+    def _activate(name: str) {
         fiber = self.registry.get(name);
-        if fiber is None or fiber.apply is None { return; }
+        if fiber is None or fiber.apply is None {
+            return;
+        }
         prev = self.current_fiber;
         self.current_fiber = name;
         self.frames[name] = [];
@@ -216,12 +226,12 @@ obj EffectContext {
     """Store changed: keys retract/arrive; reactive classification happens
     in _refresh via satisfaction, so notify is just the re-evaluation
     trigger (Alg. 3 collapsed into refresh for the synchronous spike)."""
-    def _notify(keys: list[str]) -> None {
+    def _notify(keys: list[str]) {
         return;
     }
 
     """Recover everything registered at root level (context reset)."""
-    def dispose_all -> None {
+    def dispose_all {
         for name in list(self.registry.keys()) {
             self.unload(name);
         }

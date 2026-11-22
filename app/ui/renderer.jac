@@ -161,10 +161,8 @@ def render_frame(renderer: Renderer, layout_root: UiNode, term: Terminal) -> Fra
             term.show_cursor();
         }
         ansi = ansi + f"\x1b[{cursor.row + 1};{cursor.col + 1}H";
-    } else {
-        if term.cursor_visible {
-            term.hide_cursor();
-        }
+    } elif term.cursor_visible {
+        term.hide_cursor();
     }
     synchronized_write(term, ansi);
     used_full_clear = "\x1b[2J" in ansi or "\x1b[3J" in ansi;

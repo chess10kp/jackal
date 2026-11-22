@@ -7,8 +7,8 @@ metadata, and markup registration without editing framework source.
 import from ui.model { UiNode }
 
 walker SetProgress {
-    has value: float = 0.0;
-    has handled: bool = False;
+    has value: float = 0.0,
+        handled: bool = False;
 }
 
 # Derives the public UiNode base (framework API, not a framework edit) so

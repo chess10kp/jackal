@@ -42,36 +42,30 @@ import from .session_state {
     adopt_model_prefs,
 }
 
-
 # Serializes transparent restarts so concurrent tool calls against a dead
 # server produce exactly ONE restart, never a loop.
 glob _MCP_REVIVE_LOCK: any = threading.Lock();
 
-
 def set_mode(next_mode: str) -> str {
     if next_mode not in DEV_MODES {
         raise ValueError(
-            "invalid mode '" + next_mode
-            + "' (expected normal, auto-accept, yolo, plan, or ask)"
+            "invalid mode '" + next_mode + "' (expected normal, auto-accept, yolo, plan, or ask)"
         );
     }
     set_mode_state(next_mode);
     return get_mode_state();
 }
 
-
 """Return the active dev mode for native UI clients."""
 def get_mode -> str {
     return get_mode_state();
 }
 
-
 def _mcp_name_chunk(raw: any) -> str {
     s = str(raw);
     out = "".join([c if (c.isalnum() or c == "_") else "_" for c in s]);
-    return out if out else "srv";
+    return out or "srv";
 }
-
 
 """Extract {name: spec} MCP server entries from a parsed config.
 
@@ -211,13 +205,14 @@ def _mcp_server_specs(cfg: dict[str, any]) -> dict[str, dict[str, any]] {
     return out;
 }
 
-
 """Handler factory closing over one client/server/tool triple.
 
 Returns a native-tool handler whose string result mirrors the registry's
 resultToString convention. It accepts one decoded argument dictionary so the
 native dispatch path does not require dynamic keyword unpacking."""
-def _make_mcp_handler(client: McpClient, server_name: str, tool_name: str) -> Callable[[dict[str, any]], str] {
+def _make_mcp_handler(client: McpClient, server_name: str, tool_name: str) -> Callable[[
+    dict[str, any],
+], str] {
     def handle(args: dict[str, any]) -> str {
         res: dict[str, any] = client.call_tool(tool_name, args);
         if not res.get("ok") and not mcp_is_alive(client) {
@@ -231,8 +226,12 @@ def _make_mcp_handler(client: McpClient, server_name: str, tool_name: str) -> Ca
         if res.get("ok") {
             if res.get("is_error") {
                 return (
-                    "ERROR: mcp tool " + tool_name + " on " + server_name
-                    + " failed: " + str(res.get("result", ""))
+                    "ERROR: mcp tool "
+                    + tool_name
+                    + " on "
+                    + server_name
+                    + " failed: "
+                    + str(res.get("result", ""))
                 );
             }
             return str(res.get("result", ""));
@@ -242,10 +241,11 @@ def _make_mcp_handler(client: McpClient, server_name: str, tool_name: str) -> Ca
     return handle as Callable[[dict[str, any]], str];
 }
 
-
 """Handler for the auto-generated per-server resource reader (revive-aware,
 mirrors _make_mcp_handler but drives resources/read)."""
-def _make_mcp_resource_handler(client: McpClient, server_name: str) -> Callable[[dict[str, any]], str] {
+def _make_mcp_resource_handler(client: McpClient, server_name: str) -> Callable[[
+    dict[str, any],
+], str] {
     def handle(args: dict[str, any]) -> str {
         uri: str = str(args.get("uri", ""));
         res: dict[str, any] = mcp_read_resource(client, uri);
@@ -261,7 +261,6 @@ def _make_mcp_resource_handler(client: McpClient, server_name: str) -> Callable[
     }
     return handle as Callable[[dict[str, any]], str];
 }
-
 
 """Auto-register one `mcp_<server>_read_resource` tool when the server
 exposes resources. Reading a resource is inherently read-only, so the
@@ -281,8 +280,11 @@ def _register_resource_tool(reg: ToolRegistry, server_name: str, client: McpClie
     full_name: str = "mcp_" + sprefix + "_read_resource";
     if get_tool(reg, full_name) is not None {
         plugins.mcp_notices.append(
-            "mcp server " + server_name + " exposes resources but its own "
-            + full_name + " tool wins; no generated resource reader"
+            "mcp server "
+                + server_name
+                + " exposes resources but its own "
+                + full_name
+                + " tool wins; no generated resource reader",
         );
         return 0;
     }
@@ -290,8 +292,11 @@ def _register_resource_tool(reg: ToolRegistry, server_name: str, client: McpClie
         register_native(
             reg,
             full_name,
-            "Read one resource by URI from mcp server " + server_name
-            + ". Run /mcp resources " + server_name + " for the URI list.",
+            "Read one resource by URI from mcp server "
+                + server_name
+                + ". Run /mcp resources "
+                + server_name
+                + " for the URI list.",
             {"type": "object", "properties": {"uri": {"type": "string"}}, "required": ["uri"]},
             _make_mcp_resource_handler(client, server_name),
         );
@@ -308,7 +313,6 @@ def _register_resource_tool(reg: ToolRegistry, server_name: str, client: McpClie
     return 1;
 }
 
-
 """Public alias of _mcp_server_specs for UI modules (underscore names did
 not bind across modules at runtime): {name: argv} (windows show commands)."""
 def mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
@@ -323,7 +327,6 @@ def mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
     }
     return out;
 }
-
 
 """User-level config path: JACKAL_AGENT_DIR/config.json first, then the
 home-level ~/.jackal/config.json. Empty string when neither exists."""
@@ -343,7 +346,6 @@ def _user_config_path -> str {
     return "";
 }
 
-
 """Defensive JSON read: {} for missing/corrupt/non-dict files."""
 def _load_json_dict(path: str) -> dict[str, any] {
     out: dict[str, any] = {};
@@ -357,11 +359,9 @@ def _load_json_dict(path: str) -> dict[str, any] {
         if isinstance(parsed, dict) {
             out = parsed;
         }
-    } except Exception {
-    }
+    } except Exception {}
     return out;
 }
-
 
 """Effective MCP config: user-level config merged BENEATH the project
 config. Per-server entries are replaced wholesale by the project (same
@@ -390,14 +390,12 @@ def mcp_config(cwd: str) -> dict[str, any] {
     return {"mcp": merged};
 }
 
-
 """Configured MCP servers (all sources merged) as {name: argv} for UI glue
 that must not parse config itself."""
 def mcp_configured_specs -> dict[str, list[str]] {
-    cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
+    cwd: str = plugins.cwd or os.getcwd();
     return mcp_server_specs(mcp_config(cwd));
 }
-
 
 """Legacy mcp.json discovery sources (stdio-shaped entries only):
 the pi bundle, Cursor, and VS Code (linux/mac). Missing files are skipped."""
@@ -409,9 +407,7 @@ def _legacy_mcp_sources(agent_dir: str) -> list[str] {
     }
     cands.append(os.path.join(home, ".cursor", "mcp.json"));
     cands.append(os.path.join(home, ".config", "Code", "User", "mcp.json"));
-    cands.append(
-        os.path.join(home, "Library", "Application Support", "Code", "User", "mcp.json")
-    );
+    cands.append(os.path.join(home, "Library", "Application Support", "Code", "User", "mcp.json"));
     out: list[str] = [];
     for c in cands {
         if os.path.isfile(c) {
@@ -420,7 +416,6 @@ def _legacy_mcp_sources(agent_dir: str) -> list[str] {
     }
     return out;
 }
-
 
 """One-time import of legacy mcp.json server entries (pi bundle, Cursor,
 VS Code) into the user-level config, with an onboarding notice.
@@ -435,7 +430,7 @@ file <home>/.jackal/mcp_import_done; JACKAL_MCP_NO_IMPORT=1 disables.
 home_dir/sources are injectable for tests. Returns the imported names
 (never raises — a failed import must not break attach)."""
 def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] {
-    home: str = home_dir if home_dir else os.path.expanduser("~");
+    home: str = home_dir or os.path.expanduser("~");
     imported: list[str] = [];
     try {
         if os.environ.get("JACKAL_MCP_NO_IMPORT", "") {
@@ -446,7 +441,7 @@ def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] 
             return imported;
         }
         agent_dir: str = os.environ.get("JACKAL_AGENT_DIR", "");
-        srcs: list[str] = sources if sources else _legacy_mcp_sources(agent_dir);
+        srcs: list[str] = sources or _legacy_mcp_sources(agent_dir);
         # Target: first existing user config; else create ~/.jackal/config.json.
         target: str = os.path.join(home, ".jackal", "config.json");
         if agent_dir {
@@ -460,7 +455,7 @@ def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] 
         um: dict[str, any] = raw_um if isinstance(raw_um, dict) else {};
         raw_us: any = um.get("servers");
         us: dict[str, any] = raw_us if isinstance(raw_us, dict) else {};
-        cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
+        cwd: str = plugins.cwd or os.getcwd();
         proj_cfg: dict[str, any] = load_project_config(cwd);
         proj_specs: dict[str, dict[str, any]] = _mcp_server_specs(proj_cfg);
         changed: bool = False;
@@ -532,32 +527,40 @@ def mcp_import_legacy(home_dir: str = "", sources: list[str] = []) -> list[str] 
         with open(marker, "w", encoding="utf-8") as fh {
             fh.write("done\n");
         }
-    } except Exception {
-    }
+    } except Exception {}
     return imported;
 }
 
-
-def _mcp_set_status(server_name: str, state: str, error: str = "", tools: int = 0, cmd: list[str] | None = None, denied: int = 0) {
+def _mcp_set_status(
+    server_name: str,
+    state: str,
+    error: str = "",
+    tools: int = 0,
+    cmd: list[str] | None = None,
+    denied: int = 0,
+) {
     prev: dict[str, any] = plugins.mcp_status.get(server_name, {});
     plugins.mcp_status[server_name] = {
         "state": state,
         "error": error,
         "tools": tools,
         "cmd": cmd if cmd is not None else prev.get("cmd", []),
-        "denied": denied if denied else int(prev.get("denied", 0) or 0),
+        "denied": denied or int(prev.get("denied", 0) or 0),
     };
 }
-
 
 def _mcp_fail(server_name: str, error: str) {
     _mcp_set_status(server_name, "failed", error);
     plugins.mcp_notices.append(
-        "mcp server " + server_name + " unavailable: " + error
-        + " (/mcp for status, /mcp restart " + server_name + " to retry)"
+        "mcp server "
+            + server_name
+            + " unavailable: "
+            + error
+            + " (/mcp for status, /mcp restart "
+            + server_name
+            + " to retry)",
     );
 }
-
 
 """Synchronously restart one dead server in place (same spec, same client
 object so registered handlers keep working). Returns True when a healthy
@@ -625,12 +628,11 @@ def _revive_client(server_name: str) -> bool {
     }
 }
 
-
 """Detect unexpected server death: any client whose status still says
 `connected` but whose process is gone (or whose reader hit EOF) flips to
 `failed` with a notice. Frontends call this via drain_mcp_notices, so a
 death surfaces within one tick/turn without extra threads."""
-def mcp_health_check  {
+def mcp_health_check {
     for (name, client) in list(plugins.mcp_clients.items()) {
         st: dict[str, any] = plugins.mcp_status.get(name, {});
         if str(st.get("state", "")) != "connected" {
@@ -644,12 +646,10 @@ def mcp_health_check  {
             if client.proc is not None and client.proc.poll() is not None {
                 detail += " (exit code " + str(client.proc.poll()) + ")";
             }
-        } except Exception {
-        }
+        } except Exception {}
         _mcp_fail(name, detail);
     }
 }
-
 
 """Pop queued MCP notices for display (frontends call this each tick/turn).
 Also pumps buffered server notifications (list_changed diff) and runs the
@@ -662,14 +662,13 @@ def drain_mcp_notices -> list[str] {
     return out;
 }
 
-
 """Consume buffered server notifications for every connected client.
 
 tools/list_changed triggers a bounded re-list + diff (register new tools,
 unregister vanished ones) without a respawn; progress and logging
 notifications are dropped safely. Bounded work only: the refresh uses a
 short list timeout so a wedged server cannot stall the caller for long."""
-def mcp_pump_notifications  {
+def mcp_pump_notifications {
     for (name, client) in list(plugins.mcp_clients.items()) {
         st: dict[str, any] = plugins.mcp_status.get(name, {});
         if str(st.get("state", "")) != "connected" {
@@ -685,13 +684,14 @@ def mcp_pump_notifications  {
             continue;
         }
         for note in notes_raw {
-            if isinstance(note, dict) and str(note.get("method", "")) == "notifications/tools/list_changed" {
+            if isinstance(note, dict)
+                and str(note.get("method", "")) == "notifications/tools/list_changed"
+            {
                 _refresh_server_tools(name);
             }
         }
     }
 }
-
 
 """Re-list one server's tools and diff-register against the live registry
 (no respawn). On failure the current tools are kept and a notice explains
@@ -705,16 +705,20 @@ def _refresh_server_tools(server_name: str) {
     listed = mcp_list_tools(client, timeout_s=5.0);
     if not listed.get("ok") {
         plugins.mcp_notices.append(
-            "mcp server " + server_name + " tools/list failed: "
-            + str(listed.get("error", "")) + " (keeping current tools)"
+            "mcp server "
+                + server_name
+                + " tools/list failed: "
+                + str(listed.get("error", ""))
+                + " (keeping current tools)",
         );
         return;
     }
     raw_tools: any = listed.get("tools", []);
     if not isinstance(raw_tools, list) {
         plugins.mcp_notices.append(
-            "mcp server " + server_name
-            + " tools/list returned no tool array (keeping current tools)"
+            "mcp server "
+                + server_name
+                + " tools/list returned no tool array (keeping current tools)",
         );
         return;
     }
@@ -747,15 +751,21 @@ def _refresh_server_tools(server_name: str) {
     plugins.mcp_read_only[server_name] = list(plugins.mcp_read_only.get(server_name, []));
     plugins.mcp_tools = max(0, plugins.mcp_tools - removed) + int(stats["registered"]) + n_res;
     _mcp_set_status(
-        server_name, "connected",
-        tools=int(stats["registered"]) + n_res, denied=int(stats["denied"]),
+        server_name,
+        "connected",
+        tools=int(stats["registered"]) + n_res,
+        denied=int(stats["denied"]),
     );
     plugins.mcp_notices.append(
-        "mcp server " + server_name + " tool list changed: +"
-        + str(int(stats["registered"])) + " now registered, -" + str(removed) + " removed"
+        "mcp server "
+            + server_name
+            + " tool list changed: +"
+            + str(int(stats["registered"]))
+            + " now registered, -"
+            + str(removed)
+            + " removed",
     );
 }
-
 
 """Register one server's tools into the registry with collision handling.
 
@@ -763,13 +773,9 @@ Same-server re-registration (refresh/restart) replaces silently. A name
 owned by ANOTHER server or a foreign tool is renamed deterministically
 with a _<n> suffix; if no slot is found the tool is reported lost (never
 silently swallowed). Returns {"registered", "lost", "lost_names",
-"ro_names"} and records ownership in plugins.mcp_owned.""" 
+"ro_names"} and records ownership in plugins.mcp_owned."""
 def _register_server_tools(
-    reg: ToolRegistry,
-    server_name: str,
-    client: McpClient,
-    spec: dict[str, any],
-    tools: list[any],
+    reg: ToolRegistry, server_name: str, client: McpClient, spec: dict[str, any], tools: list[any]
 ) -> dict[str, any] {
     sprefix: str = _mcp_name_chunk(server_name);
     spec_read_only: bool = bool(spec.get("read_only", False));
@@ -860,8 +866,12 @@ def _register_server_tools(
                         full_name = cand;
                         renamed = True;
                         plugins.mcp_notices.append(
-                            "mcp tool collision: " + raw_tool + " from "
-                            + server_name + " registered as " + full_name
+                            "mcp tool collision: "
+                                + raw_tool
+                                + " from "
+                                + server_name
+                                + " registered as "
+                                + full_name,
                         );
                         break;
                     }
@@ -912,7 +922,6 @@ def _register_server_tools(
         "denied_names": denied_names,
     };
 }
-
 
 """Spawn + initialize one MCP server from its JSON-encoded spec dict,
 then seed namespaced tools into the live registry. Runs inside a
@@ -1006,40 +1015,50 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
         plugins.mcp_tools += int(stats["registered"]) + n_res;
         if int(stats["lost"]) > 0 {
             plugins.mcp_notices.append(
-                "mcp server " + server_name + " lost " + str(stats["lost"])
-                + " tool(s) to unresolvable name collisions: "
-                + ", ".join([str(x) for x in stats["lost_names"]])
+                "mcp server "
+                    + server_name
+                    + " lost "
+                    + str(stats["lost"])
+                    + " tool(s) to unresolvable name collisions: "
+                    + ", ".join([str(x) for x in stats["lost_names"]]),
             );
         }
         if int(stats["denied"]) > 0 {
             plugins.mcp_notices.append(
-                "mcp server " + server_name + " denied " + str(stats["denied"])
-                + " tool(s) by allow_tools/deny_tools: "
-                + ", ".join([str(x) for x in stats["denied_names"]])
+                "mcp server "
+                    + server_name
+                    + " denied "
+                    + str(stats["denied"])
+                    + " tool(s) by allow_tools/deny_tools: "
+                    + ", ".join([str(x) for x in stats["denied_names"]]),
             );
         }
         _mcp_set_status(
-            server_name, "connected",
-            tools=int(stats["registered"]) + n_res, denied=int(stats["denied"]),
+            server_name,
+            "connected",
+            tools=int(stats["registered"]) + n_res,
+            denied=int(stats["denied"]),
         );
     } except Exception as e {
         _mcp_fail(server_name, "attach failed: " + str(e));
     }
 }
 
-
 """Parse the effective (user + project) MCP config and background-spawn
 each declared server. Disabled servers get a `disabled` status entry and
 never attach."""
-def _attach_mcp_servers  {
-    cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
+def _attach_mcp_servers {
+    cwd: str = plugins.cwd or os.getcwd();
     imported: list[str] = mcp_import_legacy();
     if imported {
         plugins.mcp_notices.append(
-            "mcp: imported " + str(len(imported)) + " server(s) from legacy"
-            + " mcp.json sources: " + ", ".join(imported)
-            + " (user-level config; remove entries there or set"
-            + " JACKAL_MCP_NO_IMPORT=1 to opt out)"
+            "mcp: imported "
+                + str(len(imported))
+                + " server(s) from legacy"
+                + " mcp.json sources: "
+                + ", ".join(imported)
+                + " (user-level config; remove entries there or set"
+                + " JACKAL_MCP_NO_IMPORT=1 to opt out)",
         );
     }
     specs = _mcp_server_specs(mcp_config(cwd));
@@ -1057,7 +1076,6 @@ def _attach_mcp_servers  {
         flow _attach_one_mcp_server(name, json.dumps(spec));
     }
 }
-
 
 """Stop a server's client and drop its tools, then spawn it again in the
 background with the command it was configured with. Returns a status line."""
@@ -1085,8 +1103,7 @@ def mcp_restart(server_name: str) -> str {
     if old is not None {
         try {
             mcp_stop(old);
-        } except Exception {
-        }
+        } except Exception {}
         plugins.mcp_clients.pop(server_name, None);
     }
     reg = plugins.reg;
@@ -1104,15 +1121,13 @@ def mcp_restart(server_name: str) -> str {
     # HTTP specs have no argv; keep their endpoint in status so the live
     # status window continues to show the right reconnect target.
     restart_cmd: list[str] = (
-        [str(spec.get("url", ""))] if is_http
-        else [str(c) for c in spec.get("cmd", cmd)]
+        [str(spec.get("url", ""))] if is_http else [str(c) for c in spec.get("cmd", cmd)]
     );
     _mcp_set_status(server_name, "connecting", cmd=restart_cmd);
     spec_wire: str = json.dumps(spec);
     flow _attach_one_mcp_server(server_name, spec_wire);
     return "restarting mcp server " + server_name;
 }
-
 
 """List (or read) MCP resources for display. server_name "" lists every
 connected server (live, bounded 5s per server); with uri, one resource is
@@ -1156,9 +1171,13 @@ def mcp_resources(server_name: str, uri: str) -> str {
         for r in raw_res {
             line: str = "  " + str(r.get("uri", ""));
             nm: str = str(r.get("name", ""));
-            if nm { line += " — " + nm; }
+            if nm {
+                line += " — " + nm;
+            }
             mt: str = str(r.get("mimeType", ""));
-            if mt { line += " (" + mt + ")"; }
+            if mt {
+                line += " (" + mt + ")";
+            }
             lines.append(line);
         }
     }
@@ -1167,7 +1186,6 @@ def mcp_resources(server_name: str, uri: str) -> str {
     }
     return "\n".join(lines);
 }
-
 
 """Resolve an MCP server prompt to its text (one line per message,
 role-prefixed). Returns the prompt text or an ERROR string callers can
@@ -1204,7 +1222,9 @@ def mcp_prompt(server_name: str, prompt_name: str, args_json: str) -> str {
             }
             content: any = m.get("content");
             if isinstance(content, dict) and str(content.get("type", "")) == "text" {
-                parts.append("[" + str(m.get("role", "user")) + "] " + str(content.get("text", "")));
+                parts.append(
+                    "[" + str(m.get("role", "user")) + "] " + str(content.get("text", ""))
+                );
             }
         }
     }
@@ -1213,7 +1233,6 @@ def mcp_prompt(server_name: str, prompt_name: str, args_json: str) -> str {
     }
     return "\n".join(parts);
 }
-
 
 """Restart every server whose status is `failed` (bare /mcp restart).
 Returns a summary line; servers that were fine are left alone."""
@@ -1233,7 +1252,6 @@ def mcp_restart_failed -> str {
     return "restarting mcp servers: " + ", ".join(doomed);
 }
 
-
 """Block (bounded) until no MCP server is still connecting, so the first
 model request sees every tool that is going to attach. Budget comes from
 JACKAL_MCP_WAIT_S (default 10s). Returns True when nothing is pending."""
@@ -1251,15 +1269,21 @@ def wait_mcp_ready(timeout_s: float = -1.0) -> bool {
     while True {
         pending: bool = False;
         for st in list(plugins.mcp_status.values()) {
-            if str(st.get("state", "")) == "connecting" { pending = True; break; }
+            if str(st.get("state", "")) == "connecting" {
+                pending = True;
+                break;
+            }
         }
-        if not pending { return True; }
-        if time.time() >= deadline { return False; }
+        if not pending {
+            return True;
+        }
+        if time.time() >= deadline {
+            return False;
+        }
         time.sleep(0.05);
     }
     return False;
 }
-
 
 """One status line per known MCP server (REPL /mcp)."""
 def mcp_status_lines -> list[str] {
@@ -1268,20 +1292,21 @@ def mcp_status_lines -> list[str] {
         st = plugins.mcp_status[name];
         state: str = str(st.get("state", ""));
         line: str = "  " + str(name) + " — " + state;
-        if state == "connected" { line += " · " + str(st.get("tools", 0)) + " tools"; }
-        if state == "failed" { line += ": " + str(st.get("error", "")); }
+        if state == "connected" {
+            line += " · " + str(st.get("tools", 0)) + " tools";
+        }
+        if state == "failed" {
+            line += ": " + str(st.get("error", ""));
+        }
         lines.append(line);
     }
     return lines;
 }
 
-
-
 def _model_prefs_path -> str {
-    cwd = plugins.cwd if plugins.cwd else os.getcwd();
+    cwd = plugins.cwd or os.getcwd();
     return os.path.join(cwd, ".jackal", "model_prefs.json");
 }
-
 
 """One-time defensive load of model_prefs.json (missing/corrupt -> {})."""
 def _load_model_prefs {
@@ -1299,10 +1324,8 @@ def _load_model_prefs {
         if isinstance(raw, dict) {
             adopt_model_prefs(raw);
         }
-    } except (OSError, ValueError) {
-    }
+    } except (OSError, ValueError) {}
 }
-
 
 """Record the last model overall ("last") and per provider, then persist
 to <cwd>/.jackal/model_prefs.json best-effort. Never raises — a preference
@@ -1312,19 +1335,15 @@ def _record_model_pref(name: str) {
         _load_model_prefs();
         _model_prefs["last"] = name;
         _model_prefs[provider_for(name)] = name;
-        prefs_dir = os.path.join(
-            plugins.cwd if plugins.cwd else os.getcwd(), ".jackal"
-        );
+        prefs_dir = os.path.join(plugins.cwd or os.getcwd(), ".jackal");
         os.makedirs(prefs_dir, exist_ok=True);
         path = os.path.join(prefs_dir, "model_prefs.json");
         with open(path, "w") as fh {
             fh.write(json_pretty(json.dumps(_model_prefs, sort_keys=True)));
             fh.write("\n");
         }
-    } except Exception {
-    }
+    } except Exception {}
 }
-
 
 """Snapshot of persisted last-model preferences ("last" + provider keys).
 For the TUI /model picker to preselect per-provider defaults."""
@@ -1332,7 +1351,6 @@ def model_preferences -> dict[str, any] {
     _load_model_prefs();
     return dict(_model_prefs);
 }
-
 
 """Switch the active model. Validates credentials fx-style BEFORE applying:
 a model whose provider key is missing is refused and the actionable error
@@ -1352,12 +1370,10 @@ def set_model(name: str) -> str {
     if b is not None {
         try {
             fire_hook(b as PluginBridge, "model_select", {"model": name});
-        } except Exception {
-        }
+        } except Exception {}
     }
     return get_model_state();
 }
-
 
 """Set the reasoning-effort level used for subsequent turns (empty = off).
 The transport layer maps it to the request body's reasoning.effort. Fires
@@ -1368,23 +1384,17 @@ def set_thinking_level(level: str) -> str {
     if b is not None {
         try {
             fire_hook(b as PluginBridge, "thinking_level_select", {"level": level});
-        } except Exception {
-        }
+        } except Exception {}
     }
     return get_thinking_level_state();
 }
-
 
 def clear_history {
     history.clear();
 }
 
-
-
-
-
 """Apply extension-issued model and thinking-level requests."""
-def _apply_pending_model_requests  {
+def _apply_pending_model_requests {
     b = plugins.bridge;
     if b is None {
         return;

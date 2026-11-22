@@ -24,7 +24,6 @@ import struct;
 
 glob E2E_TIMEOUT_S: int = 300;
 
-
 """app/ directory (this file lives in app/e2e/)."""
 def app_dir -> str {
     env_root: str = os.environ.get("JACKAL_ROOT", "");
@@ -33,7 +32,9 @@ def app_dir -> str {
     }
     cur_dir: str = os.getcwd();
     for _ in range(4) {
-        if os.path.isfile(os.path.join(cur_dir, "main.jac")) and os.path.isdir(os.path.join(cur_dir, "agent")) {
+        if os.path.isfile(os.path.join(cur_dir, "main.jac"))
+            and os.path.isdir(os.path.join(cur_dir, "agent"))
+        {
             return cur_dir;
         }
         if os.path.isfile(os.path.join(cur_dir, "app", "main.jac")) {
@@ -44,7 +45,6 @@ def app_dir -> str {
     raise RuntimeError("e2e: cannot locate app/main.jac (set JACKAL_ROOT)");
 }
 
-
 def jac_bin -> str {
     got: str | None = os.environ.get("JAC") or shutil.which("neojac") or shutil.which("jac");
     if not got {
@@ -52,7 +52,6 @@ def jac_bin -> str {
     }
     return got;
 }
-
 
 """Native executable for an app entry module (`main.jac`, `tui/shell.jac`).
 JACKAL_BIN / JACKAL_TUI_BIN name prebuilt binaries; otherwise the entry is
@@ -72,7 +71,10 @@ def native_bin(entry_mod: str) -> str {
     }
     r = subprocess.run(
         [jac_bin(), "build", entry_mod, "-o", out],
-        cwd=app_dir(), capture_output=True, text=True, timeout=1800,
+        cwd=app_dir(),
+        capture_output=True,
+        text=True,
+        timeout=1800,
     );
     if r.returncode != 0 {
         raise RuntimeError("e2e: neojac build " + entry_mod + " failed:\n" + r.stdout + r.stderr);
@@ -83,7 +85,6 @@ def native_bin(entry_mod: str) -> str {
 }
 
 glob _built_bins: list[str] = [];
-
 
 """Isolated sandbox: a project dir (seeded with `files`, path -> text) and a
 private agent dir. Call cleanup() when done."""
@@ -128,13 +129,15 @@ obj Sandbox {
         out: list[dict[str, any]] = [];
         fh: any = open(self.log_path, "r", encoding="utf-8");
         for line in fh.read().splitlines() {
-            if line.strip() { out.append(json.loads(line)); }
+            if line.strip() {
+                out.append(json.loads(line));
+            }
         }
         fh.close();
         return out;
     }
 
-    def cleanup  {
+    def cleanup {
         shutil.rmtree(self.base_dir, ignore_errors=True);
     }
 
@@ -144,7 +147,6 @@ obj Sandbox {
         return r.describe() + "\n--- model calls ---\n" + json.dumps(self.calls(), indent=1)[:6000];
     }
 }
-
 
 def make_sandbox(files: dict[str, str] | None = None) -> Sandbox {
     base: str = tempfile.mkdtemp(prefix="jackal-e2e-");
@@ -164,11 +166,12 @@ def make_sandbox(files: dict[str, str] | None = None) -> Sandbox {
     cfg_fh.write("{}");
     cfg_fh.close();
     if files is not None {
-        for (rel, text) in files.items() { sb.write(rel, text); }
+        for (rel, text) in files.items() {
+            sb.write(rel, text);
+        }
     }
     return sb;
 }
-
 
 """Result of one jackal process run."""
 obj RunResult {
@@ -181,12 +184,15 @@ obj RunResult {
         out: list[dict[str, any]] = [];
         for line in self.stdout.splitlines() {
             line = line.strip();
-            if not line.startswith("{") { continue; }
+            if not line.startswith("{") {
+                continue;
+            }
             try {
                 ev: any = json.loads(line);
-                if isinstance(ev, dict) { out.append(ev); }
-            } except ValueError {
-            }
+                if isinstance(ev, dict) {
+                    out.append(ev);
+                }
+            } except ValueError {}
         }
         return out;
     }
@@ -196,11 +202,14 @@ obj RunResult {
     }
 
     def describe -> str {
-        return "exit=" + str(self.code) + "\n--- stdout ---\n" + self.stdout[-4000:]
-            + "\n--- stderr ---\n" + self.stderr[-4000:];
+        return "exit="
+            + str(self.code)
+            + "\n--- stdout ---\n"
+            + self.stdout[-4000:]
+            + "\n--- stderr ---\n"
+            + self.stderr[-4000:];
     }
 }
-
 
 """Run the native app/main.jac binary with ARGS inside the sandbox project with the mock
 model. `stdin_text` is fed to the process (closed afterwards)."""
@@ -214,7 +223,14 @@ def run_jackal(
     env: dict[str, str] = dict(os.environ);
     # JAC_HANDOFF names the *runner's* CLI handoff endpoint; a spawned `jac`
     # that inherits it waits for the parent instead of booting (2026-11-01).
-    for k in ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ZAI_API_KEY", "JACKAL_MODE", "JAC_HANDOFF"] {
+    for k in [
+        "OPENROUTER_API_KEY",
+        "OPENAI_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "ZAI_API_KEY",
+        "JACKAL_MODE",
+        "JAC_HANDOFF",
+    ] {
         env.pop(k, None);
     }
     env["JACKAL_MODEL"] = "mock";
@@ -226,40 +242,58 @@ def run_jackal(
     # user config during e2e runs (the import e2e opts back in explicitly).
     env["JACKAL_MCP_NO_IMPORT"] = "1";
     if env_extra is not None {
-        for (k, v) in env_extra.items() { env[k] = v; }
+        for (k, v) in env_extra.items() {
+            env[k] = v;
+        }
     }
     cmd: list[str] = [native_bin("main.jac")] + args;
     try {
         proc: any = subprocess.run(
-            cmd, input=stdin_text, capture_output=True, text=True,
-            cwd=sb.project, env=env, timeout=timeout_s,
+            cmd,
+            input=stdin_text,
+            capture_output=True,
+            text=True,
+            cwd=sb.project,
+            env=env,
+            timeout=timeout_s,
         );
     } except subprocess.TimeoutExpired as e {
-        return RunResult(code=-9, stdout=str(e.stdout or ""), stderr="TIMEOUT after " + str(timeout_s) + "s\n" + str(e.stderr or ""));
+        return RunResult(
+            code=-9,
+            stdout=str(e.stdout or ""),
+            stderr="TIMEOUT after " + str(timeout_s) + "s\n" + str(e.stderr or ""),
+        );
     }
     return RunResult(code=int(proc.returncode), stdout=str(proc.stdout), stderr=str(proc.stderr));
 }
-
 
 """JSONL request line for the --json protocol."""
 def jsonl(kind: str, text: str = "", extra: dict[str, any] | None = None) -> str {
     req: dict[str, any] = {"type": kind, "text": text};
     if extra is not None {
-        for (k, v) in extra.items() { req[k] = v; }
+        for (k, v) in extra.items() {
+            req[k] = v;
+        }
     }
     return json.dumps(req) + "\n";
 }
-
 
 # ============================ PTY / TUI driver ============================
 
 """Named keys for TuiSession.press."""
 glob KEYS: dict[str, str] = {
-    "enter": "\r", "esc": "\x1b", "tab": "\t", "backspace": "\x7f",
-    "up": "\x1b[A", "down": "\x1b[B", "right": "\x1b[C", "left": "\x1b[D",
-    "shift+tab": "\x1b[Z", "ctrl+c": "\x03", "ctrl+d": "\x04",
+    "enter": "\r",
+    "esc": "\x1b",
+    "tab": "\t",
+    "backspace": "\x7f",
+    "up": "\x1b[A",
+    "down": "\x1b[B",
+    "right": "\x1b[C",
+    "left": "\x1b[D",
+    "shift+tab": "\x1b[Z",
+    "ctrl+c": "\x03",
+    "ctrl+d": "\x04",
 };
-
 
 """A live native tui/shell.jac binary under a pseudo-terminal, with its output
 replayed into a Screen. Drive it with type_text/press, assert with
@@ -273,7 +307,7 @@ obj TuiSession {
         reader: any = None,
         alive: bool = True;
 
-    def _read_loop  {
+    def _read_loop {
         dec: any = codecs.getincrementaldecoder("utf-8")("replace");
         while self.alive {
             try {
@@ -281,12 +315,16 @@ obj TuiSession {
             } except OSError {
                 break;
             }
-            if not chunk { break; }
+            if not chunk {
+                break;
+            }
             text: str = dec.decode(chunk);
             self.lock.acquire();
             try {
                 self.raw.append(text);
-                if self.screen is not None { self.screen.write(text); }
+                if self.screen is not None {
+                    self.screen.write(text);
+                }
             } finally {
                 self.lock.release();
             }
@@ -334,13 +372,21 @@ obj TuiSession {
         deadline: float = time.time() + timeout_s;
         while time.time() < deadline {
             txt: str = self.screen_text();
-            if needle in txt { return txt; }
-            if not self.alive and self.proc.poll() is not None { break; }
+            if needle in txt {
+                return txt;
+            }
+            if not self.alive and self.proc.poll() is not None {
+                break;
+            }
             time.sleep(0.05);
         }
         raise AssertionError(
-            "timed out waiting for " + repr(needle) + "\n--- screen ---\n"
-            + self.screen_text() + "\n--- exit: " + str(self.proc.poll())
+            "timed out waiting for "
+                + repr(needle)
+                + "\n--- screen ---\n"
+                + self.screen_text()
+                + "\n--- exit: "
+                + str(self.proc.poll()),
         );
     }
 
@@ -352,19 +398,25 @@ obj TuiSession {
         deadline: float = time.time() + timeout_s;
         while time.time() < deadline {
             txt: str = self.screen_text();
-            if needle not in txt { return txt; }
-            if not self.alive and self.proc.poll() is not None { break; }
+            if needle not in txt {
+                return txt;
+            }
+            if not self.alive and self.proc.poll() is not None {
+                break;
+            }
             time.sleep(0.05);
         }
         raise AssertionError(
-            "timed out waiting for " + repr(needle) + " to disappear\n--- screen ---\n"
-            + self.screen_text() + "\n--- exit: " + str(self.proc.poll())
+            "timed out waiting for "
+                + repr(needle)
+                + " to disappear\n--- screen ---\n"
+                + self.screen_text()
+                + "\n--- exit: "
+                + str(self.proc.poll()),
         );
     }
 
     """Wait for the process to exit; returns its code (or None on timeout)."""
-
-
     def wait_exit(timeout_s: float = 30.0) -> int | None {
         try {
             return int(self.proc.wait(timeout=timeout_s));
@@ -373,26 +425,25 @@ obj TuiSession {
         }
     }
 
-    def close  {
+    def close {
         if self.proc is not None and self.proc.poll() is None {
             try {
                 os.killpg(int(self.proc.pid), 15);  # SIGTERM
-            } except Exception {
-            }
+            } except Exception {}
             try {
                 self.proc.wait(timeout=10);
             } except Exception {
-                try { os.killpg(int(self.proc.pid), 9); } except Exception { }  # SIGKILL
+                try {
+                    os.killpg(int(self.proc.pid), 9);
+                } except Exception {}  # SIGKILL
             }
         }
         self.alive = False;
         try {
             os.close(self.master_fd);
-        } except OSError {
-        }
+        } except OSError {}
     }
 }
-
 
 """Launch the native TUI in `sb.project` under a cols x rows PTY with the
 mock model. Waits until the first frame is painted."""
@@ -408,7 +459,14 @@ def spawn_tui(
     env: dict[str, str] = dict(os.environ);
     # JAC_HANDOFF names the *runner's* CLI handoff endpoint; a spawned `jac`
     # that inherits it waits for the parent instead of booting (2026-11-01).
-    for k in ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ZAI_API_KEY", "JACKAL_MODE", "JAC_HANDOFF"] {
+    for k in [
+        "OPENROUTER_API_KEY",
+        "OPENAI_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "ZAI_API_KEY",
+        "JACKAL_MODE",
+        "JAC_HANDOFF",
+    ] {
         env.pop(k, None);
     }
     env["JACKAL_MODEL"] = "mock";
@@ -419,17 +477,29 @@ def spawn_tui(
     env["COLUMNS"] = str(cols);
     env["LINES"] = str(rows);
     if env_extra is not None {
-        for (k, v) in env_extra.items() { env[k] = v; }
+        for (k, v) in env_extra.items() {
+            env[k] = v;
+        }
     }
     cmd: list[str] = [native_bin("tui/shell.jac")];
     proc: any = subprocess.Popen(
-        cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-        cwd=sb.project, env=env, start_new_session=True, close_fds=True,
+        cmd,
+        stdin=slave_fd,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        cwd=sb.project,
+        env=env,
+        start_new_session=True,
+        close_fds=True,
     );
     os.close(slave_fd);
     sess = TuiSession(
-        proc=proc, master_fd=master_fd, screen=EmulatedTerminal(cols, rows),
-        raw=[], lock=threading.Lock(), alive=True,
+        proc=proc,
+        master_fd=master_fd,
+        screen=EmulatedTerminal(cols, rows),
+        raw=[],
+        lock=threading.Lock(),
+        alive=True,
     );
     sess.reader = threading.Thread(target=sess._read_loop, daemon=True);
     sess.reader.start();
@@ -439,12 +509,10 @@ def spawn_tui(
     return sess;
 }
 
-
 """Absolute path of an e2e fixture file."""
 def fixture_path(name: str) -> str {
     return os.path.join(app_dir(), "e2e", "fixtures", name);
 }
-
 
 """Write the project config as .jackal/config.json (directory form, so
 sessions and tasks can live alongside it) — e.g. MCP servers."""

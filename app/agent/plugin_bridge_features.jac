@@ -27,17 +27,11 @@ def transform_markdown(
             kind="md_transform",
             session_id=bridge.session_id,
             correlation_id=corr,
-            payload={
-                "markdown": md,
-                "message_type": message_type,
-                "streaming": streaming,
-            },
+            payload={"markdown": md, "message_type": message_type, "streaming": streaming},
         );
         try {
             _write_node(bridge, req);
-            reply = _read_node_until(
-                bridge, "md_transformed", correlation_id=corr, timeout=10.0
-            );
+            reply = _read_node_until(bridge, "md_transformed", correlation_id=corr, timeout=10.0);
         } except Exception as e {
             return {"ok": False, "error": str(e), "markdown": md};
         }
@@ -65,7 +59,6 @@ def transform_markdown(
     return {"ok": True, "markdown": md};
 }
 
-
 # ======================= B1: extension traffic drain + control =======================
 
 """Pop accumulated extension traffic (messages pushed via sendMessage/
@@ -91,7 +84,6 @@ def drain_extension_traffic(bridge: PluginBridge | None) -> dict[str, any] {
     return out;
 }
 
-
 """Set the host-side session name (round-trips through any envelope)."""
 def set_session_name(bridge: PluginBridge, name: str, timeout: float = 5.0) -> bool {
     bridge.session_name = str(name);
@@ -106,9 +98,7 @@ def set_session_name(bridge: PluginBridge, name: str, timeout: float = 5.0) -> b
         );
         try {
             _write_node(bridge, req);
-            _read_node_until(
-                bridge, "hook_done", correlation_id=corr, timeout=timeout
-            );
+            _read_node_until(bridge, "hook_done", correlation_id=corr, timeout=timeout);
         } except Exception as e {
             return False;
         }
@@ -119,7 +109,6 @@ def set_session_name(bridge: PluginBridge, name: str, timeout: float = 5.0) -> b
     }
     return True;
 }
-
 
 # ============================ P10: provider seam ============================
 
@@ -159,7 +148,6 @@ def resolve_ext_model(bridge: PluginBridge | None, model_id: str) -> dict[str, a
     return None;
 }
 
-
 """P10 request seam: fire Pi's `before_provider_request` hook.
 
 Handlers may edit {model, url, headers, body} in place (echoed back) and/or
@@ -167,11 +155,7 @@ return replacements ({body}, {url}, {headers} — last one wins per field).
 Full request control is intentional: extensions are trusted in-process code.
 Never raises; on any failure the original request passes through."""
 def prepare_provider_request(
-    bridge: PluginBridge | None,
-    model: str,
-    url: str,
-    headers: dict[str, str],
-    body: dict[str, any],
+    bridge: PluginBridge | None, model: str, url: str, headers: dict[str, str], body: dict[str, any]
 ) -> dict[str, any] {
     out: dict[str, any] = {"url": url, "headers": headers, "body": body};
     if bridge is None {
@@ -208,7 +192,6 @@ def prepare_provider_request(
     return out;
 }
 
-
 """Mirror the shim's toContentLines normalization."""
 def _fake_content_lines(out: any) -> list[str] {
     if out is None {
@@ -222,7 +205,6 @@ def _fake_content_lines(out: any) -> list[str] {
     }
     return [x for x in str(out).split("\n")];
 }
-
 
 """P11: run an extension message/entry renderer; returns native content
 lines ({ok, lines}). Renderer errors degrade to unstyled fallback lines.
@@ -245,9 +227,7 @@ def render_extension_block(
         );
         try {
             _write_node(bridge, req);
-            reply = _read_node_until(
-                bridge, "rendered", correlation_id=corr, timeout=10.0
-            );
+            reply = _read_node_until(bridge, "rendered", correlation_id=corr, timeout=10.0);
         } except Exception {
             return none_out;
         }
@@ -271,14 +251,8 @@ def render_extension_block(
         return {"ok": True, "lines": _fake_content_lines(out)};
     } except Exception as e {
         text = "" if payload is None else str(payload);
-        return {
-            "ok": False,
-            "error": str(e),
-            "lines": [x for x in text.split("\n")],
-        };
+        return {"ok": False, "error": str(e), "lines": [x for x in text.split("\n")]};
     }
 }
 
-
 # ==================== P12: interactive ui round-trip ====================
-

@@ -25,15 +25,31 @@ import from ui.terminal {
 
 """Named keys for send_key (xterm sequences, as ProcessTerminal receives them)."""
 glob KEY_SEQUENCES: dict[str, str] = {
-    "enter": "\r", "escape": "\x1b", "esc": "\x1b", "tab": "\t",
-    "backspace": "\x7f", "space": " ",
-    "up": "\x1b[A", "down": "\x1b[B", "right": "\x1b[C", "left": "\x1b[D",
-    "home": "\x1b[H", "end": "\x1b[F", "page_up": "\x1b[5~", "page_down": "\x1b[6~",
-    "delete": "\x1b[3~", "shift+tab": "\x1b[Z",
-    "ctrl+a": "\x01", "ctrl+c": "\x03", "ctrl+d": "\x04", "ctrl+e": "\x05",
-    "ctrl+k": "\x0b", "ctrl+l": "\x0c", "ctrl+u": "\x15", "ctrl+w": "\x17",
+    "enter": "\r",
+    "escape": "\x1b",
+    "esc": "\x1b",
+    "tab": "\t",
+    "backspace": "\x7f",
+    "space": " ",
+    "up": "\x1b[A",
+    "down": "\x1b[B",
+    "right": "\x1b[C",
+    "left": "\x1b[D",
+    "home": "\x1b[H",
+    "end": "\x1b[F",
+    "page_up": "\x1b[5~",
+    "page_down": "\x1b[6~",
+    "delete": "\x1b[3~",
+    "shift+tab": "\x1b[Z",
+    "ctrl+a": "\x01",
+    "ctrl+c": "\x03",
+    "ctrl+d": "\x04",
+    "ctrl+e": "\x05",
+    "ctrl+k": "\x0b",
+    "ctrl+l": "\x0c",
+    "ctrl+u": "\x15",
+    "ctrl+w": "\x17",
 };
-
 
 obj EmulatedTerminal(Terminal) {
     has screen: VtScreen = VtScreen(),
@@ -62,7 +78,7 @@ obj EmulatedTerminal(Terminal) {
 
     # ---------------------------------------------------- Terminal surface
 
-    def write(data: str) -> None {
+    def write(data: str) {
         if not data {
             return;
         }
@@ -70,22 +86,36 @@ obj EmulatedTerminal(Terminal) {
         self.bytes_written += len(data);
         # Mode flags pyte does not model (alt screen, paste, sync) are
         # tracked from the byte stream so restore can be asserted.
-        if ENTER_ALT_SCREEN in data { self.alternate_screen = True; }
-        if LEAVE_ALT_SCREEN in data { self.alternate_screen = False; }
-        if ENABLE_BRACKETED_PASTE in data { self.bracketed_paste = True; }
-        if DISABLE_BRACKETED_PASTE in data { self.bracketed_paste = False; }
-        if SYNC_BEGIN in data { self.sync_active = True; }
-        if SYNC_END in data { self.sync_active = False; }
+        if ENTER_ALT_SCREEN in data {
+            self.alternate_screen = True;
+        }
+        if LEAVE_ALT_SCREEN in data {
+            self.alternate_screen = False;
+        }
+        if ENABLE_BRACKETED_PASTE in data {
+            self.bracketed_paste = True;
+        }
+        if DISABLE_BRACKETED_PASTE in data {
+            self.bracketed_paste = False;
+        }
+        if SYNC_BEGIN in data {
+            self.sync_active = True;
+        }
+        if SYNC_END in data {
+            self.sync_active = False;
+        }
         self.screen.feed(data);
         self.cursor_visible = not self.screen.cursor_hidden;
-        if self.screen.title { self.title = self.screen.title; }
+        if self.screen.title {
+            self.title = self.screen.title;
+        }
     }
 
-    def move_cursor(row: int, col: int) -> None {
+    def move_cursor(row: int, col: int) {
         self.write(f"\x1b[{row};{col}H");
     }
 
-    def start -> None {
+    def start {
         if self.started {
             return;
         }
@@ -96,14 +126,22 @@ obj EmulatedTerminal(Terminal) {
         self.restored = False;
     }
 
-    def stop -> None {
+    def stop {
         if self.restored and not self.started {
             return;
         }
-        if self.sync_active { self.write(SYNC_END); }
-        if self.bracketed_paste { self.write(DISABLE_BRACKETED_PASTE); }
-        if self.alternate_screen { self.write(LEAVE_ALT_SCREEN); }
-        if not self.cursor_visible { self.write(SHOW_CURSOR); }
+        if self.sync_active {
+            self.write(SYNC_END);
+        }
+        if self.bracketed_paste {
+            self.write(DISABLE_BRACKETED_PASTE);
+        }
+        if self.alternate_screen {
+            self.write(LEAVE_ALT_SCREEN);
+        }
+        if not self.cursor_visible {
+            self.write(SHOW_CURSOR);
+        }
         self.started = False;
         self.restored = True;
     }
@@ -141,7 +179,7 @@ obj EmulatedTerminal(Terminal) {
     }
 
     """Simulate stdin closing (ctrl+d on an empty tty / pipe EOF)."""
-    def close_input  {
+    def close_input {
         self.eof = True;
     }
 
@@ -189,7 +227,9 @@ obj EmulatedTerminal(Terminal) {
         rows: list[str] = self.viewport();
         for r in range(len(rows)) {
             col: int = rows[r].find(needle);
-            if col >= 0 { return (r, col); }
+            if col >= 0 {
+                return (r, col);
+            }
         }
         return None;
     }
@@ -197,13 +237,15 @@ obj EmulatedTerminal(Terminal) {
     """Viewport row containing `needle`, or ""."""
     def line_with(needle: str) -> str {
         for line in self.viewport() {
-            if needle in line { return line; }
+            if needle in line {
+                return line;
+            }
         }
         return "";
     }
 
     """Clear screen state (keeps size and flags)."""
-    def reset_screen  {
+    def reset_screen {
         self.screen.reset();
     }
 }

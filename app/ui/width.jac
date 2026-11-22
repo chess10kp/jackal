@@ -168,8 +168,8 @@ def grapheme_width(seg: str) -> int {
 
 """Return the length and end index of an ANSI escape at `pos`, or None."""
 obj AnsiToken {
-    has code: str = "";
-    has length: int = 0;
+    has code: str = "",
+        length: int = 0;
 }
 
 def extract_ansi(text: str, pos: int) -> AnsiToken | None {
@@ -269,8 +269,8 @@ def display_width(text: str) -> int {
 }
 
 obj TruncatedSpan {
-    has text: str = "";
-    has width: int = 0;
+    has text: str = "",
+        width: int = 0;
 }
 
 def _truncate_plain(text: str, max_width: int) -> TruncatedSpan {
@@ -399,7 +399,7 @@ def wrap_text(text: str, width: int) -> list[str] {
             result.append(current);
         }
     }
-    return result if result else [""];
+    return result or [""];
 }
 
 """Wrap `text` to `width` columns and return the lines joined with '\n'.

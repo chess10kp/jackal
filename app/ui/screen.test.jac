@@ -164,7 +164,8 @@ test "lowered shell matches build_main_shell child keys" {
     session = handle.session;
     try {
         shell = build_main_shell(session);
-        assert ordered_child_keys(lowered_screen as UiContainer) == ordered_child_keys(shell.screen);
+        assert ordered_child_keys(lowered_screen as UiContainer)
+            == ordered_child_keys(shell.screen);
     } finally {
         dispose_session(session);
     }

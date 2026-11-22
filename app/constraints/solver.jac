@@ -29,12 +29,7 @@ import from constraints.algebra {
     strength_weight,
     term,
 }
-import from constraints.results {
-    ConstraintHandle,
-    SolveError,
-    SolveResult,
-    SolverSnapshot,
-}
+import from constraints.results { ConstraintHandle, SolveError, SolveResult, SolverSnapshot }
 import from constraints.solver_types {
     SymbolKind,
     MutationJournal,
@@ -45,7 +40,9 @@ import from constraints.solver_types {
     EditInfo,
 }
 
-def _new_solver -> Solver { return Solver(); }
+def _new_solver -> Solver {
+    return Solver();
+}
 
 obj Solver {
     has rows: dict[int, Row] = {},
@@ -127,8 +124,7 @@ obj Solver {
                 return SolveResult(
                     ok=False,
                     error=SolveError.UNSATISFIABLE,
-                    message="required system inconsistent under all "
-                            + "elimination orders",
+                    message="required system inconsistent under all " + "elimination orders",
                     witness_provenance=_journal_witness_extra(self, provenance),
                 );
             }
@@ -145,16 +141,17 @@ obj Solver {
         }
         self.handle_keys[handle.id] = key;
         self.provenance[handle.id] = provenance;
-        self.history.append(StoredConstraint(
-            expression=c.expression,
-            relation=c.relation,
-            strength=c.strength,
-            provenance=provenance,
-            content_key=key,
-        ));
+        self.history.append(
+            StoredConstraint(
+                expression=c.expression,
+                relation=c.relation,
+                strength=c.strength,
+                provenance=provenance,
+                content_key=key,
+            ),
+        );
         self.generation += 1;
         return SolveResult(ok=True, handle=handle);
-
     }
 
     def has_constraint(handle: ConstraintHandle) -> bool {
@@ -171,7 +168,7 @@ obj Solver {
         return _solver_replay_all(self, order);
     }
 
-    def _adopt(bundle: Solver) -> None {
+    def _adopt(bundle: Solver) {
         _solver_adopt(self, bundle);
     }
 
@@ -194,9 +191,7 @@ obj Solver {
         self.cns.pop(key);
         self.handle_keys.pop(handle.id);
         self.provenance.pop(handle.id);
-        self.history = [
-            st for st in self.history if st.content_key != key
-        ];
+        self.history = [st for st in self.history if st.content_key != key];
         # An edit variable's underlying constraint was removed underneath
         # it; drop the registration so it cannot suggest again.
         for vid in sorted(self.edits.keys()) {
@@ -210,10 +205,7 @@ obj Solver {
 
     def add_edit_variable(v: Variable, strength: StrengthTier) -> SolveResult {
         if v.id in self.edits {
-            return SolveResult(
-                ok=False,
-                error=SolveError.DUPLICATE_EDIT_VARIABLE,
-            );
+            return SolveResult(ok=False, error=SolveError.DUPLICATE_EDIT_VARIABLE);
         }
         if strength == StrengthTier.REQUIRED {
             return SolveResult(
@@ -225,9 +217,7 @@ obj Solver {
         # The edit variable is exactly a soft equality v == 0 (kiwi
         # addEditVariable); suggestions move its constant incrementally.
         c = Constraint(
-            expression=normalize_expression(term(v)),
-            relation=Relation.EQ,
-            strength=strength,
+            expression=normalize_expression(term(v)), relation=Relation.EQ, strength=strength
         );
         res = self.add_constraint(c);
         if not res.ok {
@@ -241,11 +231,7 @@ obj Solver {
                 message="accepted add returned no handle",
             );
         }
-        self.edits[v.id] = EditInfo(
-            var_id=v.id,
-            key=self.handle_keys[handle.id],
-            handle=handle,
-        );
+        self.edits[v.id] = EditInfo(var_id=v.id, key=self.handle_keys[handle.id], handle=handle);
         return res;
     }
 
@@ -301,7 +287,7 @@ obj Solver {
         return SolverSnapshot(generation=self.generation, values=vals);
     }
 
-    def reset -> None {
+    def reset {
         self.rows = {};
         self.kinds = {};
         self.var_symbols = {};
@@ -317,7 +303,6 @@ obj Solver {
         self.infeasible_rows = [];
         self.generation = 0;
     }
-
 }
 
 def solver_strength_for_key(s: Solver, key: str) -> StrengthTier {

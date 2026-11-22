@@ -7,19 +7,9 @@
 # import from ui.renderer or ui.layout in this file (circular at collection);
 # pull everything else from leaves (ui.layout_types, ui.model).
 
-import from ui.model {
-    MainScreen,
-    Prompt,
-    ApprovalOverlay,
-    UiRegion,
-    Layer,
-    node_id,
-}
+import from ui.model { MainScreen, Prompt, ApprovalOverlay, UiRegion, Layer, node_id }
 
-import from ui.mutation {
-    append_child,
-    detach,
-}
+import from ui.mutation { append_child, detach }
 
 import from ui.layout_types {
     AxisSize,
@@ -33,46 +23,36 @@ import from ui.layout_types {
     rect_of,
 }
 
-import from ui.virtual_terminal {
-    VirtualTerminal,
-}
-
+import from ui.virtual_terminal { VirtualTerminal }
 
 node TextRegion(UiRegion) {
     has label: str = "";
 }
-
 
 # Spec builders over the permanent seam (legacy contract equivalents).
 def _sp(width: AxisSize, height: AxisSize) -> LayoutSpec {
     return LayoutSpec(width=width, height=height);
 }
 
-
 def _fill_fill -> LayoutSpec {
     return _sp(fill_axis(), fill_axis());
 }
-
 
 def _grow_region -> LayoutSpec {
     return _sp(fill_axis(), grow_axis(1.0));
 }
 
-
 def _intrinsic_spec -> LayoutSpec {
     return _sp(intrinsic_axis(), intrinsic_axis());
 }
-
 
 def _fixed_height(h: float) -> LayoutSpec {
     return _sp(fill_axis(), fixed_axis(h));
 }
 
-
 def _box(w: float, h: float) -> LayoutSpec {
     return _sp(fixed_axis(w), fixed_axis(h));
 }
-
 
 def _rect_of(state: LayoutState, n: UiNode) -> Rect {
     r = rect_of(state, n);
@@ -82,7 +62,6 @@ def _rect_of(state: LayoutState, n: UiNode) -> Rect {
     return r;
 }
 
-
 obj ShellFixture {
     has renderer: Renderer,
         screen: MainScreen,
@@ -90,7 +69,6 @@ obj ShellFixture {
         mid: TextRegion,
         bot: TextRegion;
 }
-
 
 def _shell_renderer(columns: int = 40, rows: int = 12) -> ShellFixture {
     renderer = create_renderer(columns, rows);
@@ -108,15 +86,8 @@ def _shell_renderer(columns: int = 40, rows: int = 12) -> ShellFixture {
     set_node_content(renderer, top, ["TOP"]);
     set_node_content(renderer, mid, ["mid"]);
     set_node_content(renderer, bot, ["BOT"]);
-    return ShellFixture(
-        renderer=renderer,
-        screen=screen,
-        top=top,
-        mid=mid,
-        bot=bot,
-    );
+    return ShellFixture(renderer=renderer, screen=screen, top=top, mid=mid, bot=bot);
 }
-
 
 def _rows_contain(rows: list[str], needle: str) -> bool {
     for row in rows {
@@ -127,7 +98,6 @@ def _rows_contain(rows: list[str], needle: str) -> bool {
     return False;
 }
 
-
 test "create_renderer owns empty layout registry at terminal size" {
     renderer = create_renderer(40, 12);
     assert renderer.layout.viewport.columns == 40;
@@ -135,7 +105,6 @@ test "create_renderer owns empty layout registry at terminal size" {
     assert renderer.cursor_node_id == "";
     assert renderer.damage == [];
 }
-
 
 test "request_cursor and clear_cursor track a single holder" {
     renderer = create_renderer();
@@ -146,7 +115,6 @@ test "request_cursor and clear_cursor track a single holder" {
     clear_cursor(renderer);
     assert renderer.cursor_node_id == "";
 }
-
 
 test "first paint fills expected cells without full clear" {
     shell = _shell_renderer(40, 8);
@@ -165,7 +133,6 @@ test "first paint fills expected cells without full clear" {
     assert result.sync_wrapped == True;
     term.stop();
 }
-
 
 test "growth damages union of old and new mid bounds and shifts bot" {
     # Intrinsic mid sizes to content so growth shifts siblings; grow() fills
@@ -197,7 +164,6 @@ test "growth damages union of old and new mid bounds and shifts bot" {
     assert cells[bot_y_after].startswith("BOT");
     term.stop();
 }
-
 
 test "shrink repairs uncovered cells without full clear" {
     shell = _shell_renderer(40, 10);
@@ -240,7 +206,6 @@ test "shrink repairs uncovered cells without full clear" {
     term.stop();
 }
 
-
 test "sibling move after height change repaints shifted region" {
     shell = _shell_renderer(40, 10);
     renderer = shell.renderer;
@@ -267,7 +232,6 @@ test "sibling move after height change repaints shifted region" {
     assert len(result.patch_rects) >= 1;
     term.stop();
 }
-
 
 test "resize recomputes wrap and keeps node ids" {
     renderer = create_renderer(40, 8);
@@ -297,7 +261,6 @@ test "resize recomputes wrap and keeps node ids" {
     term.stop();
 }
 
-
 test "unicode content paints without corrupting neighbor cells" {
     renderer = create_renderer(20, 4);
     screen = MainScreen(key="main");
@@ -315,7 +278,6 @@ test "unicode content paints without corrupting neighbor cells" {
     assert result.used_full_clear == False;
     term.stop();
 }
-
 
 test "overlay close damages old rect and restores underlying cells" {
     renderer = create_renderer(40, 12);
@@ -366,7 +328,6 @@ test "overlay close damages old rect and restores underlying cells" {
     term.stop();
 }
 
-
 test "cursor placed in prompt region and cleared on detach" {
     renderer = create_renderer(40, 6);
     screen = MainScreen(key="main");
@@ -395,7 +356,6 @@ test "cursor placed in prompt region and cleared on detach" {
     term.stop();
 }
 
-
 test "localized semantic edit writes fewer cells than full frame" {
     shell = _shell_renderer(40, 12);
     renderer = shell.renderer;
@@ -420,7 +380,6 @@ test "localized semantic edit writes fewer cells than full frame" {
     term.stop();
 }
 
-
 test "desired_cells matches painted virtual terminal snapshot" {
     shell = _shell_renderer(20, 6);
     renderer = shell.renderer;
@@ -436,7 +395,6 @@ test "desired_cells matches painted virtual terminal snapshot" {
     assert desired[5].startswith("BOT");
     term.stop();
 }
-
 
 test "viewport change between frames adds full-frame resize damage" {
     shell = _shell_renderer(30, 8);
@@ -478,7 +436,6 @@ test "viewport change between frames adds full-frame resize damage" {
     term.stop();
 }
 
-
 test "resize shrink repaints wrapped rows matching desired snapshot" {
     renderer = create_renderer(40, 6);
     screen = MainScreen(key="main");
@@ -516,7 +473,6 @@ test "resize shrink repaints wrapped rows matching desired snapshot" {
     term.stop();
 }
 
-
 test "resize grow paints newly exposed rows incrementally" {
     renderer = create_renderer(20, 8);
     screen = MainScreen(key="main");
@@ -531,11 +487,7 @@ test "resize grow paints newly exposed rows incrementally" {
     set_node_contract(renderer, body, _grow_region());
     set_node_contract(renderer, bot, _fixed_height(1.0));
     set_node_content(renderer, top, ["TOP"]);
-    set_node_content(
-        renderer,
-        body,
-        ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
-    );
+    set_node_content(renderer, body, ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"]);
     set_node_content(renderer, bot, ["BOT"]);
 
     term = VirtualTerminal(columns=20, rows=8);
@@ -555,7 +507,6 @@ test "resize grow paints newly exposed rows incrementally" {
     assert frame_used_full_clear(term.writes) == False;
     term.stop();
 }
-
 
 test "overlapping overlays stack by z_index and closing top reveals lower" {
     renderer = create_renderer(40, 10);
@@ -598,7 +549,6 @@ test "overlapping overlays stack by z_index and closing top reveals lower" {
     term.stop();
 }
 
-
 test "cursor relocation emits terminal position update at new cell" {
     shell = _shell_renderer(30, 8);
     renderer = shell.renderer;
@@ -625,7 +575,6 @@ test "cursor relocation emits terminal position update at new cell" {
     assert term.cursor_visible;
     term.stop();
 }
-
 
 test "disjoint edits yield separate small patch rects" {
     shell = _shell_renderer(40, 12);
@@ -660,7 +609,6 @@ test "disjoint edits yield separate small patch rects" {
     assert "mid" in cells[1];
     term.stop();
 }
-
 
 test "compute_damage unions prev and current rects after growth" {
     shell = _shell_renderer(30, 10);

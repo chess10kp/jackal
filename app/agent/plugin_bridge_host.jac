@@ -52,7 +52,7 @@ def host_status(bridge: any) -> str {
             }
         }
     }
-    return bridge.status_phase if bridge.status_phase else "idle";
+    return bridge.status_phase or "idle";
 }
 
 """Reap Node host after idle_timeout_s with no activity. Returns True if reaped."""
@@ -93,7 +93,7 @@ def ensure_node_host(
     }
     path = resolve_host_mjs(host_mjs);
     bridge.host_mjs = path;
-    bin_path = node_bin if node_bin else resolve_node_bin();
+    bin_path = node_bin or resolve_node_bin();
     bridge.node_bin = bin_path;
     _emit_host_status(bridge, "starting", "spawning node sidecar");
     _ensure_io(bridge);

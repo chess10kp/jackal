@@ -154,7 +154,7 @@ def _ui_modal_lines(app: LiveShell) -> list[str] {
         body.append("  [y] yes    [n/Esc] no");
     } else {
         draft = str(m.get("draft", ""));
-        shown = draft if draft else placeholder;
+        shown = draft or placeholder;
         body.append("  > " + shown[:inner - 6] + "\u258c");
         body.append("");
         body.append("  [enter] submit (empty allowed)   [esc] cancel");
@@ -179,7 +179,7 @@ def _picker_popup_rows(app: LiveShell) -> list[str] {
             shown = ("*" * len(draft)) if draft else "(paste API key)";
             out.append(truncate_text("  " + str(p.get("providerId", "")), width, ellipsis="…"));
         } else {
-            shown = draft if draft else "(type a value)";
+            shown = draft or "(type a value)";
         }
         out.append(truncate_text("> " + shown + "▌", width, ellipsis="…"));
         out.append("Enter submit · Esc cancel");

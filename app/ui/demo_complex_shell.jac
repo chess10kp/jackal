@@ -262,12 +262,7 @@ def run_complex_shell_demo(columns: int = 80, rows: int = 24, verbose: bool = Fa
     status = ("phase=" + shell.status.phase + " │ " + bar_line + " │ tool:jac_check");
     prompt_lines = ["> ", "(draft empty after submit)"];
     _paint_shell(
-        renderer,
-        shell,
-        header,
-        win.lines if win.lines else ["(empty transcript)"],
-        status,
-        prompt_lines,
+        renderer, shell, header, win.lines or ["(empty transcript)"], status, prompt_lines
     );
     request_cursor(renderer, shell.prompt, row_offset=0, col_offset=2);
 
@@ -313,7 +308,7 @@ def run_complex_shell_demo(columns: int = 80, rows: int = 24, verbose: bool = Fa
         renderer,
         shell,
         "Jackal │ resized 100×30 │ rev=" + str(session.graph_revision),
-        win2.lines if win2.lines else ["(empty)"],
+        win2.lines or ["(empty)"],
         "phase=tool │ " + bar_line + " │ awaiting approval",
         ["> ", ""],
     );
@@ -342,7 +337,7 @@ def run_complex_shell_demo(columns: int = 80, rows: int = 24, verbose: bool = Fa
         renderer,
         shell,
         "Jackal │ approval modal │ rev=" + str(session.graph_revision),
-        win2.lines if win2.lines else ["(empty)"],
+        win2.lines or ["(empty)"],
         "phase=approval │ " + bar_line,
         ["> ", ""],
         overlay_lines=[
@@ -389,7 +384,7 @@ def run_complex_shell_demo(columns: int = 80, rows: int = 24, verbose: bool = Fa
     if findings {
         detail_findings = findings[0].kind + ": " + findings[0].detail;
     }
-    _step(demo, "invariants", findings == [], detail_findings if detail_findings else "clean");
+    _step(demo, "invariants", findings == [], detail_findings or "clean");
 
     demo.graph_dump = dump_graph(session);
     demo.binding_dump = dump_bindings(session);

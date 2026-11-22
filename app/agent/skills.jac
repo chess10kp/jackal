@@ -162,7 +162,7 @@ def expand_skill_command(text: str, skills: list[dict[str, any]]) -> str {
 
 """Stripped body of a built-in skill's SKILL.md ('' when absent/broken)."""
 def load_skill_by_dir(dir_name: str, package_root: str = "") -> str {
-    pkg_base = package_root if package_root else _resolve_package_root();
+    pkg_base = package_root or _resolve_package_root();
     fpath = os.path.join(pkg_base, "pi", "skills", dir_name, "SKILL.md");
     if not os.path.isfile(fpath) {
         return "";

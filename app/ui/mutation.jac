@@ -28,8 +28,8 @@ import from ui.model {
     ordered_children,
 }
 
-glob RANK_GAP: int = 1024;
-glob MIN_RANK: int = 0;
+glob RANK_GAP: int = 1024,
+     MIN_RANK: int = 0;
 
 obj MutationResult {
     has graph_revision: int,

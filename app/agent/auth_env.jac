@@ -8,19 +8,21 @@ TUI, the line REPL, JSONL, and print mode alike.
 import os;
 import from .llm { PROVIDER_ROUTES }
 import from .auth {
-    load_auth_file, save_auth_file, resolve_auth_path, stored_api_key,
-    credential_remove, has_credential,
+    load_auth_file,
+    save_auth_file,
+    resolve_auth_path,
+    stored_api_key,
+    credential_remove,
+    has_credential,
 }
 
 """Env vars this process set from auth.json (so logout may unset them)."""
 glob _hydrated_envs: set[str] = set();
 
-
 def _key_env(provider_id: str) -> str {
     route: any = PROVIDER_ROUTES.get(provider_id, {});
     return str(route.get("key_env", "") or "") if isinstance(route, dict) else "";
 }
-
 
 """Export stored API keys for providers whose env var is unset. Explicit
 environment values always win. Returns the providers hydrated."""
@@ -43,12 +45,12 @@ def hydrate_auth_environment -> list[str] {
     return done;
 }
 
-
 """Remember that `key_env` now carries a stored credential (set by /login)."""
 def note_hydrated(key_env: str) {
-    if key_env { _hydrated_envs.add(key_env); }
+    if key_env {
+        _hydrated_envs.add(key_env);
+    }
 }
-
 
 """Remove a provider's stored credential. The env var is cleared only when it
 came from auth.json; a key exported by the user's shell is left alone and
@@ -76,13 +78,14 @@ def logout_provider(provider_id: str) -> str {
     return ("logged out of " + provider_id) if had else ("no stored credential for " + provider_id);
 }
 
-
 """Providers with a stored credential (for /logout completion and listing)."""
 def stored_providers -> list[str] {
     data = load_auth_file(resolve_auth_path());
     out: list[str] = [];
     for prov in PROVIDER_ROUTES {
-        if has_credential(data, str(prov)) { out.append(str(prov)); }
+        if has_credential(data, str(prov)) {
+            out.append(str(prov));
+        }
     }
     return out;
 }

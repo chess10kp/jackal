@@ -27,10 +27,16 @@ import from tui.shell { boot_tui, tui_step, shutdown_tui }
 import from agent.session { restore_model, clear_history, set_mode }
 
 glob _HARNESS_ENV_KEYS: list[str] = [
-    "JACKAL_MODEL", "JACKAL_MOCK_SCRIPT", "JACKAL_MOCK_LOG", "JACKAL_AGENT_DIR",
-    "JACKAL_MODE", "OPENROUTER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ZAI_API_KEY",
+    "JACKAL_MODEL",
+    "JACKAL_MOCK_SCRIPT",
+    "JACKAL_MOCK_LOG",
+    "JACKAL_AGENT_DIR",
+    "JACKAL_MODE",
+    "OPENROUTER_API_KEY",
+    "OPENAI_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "ZAI_API_KEY",
 ];
-
 
 obj TuiHarness {
     has app: LiveShell,
@@ -85,7 +91,9 @@ obj TuiHarness {
         while time.time() < deadline {
             self.step(1);
             txt: str = self.screen();
-            if needle in txt { return txt; }
+            if needle in txt {
+                return txt;
+            }
             time.sleep(0.01);
         }
         raise AssertionError("timed out waiting for " + repr(needle) + "\n" + self.dump());
@@ -96,7 +104,9 @@ obj TuiHarness {
         deadline: float = time.time() + timeout_s;
         while time.time() < deadline {
             self.step(1);
-            if needle not in self.screen() { return; }
+            if needle not in self.screen() {
+                return;
+            }
             time.sleep(0.01);
         }
         raise AssertionError("still showing " + repr(needle) + "\n" + self.dump());
@@ -107,7 +117,9 @@ obj TuiHarness {
         deadline: float = time.time() + timeout_s;
         while time.time() < deadline {
             self.step(1);
-            if self.app.phase == "ready" and self.app.worker is None { return; }
+            if self.app.phase == "ready" and self.app.worker is None {
+                return;
+            }
             time.sleep(0.01);
         }
         raise AssertionError("turn did not settle (phase=" + self.app.phase + ")\n" + self.dump());
@@ -115,11 +127,15 @@ obj TuiHarness {
 
     """Model calls recorded by the mock transport."""
     def calls -> list[dict[str, any]] {
-        if not os.path.exists(self.log_path) { return []; }
+        if not os.path.exists(self.log_path) {
+            return [];
+        }
         out: list[dict[str, any]] = [];
         fh: any = open(self.log_path, "r", encoding="utf-8");
         for line in fh.read().splitlines() {
-            if line.strip() { out.append(json.loads(line)); }
+            if line.strip() {
+                out.append(json.loads(line));
+            }
         }
         fh.close();
         return out;
@@ -146,14 +162,24 @@ obj TuiHarness {
         }
         rows.append(border);
         return (
-            "\n".join(rows) + "\ncursor=(" + str(x) + "," + str(y) + ") phase="
-            + self.app.phase + " running=" + str(self.app.running)
-            + "\nmodel calls: " + json.dumps(self.calls())[:2000]
+            "\n".join(rows)
+            + "\ncursor=("
+            + str(x)
+            + ","
+            + str(y)
+            + ") phase="
+            + self.app.phase
+            + " running="
+            + str(self.app.running)
+            + "\nmodel calls: "
+            + json.dumps(self.calls())[:2000]
         );
     }
 
-    def close  {
-        if self.closed { return; }
+    def close {
+        if self.closed {
+            return;
+        }
         self.closed = True;
         try {
             self.app.running = False;
@@ -161,14 +187,16 @@ obj TuiHarness {
         } finally {
             os.chdir(self.saved_cwd);
             for (k, v) in self.saved_env.items() {
-                if v is None { os.environ.pop(k, None); }
-                else { os.environ[k] = str(v); }
+                if v is None {
+                    os.environ.pop(k, None);
+                } else {
+                    os.environ[k] = str(v);
+                }
             }
             shutil.rmtree(self.base_dir, ignore_errors=True);
         }
     }
 }
-
 
 """Boot the real TUI on an emulated `columns` x `rows` terminal inside a
 throwaway project (seeded with `files`), driven by the mock model `script`."""
@@ -198,8 +226,12 @@ def open_tui(
     sf.write(json.dumps(script if script is not None else []));
     sf.close();
     saved_env: dict[str, any] = {};
-    for k in _HARNESS_ENV_KEYS { saved_env[k] = os.environ.get(k); }
-    for k in _HARNESS_ENV_KEYS { os.environ.pop(k, None); }
+    for k in _HARNESS_ENV_KEYS {
+        saved_env[k] = os.environ.get(k);
+    }
+    for k in _HARNESS_ENV_KEYS {
+        os.environ.pop(k, None);
+    }
     os.environ["JACKAL_MODEL"] = "mock";
     os.environ["JACKAL_MOCK_SCRIPT"] = script_path;
     os.environ["JACKAL_MOCK_LOG"] = os.path.join(base, "calls.jsonl");
@@ -213,9 +245,14 @@ def open_tui(
     set_mode(mode);
     app.mode = mode;
     h = TuiHarness(
-        app=app, term=term, base_dir=base, project=project,
-        log_path=os.path.join(base, "calls.jsonl"), script_path=script_path,
-        saved_cwd=saved_cwd, saved_env=saved_env,
+        app=app,
+        term=term,
+        base_dir=base,
+        project=project,
+        log_path=os.path.join(base, "calls.jsonl"),
+        script_path=script_path,
+        saved_cwd=saved_cwd,
+        saved_env=saved_env,
     );
     h.step(2);
     return h;

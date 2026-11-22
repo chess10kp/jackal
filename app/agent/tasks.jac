@@ -35,22 +35,18 @@ import from .json_pretty { json_pretty }
 glob TASKS_FILE: str = "tasks.json",
      _NO_TASKS_LINE: str = "No tasks. Use /tasks add <title> or create_task.";
 
-
 def tasks_path(cwd: str) -> str {
     return os.path.join(cwd, ".jackal", TASKS_FILE);
 }
-
 
 """Fresh 8-hex-char task id (uuid4 prefix, like the legacy toolchain)."""
 def generate_task_id -> str {
     return uuid.uuid4().hex[:8];
 }
 
-
 def _now_iso -> str {
     return datetime.datetime.now(datetime.timezone.utc).isoformat();
 }
-
 
 """Required-field shape check; extra fields are tolerated."""
 def _is_task(value: any) -> bool {
@@ -63,7 +59,6 @@ def _is_task(value: any) -> bool {
         and isinstance(value.get("updatedAt"), str)
     );
 }
-
 
 """All valid tasks from tasks.json; [] when missing, corrupt, or not a
 list (invalid entries are filtered out rather than failing the load)."""
@@ -91,7 +86,6 @@ def load_tasks(cwd: str) -> list[dict[str, any]] {
     return valid;
 }
 
-
 """Persist the full task array (indent=2 + trailing newline), creating
 the .jackal directory when needed."""
 def save_tasks(cwd: str, tasks: list[dict[str, any]]) -> bool {
@@ -115,12 +109,10 @@ def save_tasks(cwd: str, tasks: list[dict[str, any]]) -> bool {
     return True;
 }
 
-
 """Empty the store (writes [], never deletes the file)."""
 def clear_tasks(cwd: str) -> bool {
     return save_tasks(cwd, []);
 }
-
 
 """Append a new pending task; title is stripped, a blank description
 becomes null. Returns the created task dict."""
@@ -131,7 +123,7 @@ def add_task(cwd: str, title: str, description: str = "") -> dict[str, any] {
     task: dict[str, any] = {
         "id": generate_task_id(),
         "title": title.strip(),
-        "description": trimmed_desc if trimmed_desc else None,
+        "description": trimmed_desc or None,
         "status": "pending",
         "createdAt": now,
         "updatedAt": now,
@@ -140,7 +132,6 @@ def add_task(cwd: str, title: str, description: str = "") -> dict[str, any] {
     save_tasks(cwd, tasks);
     return task;
 }
-
 
 """Remove the task at `index`; None when out of range."""
 def remove_task_by_index(cwd: str, index: int) -> dict[str, any] | None {
@@ -152,7 +143,6 @@ def remove_task_by_index(cwd: str, index: int) -> dict[str, any] | None {
     save_tasks(cwd, tasks);
     return removed;
 }
-
 
 """Remove the first task whose id matches; None when unknown."""
 def remove_task_by_id(cwd: str, task_id: str) -> dict[str, any] | None {
@@ -173,7 +163,6 @@ def remove_task_by_id(cwd: str, task_id: str) -> dict[str, any] | None {
     save_tasks(cwd, tasks);
     return removed;
 }
-
 
 """Apply {id, status?, title?, description?} updates to matching tasks.
 
@@ -222,7 +211,6 @@ def update_tasks(cwd: str, updates: list[dict[str, any]]) -> list[dict[str, any]
     return tasks;
 }
 
-
 """Counts keyed by legacy snake_case status names."""
 def task_counts(tasks: list[dict[str, any]]) -> dict[str, int] {
     pending: int = 0;
@@ -241,7 +229,6 @@ def task_counts(tasks: list[dict[str, any]]) -> dict[str, int] {
     return {"pending": pending, "in_progress": in_progress, "completed": completed};
 }
 
-
 """One rendered row: status icon, [id], title, optional em-dash blurb."""
 def format_task_line(task: dict[str, any]) -> str {
     icon: str = "○";
@@ -259,7 +246,6 @@ def format_task_line(task: dict[str, any]) -> str {
     return icon + " [" + str(task["id"]) + "] " + str(task["title"]) + suffix;
 }
 
-
 """Rendered board: counts header, divider, numbered rows (or a hint when
 the list is empty)."""
 def format_tasks_list(tasks: list[dict[str, any]], title: str = "Tasks") -> str {
@@ -269,9 +255,15 @@ def format_tasks_list(tasks: list[dict[str, any]], title: str = "Tasks") -> str 
     counts = task_counts(tasks);
     header = (
         title
-        + " (" + str(counts["pending"]) + " pending"
-        + ", " + str(counts["in_progress"]) + " in progress"
-        + ", " + str(counts["completed"]) + " completed)"
+        + " ("
+        + str(counts["pending"])
+        + " pending"
+        + ", "
+        + str(counts["in_progress"])
+        + " in progress"
+        + ", "
+        + str(counts["completed"])
+        + " completed)"
     );
     lines: list[str] = [];
     idx: int = 0;

@@ -243,12 +243,12 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
         mcp_pump_notifications();
         reg_names = sorted([str(k) for k in reg.tools.keys()]);
         notes = " | ".join(plugins.mcp_notices);
-        assert get_tool(reg, "mcp_t_alpha") is None, str((
-            "alpha still registered: " + str(reg_names) + " notices: " + notes
-        ));
-        assert get_tool(reg, "mcp_t_beta") is not None, str((
-            "beta missing: " + str(reg_names) + " notices: " + notes
-        ));
+        assert get_tool(reg, "mcp_t_alpha") is None, str(
+            ("alpha still registered: " + str(reg_names) + " notices: " + notes)
+        );
+        assert get_tool(reg, "mcp_t_beta") is not None, str(
+            ("beta missing: " + str(reg_names) + " notices: " + notes)
+        );
         assert plugins.mcp_owned.get("mcp_t_beta", "") == "t";
         assert int(plugins.mcp_status["t"]["tools"]) == 1;
         joined = " ".join(plugins.mcp_notices);

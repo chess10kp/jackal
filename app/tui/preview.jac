@@ -7,8 +7,8 @@ virtual_terminal seams — see tui/popup_pick.jac for the pattern); a pure
 leaf avoids both that and the verbatim-replica sync burden.
 """
 
-glob TOOL_RESULT_PREVIEW_LINES: int = 6;
-glob TOOL_RESULT_PREVIEW_LINE_CHARS: int = 200;
+glob TOOL_RESULT_PREVIEW_LINES: int = 6,
+     TOOL_RESULT_PREVIEW_LINE_CHARS: int = 200;
 
 """Display-only preview of a tool result for the TUI transcript.
 

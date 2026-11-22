@@ -47,12 +47,11 @@ glob KNOWN_AUTH_TYPES: list[str] = ["oauth", "api_key", "env"];
 
 glob OAUTH_REQUIRED_KEYS: list[str] = ["refresh", "access"];
 
-
-import from c { def chmod(path: str, mode: i32) -> i32;  }
-
+import from c {
+    def chmod(path: str, mode: i32) -> i32;
+}
 
 # ── Checker shims ───────────────────────────────────────────────────────
-
 
 """Checker shims: the Jac type checker cannot bind AnyStr when plain str
 values flow into some os.path/stat signatures (abspath/expanduser/chmod),
@@ -61,24 +60,19 @@ def _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
-
 def _path_expanduser(p: str) -> str {
     return str(os.path.expanduser(p));
 }
-
 
 def _path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
 }
 
-
 def _file_chmod(p: str, mode: int) {
     chmod(p, i32(mode));
 }
 
-
 # ── Path resolution ─────────────────────────────────────────────────────
-
 
 """Resolve the auth.json path: explicit agent_dir > JACKAL_AGENT_DIR env
 > ~/.jackal/. Mirrors the TS resolveAuthPath."""
@@ -93,9 +87,7 @@ def resolve_auth_path(agent_dir: str = "") -> str {
     return os.path.join(base, AUTH_FILE_NAME);
 }
 
-
 # ── Credential store ────────────────────────────────────────────────────
-
 
 """Load and parse auth.json. Missing file, corrupt JSON, or a non-object
 root all yield {} (legacy behaviour: auth failures never crash boot)."""
@@ -120,9 +112,7 @@ def load_auth_file(path: str) -> dict[str, any] {
     return {};
 }
 
-
 import from .json_pretty { json_pretty }
-
 
 """Save auth data as pretty JSON (indent=2 + trailing newline), creating
 parent dirs 0700 and chmod-ing the file 0600. True on success."""
@@ -142,7 +132,6 @@ def save_auth_file(path: str, data: dict[str, any]) -> bool {
         return False;
     }
 }
-
 
 """Validate and normalise one credential record, preserving unknown keys.
 
@@ -170,8 +159,12 @@ def validate_credential(cred: any) -> dict[str, any] | None {
         if not isinstance(expires, (int, float)) or isinstance(expires, bool) {
             return None;
         }
-        out = {"type": "oauth", "access": cred["access"],
-               "refresh": cred["refresh"], "expires": expires};
+        out = {
+            "type": "oauth",
+            "access": cred["access"],
+            "refresh": cred["refresh"],
+            "expires": expires,
+        };
     } else {
         return None;
     }
@@ -184,7 +177,6 @@ def validate_credential(cred: any) -> dict[str, any] | None {
     return out;
 }
 
-
 """Stored credential for one provider, validated; None when absent or
 malformed (malformed entries are skipped rather than trusted)."""
 def credential_get(data: dict[str, any], provider: str) -> dict[str, any] | None {
@@ -194,7 +186,6 @@ def credential_get(data: dict[str, any], provider: str) -> dict[str, any] | None
     return validate_credential(data[provider]);
 }
 
-
 """Return a NEW data dict with `provider` bound to `cred`; the input dict
 is never mutated (store snapshots stay immutable like the TS spreads)."""
 def credential_set(data: dict[str, any], provider: str, cred: dict[str, any]) -> dict[str, any] {
@@ -202,7 +193,6 @@ def credential_set(data: dict[str, any], provider: str, cred: dict[str, any]) ->
     nxt[provider] = cred;
     return nxt;
 }
-
 
 """Return a NEW data dict without `provider` (no-op when absent)."""
 def credential_remove(data: dict[str, any], provider: str) -> dict[str, any] {
@@ -215,21 +205,17 @@ def credential_remove(data: dict[str, any], provider: str) -> dict[str, any] {
     return nxt;
 }
 
-
 """True when a well-formed credential exists for the provider."""
 def has_credential(data: dict[str, any], provider: str) -> bool {
     return credential_get(data, provider) is not None;
 }
 
-
 # ── Expiry math ─────────────────────────────────────────────────────────
-
 
 """Epoch milliseconds (pi-ai stores OAuth expiry in ms, not seconds)."""
 def now_ms -> int {
     return int(time.time() * 1000);
 }
-
 
 """Whether a credential is unusable at `at_ms`.
 
@@ -256,7 +242,6 @@ def is_expired(cred: any, at_ms: int = -1) -> bool {
     return now >= expires;
 }
 
-
 """Best usable secret string for a provider from stored data alone.
 
 api_key -> the key. oauth -> the access token ONLY while unexpired; an
@@ -273,7 +258,6 @@ def stored_api_key(data: dict[str, any], provider: str, at_ms: int = -1) -> str 
     }
     return str(cred.get("access", ""));
 }
-
 
 """Auth status summary mirroring the TS getAuthStatus: runtime overrides
 win, then stored credentials, then a caller-supplied env key."""

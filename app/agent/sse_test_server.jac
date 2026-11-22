@@ -14,7 +14,7 @@ glob _sse_mode: list[str] = ["ok"],
      _sse_posts: list[int] = [0];
 
 class _SSEHandler(http.server.BaseHTTPRequestHandler) {
-    def do_POST -> None {
+    def do_POST {
         length: int = int(self.headers.get("Content-Length", "0"));
         if length {
             self.rfile.read(length);
@@ -37,7 +37,7 @@ class _SSEHandler(http.server.BaseHTTPRequestHandler) {
         self.wfile.flush();
     }
 
-    override def log_message(format: str, *args: any) -> None {}
+    override def log_message(format: str, *args: any) {}
 }
 
 def make_sse_server(mode: str = "ok") -> ThreadingHTTPServer {

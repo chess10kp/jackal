@@ -45,9 +45,7 @@ glob _last_id_ms: int = 0,
      _LEGACY_INDEX_NAME: str = "latest.json",
      _TRANSCRIPT_SUFFIX: str = ".json";
 
-
 # ── Checker shims ─────────────────────────────────────────────────────────
-
 
 """Checker shims: os.path.abspath/dirname demand PathLike under native
 checking when plain str values flow in; route through any-typed aliases
@@ -56,31 +54,25 @@ def _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
-
 def _path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
 }
-
 
 def _sessions_dir(cwd: str) -> str {
     return os.path.join(cwd, ".jackal", "sessions");
 }
 
-
 def _session_path(cwd: str, session_id: str) -> str {
     return os.path.join(_sessions_dir(cwd), session_id + _TRANSCRIPT_SUFFIX);
 }
-
 
 def _index_path(cwd: str) -> str {
     return os.path.join(_sessions_dir(cwd), _INDEX_NAME);
 }
 
-
 def is_valid_session_id(session_id: str) -> bool {
     return isinstance(session_id, str) and re.match(_SESSION_ID_PATTERN, session_id) is not None;
 }
-
 
 """Monotonic epoch milliseconds: same-millisecond callers get ms + 1."""
 def _next_epoch_ms -> int {
@@ -92,12 +84,10 @@ def _next_epoch_ms -> int {
     return ms;
 }
 
-
 """Fresh legacy-format id: sess_<epoch_milliseconds>, digits only."""
 def new_session_id -> str {
     return "sess_" + str(_next_epoch_ms());
 }
-
 
 """ISO 8601 UTC with milliseconds (strftime has no native floor; the
 civil-from-days arithmetic is exact and lowers cleanly)."""
@@ -126,11 +116,9 @@ def _iso_from_ms(ms: int) -> str {
     return f"{y:04d}-{m:02d}-{d:02d}T{hh:02d}:{mi:02d}:{ss:02d}.{msec:03d}Z";
 }
 
-
 def _now_iso -> str {
     return _iso_from_ms(_next_epoch_ms());
 }
-
 
 """Parse a JSON file; None when missing or corrupt."""
 def _read_json(path: str) -> any {
@@ -146,7 +134,6 @@ def _read_json(path: str) -> any {
         return None;
     }
 }
-
 
 """Write pretty JSON (indent=2 + trailing newline); False on I/O failure."""
 def _write_json(path: str, data: any) -> bool {
@@ -164,7 +151,6 @@ def _write_json(path: str, data: any) -> bool {
     }
 }
 
-
 """Legacy SessionRecord shape check (mirrors isSessionRecord upstream)."""
 def _is_record(rec: any) -> bool {
     if not isinstance(rec, dict) {
@@ -179,7 +165,6 @@ def _is_record(rec: any) -> bool {
         and isinstance(d.get("messages"), list)
     );
 }
-
 
 """Legacy SessionIndexEntry shape check (mirrors isIndexEntry upstream)."""
 def _is_index_entry(item: any) -> bool {
@@ -196,17 +181,14 @@ def _is_index_entry(item: any) -> bool {
     );
 }
 
-
 def _entry_sort_key(rec: dict[str, any]) -> str {
     return str(rec.get("updatedAt", ""));
 }
-
 
 """Order entries newest-updated first (stable on ties)."""
 def _newest_first(entries: list[dict[str, any]]) -> list[dict[str, any]] {
     return sorted(entries, key=_entry_sort_key, reverse=True);
 }
-
 
 """Validated index entries whose transcript still exists; second value is
 False when index.json was missing or corrupt."""
@@ -235,7 +217,6 @@ def _read_index(cwd: str) -> tuple[list[dict[str, any]], bool] {
     return (valid, True);
 }
 
-
 def _write_index(cwd: str, entries: list[dict[str, any]]) -> bool {
     sdir = _sessions_dir(cwd);
     try {
@@ -245,7 +226,6 @@ def _write_index(cwd: str, entries: list[dict[str, any]]) -> bool {
     }
     return _write_json(_index_path(cwd), entries);
 }
-
 
 """Replace or append one entry in the index, preserving the others."""
 def _upsert_index_entry(cwd: str, rec: dict[str, any]) -> bool {
@@ -266,7 +246,6 @@ def _upsert_index_entry(cwd: str, rec: dict[str, any]) -> bool {
     return _write_index(cwd, kept);
 }
 
-
 """Scan *.json transcripts (excluding sidecars), skipping corrupt ones.
 
 Returns legacy-shaped index entries; used to merge into listings and to
@@ -284,7 +263,10 @@ def _scan_directory(cwd: str) -> list[dict[str, any]] {
         return found;
     }
     for name in names {
-        if not name.endswith(_TRANSCRIPT_SUFFIX) or name == _INDEX_NAME or name == _LEGACY_INDEX_NAME {
+        if not name.endswith(_TRANSCRIPT_SUFFIX)
+            or name == _INDEX_NAME
+            or name == _LEGACY_INDEX_NAME
+        {
             continue;
         }
         sid = name[:-len(_TRANSCRIPT_SUFFIX)];
@@ -313,7 +295,6 @@ def _scan_directory(cwd: str) -> list[dict[str, any]] {
     return found;
 }
 
-
 """Persist one conversation as a legacy-format transcript record.
 
 `history` is the caller-owned list of OpenAI-shape message dicts; it is
@@ -323,10 +304,9 @@ stored verbatim under `messages`. Returns metadata:
 new name is given).
 """
 def save_session(
-    cwd: str, history: list[dict[str, any]], name: str = "", session_id: str = "",
-    model: str = "",
+    cwd: str, history: list[dict[str, any]], name: str = "", session_id: str = "", model: str = ""
 ) -> dict[str, any] {
-    sid = session_id if session_id else new_session_id();
+    sid = session_id or new_session_id();
     if not is_valid_session_id(sid) {
         raise ValueError("invalid session id: " + str(sid));
     }
@@ -387,13 +367,16 @@ def save_session(
     if not _write_json(path, record) {
         raise ValueError("cannot write transcript: " + path);
     }
-    _upsert_index_entry(cwd, {
-        "id": sid,
-        "name": final_name,
-        "cwd": cwd,
-        "updatedAt": updated,
-        "messageCount": len(history),
-    });
+    _upsert_index_entry(
+        cwd,
+        {
+            "id": sid,
+            "name": final_name,
+            "cwd": cwd,
+            "updatedAt": updated,
+            "messageCount": len(history),
+        },
+    );
     return {
         "id": sid,
         "name": final_name,
@@ -404,7 +387,6 @@ def save_session(
         "model": final_model,
     };
 }
-
 
 """Full transcript record for one session, or None when unknown/corrupt.
 Used by restore flows that need model + metadata, not just messages."""
@@ -418,7 +400,6 @@ def get_session_record(cwd: str, session_id: str) -> dict[str, any] | None {
     }
     return rec;
 }
-
 
 """Messages for one session; [] when the id is unknown or the transcript
 is missing/corrupt."""
@@ -437,7 +418,6 @@ def load_session(cwd: str, session_id: str) -> list[dict[str, any]] {
     }
     return messages;
 }
-
 
 """All sessions for a project, newest-updated first.
 
@@ -468,7 +448,6 @@ def list_sessions(cwd: str) -> list[dict[str, any]] {
     }
     return ordered;
 }
-
 
 """Set the session name in BOTH the transcript and the index.
 
@@ -507,16 +486,18 @@ def rename_session(cwd: str, session_id: str, name: str) -> bool {
     if not _write_json(_session_path(cwd, session_id), renamed) {
         return False;
     }
-    _upsert_index_entry(cwd, {
-        "id": session_id,
-        "name": trimmed,
-        "cwd": record_cwd,
-        "updatedAt": updated,
-        "messageCount": count,
-    });
+    _upsert_index_entry(
+        cwd,
+        {
+            "id": session_id,
+            "name": trimmed,
+            "cwd": record_cwd,
+            "updatedAt": updated,
+            "messageCount": count,
+        },
+    );
     return True;
 }
-
 
 """Remove the transcript and its index entry.
 

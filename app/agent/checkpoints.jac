@@ -40,7 +40,6 @@ glob _MAX_CHECKPOINT_FILES: int = 500,
      _METADATA_NAME: str = "metadata.json",
      _CONVERSATION_NAME: str = "conversation.json";
 
-
 """Checker shims: the Jac type checker cannot bind AnyStr when plain str
 values flow into some os.path signatures (abspath/relpath/dirname), so
 route those calls through any-typed aliases."""
@@ -48,26 +47,21 @@ def _path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
 }
 
-
 def _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
-
 
 def _path_relpath(p: str, start: str) -> str {
     return str(os.path.relpath(p, start));
 }
 
-
 def checkpoints_dir(cwd: str) -> str {
     return os.path.join(cwd, ".jackal", "checkpoints");
 }
 
-
 def _checkpoint_path(cwd: str, name: str) -> str {
     return os.path.join(checkpoints_dir(cwd), name);
 }
-
 
 def validate_checkpoint_name(name: str) -> dict[str, any] {
     if not name or not name.strip() {
@@ -87,7 +81,6 @@ def validate_checkpoint_name(name: str) -> dict[str, any] {
     return {"valid": True};
 }
 
-
 """UTC timestamp shaped like the toolchain's generated names:
 checkpoint-YYYY-MM-DD-HH-MM-SS-microseconds+HH-MM."""
 def _generate_checkpoint_name -> str {
@@ -95,7 +88,6 @@ def _generate_checkpoint_name -> str {
     ts = ts.replace(":", "-").replace(".", "-").replace("T", "-");
     return "checkpoint-" + ts;
 }
-
 
 def _generate_description(messages: list[dict[str, any]]) -> str {
     for msg in messages {
@@ -115,13 +107,11 @@ def _generate_description(messages: list[dict[str, any]]) -> str {
     return "Empty conversation";
 }
 
-
 """HEAD commit hash for cwd, or None outside a git repo / on any failure."""
 def _git_commit_hash(cwd: str) -> str | None {
     try {
         result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=cwd, capture_output=True, text=True, timeout=5,
+            ["git", "rev-parse", "HEAD"], cwd=cwd, capture_output=True, text=True, timeout=5
         );
     } except Exception as exc {
         log_debug("checkpoints.git_head", "git rev-parse failed", {"cwd": cwd, "error": str(exc)});
@@ -133,7 +123,6 @@ def _git_commit_hash(cwd: str) -> str | None {
     return result.stdout.strip();
 }
 
-
 """Tracked modifications plus untracked files (deduped, capped at 500).
 Returns [] outside a git repo or when git fails."""
 def get_modified_files(cwd: str) -> list[str] {
@@ -141,11 +130,17 @@ def get_modified_files(cwd: str) -> list[str] {
     try {
         modified = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"],
-            cwd=cwd, capture_output=True, text=True, timeout=10,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=10,
         );
         untracked = subprocess.run(
             ["git", "ls-files", "--others", "--exclude-standard"],
-            cwd=cwd, capture_output=True, text=True, timeout=10,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=10,
         );
         mod_files: list[str] = [];
         if modified.returncode == 0 {
@@ -168,7 +163,6 @@ def get_modified_files(cwd: str) -> list[str] {
     return all_files[:_MAX_CHECKPOINT_FILES];
 }
 
-
 """Resolve rel against cwd. Deviation fix: the Python toolchain calls
 the nonexistent os.path.resolve here -- its AttributeError is swallowed
 by the surrounding handlers, so toolchain capture silently stores no
@@ -176,7 +170,6 @@ files and restore always raises. We resolve explicitly instead."""
 def _resolve_rel(cwd: str, rel: str) -> str {
     return _path_abspath(os.path.join(cwd, rel));
 }
-
 
 """Read every listed path relative to cwd into {rel-path: content}.
 Unreadable paths are silently skipped, matching the toolchain."""
@@ -199,13 +192,12 @@ def _capture_files(cwd: str, file_paths: list[str]) -> dict[str, str] {
             log_warn(
                 "checkpoints.capture",
                 "skipping unreadable file",
-                {"path": fp, "cwd": cwd, "error": str(exc)}
+                {"path": fp, "cwd": cwd, "error": str(exc)},
             );
         }
     }
     return snapshots;
 }
-
 
 def _dir_size(dir_path: str) -> int {
     total = 0;
@@ -220,7 +212,6 @@ def _dir_size(dir_path: str) -> int {
     } except OSError {}
     return total;
 }
-
 
 def _write_json(path: str, data: any) -> bool {
     fh: any = None;
@@ -238,7 +229,6 @@ def _write_json(path: str, data: any) -> bool {
     return True;
 }
 
-
 """Parse a JSON file; propagates OSError (missing) and ValueError
 (corrupt) exactly like the toolchain's json.loads calls."""
 def _load_json_file(path: str) -> any {
@@ -250,20 +240,23 @@ def _load_json_file(path: str) -> any {
     }
 }
 
-
 """Snapshot the working tree slice plus the conversation into a new
 checkpoint directory. modified_files=None triggers git detection.
 Returns the metadata dict that was persisted to metadata.json.
 Raises ValueError for invalid names (including generated ones failing
 validation) and for duplicate checkpoint names."""
 def create_checkpoint(
-    cwd: str, messages: list[dict[str, any]], provider: str, model: str,
-    name: str = "", modified_files: list[str] | None = None,
+    cwd: str,
+    messages: list[dict[str, any]],
+    provider: str,
+    model: str,
+    name: str = "",
+    modified_files: list[str] | None = None,
 ) -> dict[str, any] {
     os.makedirs(checkpoints_dir(cwd), exist_ok=True);
 
     trimmed = name.strip() if isinstance(name, str) else "";
-    checkpoint_name = trimmed if trimmed else _generate_checkpoint_name();
+    checkpoint_name = trimmed or _generate_checkpoint_name();
     validation = validate_checkpoint_name(checkpoint_name);
     if not validation["valid"] {
         err = validation.get("error");
@@ -275,7 +268,9 @@ def create_checkpoint(
         raise ValueError("Checkpoint '" + checkpoint_name + "' already exists");
     }
 
-    files_to_snapshot: list[str] = modified_files if modified_files is not None else get_modified_files(cwd);
+    files_to_snapshot: list[str] = modified_files
+        if modified_files is not None
+        else get_modified_files(cwd);
     file_snapshots = _capture_files(cwd, files_to_snapshot);
 
     now = datetime.datetime.now(datetime.timezone.utc).isoformat();
@@ -316,7 +311,6 @@ def create_checkpoint(
     return metadata;
 }
 
-
 """Full checkpoint payload: {metadata, conversation, fileSnapshots}.
 Snapshot files missing from disk are skipped silently. Raises ValueError
 when the checkpoint does not exist, and lets OSError/ValueError from the
@@ -347,24 +341,18 @@ def load_checkpoint(cwd: str, name: str) -> dict[str, any] {
                     log_warn(
                         "checkpoints.load",
                         "missing snapshot file",
-                        {"rel": str(rel_path), "error": str(exc)}
+                        {"rel": str(rel_path), "error": str(exc)},
                     );
                 }
             }
         }
     }
-    return {
-        "metadata": metadata,
-        "conversation": conversation,
-        "fileSnapshots": file_snapshots,
-    };
+    return {"metadata": metadata, "conversation": conversation, "fileSnapshots": file_snapshots};
 }
-
 
 def _timestamp_key(item: dict[str, any]) -> str {
     return str(item["metadata"].get("timestamp", ""));
 }
-
 
 """All checkpoints for a project, newest-timestamped first. Entries are
 {name, metadata, sizeBytes}; directories without readable metadata.json
@@ -405,16 +393,15 @@ def list_checkpoints(cwd: str) -> list[dict[str, any]] {
             log_warn(
                 "checkpoints.list",
                 "skipping unreadable checkpoint",
-                {"name": str(name_entry), "error": str(exc)}
+                {"name": str(name_entry), "error": str(exc)},
             );
         }
     }
     return sorted(items, key=_timestamp_key, reverse=True);
 }
 
-
 """Remove one checkpoint directory. Raises ValueError when it is unknown."""
-def delete_checkpoint(cwd: str, name: str) -> None {
+def delete_checkpoint(cwd: str, name: str) {
     dir_path = _checkpoint_path(cwd, name);
     if not os.path.exists(dir_path) {
         raise ValueError("Checkpoint '" + name + "' does not exist");
@@ -422,11 +409,10 @@ def delete_checkpoint(cwd: str, name: str) -> None {
     shutil.rmtree(dir_path);
 }
 
-
 """Write snapshot contents back under cwd, creating parent directories.
 Collects per-file failures and raises one aggregated RuntimeError when
 anything failed (partial writes are left in place, like the toolchain)."""
-def restore_checkpoint_files(cwd: str, snapshots: dict[str, str]) -> None {
+def restore_checkpoint_files(cwd: str, snapshots: dict[str, str]) {
     errors: list[str] = [];
     for rel_path in snapshots {
         try {
@@ -447,11 +433,9 @@ def restore_checkpoint_files(cwd: str, snapshots: dict[str, str]) -> None {
     }
 }
 
-
 def _plural(n: int, unit: str) -> str {
     return str(n) + " " + unit + ("s" if n != 1 else "");
 }
-
 
 def _changed_count(m: dict[str, any]) -> int {
     changed = m.get("filesChanged");
@@ -460,7 +444,6 @@ def _changed_count(m: dict[str, any]) -> int {
     }
     return 0;
 }
-
 
 """Humanized age for an ISO timestamp: just now / N min(s) / N hr(s) /
 N day(s) ago / bare YYYY-MM-DD past a week."""
@@ -486,7 +469,6 @@ def format_relative_time(timestamp: str) -> str {
     return datetime.datetime.fromisoformat(timestamp).strftime("%Y-%m-%d");
 }
 
-
 def _size_label(size_bytes: any) -> str {
     if size_bytes {
         return str(round(int(size_bytes) / 1024)) + "KB";
@@ -494,19 +476,24 @@ def _size_label(size_bytes: any) -> str {
     return "?";
 }
 
-
 """One overlay line: <name> — <N> msgs, <N> files — <when> (<size>)."""
 def format_checkpoint_overlay_row(item: dict[str, any]) -> str {
     m = item["metadata"];
     when = format_relative_time(str(m["timestamp"]));
     size_kb = _size_label(item.get("sizeBytes"));
     return (
-        str(m["name"]) + " \u2014 " + str(m["messageCount"]) + " msgs, "
-        + str(_changed_count(m)) + " files \u2014 " + when
-        + " (" + size_kb + ")"
+        str(m["name"])
+        + " \u2014 "
+        + str(m["messageCount"])
+        + " msgs, "
+        + str(_changed_count(m))
+        + " files \u2014 "
+        + when
+        + " ("
+        + size_kb
+        + ")"
     );
 }
-
 
 def format_checkpoint_list(items: list[dict[str, any]]) -> str {
     if not items {
@@ -518,8 +505,17 @@ def format_checkpoint_list(items: list[dict[str, any]]) -> str {
         when = datetime.datetime.fromisoformat(str(m["timestamp"])).strftime("%Y-%m-%d %H:%M");
         size_kb = _size_label(item.get("sizeBytes"));
         lines.append(
-            "- " + str(m["name"]) + " (" + when + ", " + str(m["messageCount"])
-            + " msgs, " + str(_changed_count(m)) + " files, " + size_kb + ")"
+            "- "
+                + str(m["name"])
+                + " ("
+                + when
+                + ", "
+                + str(m["messageCount"])
+                + " msgs, "
+                + str(_changed_count(m))
+                + " files, "
+                + size_kb
+                + ")",
         );
     }
     return "Checkpoints:\n" + "\n".join(lines);

@@ -20,11 +20,7 @@ Keys:
 
 import sys;
 
-import from ui.runtime {
-    UiSession,
-    create_session,
-    dispose_session,
-}
+import from ui.runtime { UiSession, create_session, dispose_session }
 
 import from ui.screen {
     ShellScreen,
@@ -38,11 +34,7 @@ import from ui.screen {
     shell_resize,
 }
 
-import from ui.editor {
-    editor_backspace,
-    editor_history_prev,
-    editor_history_next,
-}
+import from ui.editor { editor_backspace, editor_history_prev, editor_history_next }
 
 import from ui.transcript {
     TranscriptMessage,
@@ -53,12 +45,7 @@ import from ui.transcript {
     set_follow_tail,
 }
 
-import from ui.layout_types {
-    LayoutSpec,
-    fill_axis,
-    fixed_axis,
-    grow_axis,
-}
+import from ui.layout_types { LayoutSpec, fill_axis, fixed_axis, grow_axis }
 
 import from ui.renderer {
     Renderer,
@@ -71,10 +58,7 @@ import from ui.renderer {
     request_cursor,
 }
 
-import from ui.terminal {
-    ProcessTerminal,
-    read_terminal_size,
-}
+import from ui.terminal { ProcessTerminal, read_terminal_size }
 
 import from ui.input {
     HostEvent,
@@ -85,31 +69,17 @@ import from ui.input {
     coalesce_events,
 }
 
-import from ui.progress_bar {
-    ProgressBar,
-    SetProgress,
-}
+import from ui.progress_bar { ProgressBar, SetProgress }
 
-import from ui.width {
-    display_width,
-    truncate_text,
-}
+import from ui.width { display_width, truncate_text }
 
 import from ui.demo_live_shell_model { LiveShell, make_live_shell }
 
-import from ui.demo_live_shell_messages {
-    _push_turn,
-    _rewrite_turn,
-}
+import from ui.demo_live_shell_messages { _push_turn, _rewrite_turn }
 
-import from ui.demo_live_shell_render {
-    _install_layout,
-    _render,
-}
-
+import from ui.demo_live_shell_render { _install_layout, _render }
 
 glob SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
 
 def _apply_resize(app: LiveShell, columns: int, rows: int) {
     if columns < 40 {
@@ -131,7 +101,6 @@ def _apply_resize(app: LiveShell, columns: int, rows: int) {
     app.dirty = True;
 }
 
-
 def _begin_assistant_reply(app: LiveShell, user_text: str) {
     _push_turn(app, "user", user_text);
     app.phase = "streaming";
@@ -151,7 +120,6 @@ def _begin_assistant_reply(app: LiveShell, user_text: str) {
     app.stream_msg_id = _push_turn(app, "assistant", "▍");
     app.status_hint = "streaming";
 }
-
 
 def _tick_stream(app: LiveShell) {
     if app.phase != "streaming" {
@@ -181,7 +149,6 @@ def _tick_stream(app: LiveShell) {
     app.progress spawn SetProgress(value=app.progress_value);
 }
 
-
 def _accept_approval(app: LiveShell) {
     if app.shell.approval is None {
         return;
@@ -198,7 +165,6 @@ def _accept_approval(app: LiveShell) {
     app.dirty = True;
 }
 
-
 def _reject_approval(app: LiveShell) {
     if app.shell.approval is None {
         return;
@@ -214,19 +180,16 @@ def _reject_approval(app: LiveShell) {
     app.dirty = True;
 }
 
-
 """Prompt history via the shared editor API (ui/editor.jac)."""
 def _history_up(app: LiveShell) {
     editor_history_prev(app.shell.prompt);
     app.dirty = True;
 }
 
-
 def _history_down(app: LiveShell) {
     editor_history_next(app.shell.prompt);
     app.dirty = True;
 }
-
 
 def _handle_key(app: LiveShell, key: str) {
     if key == "ctrl+c" {
@@ -305,7 +268,6 @@ def _handle_key(app: LiveShell, key: str) {
     }
 }
 
-
 def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
     for event in coalesce_events(events) {
         if isinstance(event, TextEvent) {
@@ -331,7 +293,6 @@ def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
     }
 }
 
-
 def create_live_shell -> LiveShell {
     (cols, rows) = read_terminal_size(80, 24);
     handle = create_session();
@@ -340,10 +301,7 @@ def create_live_shell -> LiveShell {
     shell.header.title = "Jackal";
     install_shell_contracts(session, shell, "live.transcript");
     proj = bind_transcript(
-        shell.transcript,
-        "live.transcript",
-        width=max(12, cols - 2),
-        height=max(4, rows - 7),
+        shell.transcript, "live.transcript", width=max(12, cols - 2), height=max(4, rows - 7)
     );
     set_follow_tail(proj, True);
     term = ProcessTerminal();
@@ -352,28 +310,19 @@ def create_live_shell -> LiveShell {
     renderer = create_renderer(cols, rows);
     progress = ProgressBar(key="live_progress", value=0.0);
     app = make_live_shell(
-        session,
-        shell,
-        proj,
-        renderer,
-        term,
-        InputNormalizer(),
-        progress,
-        cols,
-        rows,
+        session, shell, proj, renderer, term, InputNormalizer(), progress, cols, rows
     );
     _install_layout(app);
     _push_turn(
         app,
         "system",
         "session attached · detached graph · retained paint\n"
-        + "say something — watch the stream, then the approval modal",
+            + "say something — watch the stream, then the approval modal",
     );
     return app;
 }
 
-
-def run_live_shell_demo  {
+def run_live_shell_demo {
     app = create_live_shell();
     app.term.start();
     app.term.set_title("Jackal");
@@ -414,12 +363,10 @@ def run_live_shell_demo  {
         try {
             app.term.hide_cursor();
             app.term.stop();
-        } except Exception {
-        }
+        } except Exception {}
         dispose_session(app.session);
     }
 }
-
 
 with entry {
     if not sys.stdin.isatty() or not sys.stdout.isatty() {

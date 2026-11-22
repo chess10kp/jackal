@@ -20,22 +20,18 @@ import os;
 import tempfile;
 import shutil;
 
-
 def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-chains-test-");
 }
-
 
 def _cleanup(tmp: str) {
     shutil.rmtree(tmp, ignore_errors=True);
 }
 
-
 """str-typed shim over os.path.dirname, which demands PathLike here."""
 def _parent_dir(p: any) -> str {
     return str(os.path.dirname(p));
 }
-
 
 def _write_text(path: str, text: str) {
     os.makedirs(_parent_dir(path), exist_ok=True);
@@ -47,7 +43,6 @@ def _write_text(path: str, text: str) {
     }
 }
 
-
 def _chain_names(chains: list[dict[str, any]]) -> list[str] {
     out: list[str] = [];
     for c in chains {
@@ -56,7 +51,6 @@ def _chain_names(chains: list[dict[str, any]]) -> list[str] {
     }
     return out;
 }
-
 
 test "list_chain_files finds nested chain files only" {
     tmp = _make_tmp();
@@ -77,7 +71,6 @@ test "list_chain_files finds nested chain files only" {
         _cleanup(tmp);
     }
 }
-
 
 test "parse_step_body splits config block from task text" {
     body = "output: context.md\nreads: a.md, b.md ,  \nmodel: claude-sonnet-4-5\n\nInvestigate {task}\nline two.";
@@ -103,10 +96,8 @@ test "parse_step_body splits config block from task text" {
     assert str(tight["model"]) == "m1";
 }
 
-
 def _sample_chain -> str {
-    return (
-        "---\nname: pipeline\ndescription: Full flow\n---\n"
+    return ("---\nname: pipeline\ndescription: Full flow\n---\n"
         "\n"
         "## scout\n"
         "output: context.md\n"
@@ -123,10 +114,8 @@ def _sample_chain -> str {
         "\n"
         "## worker\n"
         "\n"
-        "Execute:\n\n{previous}\n"
-    );
+        "Execute:\n\n{previous}\n");
 }
-
 
 test "parse_chain_markdown extracts frontmatter and ordered steps" {
     tmp = _make_tmp();
@@ -162,7 +151,6 @@ test "parse_chain_markdown extracts frontmatter and ordered steps" {
     }
 }
 
-
 test "parse_chain_markdown rejects bad frontmatter and stepless chains" {
     tmp = _make_tmp();
     try {
@@ -176,7 +164,9 @@ test "parse_chain_markdown rejects bad frontmatter and stepless chains" {
 
         raised2 = False;
         try {
-            parse_chain_markdown("---\ndescription: only-desc\n---\n\n## scout\nGo.", "package", "x.md");
+            parse_chain_markdown(
+                "---\ndescription: only-desc\n---\n\n## scout\nGo.", "package", "x.md"
+            );
         } except ValueError {
             raised2 = True;
         }
@@ -184,7 +174,9 @@ test "parse_chain_markdown rejects bad frontmatter and stepless chains" {
 
         raised3 = False;
         try {
-            parse_chain_markdown("---\nname: c\ndescription: d\n---\n\nNo headings here.", "package", "x.md");
+            parse_chain_markdown(
+                "---\nname: c\ndescription: d\n---\n\nNo headings here.", "package", "x.md"
+            );
         } except ValueError {
             raised3 = True;
         }
@@ -193,7 +185,9 @@ test "parse_chain_markdown rejects bad frontmatter and stepless chains" {
         # Only ### headings do not count as steps.
         raised4 = False;
         try {
-            parse_chain_markdown("---\nname: c\ndescription: d\n---\n\n### scout\nGo.", "package", "x.md");
+            parse_chain_markdown(
+                "---\nname: c\ndescription: d\n---\n\n### scout\nGo.", "package", "x.md"
+            );
         } except ValueError {
             raised4 = True;
         }
@@ -203,16 +197,19 @@ test "parse_chain_markdown rejects bad frontmatter and stepless chains" {
     }
 }
 
-
 test "load_chains_from_dir skips invalid chain files silently" {
     tmp = _make_tmp();
     try {
         good_path = os.path.join(tmp, "good.chain.md");
         _write_text(good_path, "---\nname: good\ndescription: fine\n---\n\n## scout\nGo.");
-        _write_text(os.path.join(tmp, "bad.chain.md"),
-                    "---\nname: no-steps-here\ndescription: x\n---\n\nnothing useful");
-        _write_text(os.path.join(tmp, "broken.chain.md"),
-                    "---\ndescription: missing name\n---\n\n## scout\nGo.");
+        _write_text(
+            os.path.join(tmp, "bad.chain.md"),
+            "---\nname: no-steps-here\ndescription: x\n---\n\nnothing useful",
+        );
+        _write_text(
+            os.path.join(tmp, "broken.chain.md"),
+            "---\ndescription: missing name\n---\n\n## scout\nGo.",
+        );
 
         loaded = load_chains_from_dir(tmp, "project");
         assert _chain_names(loaded) == ["good"];
@@ -224,18 +221,23 @@ test "load_chains_from_dir skips invalid chain files silently" {
     }
 }
 
-
 test "load_chains merges package and project with project winning" {
     tmp = _make_tmp();
     try {
         pkg = os.path.join(tmp, "pkg");
         cwd = os.path.join(tmp, "proj");
-        _write_text(os.path.join(pkg, "chains", "alpha.chain.md"),
-                    "---\nname: alpha\ndescription: pkg alpha\n---\n\n## scout\nGo.");
-        _write_text(os.path.join(pkg, "chains", "nested", "beta.chain.md"),
-                    "---\nname: beta\ndescription: pkg beta\n---\n\n## worker\nDo.");
-        _write_text(os.path.join(cwd, "chains", "alpha.chain.md"),
-                    "---\nname: alpha\ndescription: project alpha\n---\n\n## planner\nPlan.");
+        _write_text(
+            os.path.join(pkg, "chains", "alpha.chain.md"),
+            "---\nname: alpha\ndescription: pkg alpha\n---\n\n## scout\nGo.",
+        );
+        _write_text(
+            os.path.join(pkg, "chains", "nested", "beta.chain.md"),
+            "---\nname: beta\ndescription: pkg beta\n---\n\n## worker\nDo.",
+        );
+        _write_text(
+            os.path.join(cwd, "chains", "alpha.chain.md"),
+            "---\nname: alpha\ndescription: project alpha\n---\n\n## planner\nPlan.",
+        );
 
         merged = load_chains(cwd, pkg);
         assert sorted([str(k) for k in merged.keys()]) == ["alpha", "beta"];
@@ -256,7 +258,6 @@ test "load_chains merges package and project with project winning" {
         _cleanup(tmp);
     }
 }
-
 
 test "discover_chain_dirs and chain_dirs_exist probe both roots" {
     tmp = _make_tmp();
@@ -281,7 +282,6 @@ test "discover_chain_dirs and chain_dirs_exist probe both roots" {
     }
 }
 
-
 test "format_chain_catalog renders arrow step summaries" {
     tmp = _make_tmp();
     try {
@@ -298,7 +298,6 @@ test "format_chain_catalog renders arrow step summaries" {
         _cleanup(tmp);
     }
 }
-
 
 test "real repo chains smoke-parse read-only" {
     # Local-only catalog: pi/.pi is gitignored, so CI checkouts lack it.

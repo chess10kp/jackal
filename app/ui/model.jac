@@ -28,20 +28,20 @@ node Header(UiRegion) {
 }
 
 node TranscriptView(UiRegion) {
-    has scroll_offset: int = 0;
-    has follow_tail: bool = True;
-    has source_id: str = "";
-    has observed_revision: int = 0;
+    has scroll_offset: int = 0,
+        follow_tail: bool = True,
+        source_id: str = "",
+        observed_revision: int = 0;
 }
 
 node Prompt(UiRegion) {
-    has draft: str = "";
-    has mode: str = "insert";
-    has caret: int = 0;
-    has sel_anchor: int = -1;
-    has sel_end: int = -1;
-    has history: list[str] = [];
-    has history_index: int = -1;
+    has draft: str = "",
+        mode: str = "insert",
+        caret: int = 0,
+        sel_anchor: int = -1,
+        sel_end: int = -1,
+        history: list[str] = [],
+        history_index: int = -1;
 }
 
 node Status(UiRegion) {
@@ -66,8 +66,8 @@ edge FocusNext: UiNode --> UiNode {}
 
 """Overlay layering outside normal-flow containment."""
 edge Layer: Screen --> Overlay {
-    has z_index: int;
-    has modal: bool = False;
+    has z_index: int,
+        modal: bool = False;
 }
 
 obj RankedChild {

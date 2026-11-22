@@ -57,10 +57,8 @@ def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
                 continue;
             }
             subdirs.append(name);
-        } else {
-            if len(out) < _EXPLORER_MAX_FILES {
-                out.append(rel);
-            }
+        } elif len(out) < _EXPLORER_MAX_FILES {
+            out.append(rel);
         }
     }
     for name in subdirs {

@@ -37,10 +37,7 @@ def create_live_shell(term: Terminal | None = None) -> LiveShell {
     shell = build_main_shell(session);
     install_shell_contracts(session, shell, "live.transcript");
     proj = bind_transcript(
-        shell.transcript,
-        "live.transcript",
-        width=max(12, cols - 2),
-        height=max(4, rows - 6),
+        shell.transcript, "live.transcript", width=max(12, cols - 2), height=max(4, rows - 6)
     );
     set_follow_tail(proj, True);
     renderer = create_renderer(cols, rows);
@@ -59,13 +56,17 @@ def create_live_shell(term: Terminal | None = None) -> LiveShell {
     _push_turn(
         app,
         "system",
-        "Jackal · " + get_model() + " · " + app.mode + " mode\n"
-        + "cwd " + os.getcwd()
-        + " · /help for commands · shift+tab cycles mode · ctrl+c cancels a turn",
+        "Jackal · "
+            + get_model()
+            + " · "
+            + app.mode
+            + " mode\n"
+            + "cwd "
+            + os.getcwd()
+            + " · /help for commands · shift+tab cycles mode · ctrl+c cancels a turn",
     );
     return app;
 }
-
 
 """Boot session + shell on `term` and paint the first frame. Raises
 ValueError for an invalid JACKAL_MODE."""
@@ -77,15 +78,13 @@ def boot_tui(term: Terminal | None = None) -> LiveShell {
     # Extensions load per .jackal/extensions.json (parallel sidecar when declared).
     try {
         session_boot(interactive_ui=True);
-    } except Exception {
-    }
+    } except Exception {}
     _hydrate_auth_environment();
     # fx-style catalog preload: /models endpoints refresh in background
     # flows so the picker serves live lists without blocking first paint.
     try {
         warm_model_catalog();
-    } except Exception {
-    }
+    } except Exception {}
     app = create_live_shell(term);
     app.cmd_q = queue.Queue();
     app.term.start();
@@ -94,7 +93,6 @@ def boot_tui(term: Terminal | None = None) -> LiveShell {
     _render(app);
     return app;
 }
-
 
 """One host-loop iteration: resize check, input, tick, notices, paint.
 Returns False once the shell should exit."""
@@ -124,19 +122,16 @@ def tui_step(app: LiveShell, poll_timeout_s: float = 0.04) -> bool {
     return app.running;
 }
 
-
 """Restore the terminal and dispose the UI session (idempotent)."""
 def shutdown_tui(app: LiveShell) {
     try {
         app.term.hide_cursor();
         app.term.stop();
-    } except Exception {
-    }
+    } except Exception {}
     dispose_session(app.session);
 }
 
-
-def run_tui  {
+def run_tui {
     try {
         app = boot_tui();
     } except ValueError as e {
@@ -144,15 +139,13 @@ def run_tui  {
         raise SystemExit(2);
     }
     try {
-        while tui_step(app, 0.04) {
-        }
+        while tui_step(app, 0.04) {}
     } except KeyboardInterrupt {
         app.running = False;
     } finally {
         shutdown_tui(app);
     }
 }
-
 
 with entry:__main__ {
     if not sys.stdin.isatty() or not sys.stdout.isatty() {

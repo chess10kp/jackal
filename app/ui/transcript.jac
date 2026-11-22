@@ -5,20 +5,11 @@ the renderer materializes visible wrapped lines + overscan only. Measurement
 cache key: (message_id, width, content_rev, style_rev).
 """
 
-import from ui.model {
-    TranscriptView,
-}
+import from ui.model { TranscriptView }
 
-import from ui.width {
-    wrap_text,
-}
+import from ui.width { wrap_text }
 
-import from ui.markdown_proj {
-    looks_like_markdown,
-    project_markdown,
-    proj_lines_to_span_dicts,
-}
-
+import from ui.markdown_proj { looks_like_markdown, project_markdown, proj_lines_to_span_dicts }
 
 obj TranscriptMessage {
     has message_id: str,
@@ -29,13 +20,11 @@ obj TranscriptMessage {
         format: str = "auto";
 }
 
-
 obj MeasureCache {
     has entries: dict[str, int] = {},
         hits: int = 0,
         misses: int = 0;
 }
-
 
 obj VisibleWindow {
     has lines: list[str] = [],
@@ -45,7 +34,6 @@ obj VisibleWindow {
         anchor_offset: int = 0,
         cells_would_damage: bool = False;
 }
-
 
 obj TranscriptProjection {
     has view: TranscriptView,
@@ -60,34 +48,17 @@ obj TranscriptProjection {
         anchor_line_offset: int = 0;
 }
 
-
 def create_measure_cache -> MeasureCache {
     return MeasureCache();
 }
 
-
-def measure_cache_key(
-    message_id: str,
-    width: int,
-    content_rev: int,
-    style_rev: int,
-) -> str {
-    return (
-        message_id
-        + "|"
-        + str(width)
-        + "|"
-        + str(content_rev)
-        + "|"
-        + str(style_rev)
-    );
+def measure_cache_key(message_id: str, width: int, content_rev: int, style_rev: int) -> str {
+    return (message_id + "|" + str(width) + "|" + str(content_rev) + "|" + str(style_rev));
 }
-
 
 def _snapshot_key(content_rev: int, style_rev: int) -> str {
     return str(content_rev) + ":" + str(style_rev);
 }
-
 
 def _use_markdown(message: TranscriptMessage) -> bool {
     if message.format == "markdown" {
@@ -98,7 +69,6 @@ def _use_markdown(message: TranscriptMessage) -> bool {
     }
     return looks_like_markdown(message.content);
 }
-
 
 def _message_lines(message: TranscriptMessage, width: int) -> list[str] {
     if _use_markdown(message) {
@@ -120,7 +90,6 @@ def _message_lines(message: TranscriptMessage, width: int) -> list[str] {
     return lines;
 }
 
-
 def _total_height(proj: TranscriptProjection) -> int {
     total = 0;
     for message in proj.messages {
@@ -129,25 +98,21 @@ def _total_height(proj: TranscriptProjection) -> int {
     return total;
 }
 
-
 def _line_ranges(proj: TranscriptProjection) -> list[dict[str, any]] {
     ranges: list[dict[str, any]] = [];
     cursor = 0;
     for message in proj.messages {
         height = measure_message_height(proj, message, proj.viewport_width);
-        ranges.append(
-            {
-                "message_id": message.message_id,
-                "start": cursor,
-                "height": height,
-                "end": cursor + height,
-            }
-        );
+        ranges.append({
+            "message_id": message.message_id,
+            "start": cursor,
+            "height": height,
+            "end": cursor + height,
+        });
         cursor += height;
     }
     return ranges;
 }
-
 
 def _visible_message_ids(proj: TranscriptProjection) -> list[str] {
     if not proj.messages {
@@ -182,7 +147,6 @@ def _visible_message_ids(proj: TranscriptProjection) -> list[str] {
     return ids;
 }
 
-
 def _anchor_at_offset(proj: TranscriptProjection, offset: int) -> tuple[str, int] {
     if not proj.messages {
         return ("", 0);
@@ -202,7 +166,6 @@ def _anchor_at_offset(proj: TranscriptProjection, offset: int) -> tuple[str, int
     return (str(last["message_id"]), max(0, int(last["height"]) - 1));
 }
 
-
 def _offset_for_anchor(proj: TranscriptProjection, message_id: str, line_off: int) -> int {
     ranges = _line_ranges(proj);
     for row in ranges {
@@ -213,18 +176,11 @@ def _offset_for_anchor(proj: TranscriptProjection, message_id: str, line_off: in
     return proj.view.scroll_offset;
 }
 
-
-def _compute_damage(
-    proj: TranscriptProjection,
-    new_messages: list[TranscriptMessage],
-) -> bool {
+def _compute_damage(proj: TranscriptProjection, new_messages: list[TranscriptMessage]) -> bool {
     old_snap: dict[str, str] = dict(proj.rev_snapshot);
     new_snap: dict[str, str] = {};
     for message in new_messages {
-        new_snap[message.message_id] = _snapshot_key(
-            message.content_rev,
-            message.style_rev,
-        );
+        new_snap[message.message_id] = _snapshot_key(message.content_rev, message.style_rev);
     }
     # Temporarily use new messages for visible-id calculation with current scroll.
     saved = proj.messages;
@@ -253,13 +209,9 @@ def _compute_damage(
     return False;
 }
 
-
 """Bind a TranscriptView to a domain source and empty projection."""
 def bind_transcript(
-    view: TranscriptView,
-    source_id: str,
-    width: int = 40,
-    height: int = 10,
+    view: TranscriptView, source_id: str, width: int = 40, height: int = 10
 ) -> TranscriptProjection {
     view.source_id = source_id;
     return TranscriptProjection(
@@ -270,12 +222,9 @@ def bind_transcript(
     );
 }
 
-
 """Replace projection messages for a new observed revision."""
 def apply_transcript_revision(
-    proj: TranscriptProjection,
-    revision: int,
-    messages: list[TranscriptMessage],
+    proj: TranscriptProjection, revision: int, messages: list[TranscriptMessage]
 ) {
     # Capture anchor before mutation when not following the tail.
     if not proj.view.follow_tail and proj.messages {
@@ -296,12 +245,9 @@ def apply_transcript_revision(
                 content=message.content,
                 content_rev=message.content_rev,
                 style_rev=message.style_rev,
-            )
+            ),
         );
-        snap[message.message_id] = _snapshot_key(
-            message.content_rev,
-            message.style_rev,
-        );
+        snap[message.message_id] = _snapshot_key(message.content_rev, message.style_rev);
     }
     proj.messages = copied;
     proj.rev_snapshot = snap;
@@ -312,26 +258,16 @@ def apply_transcript_revision(
         proj.view.scroll_offset = max(0, total - proj.viewport_height);
     } elif proj.anchor_message_id {
         proj.view.scroll_offset = _offset_for_anchor(
-            proj,
-            proj.anchor_message_id,
-            proj.anchor_line_offset,
+            proj, proj.anchor_message_id, proj.anchor_line_offset
         );
     }
 }
 
-
 """Return wrapped line height for one message, using the measurement cache."""
 def measure_message_height(
-    proj: TranscriptProjection,
-    message: TranscriptMessage,
-    width: int,
+    proj: TranscriptProjection, message: TranscriptMessage, width: int
 ) -> int {
-    key = measure_cache_key(
-        message.message_id,
-        width,
-        message.content_rev,
-        message.style_rev,
-    );
+    key = measure_cache_key(message.message_id, width, message.content_rev, message.style_rev);
     if key in proj.measure_cache.entries {
         proj.measure_cache.hits += 1;
         return proj.measure_cache.entries[key];
@@ -345,7 +281,6 @@ def measure_message_height(
     proj.measure_cache.entries[key] = height;
     return height;
 }
-
 
 """Projection spans for visible lines — domain → text/style_id, not a component tree."""
 def project_visible_spans(proj: TranscriptProjection) -> list[dict[str, any]] {
@@ -410,7 +345,6 @@ def project_visible_spans(proj: TranscriptProjection) -> list[dict[str, any]] {
     }
     return spans;
 }
-
 
 """Materialize visible + overscan lines for the current scroll window."""
 def materialize_visible(proj: TranscriptProjection) -> VisibleWindow {
@@ -477,19 +411,15 @@ def materialize_visible(proj: TranscriptProjection) -> VisibleWindow {
     return win;
 }
 
-
 """True if a revision change requires terminal damage for this viewport."""
 def transcript_needs_damage(
-    proj: TranscriptProjection,
-    prev_revision: int,
-    next_revision: int,
+    proj: TranscriptProjection, prev_revision: int, next_revision: int
 ) -> bool {
     if prev_revision == next_revision {
         return False;
     }
     return proj.last_damage;
 }
-
 
 """Set follow_tail and optionally pin scroll to newest content."""
 def set_follow_tail(proj: TranscriptProjection, follow: bool) {

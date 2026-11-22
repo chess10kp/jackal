@@ -34,7 +34,6 @@ import from ui.input_sequences {
     CSI_LETTER_KEYS,
 }
 
-
 """Stateful stdin normalizer with paste mode and incomplete-escape buffering.
 
 Lone ESC stays incomplete until a follow-up byte arrives or
@@ -61,8 +60,8 @@ obj InputNormalizer {
             self.buffer = "";
             end_idx = (
                 -1
-                if BRACKETED_PASTE_END not in self.paste_buffer
-                else self.paste_buffer.index(BRACKETED_PASTE_END)
+                    if BRACKETED_PASTE_END not in self.paste_buffer
+                    else self.paste_buffer.index(BRACKETED_PASTE_END)
             );
             if end_idx != -1 {
                 pasted = self.paste_buffer[0:end_idx];
@@ -78,8 +77,8 @@ obj InputNormalizer {
         }
         start_idx = (
             -1
-            if BRACKETED_PASTE_START not in self.buffer
-            else self.buffer.index(BRACKETED_PASTE_START)
+                if BRACKETED_PASTE_START not in self.buffer
+                else self.buffer.index(BRACKETED_PASTE_START)
         );
         if start_idx != -1 {
             if start_idx > 0 {
@@ -95,8 +94,8 @@ obj InputNormalizer {
             self.buffer = "";
             end_idx = (
                 -1
-                if BRACKETED_PASTE_END not in self.paste_buffer
-                else self.paste_buffer.index(BRACKETED_PASTE_END)
+                    if BRACKETED_PASTE_END not in self.paste_buffer
+                    else self.paste_buffer.index(BRACKETED_PASTE_END)
             );
             if end_idx != -1 {
                 pasted = self.paste_buffer[0:end_idx];
@@ -201,7 +200,7 @@ obj InputNormalizer {
         return out;
     }
 
-    def clear  {
+    def clear {
         self.buffer = "";
         self.paste_mode = False;
         self.paste_buffer = "";
@@ -211,7 +210,6 @@ obj InputNormalizer {
         self.esc_armed_at_ms = -1.0;
     }
 }
-
 
 """Merge a list of already-produced events (resize/mouse/stream coalescing)."""
 def coalesce_events(events: list[HostEvent]) -> list[HostEvent] {

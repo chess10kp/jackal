@@ -23,22 +23,18 @@ import json;
 import tempfile;
 import shutil;
 
-
 def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-subagents-test-");
 }
-
 
 def _cleanup(tmp: str) {
     shutil.rmtree(tmp, ignore_errors=True);
 }
 
-
 """str-typed shim over os.path.dirname, which demands PathLike here."""
 def _parent_dir(p: any) -> str {
     return str(os.path.dirname(p));
 }
-
 
 def _write_text(path: str, text: str) {
     os.makedirs(_parent_dir(path), exist_ok=True);
@@ -50,13 +46,11 @@ def _write_text(path: str, text: str) {
     }
 }
 
-
 def _write_agent(dir_path: str, fname: str, fm: str, body: str) -> str {
     path = os.path.join(dir_path, fname);
     _write_text(path, "---\n" + fm + "\n---\n\n" + body + "\n");
     return path;
 }
-
 
 def _agent_names(agents: list[dict[str, any]]) -> list[str] {
     out: list[str] = [];
@@ -67,7 +61,6 @@ def _agent_names(agents: list[dict[str, any]]) -> list[str] {
     return out;
 }
 
-
 test "discovery finds agents in nested dirs but skips chain files and non-md" {
     tmp = _make_tmp();
     try {
@@ -75,7 +68,9 @@ test "discovery finds agents in nested dirs but skips chain files and non-md" {
         flat = os.path.join(pkg, ".pi", "agents");
         deeper = os.path.join(flat, "specialists", "deep");
         scout = _write_agent(flat, "scout.md", "name: scout\ndescription: Recon", "Scout body.");
-        worker = _write_agent(deeper, "worker.md", "name: worker\ndescription: Does work", "Work body.");
+        worker = _write_agent(
+            deeper, "worker.md", "name: worker\ndescription: Does work", "Work body."
+        );
         _write_agent(flat, "pipeline.chain.md", "name: pipeline\ndescription: chain", "## scout");
         _write_text(os.path.join(flat, "notes.txt"), "not markdown");
 
@@ -99,13 +94,13 @@ test "discovery finds agents in nested dirs but skips chain files and non-md" {
     }
 }
 
-
 test "load_agent_file extracts name description tools model systemPrompt" {
     tmp = _make_tmp();
     try {
         # Inline tools list.
         p1 = _write_agent(
-            tmp, "inline.md",
+            tmp,
+            "inline.md",
             'name:  Scout\ndescription:   Fast recon agent  \ntools: read, grep, find\nmodel: claude-haiku-4-5',
             "You are a scout.\nBe quick.",
         );
@@ -123,7 +118,8 @@ test "load_agent_file extracts name description tools model systemPrompt" {
 
         # Dash-block tools list, no model -> None.
         p2 = _write_agent(
-            tmp, "dash.md",
+            tmp,
+            "dash.md",
             "name: architect\ndescription: Designer\ntools:\n  - read\n  - write",
             "Design it.",
         );
@@ -145,12 +141,12 @@ test "load_agent_file extracts name description tools model systemPrompt" {
     }
 }
 
-
 test "invalid or unreadable agent files are tolerated without raising" {
     tmp = _make_tmp();
     try {
         # Missing name / missing description / no frontmatter at all.
-        assert load_agent_file(_write_agent(tmp, "a.md", "description: only desc", "x"), "p") is None;
+        assert load_agent_file(_write_agent(tmp, "a.md", "description: only desc", "x"), "p")
+            is None;
         assert load_agent_file(_write_agent(tmp, "b.md", "name: only-name", "x"), "p") is None;
         plain = os.path.join(tmp, "c.md");
         _write_text(plain, "just body text, no frontmatter");
@@ -173,15 +169,18 @@ test "invalid or unreadable agent files are tolerated without raising" {
     }
 }
 
-
 test "merge puts project overrides above package by name" {
     tmp = _make_tmp();
     try {
         pkg_agents = os.path.join(tmp, "pkg", ".pi", "agents");
         proj_agents = os.path.join(tmp, "proj", "subagents");
         _write_agent(pkg_agents, "scout.md", "name: scout\ndescription: pkg scout", "pkg body");
-        _write_agent(pkg_agents, "planner.md", "name: planner\ndescription: pkg planner", "pkg body");
-        _write_agent(proj_agents, "scout.md", "name: scout\ndescription: project scout", "proj body");
+        _write_agent(
+            pkg_agents, "planner.md", "name: planner\ndescription: pkg planner", "pkg body"
+        );
+        _write_agent(
+            proj_agents, "scout.md", "name: scout\ndescription: project scout", "proj body"
+        );
 
         merged = load_subagents(os.path.join(tmp, "proj"), os.path.join(tmp, "pkg"));
         assert sorted([str(k) for k in merged.keys()]) == ["planner", "scout"];
@@ -194,7 +193,9 @@ test "merge puts project overrides above package by name" {
         listed = list_subagents(os.path.join(tmp, "proj"), os.path.join(tmp, "pkg"));
         assert _agent_names(listed) == ["planner", "scout"];  # sorted by name
 
-        picked: dict[str, any] | None = get_subagent(os.path.join(tmp, "proj"), " scout ", os.path.join(tmp, "pkg"));
+        picked: dict[str, any] | None = get_subagent(
+            os.path.join(tmp, "proj"), " scout ", os.path.join(tmp, "pkg")
+        );
         assert picked is not None;
         assert str(picked["description"]) == "project scout";
         assert get_subagent(os.path.join(tmp, "proj"), "ghost", os.path.join(tmp, "pkg")) is None;
@@ -202,7 +203,6 @@ test "merge puts project overrides above package by name" {
         _cleanup(tmp);
     }
 }
-
 
 test "normalize_allowed_tool_names applies aliases mcp prefix and empty rule" {
     assert normalize_allowed_tool_names(None) is None;
@@ -216,14 +216,11 @@ test "normalize_allowed_tool_names applies aliases mcp prefix and empty rule" {
     assert got == {"read", "bash", "jac_docs", "custom_tool"};
 }
 
-
 test "filter_tools_for_subagent excludes pins bash and falls back safely" {
     all_tools = ["read", "write", "bash", "agent", "subagent", "compact_context", "mermaid"];
 
     # No allowlist -> everything except excluded.
-    assert filter_tools_for_subagent(all_tools, None) == [
-        "read", "write", "bash", "mermaid"
-    ];
+    assert filter_tools_for_subagent(all_tools, None) == ["read", "write", "bash", "mermaid"];
 
     # Allowlist intersection.
     got = filter_tools_for_subagent(all_tools, {"read", "bash"});
@@ -236,7 +233,10 @@ test "filter_tools_for_subagent excludes pins bash and falls back safely" {
 
     # Nothing survives -> fallback to all non-excluded.
     assert filter_tools_for_subagent(all_tools, {"only_ghost"}) == [
-        "read", "write", "bash", "mermaid"
+        "read",
+        "write",
+        "bash",
+        "mermaid",
     ];
 
     # Excluded names never pass even when explicitly allowed.
@@ -244,7 +244,6 @@ test "filter_tools_for_subagent excludes pins bash and falls back safely" {
 
     assert filter_tools_for_subagent([], None) == [];
 }
-
 
 test "settings.json model overrides parse or degrade to empty" {
     tmp = _make_tmp();
@@ -254,16 +253,19 @@ test "settings.json model overrides parse or degrade to empty" {
         # No settings.json yet.
         assert load_settings_model_overrides(base) == {};
 
-        _write_text(os.path.join(base, "settings.json"), json.dumps({
-            "other": 1,
-            "subagents": {
-                "agentOverrides": {
-                    "scout": {"model": "haiku-latest"},
-                    "bad": {"model": 42},
-                    "worse": "just-a-string",
+        _write_text(
+            os.path.join(base, "settings.json"),
+            json.dumps({
+                "other": 1,
+                "subagents": {
+                    "agentOverrides": {
+                        "scout": {"model": "haiku-latest"},
+                        "bad": {"model": 42},
+                        "worse": "just-a-string",
+                    },
                 },
-            },
-        }));
+            }),
+        );
         got = load_settings_model_overrides(base);
         assert got == {"scout": "haiku-latest"};
 
@@ -275,7 +277,6 @@ test "settings.json model overrides parse or degrade to empty" {
         _cleanup(tmp);
     }
 }
-
 
 test "project model overrides come from walked-up .jackal config" {
     tmp = _make_tmp();
@@ -312,7 +313,6 @@ test "project model overrides come from walked-up .jackal config" {
     }
 }
 
-
 test "format_subagent_catalog renders entries and the empty message" {
     tmp = _make_tmp();
     try {
@@ -326,10 +326,12 @@ test "format_subagent_catalog renders entries and the empty message" {
         pkg = os.path.join(tmp, "pkg");
         cwd = os.path.join(tmp, "proj");
         agents_dir = os.path.join(pkg, ".pi", "agents");
-        _write_agent(agents_dir, "zeta.md",
-                     "name: zeta\ndescription: Last one\nmodel: big-model", "b");
-        _write_agent(agents_dir, "alpha.md",
-                     "name: alpha\ndescription: First one\ntools: read, write", "b");
+        _write_agent(
+            agents_dir, "zeta.md", "name: zeta\ndescription: Last one\nmodel: big-model", "b"
+        );
+        _write_agent(
+            agents_dir, "alpha.md", "name: alpha\ndescription: First one\ntools: read, write", "b"
+        );
 
         text = format_subagent_catalog(cwd, pkg);
         assert text.startswith("Available subagents:");
@@ -343,7 +345,6 @@ test "format_subagent_catalog renders entries and the empty message" {
         _cleanup(tmp);
     }
 }
-
 
 test "real repo builtin catalog smoke-parses read-only" {
     # Local-only catalog: pi/.pi is gitignored, so CI checkouts lack it.

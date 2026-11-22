@@ -19,40 +19,45 @@ obj TurnCancel {
         reason: str = "user";
 }
 
-
-
 def _tool_defs(specs: list[ToolSpec]) -> list[dict[str, any]] {
     defs: list[dict[str, any]] = [];
     for s in specs {
         defs.append({
             "type": "function",
-            "function": {
-                "name": s.name,
-                "description": s.description,
-                "parameters": s.parameters,
-            },
+            "function": {"name": s.name, "description": s.description, "parameters": s.parameters},
         });
     }
     return defs;
 }
 
-
 def _find_spec(specs: list[ToolSpec], name: str) -> ToolSpec | None {
     for s in specs {
-        if s.name == name { return s; }
+        if s.name == name {
+            return s;
+        }
     }
     return None;
 }
 
-
 def _is_transient_error(message: str) -> bool {
     lowered = message.lower();
-    for marker in ["429", "500", "502", "503", "504", "timeout", "timed out", "connection", "temporarily unavailable"] {
-        if marker in lowered { return True; }
+    for marker in [
+        "429",
+        "500",
+        "502",
+        "503",
+        "504",
+        "timeout",
+        "timed out",
+        "connection",
+        "temporarily unavailable",
+    ] {
+        if marker in lowered {
+            return True;
+        }
     }
     return False;
 }
-
 
 def _cap_tool_result(result: any) -> str {
     text = str(result);
@@ -62,7 +67,6 @@ def _cap_tool_result(result: any) -> str {
     return text;
 }
 
-
 """Best-effort Pi message_end relay for one finalized assistant message.
 Never raises — hook transport failures must not break the turn."""
 def _notify_message_end(bridge: any, message: dict[str, any]) {
@@ -71,10 +75,8 @@ def _notify_message_end(bridge: any, message: dict[str, any]) {
     }
     try {
         fire_hook(bridge as PluginBridge, "message_end", {"message": message});
-    } except Exception {
-    }
+    } except Exception {}
 }
-
 
 """Drive the ReAct loop over `messages` IN PLACE (caller owns the history).
 
@@ -147,7 +149,10 @@ def react_loop(
             aborted = False;
             try {
                 for chunk_obj in gen {
-                    if _is_cancelled() { aborted = True; break; }
+                    if _is_cancelled() {
+                        aborted = True;
+                        break;
+                    }
                     c: any = chunk_obj;
                     if "error" in c {
                         stream_error = str(c["error"]);
@@ -158,7 +163,9 @@ def react_loop(
                         text = text + str(piece);
                         on_event("chunk", {"content": str(piece)});
                     }
-                    if "tool_calls" in c { tool_calls = c["tool_calls"]; }
+                    if "tool_calls" in c {
+                        tool_calls = c["tool_calls"];
+                    }
                 }
             } except Exception as e {
                 stream_error = str(e);
@@ -167,21 +174,21 @@ def react_loop(
                 # iterator with no .close().
                 try {
                     gen.close();
-                } except AttributeError {
-                }
+                } except AttributeError {}
             }
             if aborted {
                 on_event("cancelled", {"phase": "streaming", "text": text});
                 return text;
             }
-            if not stream_error { break; }
+            if not stream_error {
+                break;
+            }
             if retries < max_retries and _is_transient_error(stream_error) {
                 retries += 1;
-                on_event("retry", {
-                    "attempt": retries,
-                    "max_retries": max_retries,
-                    "message": stream_error,
-                });
+                on_event(
+                    "retry",
+                    {"attempt": retries, "max_retries": max_retries, "message": stream_error},
+                );
                 time.sleep(0.1 * retries);
                 continue;
             }
@@ -194,11 +201,7 @@ def react_loop(
             _notify_message_end(bridge, final_msg);
             return text;
         }
-        tc_msg: dict[str, any] = {
-            "role": "assistant",
-            "content": text,
-            "tool_calls": tool_calls,
-        };
+        tc_msg: dict[str, any] = {"role": "assistant", "content": text, "tool_calls": tool_calls};
         messages.append(tc_msg);
         _notify_message_end(bridge, tc_msg);
         for call in tool_calls {
@@ -297,8 +300,7 @@ def react_loop(
                 try {
                     rg = tool_result_gate(bridge as PluginBridge, name, args, safe_result);
                     safe_result = str(rg.get("result", safe_result));
-                } except Exception {
-                }
+                } except Exception {}
             }
             on_event("tool_result", {"tool": name, "result": safe_result});
             messages.append({
@@ -310,9 +312,7 @@ def react_loop(
                 # Pi: the agent stops early when a finalized result terminates.
                 # Simplification vs parallel mode: calls run sequentially here,
                 # so we stop at the first terminating block.
-                on_event("error", {
-                    "message": f"terminated by extension: {gate['reason']}",
-                });
+                on_event("error", {"message": f"terminated by extension: {gate['reason']}"});
                 return "";
             }
         }

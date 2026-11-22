@@ -265,9 +265,9 @@ def load_agent_file(file_path: str, source: str) -> dict[str, any] | None {
         return None;
     }
     raw_tools = frontmatter_string_list(fm.get("tools"));
-    tools = raw_tools if raw_tools else None;
+    tools = raw_tools or None;
     raw_model = frontmatter_string(fm.get("model"));
-    model = raw_model if raw_model else None;
+    model = raw_model or None;
     return {
         "name": name,
         "description": description,

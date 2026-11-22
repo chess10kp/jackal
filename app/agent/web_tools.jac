@@ -40,17 +40,9 @@ glob WEB_TIMEOUT_SECS: int = 15,
          "instance-data",
          "instance-data.ec2.internal",
      ],
-     BLOCKED_SUFFIXES: list[str] = [
-         ".localhost",
-         ".local",
-         ".internal",
-         ".home.arpa",
-     ],
-     SEARCH_USER_AGENT: str = (
-         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-         "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-     );
-
+     BLOCKED_SUFFIXES: list[str] = [".localhost", ".local", ".internal", ".home.arpa"],
+     SEARCH_USER_AGENT: str = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+         "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
 
 """True when the SSRF guard is explicitly relaxed (offline test servers).
 Never set this in a normal session: it exists so the harness can bind a
@@ -59,8 +51,8 @@ def private_hosts_allowed -> bool {
     raw: str = str(os.environ.get(ALLOW_PRIVATE_ENV, "")).strip().lower();
     return raw in ("1", "on", "true", "yes");
 }
-sem private_hosts_allowed = "Escape hatch for loopback fetches in offline tests.";
 
+sem private_hosts_allowed = "Escape hatch for loopback fetches in offline tests.";
 
 """True for addresses a model-controlled URL must never reach: loopback,
 private, link-local, CGNAT, multicast, reserved, unspecified."""
@@ -68,19 +60,19 @@ def ip_is_public(addr: any) -> bool {
     try {
         return bool(
             addr.is_global
-            and not addr.is_loopback
-            and not addr.is_private
-            and not addr.is_link_local
-            and not addr.is_multicast
-            and not addr.is_reserved
-            and not addr.is_unspecified
+                and not addr.is_loopback
+                and not addr.is_private
+                and not addr.is_link_local
+                and not addr.is_multicast
+                and not addr.is_reserved
+                and not addr.is_unspecified,
         );
     } except Exception {
         return False;
     }
 }
-sem ip_is_public = "Classify an ipaddress object as a routable public address.";
 
+sem ip_is_public = "Classify an ipaddress object as a routable public address.";
 
 """Offline host check: literal blocked names/suffixes and IP literals.
 Returns an error string, or "" when the host is acceptable. Hostname
@@ -114,14 +106,14 @@ def host_block_reason(host: str) -> str {
     }
     return "";
 }
-sem host_block_reason = "Reject loopback/private/metadata host literals without doing DNS.";
 
+sem host_block_reason = "Reject loopback/private/metadata host literals without doing DNS.";
 
 """Resolve `host` and reject when ANY address is non-public. Raises
 ValueError (caught by the tool seam) on a blocked or unresolvable host.
 The check runs immediately before each connect so a redirect target is
 re-screened too."""
-def assert_host_resolves_public(host: str) -> None {
+def assert_host_resolves_public(host: str) {
     if private_hosts_allowed() {
         return;
     }
@@ -147,14 +139,12 @@ def assert_host_resolves_public(host: str) -> None {
             raise ValueError("host '" + h + "' resolved to an unparseable address");
         }
         if not ip_is_public(addr) {
-            raise ValueError(
-                "host '" + h + "' resolves to blocked address " + addr_text
-            );
+            raise ValueError("host '" + h + "' resolves to blocked address " + addr_text);
         }
     }
 }
-sem assert_host_resolves_public = "Reject hosts whose resolved addresses are loopback/private/metadata.";
 
+sem assert_host_resolves_public = "Reject hosts whose resolved addresses are loopback/private/metadata.";
 
 """Validate an http(s) URL; reject everything else (no file://, no data:)
 and refuse loopback/private/metadata hosts. Redirects are handled by the
@@ -167,7 +157,7 @@ def validate_web_url(raw: str) -> tuple[str, str] {
     }
     parsed = urllib.parse.urlparse(url);
     if parsed.scheme not in ("http", "https") {
-        scheme = parsed.scheme if parsed.scheme else "none";
+        scheme = parsed.scheme or "none";
         return ("", f"Only http(s) URLs are allowed (got scheme '{scheme}'): {url}");
     }
     if not parsed.netloc {
@@ -181,25 +171,19 @@ def validate_web_url(raw: str) -> tuple[str, str] {
     }
     return (url, "");
 }
-sem validate_web_url = "Reject non-http(s) and loopback/private/metadata URLs before any network I/O.";
 
+sem validate_web_url = "Reject non-http(s) and loopback/private/metadata URLs before any network I/O.";
 
 """Redirect handler that does not follow; `_open_checked` validates the
 Location header before issuing the next request (urllib would otherwise
 fetch a private/metadata target given a public redirector)."""
 obj _NoRedirectHandler(urllib.request.HTTPRedirectHandler) {
     def redirect_request(
-        req: Request,
-        fp: any,
-        code: int,
-        msg: str,
-        headers: any,
-        newurl: str,
+        req: Request, fp: any, code: int, msg: str, headers: any, newurl: str
     ) -> Request | None {
         raise urllib.error.HTTPError(str(newurl), int(code), "redirect", headers, fp);
     }
 }
-
 
 """Open `url`, following at most MAX_REDIRECT_HOPS redirects, and re-run the
 scheme/host/DNS check on every hop. Raises ValueError for a blocked target;
@@ -215,9 +199,7 @@ def _open_checked(url: str) -> any {
     while True {
         hop: any = urllib.parse.urlparse(current);
         assert_host_resolves_public(str(hop.hostname or ""));
-        req: any = urllib.request.Request(
-            current, headers={"User-Agent": SEARCH_USER_AGENT}
-        );
+        req: any = urllib.request.Request(current, headers={"User-Agent": SEARCH_USER_AGENT});
         try {
             return opener.open(req, timeout=WEB_TIMEOUT_SECS);
         } except urllib.error.HTTPError as exc {
@@ -250,6 +232,7 @@ def _open_checked(url: str) -> any {
     }
     return None;
 }
+
 sem _open_checked = "HTTP open with SSRF-safe manual redirect following.";
 
 """Decode a DuckDuckGo outbound link into the real target URL."""
@@ -277,6 +260,7 @@ def strip_html(page: str) -> str {
     t = re.sub(r"\n{3,}", "\n\n", t);
     return t.strip();
 }
+
 sem strip_html = "Regex-based HTML-to-text extraction (scripts/styles removed first).";
 
 """Cap tool output at the shared MAX_TOOL_RESULT convention."""
@@ -297,7 +281,6 @@ def _extract_title(page: str) -> str {
     return strip_html(m.group(1));
 }
 
-
 """web_search tool: top DDG hits as 'N. Title / URL: ... / snippet' lines.
 Never raises; failures come back as {"ok": false, "error": ...} JSON."""
 def web_search(query: str, num_results: int = DEFAULT_SEARCH_RESULTS) -> str {
@@ -314,9 +297,7 @@ def web_search(query: str, num_results: int = DEFAULT_SEARCH_RESULTS) -> str {
         resp.close();
 
         # Result anchors: <a class="result__a" href="...">Title</a>
-        anchors = re.findall(
-            r'(?is)<a\s([^>]*class="result__a"[^>]*)>(.*?)</a>', page
-        );
+        anchors = re.findall(r'(?is)<a\s([^>]*class="result__a"[^>]*)>(.*?)</a>', page);
         snippets = re.findall(
             r'(?is)<(?:a|td|div)[^>]*class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</(?:a|td|div)>',
             page,
@@ -361,10 +342,10 @@ def web_search(query: str, num_results: int = DEFAULT_SEARCH_RESULTS) -> str {
         return json.dumps({"ok": False, "error": f"Search failed for '{q}': {e}"});
     }
 }
+
 sem web_search = "Search the web (DuckDuckGo HTML backend) and return the top results with titles, URLs, and snippets. Use for docs, releases, and facts not in the repo.";
 sem web_search.query = "Search query.";
 sem web_search.num_results = "Max results to return (default 5, capped at 20).";
-
 
 """web_fetch tool: fetch an http(s) page and return readable stripped text.
 Body is capped after decode; never raises across the seam."""
@@ -381,9 +362,8 @@ def web_fetch(url: str) -> str {
         ctype = str(resp.headers.get("Content-Type", ""));
         resp.close();
         text = raw.decode("utf-8", "replace");
-        looks_html = "html" in ctype.lower() or bool(
-            re.search(r"(?i)<html|<body|<div|<!doctype", text[:2000])
-        );
+        looks_html = "html" in ctype.lower()
+            or bool(re.search(r"(?i)<html|<body|<div|<!doctype", text[:2000]));
         header = "";
         if looks_html {
             title = _extract_title(text);
@@ -393,16 +373,19 @@ def web_fetch(url: str) -> str {
             text = strip_html(text);
         }
         if not text.strip() {
-            return json.dumps({"ok": False, "error": f"Fetched {target} but it has no readable text."});
+            return json.dumps({
+                "ok": False,
+                "error": f"Fetched {target} but it has no readable text.",
+            });
         }
         return truncate_result(header + text.strip());
     } except Exception as e {
         return json.dumps({"ok": False, "error": f"Fetch failed for {target}: {e}"});
     }
 }
+
 sem web_fetch = "Fetch an http(s) URL and return readable text (HTML stripped, ~50KB cap). Use after web_search when you need page content.";
 sem web_fetch.url = "http(s) URL to fetch.";
-
 
 """Native-safe dictionary-ABI adapters for web tools."""
 def _web_search_tool(args: dict[str, any]) -> str {
@@ -427,7 +410,10 @@ def tool_specs_web -> list[dict[str, any]] {
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Search query."},
-                    "num_results": {"type": "integer", "description": "Max results (default 5, capped at 20)."},
+                    "num_results": {
+                        "type": "integer",
+                        "description": "Max results (default 5, capped at 20).",
+                    },
                 },
                 "required": ["query"],
             },
@@ -438,9 +424,7 @@ def tool_specs_web -> list[dict[str, any]] {
             "description": "Fetch an http(s) URL and return readable text (HTML stripped, ~50KB cap). Use after web_search when you need page content.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "url": {"type": "string", "description": "http(s) URL to fetch."},
-                },
+                "properties": {"url": {"type": "string", "description": "http(s) URL to fetch."}},
                 "required": ["url"],
             },
             "handler": _web_fetch_tool,

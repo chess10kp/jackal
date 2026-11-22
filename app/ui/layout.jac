@@ -111,7 +111,7 @@ def _place_axis(
     ends: dict[str, int],
     warnings: list[LayoutDiagnostic],
     horizontal: bool,
-) -> None {
+) {
     kids = _child_ids(order, parent_id);
     if len(kids) == 0 {
         return;
