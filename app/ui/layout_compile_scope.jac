@@ -28,8 +28,8 @@ def _topology_error(message: str) -> LayoutDiagnostic {
 
 
 def _z_index_of(screen: Screen, overlay: Overlay) -> int {
-    for edge in [edge screen ->:Layer:-> overlay] {
-        return int(edge.z_index);
+    for e_ref in [edge screen ->:Layer:-> overlay] {
+        return int(e_ref.z_index);
     }
     return 0;
 }
@@ -110,8 +110,8 @@ def _walk_children(
         }
         seen[cid] = True;
         rank_val = 0;
-        for edge in [edge parent_target ->:Child:-> child] {
-            rank_val = int(edge.rank);
+        for e_ref in [edge parent_target ->:Child:-> child] {
+            rank_val = int(e_ref.rank);
             break;
         }
         scoped = _ScopedNode(

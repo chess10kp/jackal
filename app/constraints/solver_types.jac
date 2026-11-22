@@ -35,7 +35,7 @@ enum SymbolKind {
     EXTERNAL = "external",
     SLACK = "slack",
     ERROR = "error",
-    DUMMY = "dummy"
+    DUMMY = "dummy",
 }
 
 

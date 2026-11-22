@@ -25,7 +25,6 @@ One JSON object per line, keys: ts, level, source, msg, pid, and optional
 import os;
 import json;
 import datetime;
-import traceback;
 
 glob LOG_LEVELS: dict[str, int] = {
         "debug": 10,
@@ -211,6 +210,29 @@ def log_event(
 sem log_event = "Write one structured JSONL log record; never raises into the caller.";
 
 
+"""Native traceback text (CPython `format_exc` shape) from `exc.__traceback__`."""
+def _format_tb(exc: any) -> str {
+    if exc is None or not isinstance(exc, BaseException) {
+        return "";
+    }
+    e: BaseException = exc;
+    frame: any = e.__traceback__;
+    if frame is None {
+        return "";
+    }
+    lines: list[str] = ["Traceback (most recent call last):"];
+    while frame is not None {
+        code: any = frame.tb_frame.f_code;
+        lines.append(
+            f'  File "{code.co_filename}", line {frame.tb_lineno}, in {code.co_name}'
+        );
+        frame = frame.tb_next;
+    }
+    lines.append(type(e).__name__ + ": " + str(e));
+    return "\n".join(lines) + "\n";
+}
+
+
 """Record a caught exception without changing control flow. Safe outside an
 `except` block (traceback is then empty). `fields` is merged into the record."""
 def log_exception(
@@ -244,11 +266,11 @@ def log_exception(
         payload["detail"] = safe_fields(detail);
         tb: str = "";
         try {
-            tb = traceback.format_exc();
+            tb = _format_tb(exc);
         } except Exception {
             tb = "";
         }
-        if tb and tb.strip() != "NoneType: None" {
+        if tb {
             if len(tb) > MAX_TRACEBACK_LEN {
                 tb = tb[-MAX_TRACEBACK_LEN:];
             }

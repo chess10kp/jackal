@@ -292,7 +292,7 @@ draft (submitting it inlines the skill body via expand_skill_command)."""
 def _open_skills_picker(app: LiveShell) -> str {
     skills: list[dict[str, any]] = [];
     try {
-        catalog: dict[str, any] = load_jackal_skills();
+        catalog: dict[str, list[dict[str, any]]] = load_jackal_skills();
         skills = list(catalog.get("skills", []));
     } except Exception as e {
         return "ERROR: failed to load skills: " + str(e)[:80];
@@ -397,11 +397,11 @@ def _restore_checkpoint(app: LiveShell, name: str) -> str {
         }
     }
     # Swap agent memory and repaint from the snapshot conversation.
-    restore_history(msgs as list);
+    restore_history(msgs as list[dict[str, any]]);
     app.messages = [];
     app.rev = 0;
     apply_transcript_revision(app.proj, 0, app.messages);
-    for m in msgs as list {
+    for m in msgs as list[dict[str, any]] {
         if isinstance(m, dict) and str(m.get("role", "")) != "system" {
             _push_turn(app, str(m.get("role", "")), str(m.get("content", "")));
         }

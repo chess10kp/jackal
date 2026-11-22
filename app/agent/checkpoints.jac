@@ -223,7 +223,7 @@ def _dir_size(dir_path: str) -> int {
 
 
 def _write_json(path: str, data: any) -> bool {
-    fh = None;
+    fh: any = None;
     try {
         fh = open(path, "w");
         fh.write(json_pretty(json.dumps(data)));

@@ -14,7 +14,8 @@ dicts as they arrive:
 import os;
 import json;
 import time;
-import httpx;
+import urllib.request;
+import urllib.error;
 import from .tool_spec { ToolSpec, MAX_TOOL_RESULT }
 import from .registry { ToolRegistry, as_tool_specs, invoke }
 import from .plugin_bridge {
@@ -103,25 +104,43 @@ obj Transport {
         url: str, headers: dict[str, str], body: dict[str, any]
     ) -> Iterator[dict[str, any]] {
         calls: dict[int, dict[str, any]] = {};
-        client_obj: any = httpx.Client(timeout=300.0);
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode("utf-8"),
+            headers={**headers, "Content-Type": "application/json"},
+            method="POST",
+        );
         r: any = None;
         try {
-            ctx: any = client_obj.stream("POST", url, json=body, headers=headers);
-            r = ctx.__enter__();
-            # Fire strictly before the first line is read so handlers observe
-            # "provider answered" ahead of any content event downstream.
-            self._notify_response(r.status_code, dict(r.headers));
-            if r.status_code != 200 {
-                detail = r.read().decode("utf-8", "replace")[:400];
-                yield {"error": f"HTTP {r.status_code}: {detail}"};
+            try {
+                r = urllib.request.urlopen(req, timeout=300.0);
+            } except urllib.error.HTTPError as e {
+                hdrs: dict[str, str] = {};
+                for (hk, hv) in e.headers.items() {
+                    hdrs[str(hk)] = str(hv);
+                }
+                self._notify_response(int(e.code), hdrs);
+                detail = e.read().decode("utf-8", "replace")[:400];
+                yield {"error": f"HTTP {e.code}: {detail}"};
                 return;
             }
-            for raw_line in r.iter_lines() {
-                line: any = raw_line;
+            rhdrs: dict[str, str] = {};
+            for (hk, hv) in r.headers.items() {
+                rhdrs[str(hk)] = str(hv);
+            }
+            # Fire strictly before the first line is read so handlers observe
+            # "provider answered" ahead of any content event downstream.
+            self._notify_response(int(r.status), rhdrs);
+            while True {
+                raw: bytes = r.readline();
+                if not raw {
+                    break;
+                }
+                line: str = raw.decode("utf-8", "replace").rstrip("\r\n");
                 if not line.startswith("data: ") {
                     continue;
                 }
-                payload: any = line[len("data: "):];
+                payload: str = line[len("data: "):];
                 if payload == "[DONE]" {
                     break;
                 }
@@ -160,7 +179,6 @@ obj Transport {
             if r is not None {
                 r.close();
             }
-            client_obj.close();
         }
         if calls {
             ordered: list[dict[str, any]] = [];

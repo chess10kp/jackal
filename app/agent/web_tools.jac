@@ -310,7 +310,7 @@ def web_search(query: str, num_results: int = DEFAULT_SEARCH_RESULTS) -> str {
         endpoint = "https://html.duckduckgo.com/html/?" + urllib.parse.urlencode({"q": q});
         req = urllib.request.Request(endpoint, headers={"User-Agent": SEARCH_USER_AGENT});
         resp = urllib.request.urlopen(req, timeout=WEB_TIMEOUT_SECS);
-        page = resp.read(FETCH_BODY_CAP * 4).decode("utf-8", errors="replace");
+        page = resp.read(FETCH_BODY_CAP * 4).decode("utf-8", "replace");
         resp.close();
 
         # Result anchors: <a class="result__a" href="...">Title</a>
@@ -380,7 +380,7 @@ def web_fetch(url: str) -> str {
         raw = resp.read(FETCH_BODY_CAP * 4);
         ctype = str(resp.headers.get("Content-Type", ""));
         resp.close();
-        text = raw.decode("utf-8", errors="replace");
+        text = raw.decode("utf-8", "replace");
         looks_html = "html" in ctype.lower() or bool(
             re.search(r"(?i)<html|<body|<div|<!doctype", text[:2000])
         );

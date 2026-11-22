@@ -16,7 +16,7 @@ enum SolveError {
     REQUIRED_EDIT_VARIABLE = "required_edit_variable",
     NON_FINITE_VALUE = "non_finite_value",
     INVALID_EXPRESSION = "invalid_expression",
-    INTERNAL_INVARIANT = "internal_invariant"
+    INTERNAL_INVARIANT = "internal_invariant",
 }
 
 

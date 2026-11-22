@@ -17,7 +17,8 @@ stale catalogs refresh in a deduplicated background flow.
 
 import os;
 import time;
-import httpx;
+import json;
+import urllib.request;
 import from .llm_transport { PROVIDER_ROUTES }
 
 glob _CATALOG_REFRESHING: dict[str, bool] = {};
@@ -179,15 +180,15 @@ def _fetch_route_models(route: dict[str, any]) -> list[str] {
             headers["Authorization"] = "Bearer " + api_key;
         }
         # Short timeout for background refreshes; picker reads never wait here.
-        client_obj: any = httpx.Client(timeout=5.0);
+        req = urllib.request.Request(url, headers=headers);
+        r: any = urllib.request.urlopen(req, timeout=5.0);
         try {
-            r: any = client_obj.get(url, headers=headers);
-            if r.status_code != 200 {
+            if int(r.status) != 200 {
                 return [];
             }
-            return _parse_models_payload(r.json());
+            return _parse_models_payload(json.loads(r.read().decode("utf-8")));
         } finally {
-            client_obj.close();
+            r.close();
         }
     } except Exception {
         return [];

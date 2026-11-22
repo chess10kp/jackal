@@ -45,12 +45,12 @@ def _resume_session(app: LiveShell, sid: str) -> str {
     if not isinstance(msgs, list) or not msgs {
         return "session has no transcript: " + sid;
     }
-    restore_history(msgs as list);
+    restore_history(msgs as list[dict[str, any]]);
     # Repaint transcript from restored messages (skip system prompt).
     app.messages = [];
     app.rev = 0;
     apply_transcript_revision(app.proj, 0, app.messages);
-    for m in msgs as list {
+    for m in msgs as list[dict[str, any]] {
         if isinstance(m, dict) and str(m.get("role", "")) != "system" {
             _push_turn(app, str(m.get("role", "")), str(m.get("content", "")));
         }
@@ -268,7 +268,7 @@ def _run_slash(app: LiveShell, line: str) -> str {
         # Inline skill expansion: the transcript keeps the typed command;
         # the model receives the <skill> block with args appended.
         try {
-            catalog: dict[str, any] = load_jackal_skills();
+            catalog: dict[str, list[dict[str, any]]] = load_jackal_skills();
         } except Exception as e {
             return "ERROR: failed to load skills: " + str(e);
         }

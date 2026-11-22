@@ -293,6 +293,6 @@ default = "native"
 harness = "jac test tui/harness.test.jac"
 
 [dependencies.pypi]
-httpx = "~=0.28"
+
 # Terminal emulator for TUI tests (ui/emulated_terminal.jac).
 pyte = "~=0.8"

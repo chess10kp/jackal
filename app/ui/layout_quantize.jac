@@ -75,7 +75,19 @@ obj QuantizeResult {
         index: int = -1;
 }
 
+glob _INT_CLAMP: float = 4.0e18;
+
 def _floor(value: float) -> int {
+    # Native int is 64-bit: clamp the +/-1e308 "unbounded" sentinels.
+    if value != value {
+        return 0;
+    }
+    if value >= _INT_CLAMP {
+        return int(_INT_CLAMP);
+    }
+    if value <= -_INT_CLAMP {
+        return -int(_INT_CLAMP);
+    }
     t = int(value);
     if value >= 0.0 or float(t) == value {
         return t;

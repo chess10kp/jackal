@@ -209,7 +209,7 @@ def _emit_sized_axis(
         }
         return _emit(
             result,
-            _expr(span_terms, -natural),
+            _expr(span_terms, -float(natural)),
             Relation.EQ,
             StrengthTier.WEAK,
             _prov("intrinsic", id_str, label, src_extra),
@@ -230,7 +230,7 @@ def _emit_sized_axis(
         if size.maximum is not None and is_finite(size.maximum) {
             if not _emit(
                 result,
-                _expr(span_terms, -size.maximum),
+                _expr(span_terms, -float(size.maximum)),
                 Relation.LEQ,
                 StrengthTier.REQUIRED,
                 _prov("bounded", id_str, label, src_extra),
