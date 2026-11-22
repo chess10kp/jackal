@@ -42,14 +42,14 @@ test "config-only server reports not connected; status-only reports attached sha
 test "rows are name-sorted regardless of insertion order" {
     out = mcp_window_rows({"zeta": ["z"], "alpha": ["a"]}, {});
     assert out["ids"] == ["alpha", "zeta"], str(out["ids"]);
-    assert out["rows"][0].startswith("alpha —"), out["rows"][0];
-    assert out["rows"][1].startswith("zeta —"), out["rows"][1];
+    assert out["rows"][0].startswith("alpha —"), str(out["rows"][0]);
+    assert out["rows"][1].startswith("zeta —"), str(out["rows"][1]);
 }
 
 test "empty state names the config convention and carries a furniture id" {
     out = mcp_window_rows({}, {});
     assert len(out["rows"]) == 1;
-    assert "no mcp servers configured" in out["rows"][0], out["rows"][0];
+    assert "no mcp servers configured" in out["rows"][0], str(out["rows"][0]);
     assert out["ids"] == [""];
 }
 

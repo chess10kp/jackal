@@ -5,12 +5,12 @@ test "first frame: header hidden, prompt, terminal modes" {
     h = open_tui();
     try {
         h.wait_for("❯");
-        assert h.term.find("● ready") is None, h.dump();
-        assert h.term.find("❯") is not None, h.dump();
-        assert h.term.alternate_screen and h.term.bracketed_paste, h.dump();
-        assert h.term.title.startswith("Jackal"), h.term.title;
+        assert h.term.find("● ready") is None, str(h.dump());
+        assert h.term.find("❯") is not None, str(h.dump());
+        assert h.term.alternate_screen and h.term.bracketed_paste, str(h.dump());
+        assert h.term.title.startswith("Jackal"), str(h.term.title);
         for line in h.term.viewport() {
-            assert len(line) <= 100, h.dump();
+            assert len(line) <= 100, str(h.dump());
         }
     } finally {
         h.close();
@@ -26,7 +26,7 @@ test "typing echoes in the editor and backspace leaves no residue" {
             h.press("backspace");
         }
         h.wait_gone("hello there");
-        assert "hello" not in h.screen(), h.dump();
+        assert "hello" not in h.screen(), str(h.dump());
         assert h.calls() == [];
     } finally {
         h.close();
@@ -41,10 +41,10 @@ test "submit streams the reply into the transcript" {
         h.wait_for("streamed reply from mock");
         h.wait_idle();
         txt = h.screen();
-        assert "◆ You" in txt and "hi jackal" in txt, h.dump();
-        assert "◇ Jackal" in txt, h.dump();
+        assert "◆ You" in txt and "hi jackal" in txt, str(h.dump());
+        assert "◇ Jackal" in txt, str(h.dump());
         calls = h.calls();
-        assert len(calls) == 1 and calls[0]["last"]["content"] == "hi jackal", h.dump();
+        assert len(calls) == 1 and calls[0]["last"]["content"] == "hi jackal", str(h.dump());
     } finally {
         h.close();
     }
@@ -92,7 +92,7 @@ test "approval modal: n denies and the model is told" {
         h.wait_for("ok, skipped");
         h.wait_idle();
         assert not h.exists("b.txt");
-        assert "denied" in h.calls()[1]["last"]["content"], h.dump();
+        assert "denied" in h.calls()[1]["last"]["content"], str(h.dump());
     } finally {
         h.close();
     }
@@ -160,10 +160,10 @@ test "resize reflows within the new bounds" {
         h.resize(50, 20);
         h.wait_for("❯");
         for line in h.term.viewport() {
-            assert len(line) <= 50, h.dump();
+            assert len(line) <= 50, str(h.dump());
         }
         assert len(h.term.viewport()) == 20;
-        assert "narrow" in h.screen(), h.dump();
+        assert "narrow" in h.screen(), str(h.dump());
     } finally {
         h.close();
     }
@@ -174,7 +174,7 @@ test "esc quits and close restores the terminal" {
     try {
         h.press("esc");
         h.step(3);
-        assert not h.app.running, h.dump();
+        assert not h.app.running, str(h.dump());
     } finally {
         h.close();
     }

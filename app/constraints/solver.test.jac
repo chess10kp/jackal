@@ -26,6 +26,7 @@ import from constraints.algebra {
 import from time {
     perf_counter,
 }
+import sys;
 
 
 def _vt(v: Variable, c: float = 1.0) -> Expression {
@@ -528,7 +529,7 @@ test "baseline timings print for progress log" {
 def _fixture_expr(vs: list[Variable], pairs: list[list[any]], const: float) -> Expression {
     acc: Expression = Expression(constant=const);
     for pair in pairs {
-        plist: list[any] = pair as list;
+        plist: list[any] = pair as list[any];
         vid: int = int(plist[0] as int);
         coef: float = plist[1] as float;
         acc = add_expressions(
@@ -807,7 +808,6 @@ test "edit variables track suggestions under hard constraints" {
     )).ok;
 
     assert s.add_edit_variable(width, StrengthTier.STRONG).ok;
-    import sys;
     sys.stderr.write("rows=" + str(len(s.rows)) + "\n");
     for suggested in [40.0, 80.0, 20.0, 0.0] {
         r = s.suggest_value(width, suggested);

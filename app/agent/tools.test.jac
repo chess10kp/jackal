@@ -69,7 +69,7 @@ test "jac_check happy path formats real CLI output" {
         # Assert the _run_jac_cli output FORMAT only - toolchain verdicts
         # belong to the Jac toolchain, not to this adapter layer.
         # Contract: "jac check <path> -> ok|failed (exit N)\n<body>"
-        assert out.startswith("jac check "), out;
+        assert out.startswith("jac check "), str(out);
         assert " -> " in out;
         first_line = out.split("\n")[0];
         assert "ok" in first_line or "failed" in first_line;
@@ -103,7 +103,7 @@ test "JACKAL_SANDBOX_ROOT contains tools inside the root" {
                 resolve_path(bad);
                 assert False, "expected rejection: " + bad;
             } except ValueError as exc {
-                assert "JACKAL_SANDBOX_ROOT" in str(exc), exc;
+                assert "JACKAL_SANDBOX_ROOT" in str(exc), str(exc);
             }
         }
     } finally {
@@ -131,7 +131,7 @@ test "resolve_path keeps cwd semantics when no sandbox root is set" {
             resolve_path("");
             assert False, "empty path must raise";
         } except ValueError as exc {
-            assert "empty" in str(exc), exc;
+            assert "empty" in str(exc), str(exc);
         }
     } finally {
         os.chdir(cwd);
@@ -147,11 +147,11 @@ test "child jac processes never inherit JAC_HANDOFF" {
     try {
         os.environ["JAC_HANDOFF"] = "tcp://127.0.0.1:1";
         env = _jac_child_env();
-        assert "JAC_HANDOFF" not in env, env.get("JAC_HANDOFF");
+        assert "JAC_HANDOFF" not in env, str(env.get("JAC_HANDOFF"));
         # Unrelated env still passes through.
         os.environ["JACKAL_PROBE_KEEP"] = "yes";
         env2 = _jac_child_env();
-        assert env2.get("JACKAL_PROBE_KEEP") == "yes", env2.get("JACKAL_PROBE_KEEP");
+        assert env2.get("JACKAL_PROBE_KEEP") == "yes", str(env2.get("JACKAL_PROBE_KEEP"));
     } finally {
         os.environ.pop("JACKAL_PROBE_KEEP", None);
         if old is None {
@@ -167,8 +167,8 @@ test "run_command children do not inherit JAC_HANDOFF" {
     try {
         os.environ["JAC_HANDOFF"] = "tcp://127.0.0.1:1";
         out = run_command("printenv JAC_HANDOFF || echo ABSENT");
-        assert "ABSENT" in out, out;
-        assert "127.0.0.1:1" not in out, out;
+        assert "ABSENT" in out, str(out);
+        assert "127.0.0.1:1" not in out, str(out);
     } finally {
         if old is None {
             os.environ.pop("JAC_HANDOFF", None);

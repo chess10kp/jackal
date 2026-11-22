@@ -19,7 +19,7 @@ def _write_project_cfg(base: str, cfg: dict[str, any]) {
 }
 
 test "mcp server specs parse env, cwd, enabled, and timeout" {
-    cfg = {
+    cfg: dict[str, any] = {
         "mcp": {
             "servers": {
                 "full": {
@@ -212,7 +212,7 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
         fh: any = open(path, "w");
         fh.write(REF_SERVER_SRC);
         fh.close();
-        cmd = [sys.executable, path];
+        cmd = [_fixture_python(), path];
         started = mcp_start(client, cmd, timeout_s=10.0);
         assert started.get("ok") is True, str(started.get("error", "no error"));
         plugins.mcp_clients["t"] = client;
@@ -227,7 +227,7 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
                 {
                     "name": "alpha",
                     "description": "d",
-                    "inputSchema": {"type": "object", "properties": {}, "required": []},
+                    "inputSchema": {"type": "object", "properties": _no_props(), "required": []},
                 },
             ],
         );
@@ -243,12 +243,12 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
         mcp_pump_notifications();
         reg_names = sorted([str(k) for k in reg.tools.keys()]);
         notes = " | ".join(plugins.mcp_notices);
-        assert get_tool(reg, "mcp_t_alpha") is None, (
+        assert get_tool(reg, "mcp_t_alpha") is None, str((
             "alpha still registered: " + str(reg_names) + " notices: " + notes
-        );
-        assert get_tool(reg, "mcp_t_beta") is not None, (
+        ));
+        assert get_tool(reg, "mcp_t_beta") is not None, str((
             "beta missing: " + str(reg_names) + " notices: " + notes
-        );
+        ));
         assert plugins.mcp_owned.get("mcp_t_beta", "") == "t";
         assert int(plugins.mcp_status["t"]["tools"]) == 1;
         joined = " ".join(plugins.mcp_notices);
@@ -275,7 +275,7 @@ test "cross-server tool name collisions rename deterministically" {
                 {
                     "name": "x",
                     "description": "d",
-                    "inputSchema": {"type": "object", "properties": {}, "required": []},
+                    "inputSchema": {"type": "object", "properties": _no_props(), "required": []},
                 },
             ],
         );
@@ -291,7 +291,7 @@ test "cross-server tool name collisions rename deterministically" {
                 {
                     "name": "x",
                     "description": "d",
-                    "inputSchema": {"type": "object", "properties": {}, "required": []},
+                    "inputSchema": {"type": "object", "properties": _no_props(), "required": []},
                 },
             ],
         );
@@ -311,7 +311,7 @@ test "cross-server tool name collisions rename deterministically" {
                 {
                     "name": "x",
                     "description": "d2",
-                    "inputSchema": {"type": "object", "properties": {}, "required": []},
+                    "inputSchema": {"type": "object", "properties": _no_props(), "required": []},
                 },
             ],
         );
@@ -333,7 +333,7 @@ test "health check flips dead servers to failed with a notice" {
         fh: any = open(path, "w");
         fh.write(REF_SERVER_SRC);
         fh.close();
-        cmd = [sys.executable, path];
+        cmd = [_fixture_python(), path];
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         plugins.mcp_clients["t"] = client;
         plugins.mcp_specs["t"] = _spec_for(cmd);
@@ -363,7 +363,7 @@ test "a tool call against a dead server revives once and succeeds" {
         fh: any = open(path, "w");
         fh.write(REF_SERVER_SRC);
         fh.close();
-        cmd = [sys.executable, path];
+        cmd = [_fixture_python(), path];
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
         plugins.mcp_clients["t"] = client;
         plugins.mcp_specs["t"] = _spec_for(cmd);
@@ -373,7 +373,7 @@ test "a tool call against a dead server revives once and succeeds" {
         client.proc.kill();
         client.proc.wait(timeout=5);
         res: str = handler({});
-        assert res == "pong", res;
+        assert res == "pong", str(res);
         assert str(plugins.mcp_status["t"]["state"]) == "connected";
         joined = " ".join(plugins.mcp_notices);
         assert "restarted after unexpected death" in joined;
@@ -396,21 +396,21 @@ test "allow_tools and deny_tools gate registration (deny wins)" {
         spec = _spec_for(["noop"]);
         spec["allow_tools"] = ["read_*"];
         spec["deny_tools"] = ["read_secret*"];
-        tools = [
+        tools: list[dict[str, any]] = [
             {
                 "name": "read_docs",
                 "description": "d",
-                "inputSchema": {"type": "object", "properties": {}, "required": []},
+                "inputSchema": {"type": "object", "properties": _no_props(), "required": []},
             },
             {
                 "name": "read_secret",
                 "description": "d",
-                "inputSchema": {"type": "object", "properties": {}, "required": []},
+                "inputSchema": {"type": "object", "properties": _no_props(), "required": []},
             },
             {
                 "name": "write_docs",
                 "description": "d",
-                "inputSchema": {"type": "object", "properties": {}, "required": []},
+                "inputSchema": {"type": "object", "properties": _no_props(), "required": []},
             },
         ];
         stats = _register_server_tools(reg, "g", dummy, spec, tools);
@@ -436,7 +436,7 @@ test "mcp_restart_failed restarts only failed servers" {
         # Give the failed server a resolvable spec so restart can proceed.
         plugins.mcp_specs["dead"] = _spec_for(["true"]);
         out: str = mcp_restart_failed();
-        assert out.startswith("restarting mcp servers: dead"), out;
+        assert out.startswith("restarting mcp servers: dead"), str(out);
         # The alive server is untouched (still its old status object state).
         assert str(plugins.mcp_status["alive"]["state"]) == "connected";
         # (The failed server's re-attach runs in a background flow; its state
@@ -486,7 +486,7 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
             );
         }
         imported = mcp_import_legacy(home_dir=home_dir, sources=[src1, src2]);
-        assert sorted(imported) == ["leg_off", "leg_one", "leg_two"], imported;
+        assert sorted(imported) == ["leg_off", "leg_one", "leg_two"], str(imported);
         # user config written with mapped entries
         user_cfg: any = json.load(open(os.path.join(home_dir, ".jackal", "config.json")));
         servers: any = user_cfg["mcp"]["servers"];
@@ -542,7 +542,7 @@ test "legacy import respects JACKAL_MCP_NO_IMPORT and existing names" {
             );
         }
         imported = mcp_import_legacy(home_dir=home_dir, sources=[src1]);
-        assert imported == ["leg_two"], imported;
+        assert imported == ["leg_two"], str(imported);
         user_cfg: any = json.load(open(target));
         assert user_cfg["mcp"]["servers"]["leg_one"]["command"] == "already-here";
         # opt-out env var: nothing imports, no marker written
@@ -565,4 +565,17 @@ test "legacy import respects JACKAL_MCP_NO_IMPORT and existing names" {
         }
         shutil.rmtree(tmp, ignore_errors=True);
     }
+}
+
+"""Interpreter for the Python fixture servers. Never `sys.executable`: in a
+native test runner that is the runner itself, so spawning it re-runs the
+suite recursively (a fork bomb)."""
+def _fixture_python -> str {
+    found: str | None = shutil.which("python3");
+    return found if found is not None else "python3";
+}
+
+def _no_props -> dict[str, any] {
+    out: dict[str, any] = {};
+    return out;
 }

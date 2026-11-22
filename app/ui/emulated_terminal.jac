@@ -1,4 +1,4 @@
-"""Terminal backed by a real VT emulator (pyte) — the Jac counterpart of Pi's
+"""Terminal backed by a real VT emulator (native ui/vt_screen.jac; was pyte) — the Jac counterpart of Pi's
 xterm-headless VirtualTerminal (reference/pi/packages/tui/test/virtual-terminal.ts).
 
 Everything the app writes is interpreted the way a real terminal would:
@@ -10,7 +10,7 @@ resizes. Implements the same surface the live shell uses on ProcessTerminal
 in-process.
 """
 
-import pyte;
+import from ui.vt_screen { VtScreen, VtCell }
 import from ui.terminal {
     Terminal,
     ENTER_ALT_SCREEN,
@@ -36,8 +36,7 @@ glob KEY_SEQUENCES: dict[str, str] = {
 
 
 obj EmulatedTerminal(Terminal) {
-    has screen: any = None,
-        stream: any = None,
+    has screen: VtScreen = VtScreen(),
         input_queue: list[str] = [],
         title: str = "",
         bytes_written: int = 0,
@@ -47,8 +46,7 @@ obj EmulatedTerminal(Terminal) {
         super.init();
         self.columns = columns;
         self.rows = rows;
-        self.screen = pyte.HistoryScreen(columns, rows, history=scrollback, ratio=0.5);
-        self.stream = pyte.Stream(self.screen);
+        self.screen = VtScreen(columns, rows, scrollback);
         self.input_queue = [];
         self.eof = False;
         self.title = "";
@@ -78,10 +76,9 @@ obj EmulatedTerminal(Terminal) {
         if DISABLE_BRACKETED_PASTE in data { self.bracketed_paste = False; }
         if SYNC_BEGIN in data { self.sync_active = True; }
         if SYNC_END in data { self.sync_active = False; }
-        self.stream.feed(data);
-        self.cursor_visible = not bool(self.screen.cursor.hidden);
-        t: any = self.screen.title;
-        if t { self.title = str(t); }
+        self.screen.feed(data);
+        self.cursor_visible = not self.screen.cursor_hidden;
+        if self.screen.title { self.title = self.screen.title; }
     }
 
     def move_cursor(row: int, col: int) -> None {
@@ -152,7 +149,7 @@ obj EmulatedTerminal(Terminal) {
 
     """Visible rows, trailing spaces trimmed (Pi: getViewport)."""
     def viewport -> list[str] {
-        return [str(line).rstrip() for line in self.screen.display];
+        return [line.rstrip() for line in self.screen.display()];
     }
 
     def viewport_text -> str {
@@ -162,33 +159,28 @@ obj EmulatedTerminal(Terminal) {
     """Scrollback above the viewport plus the viewport (Pi: getScrollBuffer)."""
     def scroll_buffer -> list[str] {
         out: list[str] = [];
-        for row in self.screen.history.top {
-            chars: list[str] = [];
-            for x in range(self.columns) {
-                cell: any = row[x] if x in row else None;
-                chars.append(str(cell.data) if cell is not None else " ");
-            }
-            out.append("".join(chars).rstrip());
+        for row in self.screen.history {
+            out.append(self.screen.history_text(row).rstrip());
         }
         return out + self.viewport();
     }
 
     """(x, y) zero-based cursor position (Pi: getCursorPosition)."""
     def cursor -> tuple[int, int] {
-        return (int(self.screen.cursor.x), int(self.screen.cursor.y));
+        return (self.screen.cursor_x, self.screen.cursor_y);
     }
 
     """Style of one cell: char, fg, bg, bold, italics, underscore, reverse."""
     def cell(row: int, col: int) -> dict[str, any] {
-        c: any = self.screen.buffer[row][col];
+        c: VtCell = self.screen.buffer[row][col];
         return {
-            "char": str(c.data),
-            "fg": str(c.fg),
-            "bg": str(c.bg),
-            "bold": bool(c.bold),
-            "italics": bool(c.italics),
-            "underscore": bool(c.underscore),
-            "reverse": bool(c.reverse),
+            "char": c.data,
+            "fg": c.fg,
+            "bg": c.bg,
+            "bold": c.bold,
+            "italics": c.italics,
+            "underscore": c.underscore,
+            "reverse": c.reverse,
         };
     }
 

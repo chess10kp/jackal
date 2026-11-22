@@ -18,6 +18,7 @@ answers as text/event-stream (both client response paths).
 """
 
 glob FAKE_SERVER_SRC: str = """
+import shutil;
 import sys, json, time, os
 
 def send(obj):
@@ -177,7 +178,7 @@ def _write_mode_server(tmp: str, mode: str) -> list[str] {
     with open(path, "w") as f {
         f.write(FAKE_SERVER_SRC);
     }
-    return [sys.executable, path, mode];
+    return [_fixture_python(), path, mode];
 }
 
 def _write_fake_server(tmp: str) -> list[str] {
@@ -265,7 +266,7 @@ test "server-to-client requests are answered, never buffered" {
         # The server names its only tool after what it observed: ok_ping
         # means the client answered sampling/roots with method errors.
         names = [str(t.get("name", "")) for t in tools];
-        assert "ok_ping" in names, names;
+        assert "ok_ping" in names, str(names);
         # And the requests were never buffered as notifications.
         for note in client.notifications {
             assert str(note.get("method", "")) != "sampling/createMessage";
@@ -360,10 +361,10 @@ test "non-text content blocks surface as stubs and ride along raw" {
         res = mcp_call_tool(client, "rich", {}, timeout_s=10.0);
         assert res["ok"] is True;
         text: str = str(res.get("result", ""));
-        assert "[image: image/png, 8 b64 chars]" in text, text;
-        assert "[resource: file:///x.txt text/plain]" in text, text;
-        assert "resource body" in text, text;
-        assert "[resource_link: file:///y.txt]" in text, text;
+        assert "[image: image/png, 8 b64 chars]" in text, str(text);
+        assert "[resource: file:///x.txt text/plain]" in text, str(text);
+        assert "resource body" in text, str(text);
+        assert "[resource_link: file:///y.txt]" in text, str(text);
         blocks: any = res.get("content", []);
         assert isinstance(blocks, list) and len(blocks) == 3;
     } finally {
@@ -389,7 +390,7 @@ test "prompts list and get round trip" {
         msgs: any = got.get("messages", []);
         assert len(msgs) == 1;
         text: str = str(msgs[0].get("content", {}).get("text", ""));
-        assert text == "Hello, jackal!", text;
+        assert text == "Hello, jackal!", str(text);
         # unknown prompt -> honest error at the seam
         bad = mcp_get_prompt(client, "nope", {}, timeout_s=10.0);
         assert bad["ok"] is False;
@@ -513,7 +514,7 @@ def _start_fake_http_server(tmp: str) -> tuple[any, str] {
     err_path: str = os.path.join(tmp, "mcp_http_server.err");
     err_fh: any = open(err_path, "w");
     proc = subprocess.Popen(
-        [sys.executable, path], stdout=subprocess.PIPE, stderr=err_fh, text=True, bufsize=1
+        [_fixture_python(), path], stdout=subprocess.PIPE, stderr=err_fh, text=True, bufsize=1
     );
     out_pipe: any = proc.stdout;
     ready: str = out_pipe.readline().strip();
@@ -546,20 +547,20 @@ test "http transport round trip: initialize, session echo, json and sse bodies" 
         proc = started_up[0];
         url: str = started_up[1];
         res = mcp_start_http(client, url, {"X-Probe": "on"}, timeout_s=10.0);
-        assert res["ok"] is True, res;
+        assert res["ok"] is True, str(res);
         assert res.get("server_name") == "fake-http-mcp";
         # session id captured from the initialize response
         assert client.session_id == "sess-42";
         # tools/list over the JSON body path (session id must be echoed or
         # the server rejects with 400)
         listed = mcp_list_tools(client, timeout_s=10.0);
-        assert listed["ok"] is True, listed;
+        assert listed["ok"] is True, str(listed);
         tools: any = listed.get("tools", []);
         assert len(tools) == 1;
         assert str(tools[0]["name"]) == "echo";
         # tools/call over the text/event-stream body path
         call = mcp_call_tool(client, "echo", {"text": "hi"}, timeout_s=10.0);
-        assert call["ok"] is True, call;
+        assert call["ok"] is True, str(call);
         assert str(call.get("result", "")) == "echo:hi";
         # unknown method -> honest JSON-RPC error
         bad = mcp_call_tool(client, "nope", {}, timeout_s=10.0);
@@ -568,7 +569,7 @@ test "http transport round trip: initialize, session echo, json and sse bodies" 
         # stop sends DELETE; a fresh initialize on the same client works
         assert mcp_stop(client)["ok"] is True;
         again = mcp_start_http(client, url, timeout_s=10.0);
-        assert again["ok"] is True, again;
+        assert again["ok"] is True, str(again);
     } finally {
         mcp_stop(client);
         if proc is not None {
@@ -592,5 +593,13 @@ test "http transport refuses bad urls and reports unreachable servers" {
     refused = mcp_start_http(client, "http://127.0.0.1:9/mcp", timeout_s=5.0);
     assert refused["ok"] is False;
     err: str = str(refused.get("error", ""));
-    assert "initialize failed" in err, err;
+    assert "initialize failed" in err, str(err);
+}
+
+"""Interpreter for the Python fixture servers. Never `sys.executable`: in a
+native test runner that is the runner itself, so spawning it re-runs the
+suite recursively (a fork bomb)."""
+def _fixture_python -> str {
+    found: str | None = shutil.which("python3");
+    return found if found is not None else "python3";
 }

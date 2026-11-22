@@ -475,7 +475,7 @@ def _instantiate_tracked(
     errors: list[MarkupError],
     gen_lines: list[str],
     var_counter: list[int],
-) -> (UiNode | None, str) {
+) -> tuple[UiNode | None, str] {
     if elem.tag not in registry.tags {
         errors.append(
             MarkupError(

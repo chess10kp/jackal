@@ -8,7 +8,7 @@ builder from there fails the seal (E5093). See docs/TESTING.md and
 jaseci-labs/jac#10490.
 """
 
-import from ui.model { MainScreen, node_id, ordered_child_keys }
+import from ui.model { MainScreen, UiContainer, node_id, ordered_child_keys }
 
 import from ui.layout_types { SizeMode, create_layout_state }
 import from ui.runtime { create_session, dispose_session, get_focus_node, set_focus }
@@ -104,7 +104,7 @@ test "second build_main_shell reuses or refuses duplicate topology" {
     session = handle.session;
     first = build_main_shell(session);
     failed = False;
-    second = None;
+    second: any = None;
     try {
         second = build_main_shell(session);
     } except ValueError {
@@ -164,7 +164,7 @@ test "lowered shell matches build_main_shell child keys" {
     session = handle.session;
     try {
         shell = build_main_shell(session);
-        assert ordered_child_keys(lowered_screen) == ordered_child_keys(shell.screen);
+        assert ordered_child_keys(lowered_screen as UiContainer) == ordered_child_keys(shell.screen);
     } finally {
         dispose_session(session);
     }

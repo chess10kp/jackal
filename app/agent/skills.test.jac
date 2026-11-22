@@ -64,7 +64,7 @@ def _write_skill(dir_path: str, name: str, description: str,
 }
 
 
-def _names(result: dict[str, any]) -> list[str] {
+def _names(result: dict[str, list[dict[str, any]]]) -> list[str] {
     out: list[str] = [];
     items: list[dict[str, any]] = result["skills"];
     for item in items {
@@ -75,7 +75,7 @@ def _names(result: dict[str, any]) -> list[str] {
 }
 
 
-def _diag_types(result: dict[str, any], kind: str) -> list[dict[str, any]] {
+def _diag_types(result: dict[str, list[dict[str, any]]], kind: str) -> list[dict[str, any]] {
     found: list[dict[str, any]] = [];
     diags: list[dict[str, any]] = result["diagnostics"];
     for d in diags {
@@ -102,7 +102,7 @@ test "discovery walk claims SKILL.md branches and skips hidden vendor dirs" {
         _write_text(os.path.join(skills_root, "gamma", ".gitignore"), "SKILL.md\n");
         _write_skill(os.path.join(skills_root, "gamma"), "gamma", "Ignored by rule.");
 
-        result = load_skills_from_dir(skills_root, "project");
+        result: dict[str, list[dict[str, any]]] = load_skills_from_dir(skills_root, "project");
         assert sorted(_names(result)) == ["alpha", "beta"];
         assert len(_diag_types(result, "collision")) == 0;
 
@@ -123,7 +123,7 @@ test "discovery walk claims SKILL.md branches and skips hidden vendor dirs" {
             os.path.join(plain_root, "loose.md"),
             "---\nname: loose-note\ndescription: A root level note.\n---\n\nNote body.\n",
         );
-        loose = load_skills_from_dir(plain_root, "builtin");
+        loose: dict[str, list[dict[str, any]]] = load_skills_from_dir(plain_root, "builtin");
         assert sorted(_names(loose)) == ["loose-note", "nested-skill"];
         loose_items: list[dict[str, any]] = loose["skills"];
         first: dict[str, any] = loose_items[0];
@@ -209,7 +209,7 @@ test "malformed SKILL.md files produce warnings without crashing" {
                     "---\nname [broken: ===\nno closing delimiter ever");
         _write_skill(os.path.join(tree_base, "goodone"), "goodone", "Fine.");
 
-        result = load_skills_from_dir(tree_base, "path");
+        result: dict[str, list[dict[str, any]]] = load_skills_from_dir(tree_base, "path");
         names = _names(result);
         # nodesc/emptyf/binary/garbled excluded; badname+toolong warn but
         # keep loading under their declared (invalid) names -- the dir-name
@@ -267,7 +267,7 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
         _write_skill(os.path.join(proj, ".jackal", "skills", "gamma"),
                      "gamma", "Project gamma.");
 
-        result = load_jackal_skills(cwd=proj, package_root=pkg, agent_dir=home);
+        result: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=proj, package_root=pkg, agent_dir=home);
         # Sorted by name across all roots.
         assert _names(result) == ["alpha", "beta", "dupe", "gamma", "zeta"];
 
@@ -298,7 +298,7 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
         assert str(col["loserPath"]) == dupe_builtin;
 
         # include_defaults=False loads only explicit paths.
-        only_paths = load_jackal_skills(
+        only_paths: dict[str, list[dict[str, any]]] = load_jackal_skills(
             cwd=proj, package_root=pkg, agent_dir=home,
             include_defaults=False,
             skill_paths=[os.path.join(pkg, "pi", "skills", "alpha")],
@@ -308,7 +308,7 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
         # Project skills dir discovered via walk-up from a nested cwd.
         nested_cwd = os.path.join(proj, "deep", "deeper");
         os.makedirs(nested_cwd, exist_ok=True);
-        walked_up = load_jackal_skills(cwd=nested_cwd, package_root=pkg, agent_dir=home);
+        walked_up: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=nested_cwd, package_root=pkg, agent_dir=home);
         assert "gamma" in _names(walked_up);
     } finally {
         _cleanup(tmp);
@@ -328,14 +328,14 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         _write_text(os.path.join(proj, "notmd.txt"), "plain text");
 
         # Relative directory resolves against cwd.
-        rel = load_jackal_skills(cwd=proj, include_defaults=False, skill_paths=["local"]);
+        rel: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=proj, include_defaults=False, skill_paths=["local"]);
         assert _names(rel) == ["local-one"];
         rel_items: list[dict[str, any]] = rel["skills"];
         rel0: dict[str, any] = rel_items[0];
         assert str(rel0["filePath"]) == target;
 
         # Single .md file loads directly; duplicate paths dedup by realpath.
-        solo = load_jackal_skills(cwd=proj, include_defaults=False,
+        solo: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=proj, include_defaults=False,
                                   skill_paths=["standalone.md", str(single_md)]);
         assert _names(solo) == ["standalone"];
 
@@ -366,7 +366,7 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         old_home = os.environ.get("HOME");
         os.environ["HOME"] = home;
         try {
-            tilded = load_jackal_skills(cwd=proj, include_defaults=False,
+            tilded: dict[str, list[dict[str, any]]] = load_jackal_skills(cwd=proj, include_defaults=False,
                                         skill_paths=["~/skills/homed"]);
             assert _names(tilded) == ["homed"];
         } finally {

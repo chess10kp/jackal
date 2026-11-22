@@ -227,13 +227,13 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
     for m in re.finditer(_QUOTED_MENTION_PATTERN, text) {
         inner: str = str(m.group(1));
         path_part: str = inner;
-        rng: dict[str, int] | None = None;
+        rng: dict[str, any] | None = None;
         outer_start: any = m.group(2);
         outer_end: any = m.group(3);
         if outer_start {
             # Range AFTER the closing quote: @"path":10-20.
             outer_range: str = str(outer_start) + ("-" + str(outer_end) if outer_end else "");
-            parsed_outer: dict[str, int] | None = parse_line_range(outer_range);
+            parsed_outer: dict[str, any] | None = parse_line_range(outer_range);
             if parsed_outer is not None {
                 rng = parsed_outer;
             }
@@ -243,7 +243,7 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
             cm = re.search(r":(\d+)(?:-(\d+))?$", inner);
             if cm is not None {
                 inner_range: str = inner[cm.start() + 1:];
-                parsed_inner: dict[str, int] | None = parse_line_range(inner_range);
+                parsed_inner: dict[str, any] | None = parse_line_range(inner_range);
                 if parsed_inner is not None {
                     path_part = inner[:cm.start()];
                     rng = parsed_inner;
@@ -489,7 +489,7 @@ test "skills picker lists project skills with hidden tagging" {
         _seed_skill(cwd, "quiet-skill", "quiet-skill", "hidden helper", hidden=True);
 
         # Real loader: parse the seeded project skills dir, then format.
-        loaded: dict[str, any] = load_skills_from_dir(
+        loaded: dict[str, list[dict[str, any]]] = load_skills_from_dir(
             os.path.join(cwd, ".jackal", "skills"), "project"
         );
         assert len(loaded["skills"]) == 2;

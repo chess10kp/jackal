@@ -341,7 +341,7 @@ test "format_task_line picks icons per status and renders optional blurb" {
         assert format_task_line(plain) == "○ [aaaa1111] plain";
 
         # Legacy files may omit description entirely; must not crash.
-        bare: dict[str, str] = {"id": "bbbb2222", "title": "bare", "status": "pending"};
+        bare: dict[str, any] = {"id": "bbbb2222", "title": "bare", "status": "pending"};
         assert format_task_line(bare) == "○ [bbbb2222] bare";
     } finally {
         _cleanup(tmp);

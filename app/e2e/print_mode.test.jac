@@ -7,10 +7,10 @@ test "print mode answers and exits 0" {
     try {
         sb.script([{"text": "hello from the mock"}]);
         r = run_jackal(sb, ["-p", "say hi"]);
-        assert r.code == 0, sb.explain(r);
-        assert r.stdout.strip() == "hello from the mock", sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert r.stdout.strip() == "hello from the mock", str(sb.explain(r));
         calls = sb.calls();
-        assert len(calls) == 1, sb.explain(r);
+        assert len(calls) == 1, str(sb.explain(r));
         assert calls[0]["last"]["content"] == "say hi";
         assert "read_file" in calls[0]["tools"];
     } finally {
@@ -22,9 +22,9 @@ test "print mode reads the prompt from stdin" {
     sb = make_sandbox();
     try {
         r = run_jackal(sb, ["-p", "summarize"], stdin_text="file body");
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         # Unscripted mock echoes the last user message.
-        assert "summarize" in r.stdout and "file body" in r.stdout, sb.explain(r);
+        assert "summarize" in r.stdout and "file body" in r.stdout, str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -47,10 +47,10 @@ test "tool loop edits a file in yolo mode" {
             {"text": "done"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "rename alpha"]);
-        assert r.code == 0, sb.explain(r);
-        assert sb.read("notes.txt") == "beta\n", sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert sb.read("notes.txt") == "beta\n", str(sb.explain(r));
         calls = sb.calls();
-        assert len(calls) == 3, sb.explain(r);
+        assert len(calls) == 3, str(sb.explain(r));
         # The model saw the read_file result before editing.
         assert calls[1]["last"]["role"] == "tool";
         assert "alpha" in calls[1]["last"]["content"];
@@ -72,10 +72,10 @@ test "normal mode refuses confirm-gated tools without a prompt" {
             {"text": "could not write"},
         ]);
         r = run_jackal(sb, ["-p", "overwrite it"]);
-        assert r.code == 0, sb.explain(r);
-        assert sb.read("keep.txt") == "original\n", sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert sb.read("keep.txt") == "original\n", str(sb.explain(r));
         calls = sb.calls();
-        assert "needs approval" in calls[1]["last"]["content"], sb.explain(r);
+        assert "needs approval" in calls[1]["last"]["content"], str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -92,8 +92,8 @@ test "plan mode blocks writes" {
             {"text": "planned"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "plan", "make a file"]);
-        assert r.code == 0, sb.explain(r);
-        assert not sb.exists("new.txt"), sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert not sb.exists("new.txt"), str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -104,9 +104,9 @@ test "json output reports result metadata" {
     try {
         sb.script([{"text": "structured"}]);
         r = run_jackal(sb, ["-p", "--output-format", "json", "q"]);
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         evs = r.events();
-        assert len(evs) == 1, sb.explain(r);
+        assert len(evs) == 1, str(sb.explain(r));
         res = evs[0];
         assert res["type"] == "result";
         assert res["result"] == "structured";
@@ -123,10 +123,10 @@ test "stream-json emits chunks then a result" {
     try {
         sb.script([{"text": "streamed text"}]);
         r = run_jackal(sb, ["-p", "--output-format", "stream-json", "q"]);
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         types = r.event_types();
-        assert "chunk" in types, sb.explain(r);
-        assert types[-1] == "result", sb.explain(r);
+        assert "chunk" in types, str(sb.explain(r));
+        assert types[-1] == "result", str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -137,7 +137,7 @@ test "provider error exits 1" {
     try {
         sb.script([{"error": "HTTP 400: bad request"}]);
         r = run_jackal(sb, ["-p", "--output-format", "json", "q"]);
-        assert r.code == 1, sb.explain(r);
+        assert r.code == 1, str(sb.explain(r));
         res = r.events()[-1];
         assert res["is_error"] == True;
         assert "HTTP 400" in " ".join(res["errors"]);
@@ -150,8 +150,8 @@ test "bad flags exit 2 with usage" {
     sb = make_sandbox();
     try {
         r = run_jackal(sb, ["--nope"]);
-        assert r.code == 2, sb.explain(r);
-        assert "unknown option" in r.stderr and "usage:" in r.stderr, sb.explain(r);
+        assert r.code == 2, str(sb.explain(r));
+        assert "unknown option" in r.stderr and "usage:" in r.stderr, str(sb.explain(r));
         assert sb.calls() == [];
     } finally {
         sb.cleanup();
@@ -163,12 +163,12 @@ test "continue resumes the previous session transcript" {
     try {
         sb.script([{"text": "first answer"}, {"text": "second answer"}]);
         r1 = run_jackal(sb, ["-p", "remember 42"]);
-        assert r1.code == 0, sb.explain(r1);
+        assert r1.code == 0, str(sb.explain(r1));
         r2 = run_jackal(sb, ["-p", "-c", "what number?"]);
-        assert r2.code == 0, sb.explain(r2);
+        assert r2.code == 0, str(sb.explain(r2));
         calls = sb.calls();
         # Second process sent system + first exchange + new prompt.
-        assert calls[-1]["messages"] >= 4, sb.explain(r2);
+        assert calls[-1]["messages"] >= 4, str(sb.explain(r2));
     } finally {
         sb.cleanup();
     }

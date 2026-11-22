@@ -18,7 +18,9 @@
 # stays native and its call lands on an abort stub (jaseci-labs/jac#10496).
 # Unquarantine when stored-callable calls lower (or when demotion is
 # order-independent and demoted callees are bridged instead of aborted).
-cordis/core
+# cordis/core: unquarantined 2026-11-22 — passes 6/6 as a native neojac runner.
+# Harness drives the full LiveShell (native VtScreen emulator since 2026-11-22;
+# under neojac 7 passed, 2 failed — still only the two mode-badge assertions).
 # Harness drives the full LiveShell (pyte + native-pinned ui render stack).
 # It now RUNS (592 passed, 3 failed) instead of skipping — the old skip was
 # the missing httpx dependency. The 3 failures are text assertions against the

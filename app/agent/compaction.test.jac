@@ -55,7 +55,7 @@ test "usage estimation is char/4 with per-message overhead" {
     assert estimate_tokens("12345678") == 2;
     # Rounding up: 5 chars -> 2 tokens.
     assert estimate_tokens("12345") == 2;
-    msgs = [{"role": "user", "content": "abcdefgh"}];  # 2 + 4 overhead = 6
+    msgs: list[dict[str, any]] = [{"role": "user", "content": "abcdefgh"}];  # 2 + 4 overhead = 6
     usage = compute_context_usage(msgs);
     assert usage["used"] == 6;
     assert usage["max"] == DEFAULT_CONTEXT_MAX;
@@ -97,7 +97,7 @@ test "mechanical summary shape: wrapper, role prefixes, truncation" {
 }
 
 test "llm summary prompt previews truncate at 200 and wrap summary guards empty" {
-    msgs = [{"role": "user", "content": "y" * 500}];
+    msgs: list[dict[str, any]] = [{"role": "user", "content": "y" * 500}];
     p = build_llm_summary_prompt(msgs);
     plines = p.split("\n");
     # Instruction header first, preview last, truncated to 197 + "...".

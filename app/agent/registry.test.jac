@@ -124,15 +124,15 @@ test "a failing native handler is logged without changing the ERROR contract" {
             _tool_boom,
         );
         err = invoke(reg, "boom", {"x": 1});
-        assert err.startswith("ERROR:"), err;
+        assert err.startswith("ERROR:"), str(err);
         fh: any = open(sink, "r");
         lines: list[str] = fh.read().splitlines();
         fh.close();
-        assert len(lines) == 1, lines;
+        assert len(lines) == 1, str(lines);
         rec: any = json.loads(lines[0]);
-        assert rec["source"] == "registry.invoke", rec;
-        assert rec["fields"]["tool"] == "boom", rec;
-        assert "ValueError" in rec["msg"], rec;
+        assert rec["source"] == "registry.invoke", str(rec);
+        assert rec["fields"]["tool"] == "boom", str(rec);
+        assert "ValueError" in rec["msg"], str(rec);
     } finally {
         if old_log is None {
             os.environ.pop("JACKAL_LOG", None);

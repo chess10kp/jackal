@@ -26,7 +26,7 @@ test "inject queues input and invokes callback" {
     term = VirtualTerminal(
         columns=20,
         rows=5,
-        on_input=lambda (data: str) -> None { seen.append(data); },
+        on_input=lambda (data: str) -> None { seen.append(data) },
     );
     term.start();
     term.inject("abc");
@@ -45,7 +45,7 @@ test "inject_resize updates size and notifies" {
     term = VirtualTerminal(
         columns=80,
         rows=24,
-        on_resize=lambda (c: int, r: int) -> None { sizes.append((c, r)); },
+        on_resize=lambda (c: int, r: int) -> None { sizes.append((c, r)) },
     );
     term.inject_resize(100, 30);
     assert term.columns == 100;
@@ -58,7 +58,7 @@ test "inject_resize updates size and notifies" {
 test "inject_sigint restores terminal" {
     hits = [0];
     term = VirtualTerminal(
-        on_interrupt=lambda () -> None { hits[0] = hits[0] + 1; },
+        on_interrupt=lambda -> None { hits[0] = hits[0] + 1; },
     );
     term.start();
     assert not term.restored;

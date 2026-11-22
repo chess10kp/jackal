@@ -4,13 +4,16 @@ Provides node type, event handling, measure/paint hooks, disposal, inspection
 metadata, and markup registration without editing framework source.
 """
 
+import from ui.model { UiNode }
+
 walker SetProgress {
     has value: float = 0.0;
     has handled: bool = False;
 }
 
-node ProgressBar {
-    has key: str = "";
+# Derives the public UiNode base (framework API, not a framework edit) so
+# markup can construct it as a UiNode under native typing.
+node ProgressBar(UiNode) {
     has value: float = 0.0;
 
     can set_value with SetProgress entry {

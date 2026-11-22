@@ -128,7 +128,7 @@ test "legacy fixture file loads and lists exactly like the real runtime wrote it
 
         # Our own save must emit all six keys too, so the legacy runtime
         # can read our files back.
-        hist = [{"role": "user", "content": "ours"}];
+        hist: list[dict[str, any]] = [{"role": "user", "content": "ours"}];
         meta = save_session(tmp, hist, name="renamed by us");
         ours = _read_raw(meta["path"]);
         assert set(ours.keys()) == {"sessionId", "sessionName", "cwd", "createdAt", "updatedAt", "messages"};

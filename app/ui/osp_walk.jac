@@ -18,9 +18,9 @@ the subset of `ui_jids` that is reachable."""
 def ui_jids_reachable_from_nodes(seeds: list[any], ui_jids: set[str]) -> list[str] {
     found: list[str] = [];
     visited: set[str] = set();
-    queue: list[OspAny] = [];
+    queue: list[Node] = [];
     for s_any in seeds {
-        s: OspAny = s_any;
+        s: Node = s_any;
         sj: str = jid(s);
         if sj not in visited {
             visited.add(sj);
@@ -28,13 +28,13 @@ def ui_jids_reachable_from_nodes(seeds: list[any], ui_jids: set[str]) -> list[st
         }
     }
     while queue {
-        current: OspAny = queue.pop(0);
+        current: Node = queue.pop(0);
         current_jid: str = jid(current);
         if current_jid in ui_jids {
             found.append(current_jid);
         }
         for n_fwd in [current -->] {
-            neighbor: OspAny = n_fwd;
+            neighbor: Node = n_fwd;
             nj: str = jid(neighbor);
             if nj not in visited {
                 visited.add(nj);
@@ -42,7 +42,7 @@ def ui_jids_reachable_from_nodes(seeds: list[any], ui_jids: set[str]) -> list[st
             }
         }
         for n_bwd in [current <--] {
-            in_neighbor: OspAny = n_bwd;
+            in_neighbor: Node = n_bwd;
             inj: str = jid(in_neighbor);
             if inj not in visited {
                 visited.add(inj);

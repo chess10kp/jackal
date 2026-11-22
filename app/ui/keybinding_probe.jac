@@ -13,7 +13,8 @@ replicated (not exercised): the branch ordering inside tui._handle_key.
 """
 
 import from agent.session { plugins, list_extension_shortcuts, run_extension_shortcut }
-import from agent.plugin_bridge { create_bridge, register_fake_shortcut, dispose_bridge }
+import from agent.plugin_bridge { create_bridge, dispose_bridge }
+import from agent.fake_host { register_fake_shortcut }
 
 """Minimal LiveShell-shaped target. Only attributes read by the replicated
 branches are present."""

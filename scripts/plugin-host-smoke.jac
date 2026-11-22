@@ -30,7 +30,6 @@ import from agent.plugin_bridge {
 }
 import from agent.registry { invoke, get_tool, ToolRegistry }
 
-
 with entry {
     t_wall0 = time.time();
     stub = resolve_stub_echo();
@@ -54,7 +53,7 @@ with entry {
     ready = wait_extensions_ready(15.0);
     print(
         f"  time_to_extension_ready={ready.t_ext_ready_s - t_wall0:.3f}s "
-        + f"label={ready.label} compat={ready.compat_tier}"
+            + f"label={ready.label} compat={ready.compat_tier}",
     );
     if ready.phase == "degraded" and ready.loaded < ready.total {
         print(f"FAIL: degraded {ready.detail}");

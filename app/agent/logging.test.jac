@@ -47,7 +47,7 @@ test "logging is off by default and writes nothing" {
         return log_event("error", "test", "should not appear");
     }
     wrote = _with_env({"JACKAL_LOG": "", "JACKAL_LOG_LEVEL": "debug"}, body);
-    assert wrote is False, wrote;
+    assert wrote is False, str(wrote);
     assert log_sink() == "";
     assert not log_enabled("error");
 }
@@ -62,19 +62,19 @@ test "explicit sink path writes one JSON object per event" {
             return log_info("agent.tools", "second", None);
         }
         wrote = _with_env({"JACKAL_LOG": sink, "JACKAL_LOG_LEVEL": "debug"}, body);
-        assert wrote is True, wrote;
+        assert wrote is True, str(wrote);
         assert os.path.exists(sink);
         records = read_log(sink);
-        assert len(records) == 2, records;
+        assert len(records) == 2, str(records);
         first = records[0];
-        assert first["level"] == "info", first;
-        assert first["source"] == "agent.tools", first;
-        assert first["msg"] == "read_file ok", first;
-        assert first["fields"]["path"] == "a.txt", first;
-        assert first["fields"]["bytes"] == 3, first;
-        assert isinstance(first["ts"], str) and len(first["ts"]) > 10, first;
-        assert first["pid"] == os.getpid(), first;
-        assert not ("fields" in records[1]), records[1];
+        assert first["level"] == "info", str(first);
+        assert first["source"] == "agent.tools", str(first);
+        assert first["msg"] == "read_file ok", str(first);
+        assert first["fields"]["path"] == "a.txt", str(first);
+        assert first["fields"]["bytes"] == 3, str(first);
+        assert isinstance(first["ts"], str) and len(first["ts"]) > 10, str(first);
+        assert first["pid"] == os.getpid(), str(first);
+        assert not ("fields" in records[1]), str(records[1]);
     } finally {
         shutil.rmtree(tmp, ignore_errors=True);
     }
@@ -91,12 +91,12 @@ test "JACKAL_LOG=1 uses the per-process .jackal/logs file" {
             return log_sink();
         }
         sink = _with_env({"JACKAL_LOG": "1", "JACKAL_LOG_LEVEL": "info"}, body);
-        assert sink.startswith(os.path.join(tmp, ".jackal", "logs")), sink;
-        assert sink.endswith(".jsonl"), sink;
-        assert os.path.exists(sink), sink;
+        assert sink.startswith(os.path.join(tmp, ".jackal", "logs")), str(sink);
+        assert sink.endswith(".jsonl"), str(sink);
+        assert os.path.exists(sink), str(sink);
         recs = read_log(sink);
-        assert len(recs) == 1, recs;
-        assert recs[0]["level"] == "warn", recs[0];
+        assert len(recs) == 1, str(recs);
+        assert recs[0]["level"] == "warn", str(recs[0]);
     } finally {
         os.chdir(cwd);
         shutil.rmtree(tmp, ignore_errors=True);
@@ -115,8 +115,8 @@ test "level threshold filters lower-severity records" {
         }
         _with_env({"JACKAL_LOG": sink, "JACKAL_LOG_LEVEL": "warn"}, body);
         recs = read_log(sink);
-        assert len(recs) == 1, recs;
-        assert recs[0]["level"] == "warn", recs[0];
+        assert len(recs) == 1, str(recs);
+        assert recs[0]["level"] == "warn", str(recs[0]);
     } finally {
         shutil.rmtree(tmp, ignore_errors=True);
     }
@@ -134,7 +134,7 @@ test "unknown level names do not disable or crash logging" {
         wrote = _with_env({"JACKAL_LOG": sink, "JACKAL_LOG_LEVEL": "chatty"}, body);
         assert wrote is True;
         recs = read_log(sink);
-        assert len(recs) == 1 and recs[0]["level"] == "info", recs;
+        assert len(recs) == 1 and recs[0]["level"] == "info", str(recs);
     } finally {
         shutil.rmtree(tmp, ignore_errors=True);
     }
@@ -150,12 +150,12 @@ test "unserializable payloads are projected, not raised" {
         "many": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
     };
     proj: any = safe_fields(fields);
-    assert isinstance(proj, dict), proj;
-    assert proj["obj"] == "<weird object>", proj["obj"];
-    assert isinstance(proj["blob"], str), proj["blob"];
-    assert proj["huge"].endswith("..."), proj["huge"];
-    assert len(proj["huge"]) <= MAX_STRING_LEN + 3, len(proj["huge"]);
-    assert proj["many"][-1] == "...", proj["many"];
+    assert isinstance(proj, dict), str(proj);
+    assert proj["obj"] == "<weird object>", str(proj["obj"]);
+    assert isinstance(proj["blob"], str), str(proj["blob"]);
+    assert proj["huge"].endswith("..."), str(proj["huge"]);
+    assert len(proj["huge"]) <= MAX_STRING_LEN + 3, str(len(proj["huge"]));
+    assert proj["many"][-1] == "...", str(proj["many"]);
     # The whole write path must also survive it.
     tmp = tempfile.mkdtemp(prefix="jackal-log-weird-");
     try {
@@ -184,7 +184,7 @@ test "an unusable sink path is a no-op, not an exception" {
             return log_event("error", "x", "boom");
         }
         wrote = _with_env({"JACKAL_LOG": sink, "JACKAL_LOG_LEVEL": "debug"}, body);
-        assert wrote is False, wrote;
+        assert wrote is False, str(wrote);
     } finally {
         shutil.rmtree(tmp, ignore_errors=True);
     }
@@ -205,19 +205,19 @@ test "log_exception records type, message and traceback, and never raises" {
             return log_exception("x", None);
         }
         wrote = _with_env({"JACKAL_LOG": sink, "JACKAL_LOG_LEVEL": "debug"}, body);
-        assert wrote is True, wrote;
+        assert wrote is True, str(wrote);
         recs = read_log(sink);
-        assert len(recs) == 2, recs;
+        assert len(recs) == 2, str(recs);
         rec = recs[0];
-        assert rec["level"] == "error", rec;
-        assert rec["fields"]["exception"] == "ValueError", rec;
-        assert rec["fields"]["detail"] == "disk on fire", rec;
-        assert rec["fields"]["phase"] == "capture", rec;
-        assert "ValueError: disk on fire" in rec["fields"]["traceback"], rec;
+        assert rec["level"] == "error", str(rec);
+        assert rec["fields"]["exception"] == "ValueError", str(rec);
+        assert rec["fields"]["detail"] == "disk on fire", str(rec);
+        assert rec["fields"]["phase"] == "capture", str(rec);
+        assert "ValueError: disk on fire" in rec["fields"]["traceback"], str(rec);
         # The no-exception call still logs, without a traceback field.
         second_rec = recs[1];
-        assert second_rec["level"] == "error", second_rec;
-        assert not ("traceback" in second_rec["fields"]), second_rec;
+        assert second_rec["level"] == "error", str(second_rec);
+        assert not ("traceback" in second_rec["fields"]), str(second_rec);
     } finally {
         shutil.rmtree(tmp, ignore_errors=True);
     }
@@ -232,8 +232,8 @@ test "read_log skips malformed lines and missing files" {
         fh.write("{\"ok\": 1}\nnot json\n\n[1,2,3]\n{\"ok\": 2}\n");
         fh.close();
         recs = read_log(path);
-        assert len(recs) == 2, recs;
-        assert recs[0]["ok"] == 1 and recs[1]["ok"] == 2, recs;
+        assert len(recs) == 2, str(recs);
+        assert recs[0]["ok"] == 1 and recs[1]["ok"] == 2, str(recs);
         assert read_log(os.path.join(tmp, "missing.jsonl")) == [];
     } finally {
         shutil.rmtree(tmp, ignore_errors=True);

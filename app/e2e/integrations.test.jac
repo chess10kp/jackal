@@ -1,5 +1,6 @@
 """E2E: MCP servers and subagents through the real entry and mock model."""
 
+import shutil;
 import os;
 import sys;
 import json;
@@ -11,7 +12,7 @@ def _mcp_cfg(env_fail: bool = False) -> dict[str, any] {
             "servers": {
                 "fake": {
                     "command": [
-                        sys.executable if not env_fail else "false",
+                        _fixture_python() if not env_fail else "false",
                         fixture_path("fake_mcp.py"),
                     ],
                 },
@@ -29,11 +30,11 @@ test "mcp tools are offered on the first request and callable" {
             {"text": "mcp said hi"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "use mcp"]);
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         calls = sb.calls();
-        assert "mcp_fake_echo" in calls[0]["tools"], sb.explain(r);
-        assert "mcp_fake_add" in calls[0]["tools"], sb.explain(r);
-        assert calls[1]["last"]["content"] == "echo: ping", sb.explain(r);
+        assert "mcp_fake_echo" in calls[0]["tools"], str(sb.explain(r));
+        assert "mcp_fake_add" in calls[0]["tools"], str(sb.explain(r));
+        assert calls[1]["last"]["content"] == "echo: ping", str(sb.explain(r));
         assert r.stdout.strip() == "mcp said hi";
     } finally {
         sb.cleanup();
@@ -46,10 +47,10 @@ test "a failing mcp server degrades without breaking the turn" {
         write_project_config(sb, _mcp_cfg(env_fail=True));
         sb.script([{"text": "still works"}]);
         r = run_jackal(sb, ["-p", "q"]);
-        assert r.code == 0, sb.explain(r);
-        assert r.stdout.strip() == "still works", sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert r.stdout.strip() == "still works", str(sb.explain(r));
         for t in sb.calls()[0]["tools"] {
-            assert not str(t).startswith("mcp_fake_"), sb.explain(r);
+            assert not str(t).startswith("mcp_fake_"), str(sb.explain(r));
         }
     } finally {
         sb.cleanup();
@@ -63,8 +64,8 @@ test "repl /mcp reports server status" {
         sb.script([{"text": "warm"}]);
         # One turn first so the attach flow has settled before /mcp.
         r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
-        assert r.code == 0, sb.explain(r);
-        assert "fake — connected · 6 tools" in r.stdout, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert "fake — connected · 6 tools" in r.stdout, str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -81,7 +82,7 @@ test "mcp env and cwd reach the server subprocess" {
                 "mcp": {
                     "servers": {
                         "fake": {
-                            "command": [sys.executable, fixture_path("fake_mcp.py")],
+                            "command": [_fixture_python(), fixture_path("fake_mcp.py")],
                             "env": {"FAKE_MCP_TOKEN": "xyz42"},
                             "cwd": "sub",
                         },
@@ -95,10 +96,10 @@ test "mcp env and cwd reach the server subprocess" {
             {"text": "probed"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "probe the server"]);
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         calls = sb.calls();
-        assert calls[1]["last"]["content"] == "token=xyz42", sb.explain(r);
-        assert calls[2]["last"]["content"] == sub, sb.explain(r);
+        assert calls[1]["last"]["content"] == "token=xyz42", str(sb.explain(r));
+        assert calls[2]["last"]["content"] == sub, str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -113,7 +114,7 @@ test "an enabled:false mcp server never attaches" {
                 "mcp": {
                     "servers": {
                         "off": {
-                            "command": [sys.executable, fixture_path("fake_mcp.py")],
+                            "command": [_fixture_python(), fixture_path("fake_mcp.py")],
                             "enabled": False,
                         },
                     },
@@ -122,11 +123,11 @@ test "an enabled:false mcp server never attaches" {
         );
         sb.script([{"text": "warm"}]);
         r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         for t in sb.calls()[0]["tools"] {
-            assert not str(t).startswith("mcp_off_"), sb.explain(r);
+            assert not str(t).startswith("mcp_off_"), str(sb.explain(r));
         }
-        assert "off — disabled" in r.stdout, sb.explain(r);
+        assert "off — disabled" in r.stdout, str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -143,7 +144,7 @@ test "legacy mcp.json import attaches imported servers with a notice" {
             f.write(
                 json.dumps({
                     "mcpServers": {
-                        "leg": {"command": sys.executable, "args": [fixture_path("fake_mcp.py")]},
+                        "leg": {"command": _fixture_python(), "args": [fixture_path("fake_mcp.py")]},
                     },
                 }),
             );
@@ -155,17 +156,17 @@ test "legacy mcp.json import attaches imported servers with a notice" {
             stdin_text="hi\n/mcp\n/exit\n",
             env_extra={"JACKAL_MCP_NO_IMPORT": "", "HOME": home},
         );
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         # imported server attached from the legacy source...
-        assert "leg — connected · 6 tools" in r.stdout, sb.explain(r);
+        assert "leg — connected · 6 tools" in r.stdout, str(sb.explain(r));
         # ...and the onboarding notice surfaced
-        assert "imported 1 server(s) from legacy" in r.stdout, sb.explain(r);
+        assert "imported 1 server(s) from legacy" in r.stdout, str(sb.explain(r));
         # the marker makes it one-time: a second run imports nothing new
         r2 = run_jackal(
             sb, [], stdin_text="hi\n/exit\n", env_extra={"JACKAL_MCP_NO_IMPORT": "", "HOME": home}
         );
-        assert r2.code == 0, sb.explain(r2);
-        assert "imported" not in r2.stdout, sb.explain(r2);
+        assert r2.code == 0, str(sb.explain(r2));
+        assert "imported" not in r2.stdout, str(sb.explain(r2));
     } finally {
         sb.cleanup();
     }
@@ -181,10 +182,10 @@ test "a dead mcp server degrades, then recovers on the next call" {
             {"text": "recovered"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "kill then use"]);
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         calls = sb.calls();
-        assert calls[1]["last"]["content"] == "dying", sb.explain(r);
-        assert calls[2]["last"]["content"] == "echo: back", sb.explain(r);
+        assert calls[1]["last"]["content"] == "dying", str(sb.explain(r));
+        assert calls[2]["last"]["content"] == "echo: back", str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -196,8 +197,8 @@ test "repl /mcp SERVER PROMPT expands the server prompt" {
         write_project_config(sb, _mcp_cfg());
         sb.script([{"text": "warm"}]);
         r = run_jackal(sb, [], stdin_text='hi\n/mcp fake greet {"who": "jackal"}\n/exit\n');
-        assert r.code == 0, sb.explain(r);
-        assert "Hello, jackal!" in r.stdout, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert "Hello, jackal!" in r.stdout, str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -209,7 +210,7 @@ test "an http mcp server attaches and its tools are callable" {
     try {
         # ephemeral fake streamable-HTTP server on loopback
         proc = subprocess.Popen(
-            [sys.executable, fixture_path("fake_mcp_http.py")],
+            [_fixture_python(), fixture_path("fake_mcp_http.py")],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -217,7 +218,7 @@ test "an http mcp server attaches and its tools are callable" {
         );
         out_pipe: any = proc.stdout;
         ready: str = out_pipe.readline().strip();
-        assert ready.startswith("READY "), ready;
+        assert ready.startswith("READY "), str(ready);
         port: str = ready.split(" ")[1];
         write_project_config(
             sb,
@@ -234,10 +235,10 @@ test "an http mcp server attaches and its tools are callable" {
             {"text": "remote done"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "use the remote server"]);
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         calls = sb.calls();
-        assert "mcp_rem_echo" in calls[0]["tools"], sb.explain(r);
-        assert calls[1]["last"]["content"] == "echo:hi", sb.explain(r);
+        assert "mcp_rem_echo" in calls[0]["tools"], str(sb.explain(r));
+        assert calls[1]["last"]["content"] == "echo:hi", str(sb.explain(r));
         assert r.stdout.strip() == "remote done";
     } finally {
         if proc is not None {
@@ -257,7 +258,7 @@ test "repl /mcp reports an http server as connected" {
     proc: any = None;
     try {
         proc = subprocess.Popen(
-            [sys.executable, fixture_path("fake_mcp_http.py")],
+            [_fixture_python(), fixture_path("fake_mcp_http.py")],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -265,7 +266,7 @@ test "repl /mcp reports an http server as connected" {
         );
         out_pipe: any = proc.stdout;
         ready: str = out_pipe.readline().strip();
-        assert ready.startswith("READY "), ready;
+        assert ready.startswith("READY "), str(ready);
         port: str = ready.split(" ")[1];
         write_project_config(
             sb,
@@ -279,8 +280,8 @@ test "repl /mcp reports an http server as connected" {
         );
         sb.script([{"text": "warm"}]);
         r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
-        assert r.code == 0, sb.explain(r);
-        assert "rem — connected · 1 tools" in r.stdout, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert "rem — connected · 1 tools" in r.stdout, str(sb.explain(r));
     } finally {
         if proc is not None {
             proc.terminate();
@@ -306,10 +307,10 @@ test "mcp resources surface as a generated read-only tool" {
             {"text": "read the memo"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "read the resource"]);
-        assert r.code == 0, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
         calls = sb.calls();
-        assert "mcp_fake_read_resource" in calls[0]["tools"], sb.explain(r);
-        assert calls[1]["last"]["content"] == "the memo body", sb.explain(r);
+        assert "mcp_fake_read_resource" in calls[0]["tools"], str(sb.explain(r));
+        assert calls[1]["last"]["content"] == "the memo body", str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -323,9 +324,9 @@ test "repl /mcp resources lists and reads" {
         r = run_jackal(
             sb, [], stdin_text="hi\n/mcp resources\n/mcp resources fake memo://1\n/exit\n"
         );
-        assert r.code == 0, sb.explain(r);
-        assert "memo://1 — memo (text/plain)" in r.stdout, sb.explain(r);
-        assert "the memo body" in r.stdout, sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert "memo://1 — memo (text/plain)" in r.stdout, str(sb.explain(r));
+        assert "the memo body" in r.stdout, str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
@@ -348,12 +349,12 @@ test "subagent runs a nested loop and returns its report" {
             {"text": "subagent found kumquat"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "auto-accept", "delegate it"]);
-        assert r.code == 0, sb.explain(r);
-        assert r.stdout.strip() == "subagent found kumquat", sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert r.stdout.strip() == "subagent found kumquat", str(sb.explain(r));
         calls = sb.calls();
-        assert len(calls) == 4, sb.explain(r);
+        assert len(calls) == 4, str(sb.explain(r));
         # Nested call 1 starts fresh: system + task only, and no recursion tool.
-        assert calls[1]["messages"] == 2, sb.explain(r);
+        assert calls[1]["messages"] == 2, str(sb.explain(r));
         assert calls[1]["last"]["content"] == "find the secret word in README.md";
         assert "subagent" not in calls[1]["tools"];
         # The main loop got only the report back.
@@ -372,9 +373,17 @@ test "task tools persist the board across processes" {
             {"text": "planned"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "auto-accept", "plan work"]);
-        assert r.code == 0, sb.explain(r);
-        assert "ship it" in sb.read(".jackal/tasks.json"), sb.explain(r);
+        assert r.code == 0, str(sb.explain(r));
+        assert "ship it" in sb.read(".jackal/tasks.json"), str(sb.explain(r));
     } finally {
         sb.cleanup();
     }
+}
+
+"""Interpreter for the Python fixture servers. Never `sys.executable`: in a
+native test runner that is the runner itself, so spawning it re-runs the
+suite recursively (a fork bomb)."""
+def _fixture_python -> str {
+    found: str | None = shutil.which("python3");
+    return found if found is not None else "python3";
 }

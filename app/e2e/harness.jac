@@ -16,6 +16,11 @@ import subprocess;
 import time;
 import threading;
 import from ui.emulated_terminal { EmulatedTerminal }
+import codecs;
+import pty;
+import fcntl;
+import termios;
+import struct;
 
 glob E2E_TIMEOUT_S: int = 300;
 
@@ -26,27 +31,58 @@ def app_dir -> str {
     if env_root and os.path.isfile(os.path.join(env_root, "app", "main.jac")) {
         return os.path.join(env_root, "app");
     }
-    here: str = os.getcwd();
+    cur_dir: str = os.getcwd();
     for _ in range(4) {
-        if os.path.isfile(os.path.join(here, "main.jac")) and os.path.isdir(os.path.join(here, "agent")) {
-            return here;
+        if os.path.isfile(os.path.join(cur_dir, "main.jac")) and os.path.isdir(os.path.join(cur_dir, "agent")) {
+            return cur_dir;
         }
-        if os.path.isfile(os.path.join(here, "app", "main.jac")) {
-            return os.path.join(here, "app");
+        if os.path.isfile(os.path.join(cur_dir, "app", "main.jac")) {
+            return os.path.join(cur_dir, "app");
         }
-        here = os.path.dirname(here);
+        cur_dir = os.path.dirname(cur_dir);
     }
     raise RuntimeError("e2e: cannot locate app/main.jac (set JACKAL_ROOT)");
 }
 
 
 def jac_bin -> str {
-    got: str | None = os.environ.get("JAC") or shutil.which("jac");
+    got: str | None = os.environ.get("JAC") or shutil.which("neojac") or shutil.which("jac");
     if not got {
-        raise RuntimeError("e2e: jac not on PATH (set JAC)");
+        raise RuntimeError("e2e: neojac not on PATH (set JAC)");
     }
     return got;
 }
+
+
+"""Native executable for an app entry module (`main.jac`, `tui/shell.jac`).
+JACKAL_BIN / JACKAL_TUI_BIN name prebuilt binaries; otherwise the entry is
+built once into .jac/e2e/ with `neojac build` (its build cache makes a
+rebuild of unchanged sources near-instant)."""
+def native_bin(entry_mod: str) -> str {
+    env_key: str = "JACKAL_TUI_BIN" if entry_mod.startswith("tui") else "JACKAL_BIN";
+    pre: str = os.environ.get(env_key, "");
+    if pre {
+        return pre;
+    }
+    out_dir: str = os.path.join(app_dir(), ".jac", "e2e");
+    os.makedirs(out_dir, exist_ok=True);
+    out: str = os.path.join(out_dir, os.path.basename(entry_mod).replace(".jac", ""));
+    if out in _built_bins {
+        return out;
+    }
+    r = subprocess.run(
+        [jac_bin(), "build", entry_mod, "-o", out],
+        cwd=app_dir(), capture_output=True, text=True, timeout=1800,
+    );
+    if r.returncode != 0 {
+        raise RuntimeError("e2e: neojac build " + entry_mod + " failed:\n" + r.stdout + r.stderr);
+    }
+    _built_bins.append(out);
+    os.environ[env_key] = out;
+    return out;
+}
+
+glob _built_bins: list[str] = [];
 
 
 """Isolated sandbox: a project dir (seeded with `files`, path -> text) and a
@@ -166,7 +202,7 @@ obj RunResult {
 }
 
 
-"""Run `jac run app/main.jac -- ARGS` inside the sandbox project with the mock
+"""Run the native app/main.jac binary with ARGS inside the sandbox project with the mock
 model. `stdin_text` is fed to the process (closed afterwards)."""
 def run_jackal(
     sb: Sandbox,
@@ -192,7 +228,7 @@ def run_jackal(
     if env_extra is not None {
         for (k, v) in env_extra.items() { env[k] = v; }
     }
-    cmd: list[str] = [jac_bin(), "run", os.path.join(app_dir(), "main.jac"), "--"] + args;
+    cmd: list[str] = [native_bin("main.jac")] + args;
     try {
         proc: any = subprocess.run(
             cmd, input=stdin_text, capture_output=True, text=True,
@@ -225,7 +261,7 @@ glob KEYS: dict[str, str] = {
 };
 
 
-"""A live `jac run tui/shell.jac` under a pseudo-terminal, with its output
+"""A live native tui/shell.jac binary under a pseudo-terminal, with its output
 replayed into a Screen. Drive it with type_text/press, assert with
 wait_for/screen_text, and always close()."""
 obj TuiSession {
@@ -238,8 +274,6 @@ obj TuiSession {
         alive: bool = True;
 
     def _read_loop  {
-        import os;
-        import codecs;
         dec: any = codecs.getincrementaldecoder("utf-8")("replace");
         while self.alive {
             try {
@@ -261,7 +295,6 @@ obj TuiSession {
     }
 
     def send(data: str) {
-        import os;
         os.write(self.master_fd, data.encode("utf-8"));
     }
 
@@ -370,10 +403,6 @@ def spawn_tui(
     env_extra: dict[str, str] | None = None,
     boot_timeout_s: float = 240.0,
 ) -> TuiSession {
-    import pty;
-    import fcntl;
-    import termios;
-    import struct;
     (master_fd, slave_fd) = pty.openpty();
     fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0));
     env: dict[str, str] = dict(os.environ);
@@ -392,7 +421,7 @@ def spawn_tui(
     if env_extra is not None {
         for (k, v) in env_extra.items() { env[k] = v; }
     }
-    cmd: list[str] = [jac_bin(), "run", os.path.join(app_dir(), "tui", "shell.jac")];
+    cmd: list[str] = [native_bin("tui/shell.jac")];
     proc: any = subprocess.Popen(
         cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
         cwd=sb.project, env=env, start_new_session=True, close_fds=True,

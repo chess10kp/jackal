@@ -77,10 +77,10 @@ def _oauth_cred(access: str, refresh: str, expires: int) -> dict[str, any] {
 test "load/save round trip preserves both credential types and unknown keys" {
     tmp = _make_tmp();
     try {
-        data = {
+        data: dict[str, any] = {
             "anthropic": _api_cred("sk-ant-live-1234"),
-            "openai-codex": dict(_oauth_cred("acc-token", "ref-token", 9999999999999),
-                                 **{"account_id": "acct-42", "lastRefresh": "2026-01-01"}),
+            "openai-codex": {**_oauth_cred("acc-token", "ref-token", 9999999999999),
+                                 "account_id": "acct-42", "lastRefresh": "2026-01-01"},
             "totally-unknown-provider": {"type": "weird", "stuff": [1, 2]},
         };
         assert save_auth_file(_auth_path(tmp), data);
@@ -200,7 +200,7 @@ test "credential set/remove are immutable snapshots and persist to disk" {
     tmp = _make_tmp();
     try {
         path = _auth_path(tmp);
-        original = {"a": _api_cred("ka")};
+        original: dict[str, any] = {"a": _api_cred("ka")};
         updated = credential_set(original, "b", _oauth_cred("t", "r", 5_000_000_000_000));
         assert original == {"a": _api_cred("ka")};  # input untouched
         assert has_credential(updated, "b");
@@ -285,7 +285,7 @@ test "stored_api_key routes api keys live oauth and expired-oauth-to-seam" {
 
 
 test "get_auth_status precedence: runtime > stored > env > unconfigured" {
-    stored = {"a": _api_cred("k")};
+    stored: dict[str, any] = {"a": _api_cred("k")};
     assert get_auth_status("a", stored, runtime_keys=["a"]) == {
         "configured": True, "source": "stored", "label": "runtime override",
     };
@@ -507,7 +507,7 @@ test "filters and labels match the picker rendering contract" {
     assert len(filter_providers_by_query(providers, "OpenAI")) == 1;
     assert filter_providers_by_query(providers, "") == providers;
 
-    models = [
+    models: list[dict[str, any]] = [
         {"provider": "anthropic", "modelId": "claude-opus", "displayName": "Opus"},
         {"provider": "openai", "modelId": "gpt-mini", "displayName": "Mini"},
         {"provider": "anthropic", "modelId": "claude-haiku", "displayName": "Haiku"},

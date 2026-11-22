@@ -19,6 +19,26 @@ Jac-native terminal coding agent.
 
 ## Quick start (dev)
 
+**neojac (native, current):** the whole harness compiles to self-contained
+native executables with [neojac](https://github.com/jaseci-labs/neojac-releases)
+— no CPython is linked in (no Python imports remain; `pyte` was replaced by
+`ui/vt_screen.jac`, `httpx` by native `urllib`).
+
+```bash
+./run.sh                                  # neojac build tui/shell.jac + exec (cached)
+JACKAL_ENTRY=main ./run.sh --json         # line REPL / JSONL frontend
+cd app && neojac build main.jac -o .jac/bin/jackal
+cd app && neojac test agent/auth.jac       # one module (per-module, memory-capped: scripts/neojac-test-each.sh OUT MOD...)
+```
+
+Native gotchas: `int` is 64-bit (clamp float sentinels before `int()`);
+containers are invariant (annotate `list[dict[str, any]]` literals);
+`assert c, msg` needs a `str` msg; imports only at module level;
+`sys.executable` is the program itself (never spawn it for Python fixtures —
+it fork-bombs the test runner); `bytes.decode(enc, errors)` is positional.
+
+**Legacy jac (vendored jaclang):**
+
 ```bash
 # Native harness (the product)
 cd app && ../jac run main.jac       # term REPL frontend (--json for JSONL protocol)

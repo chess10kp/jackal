@@ -55,7 +55,7 @@ def transition_auth_flow(current_state: dict[str, any], action: str, payload: di
     step: dict[str, any] = current_state.get("step", {});
 
     if action == "open_provider_picker" {
-        incoming: list[dict[str, any]] = p.get("providers", []);
+        incoming: list[any] = p.get("providers", []);
         valid: list[dict[str, any]] = [];
         for item in incoming {
             v = validate_provider_entry(item);
@@ -67,7 +67,7 @@ def transition_auth_flow(current_state: dict[str, any], action: str, payload: di
     }
 
     if action == "open_model_picker" {
-        incoming: list[dict[str, any]] = p.get("models", []);
+        incoming: list[any] = p.get("models", []);
         valid: list[dict[str, any]] = [];
         for item in incoming {
             v = validate_model_entry(item);

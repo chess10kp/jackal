@@ -5,7 +5,7 @@ native unit (hard pin), so it must not import the server-placed screen/runtime
 modules — the cross-context cases live in `ui/screen.test.jac` instead.
 """
 
-import from ui.model { MainScreen, ordered_child_keys }
+import from ui.model { MainScreen, UiContainer, ordered_child_keys }
 
 test "default_shell_registry has Jackal shell tags" {
     reg = default_shell_registry();
@@ -55,7 +55,7 @@ test "shell markup lowers to MainScreen with expected children" {
     assert result.graph_root is not None;
     screen = result.graph_root;
     assert isinstance(screen, MainScreen);
-    keys = ordered_child_keys(screen);
+    keys = ordered_child_keys(screen as UiContainer);
     assert keys == ["header", "transcript", "status", "prompt"];
 }
 

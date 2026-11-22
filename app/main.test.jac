@@ -3,6 +3,10 @@
 import from agent.session { plugins, session_boot, session_dispose }
 import from agent.plugin_bridge { PluginBridge, create_bridge, dispose_bridge }
 import from agent.fake_host { ensure_host, register_fake_command }
+import os;
+import tempfile;
+import shutil;
+import from agent.sessions { save_session }
 
 def _upper(args: str, ctx: any) -> str {
     out = str(args).strip().upper();
@@ -55,9 +59,6 @@ test "handle_command routes slash args into extension commands" {
 }
 
 test "session_boot dispose round trip (no extensions)" {
-    import os;
-    import tempfile;
-    import shutil;
 
     # Empty cwd -> no .jackal/extensions.json -> idle phase, bridge is None.
     tmp = tempfile.mkdtemp(prefix="jackal-main-boot-");
@@ -78,17 +79,13 @@ test "session_boot dispose round trip (no extensions)" {
 }
 
 test "handle_command sessions resume export round-trip" {
-    import os;
-    import tempfile;
-    import shutil;
-    import from agent.sessions { save_session }
 
     tmp = tempfile.mkdtemp(prefix="jackal-main-sess-");
     old_cwd = os.getcwd();
     os.chdir(tmp);
     checks: list[str] = [];
     try {
-        hist = [
+        hist: list[dict[str, any]] = [
             {"role": "system", "content": "sys"},
             {"role": "user", "content": "hello"},
             {"role": "assistant", "content": "hi there"},

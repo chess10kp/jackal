@@ -146,7 +146,7 @@ test "tui previews long tool results at six lines with a more-lines footer" {
         tui.wait_for("fixture line 1", 10.0);
         screen = tui.screen_text();
         # Display truncates: the seventh line never renders.
-        assert "fixture line 7" not in screen, screen;
+        assert "fixture line 7" not in screen, str(screen);
         # Display-only: the full result still reached the model (request 2's
         # last message is the untruncated tool result).
         calls = sb.calls();
@@ -219,7 +219,7 @@ test "tui login api-key input accepts a bracketed paste" {
         fh: any = open(auth_path, "r", encoding="utf-8");
         stored: str = fh.read();
         fh.close();
-        assert key in stored, stored;
+        assert key in stored, str(stored);
     } finally {
         if tui is not None {
             tui.close();

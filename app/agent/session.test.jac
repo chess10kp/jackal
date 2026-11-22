@@ -101,7 +101,6 @@ test "load_extension_decls reads .jackal/extensions.json" {
         assert decls[0].id == "stub.echo";
         assert decls[0].runtime == "node";
     } finally {
-        import shutil;
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
@@ -119,6 +118,7 @@ test "enqueue_prompt queues while loading" {
 
 import from .plugin_bridge { resolve_stub_commands }
 import from .fake_host { register_fake_command, register_fake_listener }
+import shutil;
 
 test "session_boot mirrors extension commands and run_command round-trips" {
     session_dispose();

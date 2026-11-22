@@ -155,13 +155,13 @@ test "validate_web_url blocks loopback private and metadata targets" {
     ];
     for target in blocked {
         res = validate_web_url(target);
-        assert str(res[0]) == "", target;
-        assert len(str(res[1])) > 0, target;
-        assert "lock" in str(res[1]) or "Invalid" in str(res[1]), (target, res[1]);
+        assert str(res[0]) == "", str(target);
+        assert len(str(res[1])) > 0, str(target);
+        assert "lock" in str(res[1]) or "Invalid" in str(res[1]), str((target, res[1]));
     }
     # A public literal is still allowed without any DNS lookup.
     ok = validate_web_url("https://93.184.216.34/page");
-    assert str(ok[1]) == "", ok;
+    assert str(ok[1]) == "", str(ok);
 }
 
 
@@ -171,8 +171,8 @@ test "the private-host escape hatch only relaxes the guard when set" {
         os.environ["JACKAL_ALLOW_PRIVATE_HOSTS"] = "1";
         assert private_hosts_allowed();
         ok = validate_web_url("http://127.0.0.1:9/x");
-        assert str(ok[1]) == "", ok;
-        assert str(ok[0]) == "http://127.0.0.1:9/x", ok;
+        assert str(ok[1]) == "", str(ok);
+        assert str(ok[0]) == "http://127.0.0.1:9/x", str(ok);
     } finally {
         if old is None {
             os.environ.pop("JACKAL_ALLOW_PRIVATE_HOSTS", None);
@@ -187,11 +187,11 @@ test "the private-host escape hatch only relaxes the guard when set" {
 test "web_fetch refuses a blocked URL without touching the network" {
     out = web_fetch("http://169.254.169.254/latest/meta-data/");
     parsed = json.loads(out);
-    assert parsed.get("ok") is False, out;
-    assert "lock" in str(parsed.get("error", "")), out;
+    assert parsed.get("ok") is False, str(out);
+    assert "lock" in str(parsed.get("error", "")), str(out);
     assert web_fetch("http://127.0.0.1:1/") != "";
     parsed2 = json.loads(web_fetch("http://127.0.0.1:1/"));
-    assert parsed2.get("ok") is False, parsed2;
+    assert parsed2.get("ok") is False, str(parsed2);
 }
 
 
@@ -200,13 +200,13 @@ test "resolved-address guard rejects loopback names and unresolvable hosts" {
         assert_host_resolves_public("localhost");
         assert False, "localhost must be rejected";
     } except ValueError as exc {
-        assert "blocked" in str(exc).lower(), exc;
+        assert "blocked" in str(exc).lower(), str(exc);
     }
     try {
         assert_host_resolves_public("no-such-host.invalid");
         assert False, "unresolvable host must be rejected";
     } except ValueError as exc {
-        assert "resolve" in str(exc).lower(), exc;
+        assert "resolve" in str(exc).lower(), str(exc);
     }
     # Public names only when egress/DNS is available (CI may be offline).
     if _egress_available() {

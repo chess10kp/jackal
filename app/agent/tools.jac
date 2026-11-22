@@ -194,9 +194,14 @@ Spawns with a sanitized environment (see JAC_CHILD_ENV_DROP) and no stdin:
 a CLI that prompts must fail fast, never hang the agent turn."""
 def _run_jac_cli(args: list[str], timeout_secs: int = 120) -> str {
     effective = timeout_secs if timeout_secs > 0 else 120;
+    argv: list[str] = ["jac"] + args;
+    if shutil.which("jac") is None and shutil.which("neojac") is not None {
+        # neojac-only machine: same verbs, but `format` is `fmt`.
+        argv = ["neojac"] + [("fmt" if a == "format" else a) for a in args];
+    }
     try {
         r = subprocess.run(
-            ["jac"] + args, capture_output=True, text=True, timeout=effective,
+            argv, capture_output=True, text=True, timeout=effective,
             env=_jac_child_env(), stdin=subprocess.DEVNULL,
         );
     } except FileNotFoundError {

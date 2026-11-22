@@ -91,8 +91,8 @@ def _init_git_repo(tmp: str) -> str {
 }
 
 
-def _msgs(*texts: str) -> list[dict[str, str]] {
-    out: list[dict[str, str]] = [];
+def _msgs(*texts: str) -> list[dict[str, any]] {
+    out: list[dict[str, any]] = [];
     for t in texts {
         out.append({"role": "user", "content": t});
         out.append({"role": "assistant", "content": "ok"});
@@ -112,7 +112,7 @@ test "create writes the documented layout and exact metadata keys" {
     try {
         _write_file(tmp, "src/a.txt", "alpha");
         _write_file(tmp, "lib/deep/b.txt", "beta");
-        msgs = _msgs("hello there");
+        msgs: list[dict[str, any]] = _msgs("hello there");
         meta = create_checkpoint(
             tmp, msgs, "prov", "model-x", name="first",
             modified_files=["src/a.txt", "lib/deep/b.txt"],
@@ -274,7 +274,7 @@ test "gitCommitHash matches HEAD inside a repo and is null outside" {
 test "load round trips metadata, conversation and file snapshots" {
     tmp = _make_tmp();
     try {
-        msgs = _msgs("round trip");
+        msgs: list[dict[str, any]] = _msgs("round trip");
         _write_file(tmp, "a.txt", "content-a");
         create_checkpoint(
             tmp, msgs, "prov", "model-y", name="snap",
@@ -510,7 +510,7 @@ test "overlay rows render name, counts, time and size" {
     assert row.startswith("my-cp \u2014 4 msgs, 2 files \u2014 ");
     assert "(2KB)" in row;
 
-    no_size = {"metadata": dict(item["metadata"]), "sizeBytes": None};
+    no_size: dict[str, any] = {"metadata": dict(item["metadata"]), "sizeBytes": None};
     assert "(?)" in format_checkpoint_overlay_row(no_size);
 }
 
@@ -546,14 +546,14 @@ test "a swallowed capture failure is recorded in the debug log" {
         project = os.path.join(tmp, "project");
         os.makedirs(project);
         snaps = _capture_files(project, ["missing.txt"]);
-        assert snaps == {}, snaps;
+        assert snaps == {}, str(snaps);
         fh: any = open(sink, "r");
         lines: list[str] = fh.read().splitlines();
         fh.close();
         records: list[dict[str, any]] = [json.loads(line) for line in lines if line.strip()];
-        assert len(records) == 1, records;
-        assert records[0]["source"] == "checkpoints.capture", records[0];
-        assert records[0]["fields"]["path"] == "missing.txt", records[0];
+        assert len(records) == 1, str(records);
+        assert records[0]["source"] == "checkpoints.capture", str(records[0]);
+        assert records[0]["fields"]["path"] == "missing.txt", str(records[0]);
     } finally {
         if old_log is None {
             os.environ.pop("JACKAL_LOG", None);

@@ -292,7 +292,4 @@ default = "native"
 # seam dispatch or the ui.model lowering walls.
 harness = "jac test tui/harness.test.jac"
 
-[dependencies.pypi]
 
-# Terminal emulator for TUI tests (ui/emulated_terminal.jac).
-pyte = "~=0.8"

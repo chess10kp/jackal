@@ -7,10 +7,10 @@ tool_call block verdicts.
 Test-only transports and helpers live here, not in llm.jac.
 """
 
-obj RetryTransport {
+obj RetryTransport(Transport) {
     has calls: int = 0;
 
-    def stream(
+    override def stream(
         messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
     ) -> Iterator[dict[str, any]] {
         self.calls += 1;
@@ -22,8 +22,8 @@ obj RetryTransport {
     }
 }
 
-obj TwoCallTransport {
-    def stream(
+obj TwoCallTransport(Transport) {
+    override def stream(
         messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
     ) -> Iterator[dict[str, any]] {
         saw = False;
@@ -58,13 +58,13 @@ obj TwoCallTransport {
 # Test doubles are duck-typed transports; call sites cast with
 # `as Transport` so react_loop's typed parameter accepts them under native
 # checking (the same-stem annex cannot reference Transport at class-def time).
-obj ScriptedTransport {
+obj ScriptedTransport(Transport) {
     has tool_call_id: str = "call_1",
         tool_name: str = "echo",
         tool_args: str = "{\"text\": \"hi\"}",
         final_text: str = "done";
 
-    def stream(
+    override def stream(
         messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
     ) -> Iterator[dict[str, any]] {
         saw_tool_result = False;
@@ -106,7 +106,7 @@ def _noop_event(kind: str, data: dict[str, any]) {
 glob _events: list[any] = [];
 
 test "react loop runs a tool then finishes" {
-    messages = [{"role": "user", "content": "echo hi"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "echo hi"}];
     specs = [
         ToolSpec(
             name="echo",
@@ -141,7 +141,7 @@ test "react loop runs a tool then finishes" {
 }
 
 test "react loop retries transient transport errors" {
-    messages = [{"role": "user", "content": "hello"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "hello"}];
     _events.clear();
     transport = RetryTransport();
     answer = react_loop(messages, [], transport as Transport, _noop_event, max_retries=1);
@@ -151,10 +151,10 @@ test "react loop retries transient transport errors" {
     assert _events[1][0] == "chunk";
 }
 
-obj CancelMidStreamTransport {
+obj CancelMidStreamTransport(Transport) {
     has flag: any = None;
 
-    def stream(
+    override def stream(
         messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
     ) -> Iterator[dict[str, any]] {
         yield {"content": "partial"};
@@ -166,7 +166,7 @@ obj CancelMidStreamTransport {
 }
 
 test "react loop stops mid-stream on cancel without touching history" {
-    messages = [{"role": "user", "content": "hello"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "hello"}];
     _events.clear();
     cancel = TurnCancel();
     transport = CancelMidStreamTransport(flag=cancel);
@@ -179,7 +179,7 @@ test "react loop stops mid-stream on cancel without touching history" {
 }
 
 test "cancel before tool calls fills cancelled tool results" {
-    messages = [{"role": "user", "content": "echo hi"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "echo hi"}];
     specs = [
         ToolSpec(
             name="echo",
@@ -221,7 +221,7 @@ def _allow_all(name: str, args: dict[str, any]) -> any {
 }
 
 test "approve hook denial yields error tool result without executing" {
-    messages = [{"role": "user", "content": "echo hi"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "echo hi"}];
     specs = [
         ToolSpec(
             name="echo",
@@ -248,7 +248,7 @@ test "approve hook denial yields error tool result without executing" {
 }
 
 test "approve hook allow runs the tool unchanged" {
-    messages = [{"role": "user", "content": "echo hi"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "echo hi"}];
     specs = [
         ToolSpec(
             name="echo",
@@ -265,7 +265,7 @@ test "approve hook allow runs the tool unchanged" {
 }
 
 test "react loop emits loop limit" {
-    messages = [{"role": "user", "content": "echo"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "echo"}];
     specs = [
         ToolSpec(
             name="echo",
@@ -357,7 +357,7 @@ test "routed_model_id prefixes bare ids and passes routed ids through" {
 }
 
 test "unknown tool yields error result without crashing" {
-    messages = [{"role": "user", "content": "go"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "go"}];
     spec = ScriptedTransport();
     spec.tool_name = "missing";
     _events.clear();
@@ -367,14 +367,12 @@ test "unknown tool yields error result without crashing" {
 }
 
 test "react loop invokes js tool via registry bridge" {
-    import from .registry { create_registry }
-    import from .plugin_bridge { create_bridge, load_extension, dispose_bridge }
 
     def _js_echo(text: str) -> str {
         return "JS:" + text;
     }
 
-    messages = [{"role": "user", "content": "echo hi"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "echo hi"}];
     reg = create_registry();
     bridge = create_bridge("react-js");
     load_extension(
@@ -405,15 +403,12 @@ test "react loop invokes js tool via registry bridge" {
 }
 
 test "react loop honors tool_call block verdicts from a plugin bridge" {
-    import from .plugin_bridge { create_bridge, dispose_bridge }
-    import from .fake_host { ensure_host, register_fake_listener }
-    import from .registry { create_registry }
 
     def _block_no_terminate(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"block": True, "reason": "policy"};
     }
 
-    messages = [{"role": "user", "content": "run echo"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "run echo"}];
     reg = create_registry();
     bridge = create_bridge("react-gate");
     ensure_host(bridge);
@@ -430,15 +425,12 @@ test "react loop honors tool_call block verdicts from a plugin bridge" {
 }
 
 test "react loop stops early on terminating block verdict" {
-    import from .plugin_bridge { create_bridge, dispose_bridge }
-    import from .fake_host { ensure_host, register_fake_listener }
-    import from .registry { create_registry }
 
     def _terminate_block(data: dict[str, any], ctx: any) -> dict[str, any] {
         return {"block": True, "reason": "dangerous command", "terminate": True};
     }
 
-    messages = [{"role": "user", "content": "run echo"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "run echo"}];
     reg = create_registry();
     bridge = create_bridge("react-term");
     ensure_host(bridge);
@@ -455,8 +447,6 @@ test "react loop stops early on terminating block verdict" {
 }
 
 test "make_ext_transport wires provider config without network" {
-    import from .plugin_bridge { create_bridge, dispose_bridge }
-    import from .fake_host { register_fake_provider }
 
     bridge = create_bridge("p10-transport");
     register_fake_provider(
@@ -477,15 +467,6 @@ test "make_ext_transport wires provider config without network" {
 }
 
 test "react loop applies tool_result rewrites from a plugin bridge" {
-    import from .plugin_bridge {
-        PluginBridge,
-        create_bridge,
-        ensure_host,
-        register_fake_listener,
-        load_extension,
-        dispose_bridge,
-    }
-    import from .registry { create_registry, ToolRegistry }
 
     def _rewrite(data: dict[str, any], ctx: any) -> dict[str, any] | None {
         # Sees the latest content; appends a marker (middleware chain).
@@ -501,7 +482,7 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
         return None;
     }
 
-    messages = [{"role": "user", "content": "run echo"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "run echo"}];
     reg = create_registry();
     bridge = create_bridge("react-tres");
     ensure_host(bridge);
@@ -532,15 +513,6 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
 }
 
 test "react loop skips tool execution when cancelled during the gate" {
-    import from .plugin_bridge {
-        PluginBridge,
-        create_bridge,
-        ensure_host,
-        register_fake_listener,
-        load_extension,
-        dispose_bridge,
-    }
-    import from .registry { create_registry }
 
     # TurnCancel is module-level in this file.
     cancel = TurnCancel();
@@ -551,7 +523,7 @@ test "react loop skips tool execution when cancelled during the gate" {
         return None;
     }
 
-    messages = [{"role": "user", "content": "run echo"}];
+    messages: list[dict[str, any]] = [{"role": "user", "content": "run echo"}];
     reg = create_registry();
     bridge = create_bridge("react-cancel-gate");
     ensure_host(bridge);
@@ -587,7 +559,6 @@ test "react loop skips tool execution when cancelled during the gate" {
 # ===================== after_provider_response (Pi parity) =====================
 
 test "make_transport wires hook_bridge through every provider branch" {
-    import from .plugin_bridge { create_bridge, dispose_bridge }
     bridge = create_bridge("apr-native");
 
     for m in ["openrouter/vendor/x", "deepseek/ds-chat", "gpt-4o-mini"] {
@@ -602,8 +573,6 @@ test "make_transport wires hook_bridge through every provider branch" {
 }
 
 test "make_ext_transport attaches the hook bridge" {
-    import from .plugin_bridge { create_bridge, dispose_bridge }
-    import from .fake_host { register_fake_provider }
 
     bridge = create_bridge("apr-ext");
     register_fake_provider(
@@ -616,8 +585,6 @@ test "make_ext_transport attaches the hook bridge" {
 }
 
 test "_notify_response fires after_provider_response with status and headers" {
-    import from .plugin_bridge { create_bridge, dispose_bridge }
-    import from .fake_host { register_fake_listener }
 
     bridge = create_bridge("apr-notify");
     seen: list[dict[str, any]] = [];
@@ -645,8 +612,6 @@ test "_notify_response fires after_provider_response with status and headers" {
 }
 
 test "_open_stream fires hook before the first delta from a live SSE server" {
-    import from .fake_host { register_fake_listener }
-    import from .plugin_bridge { create_bridge, dispose_bridge }
 
     order: list[str] = [];
     def _mark(data: dict[str, any], ctx: any) -> str {
@@ -680,8 +645,6 @@ test "_open_stream fires hook before the first delta from a live SSE server" {
 }
 
 test "_open_stream fires the hook even when the provider answers non-200" {
-    import from .fake_host { register_fake_listener }
-    import from .plugin_bridge { create_bridge, dispose_bridge }
 
     statuses: list[int] = [];
     def _cap(data: dict[str, any], ctx: any) -> str {
@@ -711,11 +674,18 @@ test "_open_stream fires the hook even when the provider answers non-200" {
     }
 }
 
-import from sse_test_server { make_sse_server }
+import from .sse_test_server { make_sse_server }
+import from .registry { create_registry }
+import from .plugin_bridge { create_bridge, load_extension, dispose_bridge }
+import from .plugin_bridge { create_bridge, dispose_bridge }
+import from .fake_host { ensure_host, register_fake_listener }
+import from .fake_host { register_fake_provider }
+import from .plugin_bridge { PluginBridge }
+import from .registry { create_registry, ToolRegistry }
+import from .fake_host { register_fake_listener }
+import os;
 
 test "after_provider_response refires per retry attempt through react_loop" {
-    import from .fake_host { register_fake_listener }
-    import from .plugin_bridge { create_bridge, dispose_bridge }
 
     statuses: list[int] = [];
     def _cap(data: dict[str, any], ctx: any) -> str {
@@ -772,7 +742,6 @@ test "provider_for dispatches by case-sensitive prefix" {
 }
 
 test "credential_error is empty when each routed key is set" {
-    import os;
     cases = [
         ["openrouter/vendor/x", "OPENROUTER_API_KEY"],
         ["deepseek/ds-chat", "DEEPSEEK_API_KEY"],
@@ -797,7 +766,6 @@ test "credential_error is empty when each routed key is set" {
 }
 
 test "credential_error names provider, key, and /model escape hatch" {
-    import os;
     saved = os.environ.pop("OPENROUTER_API_KEY", None);
     try {
         msg = credential_error("openrouter/anthropic/claude-sonnet-5");
@@ -828,7 +796,6 @@ test "credential_error names provider, key, and /model escape hatch" {
 }
 
 test "credential_error never fires for keyless or ext providers" {
-    import os;
     # mock needs no credential; ext ids are validated by their own extension.
     for m in ["mock", "mockllm", "mock/echo", "ext/acme/sonnet-x"] {
         assert credential_error(m) == "";
@@ -838,7 +805,6 @@ test "credential_error never fires for keyless or ext providers" {
 }
 
 test "every provider route declares usable metadata" {
-    import os;
     for pid in PROVIDER_ROUTES {
         route = PROVIDER_ROUTES[pid];
         assert isinstance(route.get("description", ""), str);
@@ -870,7 +836,6 @@ test "every provider route declares usable metadata" {
 }
 
 test "make_transport keeps historical wiring via the table" {
-    import os;
     saved = os.environ.pop("OPENAI_COMPAT_BASE", None);
     try {
         # Prefix stripping still happens for prefixed providers.

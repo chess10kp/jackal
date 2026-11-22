@@ -32,6 +32,8 @@ import from .fake_host {
     set_fake_active_tools,
     fake_session_name,
 }
+import threading;
+import json;
 
 
 def _echo(text: str) -> str {
@@ -299,7 +301,6 @@ test "tool_cancel aborts slow Pi tool" {
     slow = os.path.join(_path_dirname(str(host)), "fixtures", "pi_slow.mjs");
     load_extension_path(bridge, reg, "pi.slow", slow);
     # Fire invoke on a worker thread; cancel shortly after.
-    import threading;
     box: dict[str, str] = {"result": ""};
 
     def _run {
@@ -746,7 +747,7 @@ test "context_gate applies in-place edits and replacements non-destructively" {
         return {"messages": [{"role": "user", "content": "replaced"}]};
     }
 
-    history = [{"role": "user", "content": "hi"}];
+    history: list[dict[str, any]] = [{"role": "user", "content": "hi"}];
     register_fake_listener(bridge, "context", _ctx_edit);
     out1 = context_gate(bridge, history);
     assert len(out1) == 2;
@@ -803,7 +804,7 @@ test "node host echoes structured verdicts and mutated working data" {
     assert g2["args"]["text"] == "HI";
 
     # context in-place message edit echoed back.
-    msgs = [{"role": "user", "content": "q"}];
+    msgs: list[dict[str, any]] = [{"role": "user", "content": "q"}];
     out = context_gate(bridge, msgs);
     assert out[-1]["content"] == "[gated-context-injection]";
     assert len(msgs) == 1;
@@ -1172,7 +1173,6 @@ test "cancel_all_ui drains and expires auto-cancel" {
     assert cancel_all_ui(bridge, "again") == 0;
 
     # Expiry path: enqueue with a tiny timeout, poll after it lapses.
-    import time;
     env2 = make_plugin_envelope(
         kind="ui_request",
         payload={
@@ -1203,7 +1203,6 @@ test "node host sends builtins on ext_load and getAllTools sees them" {
 
     ctx_report = invoke(reg, "probe_ctx", {}, bridge);
     assert ctx_report.startswith("{");
-    import json;
     data: dict[str, any] = json.loads(ctx_report);
     assert data["has_cwd"] is True;
     assert data["ui_kind"] == "object";

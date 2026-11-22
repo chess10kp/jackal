@@ -1,43 +1,46 @@
 #!/usr/bin/env bash
-# Launch the Jackal TUI.
+# Launch the Jackal TUI as a native executable built by neojac.
 #
-# Deliberately one process: `jac run tui/shell.jac` from app/ directly. The
-# old path went through app/run.jac, which re-spawned whatever `jac` happened
-# to be on PATH -- often a different build than the workspace ./jac, and one
-# extra full compile on every launch.
+# `neojac build` compiles app/tui/shell.jac (and everything it imports) into
+# one self-contained binary — no CPython, no JIT at launch. neojac's build
+# cache makes a rebuild of unchanged sources near-instant, so this builds on
+# every launch and then execs the binary.
+#
+#   ./run.sh               build + run the TUI
+#   JACKAL_ENTRY=main ./run.sh [--json|...]   the line REPL / JSONL frontend
+#   JACKAL_LEGACY_JAC=1 ./run.sh             old path: workspace ./jac run (Python codespace)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ ! -x "$REPO_ROOT/jac" ]]; then
-  echo "workspace Jac binary missing; run ./scripts/setup-vendor-jac.sh with Zig 0.16.0" >&2
-  exit 127
-fi
 
 # Auth/skills/chains catalogs live in the repo, not in app/.
 export JACKAL_ROOT="$REPO_ROOT"
 export JACKAL_AGENT_DIR="${JACKAL_AGENT_DIR:-$REPO_ROOT/pi}"
-
-# JAC_HANDOFF names an enclosing jac process's CLI endpoint; inheriting it
-# deadlocks the child `jac`.
 unset JAC_HANDOFF
 
-# Dev fast path. `app/jac.toml` pins most of the ui stack to `native`, which a
-# dev `jac run` satisfies by JIT-linking the whole app on every launch: cold
-# start ~6 min, warm restore hangs (>5 min, stuck in MCJIT, Linux). Running on
-# the Python codespace instead makes it plain Python: ~3 s warm, ~2 min cold.
-#
-# Two levers do that, and they differ in portability:
-#   -b python                      upstream flag; any released `jac` honors it
-#   JAC_IGNORE_PLACEMENT_PINS=1    local vendor hook (vendor/jac 6e7e4986c),
-#                                  absent from upstream main and from releases
-# The flag is the one that matters -- e.g. a downloaded macOS binary ignores
-# the env var, so without it ./run.sh would pay the full native prepare there.
-# Set JACKAL_NATIVE=1 to keep the pins (use when probing native lowering).
-if [[ "${JACKAL_NATIVE:-0}" != "1" ]]; then
+if [[ "${JACKAL_LEGACY_JAC:-0}" == "1" ]]; then
+  if [[ ! -x "$REPO_ROOT/jac" ]]; then
+    echo "workspace Jac binary missing; run ./scripts/setup-vendor-jac.sh with Zig 0.16.0" >&2
+    exit 127
+  fi
   export JAC_IGNORE_PLACEMENT_PINS=1
   cd "$REPO_ROOT/app"
   exec "$REPO_ROOT/jac" run -b python tui/shell.jac "$@"
 fi
 
+NEOJAC="${NEOJAC:-$(command -v neojac || true)}"
+if [[ -z "$NEOJAC" ]]; then
+  echo "neojac not found; install: curl -fsSL https://github.com/jaseci-labs/neojac-releases/releases/latest/download/install.sh | bash" >&2
+  exit 127
+fi
+
+case "${JACKAL_ENTRY:-tui}" in
+  tui)  src="tui/shell.jac"; out="jackal-tui" ;;
+  main) src="main.jac";      out="jackal" ;;
+  *) echo "JACKAL_ENTRY must be tui or main" >&2; exit 2 ;;
+esac
+
 cd "$REPO_ROOT/app"
-exec "$REPO_ROOT/jac" run tui/shell.jac "$@"
+mkdir -p .jac/bin
+"$NEOJAC" build "$src" -o ".jac/bin/$out" ${JACKAL_RELEASE:+--release}
+exec ".jac/bin/$out" "$@"
