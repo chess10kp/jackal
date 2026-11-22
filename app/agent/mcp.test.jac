@@ -172,23 +172,21 @@ for raw in sys.stdin:
             "code": -32601, "message": "method not found"}})
 """;
 
-
 def _write_mode_server(tmp: str, mode: str) -> list[str] {
     path = os.path.join(tmp, "mcp_server_" + mode + ".py");
-    with open(path, "w") as f { f.write(FAKE_SERVER_SRC); }
+    with open(path, "w") as f {
+        f.write(FAKE_SERVER_SRC);
+    }
     return [sys.executable, path, mode];
 }
-
 
 def _write_fake_server(tmp: str) -> list[str] {
     return _write_mode_server(tmp, "normal");
 }
 
-
 def _write_silent_server(tmp: str) -> list[str] {
     return _write_mode_server(tmp, "silent");
 }
-
 
 test "start handshake and stop against fake mcp server" {
     tmp = tempfile.mkdtemp();
@@ -206,7 +204,6 @@ test "start handshake and stop against fake mcp server" {
     }
 }
 
-
 test "tools/list maps to ToolSpec-shaped specs" {
     tmp = tempfile.mkdtemp();
     client = create_mcp_client();
@@ -217,7 +214,9 @@ test "tools/list maps to ToolSpec-shaped specs" {
         assert len(specs) == 3;
         echo: any = None;
         for s in specs {
-            if s["name"] == "echo" { echo = s; }
+            if s["name"] == "echo" {
+                echo = s;
+            }
         }
         assert echo is not None;
         assert echo["description"] == "Echo the given text back.";
@@ -232,7 +231,6 @@ test "tools/list maps to ToolSpec-shaped specs" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "tools/list follows nextCursor pagination to exhaustion" {
     tmp = tempfile.mkdtemp();
@@ -254,7 +252,6 @@ test "tools/list follows nextCursor pagination to exhaustion" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "server-to-client requests are answered, never buffered" {
     tmp = tempfile.mkdtemp();
@@ -279,7 +276,6 @@ test "server-to-client requests are answered, never buffered" {
     }
 }
 
-
 test "call_tool round trip through fake server" {
     tmp = tempfile.mkdtemp();
     client = create_mcp_client();
@@ -300,7 +296,6 @@ test "call_tool round trip through fake server" {
     }
 }
 
-
 test "timeout on silent tools/list returns ok False" {
     tmp = tempfile.mkdtemp();
     client = create_mcp_client();
@@ -318,7 +313,6 @@ test "timeout on silent tools/list returns ok False" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "server death fails in-flight calls fast and marks the client dead" {
     tmp = tempfile.mkdtemp();
@@ -341,7 +335,6 @@ test "server death fails in-flight calls fast and marks the client dead" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "spawn failure and empty-cmd fail loud without raising" {
     client = create_mcp_client();
@@ -406,7 +399,6 @@ test "prompts list and get round trip" {
     }
 }
 
-
 test "resources list and read round trip" {
     tmp = tempfile.mkdtemp();
     client = create_mcp_client();
@@ -429,7 +421,8 @@ test "resources list and read round trip" {
         # blob content surfaces as an honest stub, never dropped
         blob = mcp_read_resource(client, "mem://bin/1", timeout_s=10.0);
         assert blob["ok"] is True;
-        assert "[blob resource: application/octet-stream, 4 b64 chars]" in str(blob.get("text", ""));
+        assert "[blob resource: application/octet-stream, 4 b64 chars]"
+            in str(blob.get("text", ""));
         # unknown uri -> honest JSON-RPC error at the seam
         bad = mcp_read_resource(client, "mem://nope", timeout_s=10.0);
         assert bad["ok"] is False;
@@ -439,7 +432,6 @@ test "resources list and read round trip" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 glob FAKE_HTTP_SERVER_SRC: str = """
 import json, sys
@@ -511,41 +503,39 @@ print("READY %d" % srv.server_address[1], flush=True)
 srv.serve_forever()
 """;
 
-
 """Spawn the fake HTTP server on an ephemeral port; returns the process and
 its URL (blocks until the server prints READY <port>)."""
 def _start_fake_http_server(tmp: str) -> tuple[any, str] {
     path: str = os.path.join(tmp, "mcp_http_server.py");
-    with open(path, "w") as f { f.write(FAKE_HTTP_SERVER_SRC); }
+    with open(path, "w") as f {
+        f.write(FAKE_HTTP_SERVER_SRC);
+    }
     err_path: str = os.path.join(tmp, "mcp_http_server.err");
     err_fh: any = open(err_path, "w");
     proc = subprocess.Popen(
-        [sys.executable, path], stdout=subprocess.PIPE,
-        stderr=err_fh, text=True, bufsize=1,
+        [sys.executable, path], stdout=subprocess.PIPE, stderr=err_fh, text=True, bufsize=1
     );
     out_pipe: any = proc.stdout;
     ready: str = out_pipe.readline().strip();
     if not ready.startswith("READY ") {
         proc.terminate();
-        try { proc.wait(timeout=5.0); } except Exception {
+        try {
+            proc.wait(timeout=5.0);
+        } except Exception {
             proc.kill();
         }
         err_fh.close();
         err_txt: str = "";
         try {
             err_txt = open(err_path).read()[:500];
-        } except Exception {
-        }
-        raise RuntimeError(
-            "fake http server did not start: " + ready + " | stderr: " + err_txt
-        );
+        } except Exception {}
+        raise RuntimeError("fake http server did not start: " + ready + " | stderr: " + err_txt);
     }
     err_fh.close();
     port: int = int(ready.split(" ")[1]);
     url: str = "http://127.0.0.1:" + str(port) + "/mcp";
     return (proc, url);
 }
-
 
 test "http transport round trip: initialize, session echo, json and sse bodies" {
     tmp = tempfile.mkdtemp();
@@ -583,14 +573,15 @@ test "http transport round trip: initialize, session echo, json and sse bodies" 
         mcp_stop(client);
         if proc is not None {
             proc.terminate();
-            try { proc.wait(timeout=5.0); } except Exception {
+            try {
+                proc.wait(timeout=5.0);
+            } except Exception {
                 proc.kill();
             }
         }
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "http transport refuses bad urls and reports unreachable servers" {
     client = create_mcp_client();

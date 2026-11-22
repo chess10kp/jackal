@@ -33,7 +33,6 @@ def poll_ui_request(bridge: PluginBridge) -> dict[str, any] | None {
     };
 }
 
-
 """Answer one pending request. select/input pass strings, confirm passes
 bool. Unknown/expired corr is ignored (idempotent)."""
 def respond_ui(bridge: PluginBridge, corr: str, value: any) -> bool {
@@ -47,7 +46,6 @@ def respond_ui(bridge: PluginBridge, corr: str, value: any) -> bool {
     return _ui_send_response(bridge, str(r.corr), "ok", value);
 }
 
-
 """Cancel one pending request by child correlation."""
 def cancel_ui(bridge: PluginBridge, corr: str, reason: str = "cancelled") -> bool {
     if bridge is None or bridge.ui_q is None {
@@ -59,7 +57,6 @@ def cancel_ui(bridge: PluginBridge, corr: str, reason: str = "cancelled") -> boo
     }
     return _ui_send_response(bridge, str(r.corr), "cancelled", None, reason);
 }
-
 
 """Cancel every open request (turn abort / dispose). Returns count."""
 def cancel_all_ui(bridge: PluginBridge, reason: str = "cancelled") -> int {

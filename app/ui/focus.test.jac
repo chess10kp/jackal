@@ -33,11 +33,9 @@ import from ui.runtime {
     close_overlay,
 }
 
-
 node FocusLeaf(UiRegion) {
     has label: str = "";
 }
-
 
 test "layers_paint_order is ascending z_index" {
     handle = create_session();
@@ -58,7 +56,6 @@ test "layers_paint_order is ascending z_index" {
     assert painted[1] is high;
 }
 
-
 test "layers_input_order is descending z_index" {
     handle = create_session();
     session = handle.session;
@@ -76,7 +73,6 @@ test "layers_input_order is descending z_index" {
     assert targets[0] is high;
     assert targets[1] is low;
 }
-
 
 test "focus_order follows containment then FocusNext override" {
     handle = create_session();
@@ -108,7 +104,6 @@ test "focus_order follows containment then FocusNext override" {
     assert keys.index("c") == keys.index("a") + 1;
 }
 
-
 test "advance_focus walks focus_order next and prev" {
     handle = create_session();
     session = handle.session;
@@ -136,7 +131,6 @@ test "advance_focus walks focus_order next and prev" {
     assert prev is b;
 }
 
-
 test "open_modal_overlay saves focus traps and focuses initial target" {
     handle = create_session();
     session = handle.session;
@@ -154,9 +148,7 @@ test "open_modal_overlay saves focus traps and focuses initial target" {
     set_focus(session, prompt);
     prior = node_id(prompt);
 
-    result = open_modal_overlay(
-        session, screen, overlay, initial_focus=button, z_index=10
-    );
+    result = open_modal_overlay(session, screen, overlay, initial_focus=button, z_index=10);
     assert result.saved_focus_id == prior;
     assert result.overlay_id == node_id(overlay);
     assert result.initial_focus_id == node_id(button);
@@ -165,7 +157,6 @@ test "open_modal_overlay saves focus traps and focuses initial target" {
     # Modal layer must exist and be preferred for input targeting.
     assert overlay in [screen ->:Layer:->];
 }
-
 
 test "close_overlay restores prior focus and reports damage bounds" {
     handle = create_session();
@@ -192,11 +183,8 @@ test "close_overlay restores prior focus and reports damage bounds" {
     assert get_focus_node(session) is prompt;
     assert overlay not in [screen ->:Layer:->];
     # Damage must cover the former overlay region so underlay is repainted.
-    assert not closed.damage.is_empty() or (
-        closed.damage.width >= 0 and closed.damage.height >= 0
-    );
+    assert not closed.damage.is_empty() or (closed.damage.width >= 0 and closed.damage.height >= 0);
 }
-
 
 test "closing overlay with deleted prior focus clears focus safely" {
     handle = create_session();
@@ -218,7 +206,6 @@ test "closing overlay with deleted prior focus clears focus safely" {
     assert closed.restored_focus_id == "";
     assert get_focus_node(session) is None;
 }
-
 
 test "non-modal overlays coexist without stealing modal trap" {
     handle = create_session();

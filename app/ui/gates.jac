@@ -77,7 +77,7 @@ obj Gate4Report {
 
 
 """Gate 1 — Detached graph lifecycle: no UI jids from persistent root; dispose cleans."""
-def run_gate1_detached_lifecycle() -> bool {
+def run_gate1_detached_lifecycle -> bool {
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
@@ -116,7 +116,7 @@ def run_gate1_detached_lifecycle() -> bool {
 
 
 """Gate 3 — Real layout and damage across shell scenarios."""
-def run_gate3_layout_damage() -> bool {
+def run_gate3_layout_damage -> bool {
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
@@ -144,7 +144,7 @@ def run_gate3_layout_damage() -> bool {
 
 
 """Gate 4 — Invalidation benchmark numbers (nodes, cells, latency)."""
-def run_gate4_invalidation_bench() -> Gate4Report {
+def run_gate4_invalidation_bench -> Gate4Report {
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
@@ -184,7 +184,7 @@ def run_gate4_invalidation_bench() -> Gate4Report {
 
 
 """Gate 5 — External ProgressBar package without framework-source edits."""
-def run_gate5_external_widget() -> bool {
+def run_gate5_external_widget -> bool {
     bar = ProgressBar(key="p", value=0.0);
     event = SetProgress(value=0.4);
     bar spawn event;
@@ -218,7 +218,7 @@ def run_gate5_external_widget() -> bool {
 
 
 """Gate 6 — Authoring scale: dozens of regions via markup, no manual ranks."""
-def run_gate6_authoring_scale() -> bool {
+def run_gate6_authoring_scale -> bool {
     parts: list[str] = ['<MainScreen key="main">'];
     parts.append('  <Header key="header" title="Jackal" />');
     parts.append('  <TranscriptView key="transcript" />');

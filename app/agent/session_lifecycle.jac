@@ -31,7 +31,7 @@ import from .extensions {
 import from .mcp { McpClient, mcp_stop }
 
 
-def extensions_status() -> ExtensionStatus {
+def extensions_status -> ExtensionStatus {
     st = ExtensionStatus(
         phase=plugins.phase,
         loaded=plugins.loaded,
@@ -265,7 +265,7 @@ def enqueue_prompt(message: str) -> int {
 }
 
 
-def drain_prompt_queue() -> list[str] {
+def drain_prompt_queue -> list[str] {
     out: list[str] = list(plugins.prompt_queue);
     plugins.prompt_queue.clear();
     return out;

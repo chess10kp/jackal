@@ -2,24 +2,12 @@
 import threading;
 import queue;
 import from tui.state { LiveShell }
-import from tui.core {
-    _push_turn,
-    _rewrite_turn,
-    _finish_turn,
-    _install_layout,
-}
-import from tui.format {
-    format_tool_call,
-    format_tool_result,
-}
+import from tui.core { _push_turn, _rewrite_turn, _finish_turn, _install_layout }
+import from tui.format { format_tool_call, format_tool_result }
 import from tui.preview { tool_result_preview }
 import from agent.session { run_turn, cancel_active_turn }
-import from agent.modes {
-    requires_approval, is_read_only_mode, read_only_mode_block_reason,
-}
-import from ui.screen {
-      shell_resize,
-}
+import from agent.modes { requires_approval, is_read_only_mode, read_only_mode_block_reason }
+import from ui.screen { shell_resize }
 import from ui.renderer { create_renderer }
 import from tui.window { WindowSpec, WindowState }
 import from tui.windows { _open_window, _close_top_window, _approval_state }
@@ -44,7 +32,6 @@ def _apply_resize(app: LiveShell, columns: int, rows: int) {
     app.dirty = True;
 }
 
-
 """Launch the real agent turn on a worker thread.
 
 Events flow through app.evq as (kind, data) pairs consumed by _tick_stream;
@@ -67,8 +54,7 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
     def collector(kind: str, data: dict[str, any]) {
         try {
             q.put((str(kind), dict(data)));
-        } except Exception {
-        }
+        } except Exception {}
     }
 
     # Tool approver: auto-allow per the ACTIVE dev mode (Shift+Tab cycle);
@@ -111,8 +97,7 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
         } except Exception as e {
             try {
                 q.put(("error", {"message": str(e)}));
-            } except Exception {
-            }
+            } except Exception {}
             q.put(("__done__", {"answer": ""}));
         }
     }
@@ -120,7 +105,6 @@ def _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = "")
     app.worker = threading.Thread(target=worker_main, daemon=True);
     app.worker.start();
 }
-
 
 def _finish_stream(app: LiveShell, final_body: str) {
     body = final_body if final_body else app.stream_full;
@@ -133,7 +117,6 @@ def _finish_stream(app: LiveShell, final_body: str) {
     app.evq = None;
     app.dirty = True;
 }
-
 
 def _tick_stream(app: LiveShell) {
     if app.phase != "streaming" or app.evq is None {
@@ -156,18 +139,23 @@ def _tick_stream(app: LiveShell) {
             chunks_pending = True;
         } elif kind == "tool_call" {
             args: any = data.get("args", {});
-            summary = format_tool_call(str(data.get("tool", "")), args if isinstance(args, dict) else {});
+            summary = format_tool_call(
+                str(data.get("tool", "")), args if isinstance(args, dict) else {}
+            );
             app.tool_msg_id = _push_turn(app, "tool", summary);
             _rewrite_turn(app, app.tool_msg_id, "tool", summary);
         } elif kind == "tool_result" {
             _push_turn(
-                app,
-                "tool",
-                format_tool_result(tool_result_preview(str(data.get("result", "")))),
+                app, "tool", format_tool_result(tool_result_preview(str(data.get("result", ""))))
             );
         } elif kind == "retry" {
-            note = "retry " + str(data.get("attempt", "?")) + "/" + str(data.get("max_retries", "?"));
-            _push_turn(app, "tool", "retry  " + note + "\n        " + str(data.get("message", ""))[:120]);
+            note = "retry "
+                + str(data.get("attempt", "?"))
+                + "/"
+                + str(data.get("max_retries", "?"));
+            _push_turn(
+                app, "tool", "retry  " + note + "\n        " + str(data.get("message", ""))[:120]
+            );
         } elif kind == "cancelled" {
             app.stream_full = app.stream_full + "\n[cancelled]";
             _finish_stream(app, app.stream_full);
@@ -184,9 +172,9 @@ def _tick_stream(app: LiveShell) {
                 app,
                 "tool",
                 "log  "
-                + str(data.get("type", "entry"))
-                + "  "
-                + str(data.get("content", ""))[:100],
+                    + str(data.get("type", "entry"))
+                    + "  "
+                    + str(data.get("content", ""))[:100],
             );
         } elif kind == "error" {
             msg = str(data.get("message", "unknown error"));
@@ -215,7 +203,7 @@ def _tick_stream(app: LiveShell) {
                 force=True,
             );
             _push_turn(app, "tool", "await  approve\n        " + approval_label);
-                    app.dirty = True;
+            app.dirty = True;
         } elif kind == "__done__" {
             _finish_stream(app, str(data.get("answer", "")));
             return;
@@ -232,6 +220,7 @@ def _tick_stream(app: LiveShell) {
         app.dirty = True;
     }
 }
+
 def _accept_approval(app: LiveShell) {
     if app.phase != "approval" or _approval_state(app) is None {
         return;
@@ -245,7 +234,6 @@ def _accept_approval(app: LiveShell) {
     app.phase = "streaming";
     app.dirty = True;
 }
-
 
 def _reject_approval(app: LiveShell) {
     if app.phase == "approval" {

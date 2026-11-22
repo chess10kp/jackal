@@ -1,17 +1,10 @@
 """Rendering helpers for the interactive live shell demo."""
 
-import from ui.transcript {
-    materialize_visible,
-}
+import from ui.transcript { materialize_visible }
 
 import from ui.demo_live_shell_model { LiveShell }
 
-import from ui.layout_types {
-    LayoutSpec,
-    fill_axis,
-    fixed_axis,
-    grow_axis,
-}
+import from ui.layout_types { LayoutSpec, fill_axis, fixed_axis, grow_axis }
 
 import from ui.renderer {
     render_frame,
@@ -22,14 +15,9 @@ import from ui.renderer {
     request_cursor,
 }
 
-import from ui.width {
-    display_width,
-    truncate_text,
-}
-
+import from ui.width { display_width, truncate_text }
 
 glob SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
 
 def _rule(width: int, ch: str = "─") -> str {
     if width < 1 {
@@ -38,7 +26,6 @@ def _rule(width: int, ch: str = "─") -> str {
     return ch * width;
 }
 
-
 def _pad_to(text: str, width: int) -> str {
     w = display_width(text);
     if w >= width {
@@ -46,7 +33,6 @@ def _pad_to(text: str, width: int) -> str {
     }
     return text + (" " * (width - w));
 }
-
 
 """Block progress meter — denser than ASCII #/-."""
 def _meter(value: float, width: int) -> str {
@@ -61,19 +47,14 @@ def _meter(value: float, width: int) -> str {
     return "▐" + ("█" * filled) + ("░" * (inner - filled)) + "▌";
 }
 
-
 def _install_layout(app: LiveShell) {
     # Mirror screen.jac configure_main_shell_layout (M6 LayoutSpec specs);
     # app.renderer's layout state carries the app.columns x app.rows viewport.
     set_node_contract(
-        app.renderer,
-        app.shell.screen,
-        LayoutSpec(width=fill_axis(), height=fill_axis()),
+        app.renderer, app.shell.screen, LayoutSpec(width=fill_axis(), height=fill_axis())
     );
     set_node_contract(
-        app.renderer,
-        app.shell.header,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(2)),
+        app.renderer, app.shell.header, LayoutSpec(width=fill_axis(), height=fixed_axis(2))
     );
     set_node_contract(
         app.renderer,
@@ -81,28 +62,17 @@ def _install_layout(app: LiveShell) {
         LayoutSpec(width=fill_axis(), height=grow_axis(1.0), scroll_vertical=True),
     );
     set_node_contract(
-        app.renderer,
-        app.shell.status,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(1)),
+        app.renderer, app.shell.status, LayoutSpec(width=fill_axis(), height=fixed_axis(1))
     );
     set_node_contract(
-        app.renderer,
-        app.shell.prompt,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(3)),
+        app.renderer, app.shell.prompt, LayoutSpec(width=fill_axis(), height=fixed_axis(3))
     );
 }
-
 
 def _header_lines(app: LiveShell) -> list[str] {
     brand = " JACKAL ";
     tag = " osp live ";
-    right = (
-        str(app.columns)
-        + "×"
-        + str(app.rows)
-        + "  r"
-        + str(app.session.graph_revision)
-    );
+    right = (str(app.columns) + "×" + str(app.rows) + "  r" + str(app.session.graph_revision));
     mid_pad = app.columns - display_width(brand) - display_width(tag) - display_width(right) - 2;
     if mid_pad < 1 {
         mid_pad = 1;
@@ -110,7 +80,6 @@ def _header_lines(app: LiveShell) -> list[str] {
     top = brand + tag + (" " * mid_pad) + right;
     return [_pad_to(top, app.columns), _rule(app.columns, "━")];
 }
-
 
 def _status_line(app: LiveShell) -> str {
     spin = SPINNER[app.spin_i % len(SPINNER)];
@@ -131,7 +100,6 @@ def _status_line(app: LiveShell) -> str {
     }
     return left + (" " * gap) + right;
 }
-
 
 def _prompt_lines(app: LiveShell) -> list[str] {
     draft = app.shell.prompt.draft;
@@ -155,7 +123,6 @@ def _prompt_lines(app: LiveShell) -> list[str] {
     return [top, body, foot];
 }
 
-
 def _approval_lines(app: LiveShell) -> list[str] {
     _ = app;
     inner = 46;
@@ -170,7 +137,6 @@ def _approval_lines(app: LiveShell) -> list[str] {
         "╰" + _rule(inner, "─") + "╯",
     ];
 }
-
 
 def _transcript_lines(app: LiveShell) -> list[str] {
     win = materialize_visible(app.proj);
@@ -187,7 +153,6 @@ def _transcript_lines(app: LiveShell) -> list[str] {
         truncate_text("  try:  explain retained damage", w, ellipsis="…"),
     ];
 }
-
 
 def _paint(app: LiveShell) {
     header = _header_lines(app);
@@ -226,7 +191,6 @@ def _paint(app: LiveShell) {
     }
     request_cursor(app.renderer, app.shell.prompt, row_offset=1, col_offset=cursor_col);
 }
-
 
 def _render(app: LiveShell) {
     if not app.dirty {

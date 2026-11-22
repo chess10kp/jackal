@@ -192,7 +192,7 @@ def register_fake_provider(bridge: any, cfg: dict[str, any], extension_id: str =
 def register_fake_renderer(
     bridge: any,
     kind: str,
-    type: str,
+    renderer_type: str,
     fn: any,
     extension_id: str = "fake.renderer",
 ) {
@@ -202,7 +202,7 @@ def register_fake_renderer(
         raise RuntimeError("plugin host unavailable");
     }
     table = h.message_renderers if kind != "entry" else h.entry_renderers;
-    table[str(type)] = {"fn": fn, "owner": extension_id};
+    table[str(renderer_type)] = {"fn": fn, "owner": extension_id};
 }
 
 
@@ -215,11 +215,11 @@ def fake_push_message(bridge: any, role: str, content: str) {
 }
 
 
-def fake_push_entry(bridge: any, type: str, data: dict[str, any]) {
+def fake_push_entry(bridge: any, entry_type: str, data: dict[str, any]) {
     ensure_host(bridge);
     h: FakePluginHost = bridge.host;
     if h is not None {
-        h.pending_entries.append({"type": type, "data": data});
+        h.pending_entries.append({"type": entry_type, "data": data});
     }
 }
 

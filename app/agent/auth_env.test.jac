@@ -5,7 +5,6 @@ import json;
 import tempfile;
 import shutil;
 
-
 def _with_agent_dir(creds: dict[str, any]) -> str {
     tmp_dir = tempfile.mkdtemp(prefix="jackal-auth-env-");
     fh = open(os.path.join(tmp_dir, "auth.json"), "w");
@@ -13,7 +12,6 @@ def _with_agent_dir(creds: dict[str, any]) -> str {
     fh.close();
     return tmp_dir;
 }
-
 
 test "hydrate exports stored keys and logout clears only those" {
     key_env = _key_env("openrouter");
@@ -37,9 +35,14 @@ test "hydrate exports stored keys and logout clears only those" {
         assert os.environ.get(key_env) == "from-shell";
     } finally {
         os.environ.pop(key_env, None);
-        if saved_key is not None { os.environ[key_env] = saved_key; }
-        if saved_dir is None { os.environ.pop("JACKAL_AGENT_DIR", None); }
-        else { os.environ["JACKAL_AGENT_DIR"] = saved_dir; }
+        if saved_key is not None {
+            os.environ[key_env] = saved_key;
+        }
+        if saved_dir is None {
+            os.environ.pop("JACKAL_AGENT_DIR", None);
+        } else {
+            os.environ["JACKAL_AGENT_DIR"] = saved_dir;
+        }
         shutil.rmtree(tmp_dir, ignore_errors=True);
     }
 }

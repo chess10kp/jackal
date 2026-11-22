@@ -1,6 +1,5 @@
 """Behavior tests for OSP UI graph structural mutations."""
 
-
 test "append_child maintains sparse rank ordering" {
     screen = MainScreen(key="main");
     header = Header(key="header", title="Jackal");
@@ -13,16 +12,10 @@ test "append_child maintains sparse rank ordering" {
     append_child(screen, status);
     append_child(screen, prompt);
 
-    assert ordered_child_keys(screen) == [
-        "header",
-        "transcript",
-        "status",
-        "prompt",
-    ];
+    assert ordered_child_keys(screen) == ["header", "transcript", "status", "prompt"];
     assert child_rank(screen, transcript) > child_rank(screen, header);
     assert child_rank(screen, prompt) > child_rank(screen, status);
 }
-
 
 test "move_before reorders siblings without remounting unrelated nodes" {
     screen = MainScreen(key="main");
@@ -37,16 +30,10 @@ test "move_before reorders siblings without remounting unrelated nodes" {
     append_child(screen, prompt);
 
     move_before(prompt, header);
-    assert ordered_child_keys(screen) == [
-        "prompt",
-        "header",
-        "transcript",
-        "status",
-    ];
+    assert ordered_child_keys(screen) == ["prompt", "header", "transcript", "status"];
     assert child_parent(prompt) is screen;
     assert child_parent(header) is screen;
 }
-
 
 test "replace swaps one mounted node for another at the same slot" {
     screen = MainScreen(key="main");
@@ -63,7 +50,6 @@ test "replace swaps one mounted node for another at the same slot" {
     assert child_parent(old_status) is None;
 }
 
-
 test "append_child rejects duplicate sibling keys atomically" {
     screen = MainScreen(key="main");
     first = Header(key="dup");
@@ -78,7 +64,6 @@ test "append_child rejects duplicate sibling keys atomically" {
     assert failed;
     assert ordered_child_keys(screen) == ["dup"];
 }
-
 
 test "detach and dispose_subtree clear containment without touching jid keys" {
     ui_root = UiSessionRoot(key="session");
@@ -96,7 +81,6 @@ test "detach and dispose_subtree clear containment without touching jid keys" {
     assert child_parent(screen) is None;
 }
 
-
 test "insert_before and insert_after place relative to a sibling" {
     screen = MainScreen(key="main");
     a = Header(key="a");
@@ -112,7 +96,6 @@ test "insert_before and insert_after place relative to a sibling" {
     assert ordered_child_keys(screen) == ["a", "d", "b", "c"];
 }
 
-
 test "move_after reorders without changing parent" {
     screen = MainScreen(key="main");
     a = Header(key="a");
@@ -125,7 +108,6 @@ test "move_after reorders without changing parent" {
     assert ordered_child_keys(screen) == ["b", "c", "a"];
     assert child_parent(a) is screen;
 }
-
 
 test "append_child rejects containment cycles atomically" {
     outer = MainScreen(key="outer");
@@ -141,7 +123,6 @@ test "append_child rejects containment cycles atomically" {
     assert ordered_child_keys(outer) == ["inner"];
     assert child_parent(outer) is None;
 }
-
 
 test "move into own descendant is rejected without partial mutation" {
     screen = MainScreen(key="main");
@@ -162,15 +143,9 @@ test "move into own descendant is rejected without partial mutation" {
     assert child_parent(leaf) is mid;
 }
 
-
 test "sparse ranks keep a positive gap after successive appends" {
     screen = MainScreen(key="main");
-    nodes = [
-        Header(key="h0"),
-        Header(key="h1"),
-        Header(key="h2"),
-        Header(key="h3"),
-    ];
+    nodes = [Header(key="h0"), Header(key="h1"), Header(key="h2"), Header(key="h3")];
     for n in nodes {
         append_child(screen, n);
     }
@@ -182,7 +157,6 @@ test "sparse ranks keep a positive gap after successive appends" {
     # Default gap is 1024 until exhaustion forces normalize.
     assert ranks[1] - ranks[0] >= 1024 or ranks[1] > ranks[0];
 }
-
 
 test "second parent attachment is rejected (single visual parent)" {
     left = MainScreen(key="left");

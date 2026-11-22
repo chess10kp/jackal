@@ -4,16 +4,9 @@ import json;
 
 import from .protocol { Envelope, make_envelope }
 import from .fake_host { FakePluginHost, FakeUi, touch_bridge }
-import from .plugin_bridge_core {
-    PluginBridge,
-    _alloc_corr,
-    _node_alive,
-}
+import from .plugin_bridge_core { PluginBridge, _alloc_corr, _node_alive }
 import from .plugin_bridge_io { _write_node, _prepare_corr, _read_node_until }
-import from .plugin_bridge_traffic {
-    _absorb_payload,
-    _absorb_pending_fake,
-}
+import from .plugin_bridge_traffic { _absorb_payload, _absorb_pending_fake }
 
 def _absorb_hook_results(bridge: PluginBridge, results: list[any]) {
     for r in results {
@@ -51,9 +44,7 @@ def fire_hook_data(
         );
         try {
             _write_node(bridge, req);
-            reply = _read_node_until(
-                bridge, "hook_done", correlation_id=corr, timeout=timeout
-            );
+            reply = _read_node_until(bridge, "hook_done", correlation_id=corr, timeout=timeout);
         } except Exception {
             return empty;
         }
@@ -122,7 +113,6 @@ def fire_hook_data(
     return {"results": results, "data": working};
 }
 
-
 """Verdict dicts from successful listener results, in fire order."""
 def _ok_verdicts(results: list[any]) -> list[any] {
     verdicts: list[any] = [];
@@ -133,7 +123,6 @@ def _ok_verdicts(results: list[any]) -> list[any] {
     }
     return verdicts;
 }
-
 
 """tool_call gate: fires the Pi `tool_call` hook and aggregates verdicts.
 
@@ -168,7 +157,6 @@ def tool_call_gate(bridge: PluginBridge | None, name: str, args: dict[str, any])
     return out;
 }
 
-
 """tool_result gate: fires the Pi `tool_result` hook over a finished result.
 
 Pi middleware semantics: each handler sees the latest content (hosts apply
@@ -176,10 +164,7 @@ Pi middleware semantics: each handler sees the latest content (hosts apply
 Returns {ok, result, is_error} — never raises; on any failure the original
 result passes through untouched."""
 def tool_result_gate(
-    bridge: PluginBridge | None,
-    name: str,
-    args: dict[str, any],
-    result: str,
+    bridge: PluginBridge | None, name: str, args: dict[str, any], result: str
 ) -> dict[str, any] {
     out: dict[str, any] = {"ok": True, "result": result, "is_error": False};
     if bridge is None {
@@ -218,7 +203,6 @@ def tool_result_gate(
     return out;
 }
 
-
 """input gate: fires the Pi `input` hook over raw user text.
 
 Returns {action, text} — action is continue | transform | handled (first
@@ -231,9 +215,7 @@ def input_gate(bridge: PluginBridge | None, text: str) -> dict[str, any] {
         return out;
     }
     try {
-        fired = fire_hook_data(
-            bridge, "input", {"text": str(text), "source": "interactive"}
-        );
+        fired = fire_hook_data(bridge, "input", {"text": str(text), "source": "interactive"});
         results = fired.get("results", []);
         final = fired.get("data", {});
     } except Exception {
@@ -242,10 +224,7 @@ def input_gate(bridge: PluginBridge | None, text: str) -> dict[str, any] {
     for v in _ok_verdicts(results) {
         if str(v.get("action", "continue")) == "handled" {
             t: any = final.get("text") if isinstance(final, dict) else None;
-            return {
-                "action": "handled",
-                "text": str(t) if isinstance(t, str) else out["text"],
-            };
+            return {"action": "handled", "text": str(t) if isinstance(t, str) else out["text"]};
         }
         if str(v.get("action", "continue")) == "transform" {
             out["action"] = "transform";
@@ -260,13 +239,14 @@ def input_gate(bridge: PluginBridge | None, text: str) -> dict[str, any] {
     return out;
 }
 
-
 """context gate: fires the Pi `context` hook before each LLM call.
 
 Handlers may edit the message copy in place (echoed back) or return
 {messages} (explicit replacement — last one wins). Returns the message list
 to stream with; the caller's history is never mutated."""
-def context_gate(bridge: PluginBridge | None, messages: list[dict[str, any]]) -> list[dict[str, any]] {
+def context_gate(
+    bridge: PluginBridge | None, messages: list[dict[str, any]]
+) -> list[dict[str, any]] {
     if bridge is None {
         return messages;
     }
@@ -301,7 +281,6 @@ def context_gate(bridge: PluginBridge | None, messages: list[dict[str, any]]) ->
     return messages;
 }
 
-
 """before_agent_start gate: aggregate {message, systemPrompt} returns.
 
 systemPrompt composes last-wins across handlers (each handler built its
@@ -314,9 +293,7 @@ def agent_start_gate(bridge: PluginBridge | None, prompt: str) -> dict[str, any]
         return out;
     }
     try {
-        fired = fire_hook_data(
-            bridge, "before_agent_start", {"prompt": str(prompt)}
-        );
+        fired = fire_hook_data(bridge, "before_agent_start", {"prompt": str(prompt)});
         results = fired["results"];
     } except Exception {
         return out;
@@ -336,7 +313,9 @@ def agent_start_gate(bridge: PluginBridge | None, prompt: str) -> dict[str, any]
     return out;
 }
 
-def fire_hook(bridge: PluginBridge, event: str, data: dict[str, any], timeout: float = 10.0) -> list[dict[str, any]] {
+def fire_hook(
+    bridge: PluginBridge, event: str, data: dict[str, any], timeout: float = 10.0
+) -> list[dict[str, any]] {
     if bridge.host_kind == "node" and _node_alive(bridge) {
         corr = _alloc_corr(bridge);
         _prepare_corr(bridge, corr, expect_kind="hook_done");
@@ -348,9 +327,7 @@ def fire_hook(bridge: PluginBridge, event: str, data: dict[str, any], timeout: f
         );
         try {
             _write_node(bridge, req);
-            reply = _read_node_until(
-                bridge, "hook_done", correlation_id=corr, timeout=timeout
-            );
+            reply = _read_node_until(bridge, "hook_done", correlation_id=corr, timeout=timeout);
         } except Exception {
             return [];
         }
@@ -396,7 +373,6 @@ def fire_hook(bridge: PluginBridge, event: str, data: dict[str, any], timeout: f
     return results;
 }
 
-
 # ===================== cheap lifecycle events (name-pinned helpers) =====================
 
 """Fire the Pi `user_bash` hook when the agent runs a shell command.
@@ -421,7 +397,6 @@ def fire_user_bash(
     }
 }
 
-
 """Fire the Pi `project_trust` hook when a project directory is first
 trusted. Payload: {path}. Best-effort: no host or transport failure
 returns []."""
@@ -435,6 +410,5 @@ def fire_project_trust(bridge: PluginBridge | None, path: str) -> list[dict[str,
         return [];
     }
 }
-
 
 # ======================= T2-partial: markdown transformers =======================

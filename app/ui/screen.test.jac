@@ -8,28 +8,12 @@ builder from there fails the seal (E5093). See docs/TESTING.md and
 jaseci-labs/jac#10490.
 """
 
-import from ui.model {
-    MainScreen,
-    node_id,
-    ordered_child_keys,
-}
+import from ui.model { MainScreen, node_id, ordered_child_keys }
 
-import from ui.layout_types {
-    SizeMode,
-    create_layout_state,
-}
-import from ui.runtime {
-    create_session,
-    dispose_session,
-    get_focus_node,
-    set_focus,
-}
+import from ui.layout_types { SizeMode, create_layout_state }
+import from ui.runtime { create_session, dispose_session, get_focus_node, set_focus }
 
-import from ui.markup {
-    default_shell_registry,
-    lower_markup,
-}
-
+import from ui.markup { default_shell_registry, lower_markup }
 
 test "build_main_shell mounts header transcript status prompt once" {
     handle = create_session();
@@ -47,7 +31,6 @@ test "build_main_shell mounts header transcript status prompt once" {
     assert ids.prompt_id == node_id(shell.prompt);
 }
 
-
 test "typing does not replace shell node ids" {
     handle = create_session();
     session = handle.session;
@@ -62,7 +45,6 @@ test "typing does not replace shell node ids" {
     assert shell.prompt.draft == "hello\nworld" or ("hello" in shell.prompt.draft);
 }
 
-
 test "submit clears draft and yields SendPrompt effect" {
     handle = create_session();
     session = handle.session;
@@ -72,7 +54,6 @@ test "submit clears draft and yields SendPrompt effect" {
     assert len(effects) >= 1;
     assert shell.prompt.draft == "";
 }
-
 
 test "cancel restores or aborts without replacing nodes" {
     handle = create_session();
@@ -84,7 +65,6 @@ test "cancel restores or aborts without replacing nodes" {
     after = shell_ids(shell);
     assert after.prompt_id == before.prompt_id;
 }
-
 
 test "approval overlay round-trip restores prompt focus and ids" {
     handle = create_session();
@@ -104,7 +84,6 @@ test "approval overlay round-trip restores prompt focus and ids" {
     assert closed.restored_focus_id == node_id(shell.prompt);
 }
 
-
 test "resize keeps shell node ids stable" {
     handle = create_session();
     session = handle.session;
@@ -119,7 +98,6 @@ test "resize keeps shell node ids stable" {
     assert after.status_id == before.status_id;
     assert after.prompt_id == before.prompt_id;
 }
-
 
 test "second build_main_shell reuses or refuses duplicate topology" {
     handle = create_session();
@@ -137,7 +115,6 @@ test "second build_main_shell reuses or refuses duplicate topology" {
         assert node_id(second.screen) == node_id(first.screen);
     }
 }
-
 
 test "configure_main_shell_layout installs legacy-parity specs" {
     handle = create_session();
@@ -168,7 +145,6 @@ test "configure_main_shell_layout installs legacy-parity specs" {
 
     dispose_session(session);
 }
-
 
 test "lowered shell matches build_main_shell child keys" {
     source = """

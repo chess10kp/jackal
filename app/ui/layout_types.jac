@@ -44,7 +44,7 @@ import from ui.layout_measure {
 
 
 
-def fill_axis() -> AxisSize {
+def fill_axis -> AxisSize {
     return AxisSize(mode=SizeMode.FILL);
 }
 
@@ -59,7 +59,7 @@ def grow_axis(weight: float) -> AxisSize {
 }
 
 
-def intrinsic_axis() -> AxisSize {
+def intrinsic_axis -> AxisSize {
     return AxisSize(mode=SizeMode.INTRINSIC);
 }
 
@@ -81,7 +81,7 @@ def _error(code: LayoutError, message: str, node_ids: list[str] = []) -> Mutatio
 }
 
 
-def _ok() -> MutationResult {
+def _ok -> MutationResult {
     return MutationResult(ok=True);
 }
 

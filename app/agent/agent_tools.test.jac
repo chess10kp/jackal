@@ -4,11 +4,9 @@ import tempfile;
 import shutil;
 import from .registry { create_registry, register_native }
 
-
 def _noop(args: dict[str, any]) -> str {
     return "";
 }
-
 
 test "task tools round-trip through the board" {
     tmp_dir = tempfile.mkdtemp(prefix="jackal-agent-tools-");
@@ -32,7 +30,6 @@ test "task tools round-trip through the board" {
     }
 }
 
-
 test "subagent tool names map legacy aliases and exclude recursion" {
     reg = create_registry();
     for n in ["read_file", "run_command", "grep", "subagent", "compact_context"] {
@@ -45,12 +42,10 @@ test "subagent tool names map legacy aliases and exclude recursion" {
     assert subagent_tool_names(reg, ["nonexistent"]) == ["grep", "read_file", "run_command"];
 }
 
-
 test "subagent tool validates its arguments" {
     assert _subagent_tool({"task": ""}).startswith("ERROR");
     assert "unknown subagent" in _subagent_tool({"agent": "no-such-agent-xyz", "task": "x"});
 }
-
 
 test "agent tool specs register on a registry" {
     reg = create_registry();

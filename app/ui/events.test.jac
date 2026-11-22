@@ -1,12 +1,6 @@
 """Behavior tests for semantic event dispatch, bubbling, and effects."""
 
-import from ui.model {
-    MainScreen,
-    Overlay,
-    UiContainer,
-    UiRegion,
-    node_id,
-}
+import from ui.model { MainScreen, Overlay, UiContainer, UiRegion, node_id }
 
 import from ui.runtime {
     append_child_session,
@@ -15,7 +9,6 @@ import from ui.runtime {
     set_current_screen,
     set_focus,
 }
-
 
 node EchoRegion(UiRegion) {
     has seen: list[str] = [];
@@ -38,7 +31,6 @@ node EchoRegion(UiRegion) {
     }
 }
 
-
 node BubbleParent(UiContainer) {
     has arrivals: int = 0;
 
@@ -47,15 +39,11 @@ node BubbleParent(UiContainer) {
     }
 }
 
-
 node SilentRegion(UiRegion) {}
-
 
 node FocusableA(UiRegion) {}
 
-
 node FocusableB(UiRegion) {}
-
 
 test "node ability receives dispatched event and mutates state" {
     handle = create_session();
@@ -72,7 +60,6 @@ test "node ability receives dispatched event and mutates state" {
     assert event.handled;
     assert region.seen == ["insert:hi"];
 }
-
 
 test "event bubbles to ancestors as the same instance" {
     handle = create_session();
@@ -92,7 +79,6 @@ test "event bubbles to ancestors as the same instance" {
     assert parent.arrivals == 1;
     assert not event.propagation_stopped;
 }
-
 
 test "propagation_stopped prevents ancestor delivery but handled does not" {
     handle = create_session();
@@ -117,7 +103,6 @@ test "propagation_stopped prevents ancestor delivery but handled does not" {
     assert parent.arrivals == 1;
 }
 
-
 test "effects accumulate during propagation and consume clears them" {
     handle = create_session();
     session = handle.session;
@@ -139,7 +124,6 @@ test "effects accumulate during propagation and consume clears them" {
     assert pending_effects(event) == [];
 }
 
-
 test "target resolution prefers modal overlay then focus then screen" {
     handle = create_session();
     session = handle.session;
@@ -157,14 +141,13 @@ test "target resolution prefers modal overlay then focus then screen" {
     set_focus(session, focused);
     assert resolve_input_target(session) is focused;
 
-    screen +>: Layer(z_index=10, modal=True) :+> overlay;
+    screen +>:Layer(z_index=10, modal=True):+> overlay;
     assert topmost_modal_overlay(session) is overlay;
     assert resolve_input_target(session) is overlay;
 
     set_focus(session, None);
     assert resolve_input_target(session) is overlay;
 }
-
 
 test "explicit target bypasses modal and focus chain" {
     handle = create_session();
@@ -178,7 +161,7 @@ test "explicit target bypasses modal and focus chain" {
     append_child_session(session, screen, bound);
     append_child_session(session, screen, overlay);
     set_current_screen(session, screen);
-    screen +>: Layer(z_index=1, modal=True) :+> overlay;
+    screen +>:Layer(z_index=1, modal=True):+> overlay;
 
     change = TranscriptChanged(revision=7);
     dispatch_event(session, change, bound);
@@ -186,7 +169,6 @@ test "explicit target bypasses modal and focus chain" {
     assert change.revision == 7;
     assert trace_event_path(session, bound)[0] == node_id(bound);
 }
-
 
 test "MoveFocus default action walks structural siblings" {
     handle = create_session();
@@ -208,7 +190,6 @@ test "MoveFocus default action walks structural siblings" {
     dispatch_event(session, MoveFocus(direction="prev"));
     assert session.focus_id == node_id(first);
 }
-
 
 test "default_prevented suppresses the framework default action" {
     handle = create_session();
@@ -232,7 +213,6 @@ test "default_prevented suppresses the framework default action" {
     assert session.focus_id == node_id(first);
 }
 
-
 test "events pass through nodes without matching abilities" {
     handle = create_session();
     session = handle.session;
@@ -250,7 +230,6 @@ test "events pass through nodes without matching abilities" {
     assert pending_effects(event) == [];
 }
 
-
 test "dispatch on a disposed session raises" {
     handle = create_session();
     session = handle.session;
@@ -265,7 +244,6 @@ test "dispatch on a disposed session raises" {
     }
     assert failed;
 }
-
 
 test "dispatch_event_with_effects returns effects after propagation" {
     handle = create_session();
@@ -283,7 +261,6 @@ test "dispatch_event_with_effects returns effects after propagation" {
     assert isinstance(effects[0], SendPrompt);
 }
 
-
 test "containment path runs target to screen inclusive" {
     handle = create_session();
     session = handle.session;
@@ -298,13 +275,8 @@ test "containment path runs target to screen inclusive" {
     set_current_screen(session, screen);
 
     ids = trace_event_path(session, leaf);
-    assert ids == [
-        node_id(leaf),
-        node_id(mid),
-        node_id(screen),
-    ];
+    assert ids == [node_id(leaf), node_id(mid), node_id(screen)];
 }
-
 
 test "handled default_prevented and propagation_stopped are independent flags" {
     handle = create_session();
@@ -329,7 +301,6 @@ test "handled default_prevented and propagation_stopped are independent flags" {
     assert submit.default_prevented;
     assert not submit.propagation_stopped;
 }
-
 
 test "Resize walker carries terminal dimensions" {
     handle = create_session();

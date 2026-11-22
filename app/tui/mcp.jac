@@ -11,7 +11,6 @@ is the public alias) and the tui/overlays.test.jac replica (deleted; this
 annex is the real coverage)."""
 import from tui.window { WindowSpec, WindowState, window_lines }
 
-
 """MCP window rows from configured specs + live status.
 
 specs: {name: argv} from agent.session_config.mcp_server_specs (the
@@ -35,7 +34,9 @@ def mcp_window_rows(
     }
     for name in sorted(declared) {
         sname: str = str(name);
-        st: dict[str, any] = status.get(sname, {}) if isinstance(status.get(sname, {}), dict) else {};
+        st: dict[str, any] = status.get(sname, {})
+            if isinstance(status.get(sname, {}), dict)
+            else {};
         state: str = str(st.get("state", ""));
         cmd: any = st.get("cmd") if st.get("cmd") else specs.get(sname, []);
         cmd_parts: list[str] = [];
@@ -70,7 +71,6 @@ def mcp_window_rows(
     return {"rows": rows, "ids": ids};
 }
 
-
 """Build the MCP STATUS window state over live data."""
 def _mcp_window_state(
     specs: dict[str, list[str]], status: dict[str, dict[str, any]]
@@ -81,10 +81,7 @@ def _mcp_window_state(
         has_servers = True;
     }
     return WindowState(
-        spec=WindowSpec(
-            title="MCP STATUS",
-            hint="\u2191\u2193 select · r restart · esc close",
-        ),
+        spec=WindowSpec(title="MCP STATUS", hint="\u2191\u2193 select · r restart · esc close"),
         rows=list(entries["rows"]),
         ids=[str(x) for x in entries["ids"]],
         selected=0 if has_servers else -1,

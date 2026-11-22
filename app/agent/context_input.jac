@@ -35,18 +35,15 @@ glob _FILE_MENTION_PATTERN: str = r"@([^\s:]+)(?::(\d+)(?:-(\d+))?)?",
      _TOKEN_WARN_CHARS: int = 40000,
      _COMMAND_TIMEOUT_SECS: float = 60.0;
 
-
 """Checker shim: os.path.abspath/normpath stubs require PathLike, so route
 plain str values through any-typed aliases (same pattern as checkpoints.jac)."""
 def _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
-
 def _path_normpath(p: str) -> str {
     return str(os.path.normpath(p));
 }
-
 
 """Reject absolute, drive-letter, traversal, and NUL paths."""
 def is_valid_file_path(file_path: str) -> bool {
@@ -68,7 +65,6 @@ def is_valid_file_path(file_path: str) -> bool {
     }
     return True;
 }
-
 
 """{"start"} or {"start", "end"} for a `10` / `10-20` string; None when
 malformed, zero, negative, or reversed."""
@@ -100,7 +96,6 @@ def parse_line_range(range_str: str) -> dict[str, any] | None {
     }
     return None;
 }
-
 
 """All `@path` / `@path:10-20` mentions in input, in order of appearance.
 
@@ -136,7 +131,6 @@ def parse_file_mentions(input_text: str) -> list[dict[str, any]] {
     return mentions;
 }
 
-
 """Path + startLine/endLine for a mention token without the leading `@`.
 
 A trailing `:<digits>[-<digits>]` is consumed as the range; anything else
@@ -156,13 +150,8 @@ def parse_mention_token(raw: str) -> dict[str, any] {
     if rng is None {
         return {"path": raw};
     }
-    return {
-        "path": path_part,
-        "startLine": rng["start"],
-        "endLine": rng.get("end", rng["start"]),
-    };
+    return {"path": path_part, "startLine": rng["start"], "endLine": rng.get("end", rng["start"])};
 }
-
 
 """Active `@mention` spanning the cursor position, for autocomplete.
 
@@ -212,7 +201,6 @@ def get_current_file_mention(input_text: str, cursor_position: int = -1) -> dict
     return {"mention": mention, "start": start, "end": end, "rangeSuffix": range_suffix};
 }
 
-
 """Resolve input_path inside cwd; ValueError when it escapes the root."""
 def _safe_resolve(cwd: str, input_path: str) -> str {
     abs_path = _path_normpath(_path_abspath(os.path.join(cwd, input_path)));
@@ -222,7 +210,6 @@ def _safe_resolve(cwd: str, input_path: str) -> str {
     }
     return abs_path;
 }
-
 
 """Read one file slice and render it as a fenced <file> context block.
 
@@ -276,7 +263,6 @@ def _load_file_slice(cwd: str, mention: str, line_range: any = None) -> tuple[st
     return (block, len(text));
 }
 
-
 """Run `command` via `bash -lc` in cwd; collect stdout/stderr plus exit
 status into a deterministic report string. Hard timeout of 60 seconds;
 spawn failures and timeouts degrade to messages instead of raising."""
@@ -304,7 +290,6 @@ def _run_inline_command(cwd: str, command: str) -> str {
     parts.append("exit=" + str(proc.returncode));
     return "\n".join(parts)[:_MAX_FILE_CHARS];
 }
-
 
 """Expand `!cmd` prefixes and `@path` mentions in user text into prompt
 context blocks.
@@ -361,10 +346,7 @@ def expand_context_input(cwd: str, text: str) -> str {
 
     header = trimmed;
     if total_chars >= _TOKEN_WARN_CHARS {
-        header = (
-            "[Warning: attached files ~" + str(total_chars // 4) + " tokens]\n"
-            + trimmed
-        );
+        header = ("[Warning: attached files ~" + str(total_chars // 4) + " tokens]\n" + trimmed);
     }
     return header + "\n\nAttached context:\n" + "\n".join(blocks);
 }

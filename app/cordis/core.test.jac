@@ -4,37 +4,32 @@ This file is a `.test.jac` annex of core.jac - it sees the module's
 declarations directly, with no import line.
 """
 
-
 # --- component effect functions (plain functions, no closures needed) -----
 
 def model_apply(ctx: EffectContext, fiber: Fiber) -> None {
-    ctx.set("model", "claude-sonnet-5");
-    ctx.set("model.health", "ok");
+    ctx.put("model", "claude-sonnet-5");
+    ctx.put("model.health", "ok");
 }
-
 
 def tools_apply(ctx: EffectContext, fiber: Fiber) -> None {
     m = ctx.get("model");
-    ctx.set("tools.read", "read_file(" + str(m) + ")");
-    ctx.set("tools.edit", "edit_file");
+    ctx.put("tools.read", "read_file(" + str(m) + ")");
+    ctx.put("tools.edit", "edit_file");
 }
-
 
 def render_apply(ctx: EffectContext, fiber: Fiber) -> None {
-    ctx.set("renderer", "plain");
-    ctx.set("slash./render", "render_v1");
+    ctx.put("renderer", "plain");
+    ctx.put("slash./render", "render_v1");
 }
-
 
 def render_v2_apply(ctx: EffectContext, fiber: Fiber) -> None {
-    ctx.set("renderer", "ansi");
-    ctx.set("slash./render", "render_v2");
+    ctx.put("renderer", "ansi");
+    ctx.put("slash./render", "render_v2");
 }
-
 
 test "set is tracked and recoverable at root" {
     ctx = EffectContext();
-    ctx.set("model", "m1");
+    ctx.put("model", "m1");
     assert ctx.has_key("model");
     while ctx.root_frame {
         inv = ctx.root_frame.pop();
@@ -43,10 +38,11 @@ test "set is tracked and recoverable at root" {
     assert not ctx.has_key("model");
 }
 
-
 test "dependent waits until provider arrives, then activates" {
     ctx = EffectContext();
-    tools = Fiber(name="tools", inject=["model"], provide=["tools.read", "tools.edit"], apply=tools_apply);
+    tools = Fiber(
+        name="tools", inject=["model"], provide=["tools.read", "tools.edit"], apply=tools_apply
+    );
     ctx.use(tools);
     assert not tools.active;
     model = Fiber(name="model", provide=["model", "model.health"], apply=model_apply);
@@ -56,10 +52,13 @@ test "dependent waits until provider arrives, then activates" {
     assert ctx.get("tools.read") == "read_file(claude-sonnet-5)";
 }
 
-
 test "unloading provider deactivates dependents and reverts their effects" {
     ctx = EffectContext();
-    ctx.use(Fiber(name="tools", inject=["model"], provide=["tools.read", "tools.edit"], apply=tools_apply));
+    ctx.use(
+        Fiber(
+            name="tools", inject=["model"], provide=["tools.read", "tools.edit"], apply=tools_apply
+        ),
+    );
     ctx.use(Fiber(name="model", provide=["model", "model.health"], apply=model_apply));
     assert ctx.get("tools.read") is not None;
 
@@ -70,10 +69,11 @@ test "unloading provider deactivates dependents and reverts their effects" {
     assert not ctx.has_key("model");
 }
 
-
 test "re-providing reactivates waiting dependents" {
     ctx = EffectContext();
-    tools = Fiber(name="tools", inject=["model"], provide=["tools.read", "tools.edit"], apply=tools_apply);
+    tools = Fiber(
+        name="tools", inject=["model"], provide=["tools.read", "tools.edit"], apply=tools_apply
+    );
     ctx.use(tools);
     model = Fiber(name="model", provide=["model", "model.health"], apply=model_apply);
     ctx.use(model);
@@ -85,23 +85,28 @@ test "re-providing reactivates waiting dependents" {
     assert ctx.get("tools.read") is not None;
 }
 
-
 test "hot swap recovers old component effects and installs new ones" {
     ctx = EffectContext();
     ctx.use(Fiber(name="renderer", provide=["renderer", "slash./render"], apply=render_apply));
     assert ctx.get("slash./render") == "render_v1";
 
-    ctx.swap("renderer", Fiber(name="renderer", provide=["renderer", "slash./render"], apply=render_v2_apply));
+    ctx.swap(
+        "renderer",
+        Fiber(name="renderer", provide=["renderer", "slash./render"], apply=render_v2_apply),
+    );
     assert ctx.get("renderer") == "ansi";
     assert ctx.get("slash./render") == "render_v2";
     assert len([k for k in ctx.store if k.startswith("slash.")]) == 1;
 }
 
-
 test "dispose_all leaves the context empty" {
     ctx = EffectContext();
     ctx.use(Fiber(name="model", provide=["model", "model.health"], apply=model_apply));
-    ctx.use(Fiber(name="tools", inject=["model"], provide=["tools.read", "tools.edit"], apply=tools_apply));
+    ctx.use(
+        Fiber(
+            name="tools", inject=["model"], provide=["tools.read", "tools.edit"], apply=tools_apply
+        ),
+    );
     ctx.dispose_all();
     assert len(ctx.store) == 0;
     assert len(ctx.registry) == 0;

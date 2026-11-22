@@ -4,12 +4,10 @@ Provides node type, event handling, measure/paint hooks, disposal, inspection
 metadata, and markup registration without editing framework source.
 """
 
-
 walker SetProgress {
     has value: float = 0.0;
     has handled: bool = False;
 }
-
 
 node ProgressBar {
     has key: str = "";
@@ -27,7 +25,6 @@ node ProgressBar {
     }
 }
 
-
 """Render a one-line progress bar for the given width (helper, fully implemented)."""
 def render_progress(value: float, width: int) -> str {
     if width <= 2 {
@@ -41,19 +38,16 @@ def render_progress(value: float, width: int) -> str {
     return "[" + ("#" * filled) + ("-" * (inner - filled)) + "]";
 }
 
-
 """Measure height for ProgressBar (always 1)."""
 def progress_measure_height(bar: ProgressBar, max_width: int) -> int {
     _ = (bar, max_width);
     return 1;
 }
 
-
 """Paint ProgressBar into a single content line."""
 def progress_paint_line(bar: ProgressBar, width: int) -> str {
     return render_progress(bar.value, width);
 }
-
 
 """Register ProgressBar into a tag map (framework TagRegistry.tags or plain dict).
 

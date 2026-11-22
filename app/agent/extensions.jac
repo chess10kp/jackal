@@ -9,9 +9,7 @@ import json;
 import os;
 import time;
 
-
 # ── Checker shims ───────────────────────────────────────────────────────
-
 
 """Checker shims: the Jac type checker cannot bind AnyStr when plain str
 values flow into os.path abspath/dirname, so route those calls through
@@ -19,7 +17,6 @@ any-typed aliases (same pattern as auth.jac / checkpoints.jac)."""
 def _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
-
 
 def _path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
@@ -33,7 +30,6 @@ obj ExtensionDecl {
         requires: list[str] = [];
 }
 
-
 obj ExtensionStatus {
     has phase: str = "idle",
         loaded: int = 0,
@@ -45,7 +41,6 @@ obj ExtensionStatus {
         t_ext_ready_s: float = 0.0,
         compat_tier: str = "T0";
 }
-
 
 """Parse one extension dict into ExtensionDecl (missing fields → defaults)."""
 def decl_from_dict(raw: dict[str, any]) -> ExtensionDecl {
@@ -72,7 +67,6 @@ def decl_from_dict(raw: dict[str, any]) -> ExtensionDecl {
     );
 }
 
-
 """Normalize a JSON document into a list of ExtensionDecl."""
 def decls_from_json(data: any) -> list[ExtensionDecl] {
     rows: list[any] = [];
@@ -96,7 +90,6 @@ def decls_from_json(data: any) -> list[ExtensionDecl] {
     return out;
 }
 
-
 """Walk up from cwd for .jackal/extensions.json or .jackal with extensions key."""
 def load_extension_decls(cwd: str = "") -> list[ExtensionDecl] {
     start = cwd if cwd else os.getcwd();
@@ -108,8 +101,7 @@ def load_extension_decls(cwd: str = "") -> list[ExtensionDecl] {
                 with open(ext_path, "r") as fh {
                     return decls_from_json(json.load(fh));
                 }
-            } except (OSError, ValueError) {
-            }
+            } except (OSError, ValueError) {}
         }
         jackal_path = os.path.join(cur, ".jackal");
         if os.path.isfile(jackal_path) {
@@ -120,8 +112,7 @@ def load_extension_decls(cwd: str = "") -> list[ExtensionDecl] {
                 if isinstance(data, dict) and "extensions" in data {
                     return decls_from_json(data);
                 }
-            } except (OSError, ValueError) {
-            }
+            } except (OSError, ValueError) {}
         }
         parent = _path_dirname(cur);
         if parent == cur {
@@ -131,7 +122,6 @@ def load_extension_decls(cwd: str = "") -> list[ExtensionDecl] {
     }
     return [];
 }
-
 
 """Node decls that should warm on the sidecar (sidecar/default; not lazy/native)."""
 def node_sidecar_decls(decls: list[ExtensionDecl]) -> list[ExtensionDecl] {
@@ -147,7 +137,6 @@ def node_sidecar_decls(decls: list[ExtensionDecl]) -> list[ExtensionDecl] {
     }
     return out;
 }
-
 
 """Format status label: extensions: loading n/m | ready | degraded | idle."""
 def extensions_label(status: ExtensionStatus) -> str {
@@ -165,7 +154,6 @@ def extensions_label(status: ExtensionStatus) -> str {
     }
     return f"extensions: loading {status.loaded}/{status.total}";
 }
-
 
 """Resolve extension path relative to base cwd."""
 def resolve_decl_path(decl: ExtensionDecl, base_cwd: str) -> str {

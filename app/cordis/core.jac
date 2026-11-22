@@ -87,9 +87,9 @@ obj EffectContext {
         if self.verbose { print("  [cordis] " + msg); }
     }
 
-    """set(k, v) is an effect function on the coeffect store (Def. 23):
+    """put(k, v) is an effect function on the coeffect store (Def. 23):
     it extends the store and returns/tracks the restriction as inverse."""
-    def set(key: str, value: object) -> None {
+    def put(key: str, value: object) -> None {
         if key in self.store {
             raise ValueError("coeffect key already provided: " + key);
         }
@@ -99,7 +99,7 @@ obj EffectContext {
         self._notify([key]);
     }
 
-    """Inverse of set: restrict the store (then notify)."""
+    """Inverse of put: restrict the store (then notify)."""
     def unset(key: str) -> None {
         self.store.pop(key, None);
         self._notify([key]);
@@ -179,7 +179,7 @@ obj EffectContext {
     }
 
     """Re-classify every fiber's satisfaction to a fixpoint (quiescence)."""
-    def _refresh() -> None {
+    def _refresh -> None {
         for _pass in range(32) {
             flipped = False;
             for name in list(self.registry.keys()) {

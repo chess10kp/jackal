@@ -90,7 +90,7 @@ def validate_checkpoint_name(name: str) -> dict[str, any] {
 
 """UTC timestamp shaped like the toolchain's generated names:
 checkpoint-YYYY-MM-DD-HH-MM-SS-microseconds+HH-MM."""
-def _generate_checkpoint_name() -> str {
+def _generate_checkpoint_name -> str {
     ts = datetime.datetime.now(datetime.timezone.utc).isoformat();
     ts = ts.replace(":", "-").replace(".", "-").replace("T", "-");
     return "checkpoint-" + ts;

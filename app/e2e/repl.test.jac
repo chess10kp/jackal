@@ -1,7 +1,5 @@
 """E2E: the line REPL frontend driven over piped stdin."""
 
-
-
 test "repl runs a turn and slash commands then exits" {
     sb = make_sandbox();
     try {
@@ -17,12 +15,14 @@ test "repl runs a turn and slash commands then exits" {
     }
 }
 
-
 test "repl approval prompt accepts y" {
     sb = make_sandbox();
     try {
         sb.script([
-            {"text": "", "tool_calls": [{"name": "write_file", "args": {"path": "y.txt", "content": "yes"}}]},
+            {
+                "text": "",
+                "tool_calls": [{"name": "write_file", "args": {"path": "y.txt", "content": "yes"}}],
+            },
             {"text": "ok"},
         ]);
         r = run_jackal(sb, [], stdin_text="write y\ny\n/exit\n");
@@ -32,7 +32,6 @@ test "repl approval prompt accepts y" {
         sb.cleanup();
     }
 }
-
 
 test "help and version flags" {
     sb = make_sandbox();

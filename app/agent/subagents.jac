@@ -43,39 +43,35 @@ import re;
 import from .compaction { load_project_config }
 
 glob SUBAGENT_TOOL_ALIASES: dict[str, str] = {
-        "read_file": "read",
-        "write_file": "write",
-        "edit_file": "edit",
-        "grep": "bash",
-        "find": "bash",
-        "ls": "bash",
-        "list_directory": "bash",
-        "search_file_contents": "bash",
-        "find_files": "bash",
-    },
+         "read_file": "read",
+         "write_file": "write",
+         "edit_file": "edit",
+         "grep": "bash",
+         "find": "bash",
+         "ls": "bash",
+         "list_directory": "bash",
+         "search_file_contents": "bash",
+         "find_files": "bash",
+     },
      EXCLUDED_SUBAGENT_TOOLS: list[str] = ["agent", "subagent", "compact_context"];
 
-
 # ============================ path shims =================================
-
 
 """str-typed shim over os.path.abspath, which demands PathLike here."""
 def _abs_path(p: any) -> str {
     return str(os.path.abspath(p));
 }
 
-
 # ============================== frontmatter ==============================
-
 
 def _parse_scalar(value: str) -> any {
     trimmed = value.strip();
     if not trimmed {
         return "";
     }
-    if (trimmed.startswith('"') and trimmed.endswith('"')) or (
-        trimmed.startswith("'") and trimmed.endswith("'")
-    ) {
+    if (trimmed.startswith('"') and trimmed.endswith('"'))
+        or (trimmed.startswith("'") and trimmed.endswith("'"))
+    {
         return trimmed[1:-1];
     }
     if trimmed.startswith("[") and trimmed.endswith("]") {
@@ -94,7 +90,6 @@ def _parse_scalar(value: str) -> any {
     }
     return trimmed;
 }
-
 
 """Parse --- delimited YAML-like frontmatter; returns (metadata, body).
 
@@ -147,7 +142,6 @@ def parse_frontmatter(content: str) -> tuple[dict[str, any], str] {
     return (fm, body);
 }
 
-
 """Coerce a frontmatter value to display text (lists join with ', ')."""
 def frontmatter_string(value: any) -> str | None {
     if value is None {
@@ -162,7 +156,6 @@ def frontmatter_string(value: any) -> str | None {
     }
     return str(value);
 }
-
 
 """Coerce a frontmatter value to a string list (comma split for scalars)."""
 def frontmatter_string_list(value: any) -> list[str] {
@@ -189,9 +182,7 @@ def frontmatter_string_list(value: any) -> list[str] {
     return parts;
 }
 
-
 # ============================ path helpers ===============================
-
 
 """Resolve JACKAL_AGENT_DIR, else JACKAL_ROOT, else cwd (see docstring)."""
 def resolve_jackal_root(agent_dir: str = "") -> str {
@@ -209,17 +200,14 @@ def resolve_jackal_root(agent_dir: str = "") -> str {
     return _abs_path(os.getcwd());
 }
 
-
 def _is_existing_dir(path: str) -> bool {
     return os.path.isdir(path);
 }
-
 
 def _is_agent_md(name: str) -> bool {
     # Accept .md files that are NOT chain files.
     return name.endswith(".md") and not name.endswith(".chain.md");
 }
-
 
 """Recursively list files under *directory* accepted by *accept*, sorted.
 
@@ -252,9 +240,7 @@ def _list_files(directory: str, accept: any) -> list[str] {
     return found;
 }
 
-
 # ============================= agent loading =============================
-
 
 """Load one agent markdown file into a SubagentDefinition-style dict.
 
@@ -293,7 +279,6 @@ def load_agent_file(file_path: str, source: str) -> dict[str, any] | None {
     };
 }
 
-
 """Load all valid agent definitions found under *directory*."""
 def load_agents_from_dir(directory: str, source: str) -> list[dict[str, any]] {
     agents: list[dict[str, any]] = [];
@@ -306,9 +291,7 @@ def load_agents_from_dir(directory: str, source: str) -> list[dict[str, any]] {
     return agents;
 }
 
-
 # ============================== discovery ================================
-
 
 """Discovery roots: {"packageDir": <root>/.pi/agents,
 "projectDir": <cwd>/subagents}."""
@@ -319,7 +302,6 @@ def discover_subagent_dirs(cwd: str, agent_dir: str = "") -> dict[str, str] {
         "projectDir": os.path.join(_abs_path(cwd), "subagents"),
     };
 }
-
 
 """Merged subagent map keyed by name (project overrides package)."""
 def load_subagents(cwd: str, agent_dir: str = "") -> dict[str, dict[str, any]] {
@@ -334,11 +316,9 @@ def load_subagents(cwd: str, agent_dir: str = "") -> dict[str, dict[str, any]] {
     return merged;
 }
 
-
 def _agent_sort_key(agent: dict[str, any]) -> str {
     return str(agent.get("name", ""));
 }
-
 
 """Name-sorted list of merged subagent definitions."""
 def list_subagents(cwd: str, agent_dir: str = "") -> list[dict[str, any]] {
@@ -346,15 +326,12 @@ def list_subagents(cwd: str, agent_dir: str = "") -> list[dict[str, any]] {
     return sorted(agents, key=_agent_sort_key);
 }
 
-
 """Look up one merged subagent by name; None when unknown."""
 def get_subagent(cwd: str, name: str, agent_dir: str = "") -> dict[str, any] | None {
     return load_subagents(cwd, agent_dir).get(name.strip());
 }
 
-
 # ============================ model overrides ============================
-
 
 """settings.json overrides: {"<agent>": "<model>"}; {} when absent/broken."""
 def load_settings_model_overrides(agent_dir: str = "") -> dict[str, str] {
@@ -362,7 +339,7 @@ def load_settings_model_overrides(agent_dir: str = "") -> dict[str, str] {
     if not os.path.isfile(settings_path) {
         return {};
     }
-    fh = None;
+    fh: any = None;
     try {
         fh = open(settings_path, encoding="utf-8");
         parsed = json.load(fh);
@@ -394,7 +371,6 @@ def load_settings_model_overrides(agent_dir: str = "") -> dict[str, str] {
     return out;
 }
 
-
 """`.jackal` project-config overrides: {"__default__": ...} seed plus
 per-agent models from string values or {"model": ...} dicts."""
 def load_project_model_overrides(cwd: str) -> dict[str, str] {
@@ -422,9 +398,7 @@ def load_project_model_overrides(cwd: str) -> dict[str, str] {
     return out;
 }
 
-
 # =========================== tool normalization ==========================
-
 
 """Normalize an allowed-tool list into a set (aliases + mcp: prefix).
 
@@ -449,13 +423,14 @@ def normalize_allowed_tool_names(tools: list[str] | None) -> set[str] | None {
     return allowed;
 }
 
-
 """Filter *all_tool_names* for subagent use.
 
 Always drops EXCLUDED_SUBAGENT_TOOLS, intersects allowed_names when given,
 re-pins bash when it was allowed but filtered away, and falls back to all
 non-excluded tools when nothing survives."""
-def filter_tools_for_subagent(all_tool_names: list[str], allowed_names: set[str] | None) -> list[str] {
+def filter_tools_for_subagent(
+    all_tool_names: list[str], allowed_names: set[str] | None
+) -> list[str] {
     excluded: set[str] = set(EXCLUDED_SUBAGENT_TOOLS);
     filtered: list[str] = [];
     for t in all_tool_names {
@@ -486,9 +461,7 @@ def filter_tools_for_subagent(all_tool_names: list[str], allowed_names: set[str]
     return fallback;
 }
 
-
 # ============================ catalog display ============================
-
 
 """Human-readable catalog of merged subagents ('No subagents found.' empty)."""
 def format_subagent_catalog(cwd: str, agent_dir: str = "") -> str {
@@ -502,8 +475,12 @@ def format_subagent_catalog(cwd: str, agent_dir: str = "") -> str {
         tool_count: any = len(raw_tools) if isinstance(raw_tools, list) else "all";
         model = str(agent.get("model") or "inherit");
         lines.append(
-            "- " + str(agent["name"]) + " (" + str(agent["source"]) + ") — "
-            + str(agent["description"])
+            "- "
+                + str(agent["name"])
+                + " ("
+                + str(agent["source"])
+                + ") — "
+                + str(agent["description"]),
         );
         lines.append("  tools: " + str(tool_count) + "  model: " + model);
     }

@@ -24,7 +24,7 @@ def _key_env(provider_id: str) -> str {
 
 """Export stored API keys for providers whose env var is unset. Explicit
 environment values always win. Returns the providers hydrated."""
-def hydrate_auth_environment() -> list[str] {
+def hydrate_auth_environment -> list[str] {
     stored = load_auth_file(resolve_auth_path());
     done: list[str] = [];
     for prov in PROVIDER_ROUTES {
@@ -78,7 +78,7 @@ def logout_provider(provider_id: str) -> str {
 
 
 """Providers with a stored credential (for /logout completion and listing)."""
-def stored_providers() -> list[str] {
+def stored_providers -> list[str] {
     data = load_auth_file(resolve_auth_path());
     out: list[str] = [];
     for prov in PROVIDER_ROUTES {

@@ -10,8 +10,12 @@ test "glob finds files and skips generated directories" {
     try {
         os.makedirs(os.path.join(tmp, "src"));
         os.makedirs(os.path.join(tmp, "node_modules"));
-        with open(os.path.join(tmp, "src", "one.jac"), "w") as f { f.write("one"); }
-        with open(os.path.join(tmp, "node_modules", "hidden.jac"), "w") as f { f.write("skip"); }
+        with open(os.path.join(tmp, "src", "one.jac"), "w") as f {
+            f.write("one");
+        }
+        with open(os.path.join(tmp, "node_modules", "hidden.jac"), "w") as f {
+            f.write("skip");
+        }
         found = file_glob("**/*.jac", tmp);
         assert "src/one.jac" in found;
         assert "hidden.jac" not in found;
@@ -19,7 +23,6 @@ test "glob finds files and skips generated directories" {
         shutil.rmtree(tmp, ignore_errors=True);
     }
 }
-
 
 test "grep finds literal and regex matches with a cap" {
     tmp = tempfile.mkdtemp();
@@ -38,7 +41,6 @@ test "grep finds literal and regex matches with a cap" {
     }
 }
 
-
 test "jac_check and jac_format register with correct read-only blocking" {
     reg = default_registry();
     names = [spec.name for spec in tool_specs()];
@@ -51,7 +53,6 @@ test "jac_check and jac_format register with correct read-only blocking" {
     assert is_tool_blocked("plan", "jac_check") is False;
 }
 
-
 test "jac_check happy path formats real CLI output" {
     # Happy-path coverage for _run_jac_cli formatting via the public handler.
     # Runs the REAL jac CLI once (~seconds); skipped when it is not installed.
@@ -61,7 +62,9 @@ test "jac_check happy path formats real CLI output" {
     tmp = tempfile.mkdtemp();
     try {
         target = os.path.join(tmp, "probe.jac");
-        with open(target, "w") as f { f.write(""); }
+        with open(target, "w") as f {
+            f.write("");
+        }
         out = jac_check(target);
         # Assert the _run_jac_cli output FORMAT only - toolchain verdicts
         # belong to the Jac toolchain, not to this adapter layer.
@@ -75,14 +78,12 @@ test "jac_check happy path formats real CLI output" {
     }
 }
 
-
 test "jac_check and jac_format reject missing paths without spawning" {
     res = jac_check("/nonexistent/jackal/path.jac");
     assert res.startswith("ERROR:");
     fmt = jac_format("/nonexistent/jackal/path.jac");
     assert fmt.startswith("ERROR:");
 }
-
 
 test "JACKAL_SANDBOX_ROOT contains tools inside the root" {
     tmp: str = tempfile.mkdtemp();
@@ -116,7 +117,6 @@ test "JACKAL_SANDBOX_ROOT contains tools inside the root" {
     }
 }
 
-
 test "resolve_path keeps cwd semantics when no sandbox root is set" {
     tmp: str = tempfile.mkdtemp();
     cwd = os.getcwd();
@@ -142,7 +142,6 @@ test "resolve_path keeps cwd semantics when no sandbox root is set" {
     }
 }
 
-
 test "child jac processes never inherit JAC_HANDOFF" {
     old = os.environ.get("JAC_HANDOFF");
     try {
@@ -162,7 +161,6 @@ test "child jac processes never inherit JAC_HANDOFF" {
         }
     }
 }
-
 
 test "run_command children do not inherit JAC_HANDOFF" {
     old = os.environ.get("JAC_HANDOFF");

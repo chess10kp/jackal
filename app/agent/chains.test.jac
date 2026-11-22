@@ -21,7 +21,7 @@ import tempfile;
 import shutil;
 
 
-def _make_tmp() -> str {
+def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-chains-test-");
 }
 
@@ -104,7 +104,7 @@ test "parse_step_body splits config block from task text" {
 }
 
 
-def _sample_chain() -> str {
+def _sample_chain -> str {
     return (
         "---\nname: pipeline\ndescription: Full flow\n---\n"
         "\n"

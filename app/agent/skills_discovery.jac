@@ -212,7 +212,7 @@ def _add_loaded(result: dict[str, list[dict[str, any]]], skill_map: dict[str, di
 }
 
 
-def _resolve_package_root() -> str {
+def _resolve_package_root -> str {
     env = os.environ.get("JACKAL_AGENT_DIR");
     if env and os.path.isdir(os.path.join(env, "pi", "skills")) {
         return _abs_path(env);

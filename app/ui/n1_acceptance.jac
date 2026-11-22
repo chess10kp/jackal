@@ -112,7 +112,7 @@ def _wire_shell_content(
 }
 
 
-def scenario_first_paint_no_full_clear() -> N1Result {
+def scenario_first_paint_no_full_clear -> N1Result {
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
@@ -132,7 +132,7 @@ def scenario_first_paint_no_full_clear() -> N1Result {
 }
 
 
-def scenario_resize_mid_stream() -> N1Result {
+def scenario_resize_mid_stream -> N1Result {
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
@@ -153,7 +153,7 @@ def scenario_resize_mid_stream() -> N1Result {
 }
 
 
-def scenario_cancel_clears_draft() -> N1Result {
+def scenario_cancel_clears_draft -> N1Result {
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
@@ -165,7 +165,7 @@ def scenario_cancel_clears_draft() -> N1Result {
 }
 
 
-def scenario_protocol_cancel_drive() -> N1Result {
+def scenario_protocol_cancel_drive -> N1Result {
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
@@ -190,7 +190,7 @@ def scenario_protocol_cancel_drive() -> N1Result {
 }
 
 
-def scenario_esc_timeout() -> N1Result {
+def scenario_esc_timeout -> N1Result {
     norm = InputNormalizer();
     norm.esc_timeout_ms = 50;
     first = norm.feed("\x1b");
@@ -205,7 +205,7 @@ def scenario_esc_timeout() -> N1Result {
 }
 
 
-def scenario_host_interrupt_effect() -> N1Result {
+def scenario_host_interrupt_effect -> N1Result {
     loop = create_host_loop();
     term = VirtualTerminal(columns=20, rows=5);
     term.start();
@@ -224,7 +224,7 @@ def scenario_host_interrupt_effect() -> N1Result {
 }
 
 
-def scenario_restore_idempotent() -> N1Result {
+def scenario_restore_idempotent -> N1Result {
     # ProcessTerminal.restore without a TTY start must still be safe.
     term = ProcessTerminal();
     term.restore();
@@ -234,7 +234,7 @@ def scenario_restore_idempotent() -> N1Result {
 }
 
 
-def scenario_process_terminal_flag_restore() -> N1Result {
+def scenario_process_terminal_flag_restore -> N1Result {
     # Simulate mid-session flags (no TTY start) and assert stop tears them down.
     term = ProcessTerminal();
     term.started = True;
@@ -258,7 +258,7 @@ def scenario_process_terminal_flag_restore() -> N1Result {
 }
 
 
-def scenario_pty_soak_virtual() -> N1Result {
+def scenario_pty_soak_virtual -> N1Result {
     # Multi-frame soak: stream + resize + host interrupt + restore.
     handle = create_session();
     session = handle.session;
@@ -340,7 +340,7 @@ def scenario_pty_soak_virtual() -> N1Result {
 }
 
 
-def scenario_second_frame_retained() -> N1Result {
+def scenario_second_frame_retained -> N1Result {
     handle = create_session();
     session = handle.session;
     shell = build_main_shell(session);
@@ -366,7 +366,7 @@ def scenario_second_frame_retained() -> N1Result {
 }
 
 
-def run_n1_acceptance() -> bool {
+def run_n1_acceptance -> bool {
     results: list[N1Result] = [
         scenario_first_paint_no_full_clear(),
         scenario_resize_mid_stream(),

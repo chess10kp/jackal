@@ -17,29 +17,15 @@ import shutil;
 import json;
 
 import from ui.width { display_width, truncate_text }
-import from agent.tasks {
-    load_tasks,
-    format_tasks_list,
-    task_counts,
-    add_task,
-}
-import from agent.checkpoints {
-    create_checkpoint,
-    list_checkpoints,
-    format_checkpoint_overlay_row,
-}
-import from agent.skills {
-    load_skills_from_dir,
-    _load_ignore_rules,
-    _match_ignore_pattern,
-}
+import from agent.tasks { load_tasks, format_tasks_list, task_counts, add_task }
+import from agent.checkpoints { create_checkpoint, list_checkpoints, format_checkpoint_overlay_row }
+import from agent.skills { load_skills_from_dir, _load_ignore_rules, _match_ignore_pattern }
 import from agent.context_input {
     expand_context_input,
     is_valid_file_path,
     parse_line_range,
     _load_file_slice,
 }
-
 
 # --- verbatim replica of tui/shell.jac _meter ---------------------------------
 
@@ -55,7 +41,6 @@ def _meter(value: float, width: int) -> str {
     return "▐" + ("█" * filled) + ("░" * (inner - filled)) + "▌";
 }
 
-
 # --- verbatim replicas of tui/shell.jac picker entry builders ------------------
 
 def _task_picker_entries(cwd: str) -> dict[str, list[str]] {
@@ -67,8 +52,14 @@ def _task_picker_entries(cwd: str) -> dict[str, list[str]] {
     total: int = int(counts["pending"]) + int(counts["in_progress"]) + int(counts["completed"]);
     ratio: float = float(counts["completed"]) / float(total) if total else 0.0;
     rows: list[str] = [
-        str(total) + " tasks  " + _meter(ratio, 14) + "  "
-        + str(counts["completed"]) + "/" + str(total) + " done"
+        str(total)
+            + " tasks  "
+            + _meter(ratio, 14)
+            + "  "
+            + str(counts["completed"])
+            + "/"
+            + str(total)
+            + " done",
     ];
     ids: list[str] = ["__header__"];
     idx = 0;
@@ -86,7 +77,6 @@ def _task_picker_entries(cwd: str) -> dict[str, list[str]] {
     return {"rows": rows, "ids": ids};
 }
 
-
 def _checkpoint_picker_entries(cwd: str) -> dict[str, list[str]] {
     items: list[dict[str, any]] = list_checkpoints(cwd);
     rows: list[str] = [];
@@ -98,16 +88,21 @@ def _checkpoint_picker_entries(cwd: str) -> dict[str, list[str]] {
     return {"rows": rows, "ids": ids};
 }
 
-
 # --- verbatim replica of tui/shell.jac explorer/skills builders -----------------
 
 glob _EXPLORER_SKIP_DIRS: list[str] = [
-         "node_modules", "__pycache__", ".git", ".jac", ".jackal",
-         ".venv", "venv", ".mypy_cache", ".pytest_cache",
+         "node_modules",
+         "__pycache__",
+         ".git",
+         ".jac",
+         ".jackal",
+         ".venv",
+         "venv",
+         ".mypy_cache",
+         ".pytest_cache",
      ],
      _EXPLORER_MAX_FILES: int = 400,
      _EXPLORER_MAX_DEPTH: int = 6;
-
 
 def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
     if depth > _EXPLORER_MAX_DEPTH or len(out) >= _EXPLORER_MAX_FILES {
@@ -136,8 +131,7 @@ def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
             if _match_ignore_pattern(rel_cmp, rules) {
                 continue;
             }
-        } except Exception {
-        }
+        } except Exception {}
         if is_dir {
             if name.startswith(".") or name in _EXPLORER_SKIP_DIRS {
                 continue;
@@ -157,13 +151,11 @@ def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
     }
 }
 
-
 def _explorer_file_entries(cwd: str) -> dict[str, list[str]] {
     out: list[str] = [];
     _explorer_walk(cwd, cwd, 1, out);
     return {"rows": list(out), "ids": list(out)};
 }
-
 
 def _skills_picker_entries(skills: list[dict[str, any]]) -> dict[str, list[str]] {
     if not skills {
@@ -183,7 +175,6 @@ def _skills_picker_entries(skills: list[dict[str, any]]) -> dict[str, list[str]]
     }
     return {"rows": rows, "ids": ids};
 }
-
 
 def _format_mentions(paths: list[str]) -> str {
     parts: list[str] = [];
@@ -206,13 +197,11 @@ def _format_mentions(paths: list[str]) -> str {
     return " ".join(parts) + " ";
 }
 
-
 # --- verbatim replicas of tui/shell.jac mode/filter/quote helpers -------------
 
 # Quoted mention: @"path" / @"path:N[-M]" / @"path":N[-M] — an optional
 # line range is accepted inside OR after the closing quote.
 glob _QUOTED_MENTION_PATTERN: str = r'@"([^"]+)"(?::(\d+)(?:-(\d+))?)?';
-
 
 def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
     options: list[str] = list(p.get("options", []));
@@ -232,7 +221,6 @@ def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
     return (vis_options, vis_ids);
 }
 
-
 def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
     mentions: list[dict[str, any]] = [];
     spans: list[tuple[int, int]] = [];
@@ -244,9 +232,7 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
         outer_end: any = m.group(3);
         if outer_start {
             # Range AFTER the closing quote: @"path":10-20.
-            outer_range: str = str(outer_start) + (
-                "-" + str(outer_end) if outer_end else ""
-            );
+            outer_range: str = str(outer_start) + ("-" + str(outer_end) if outer_end else "");
             parsed_outer: dict[str, int] | None = parse_line_range(outer_range);
             if parsed_outer is not None {
                 rng = parsed_outer;
@@ -289,7 +275,6 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
     return ("".join(parts), mentions);
 }
 
-
 def _expand_quoted_context(cwd: str, text: str) -> str {
     lifted: tuple[str, list[dict[str, any]]] = _take_quoted_mentions(text);
     cleaned: str = lifted[0];
@@ -324,15 +309,11 @@ def _expand_quoted_context(cwd: str, text: str) -> str {
     return head + "Attached context:\n" + "\n".join(blocks);
 }
 
-
-
-
 # --- fixtures ------------------------------------------------------------
 
 def _make_project -> str {
     return tempfile.mkdtemp(prefix="jackal-tui-overlays-");
 }
-
 
 def _seed_task_file(cwd: str, tasks: list[dict[str, any]]) {
     os.makedirs(os.path.join(cwd, ".jackal"), exist_ok=True);
@@ -340,7 +321,6 @@ def _seed_task_file(cwd: str, tasks: list[dict[str, any]]) {
     json.dump(tasks, fh);
     fh.close();
 }
-
 
 # --- tests ----------------------------------------------------------------
 
@@ -398,12 +378,14 @@ test "checkpoint entries expose newest-first names with overlay rows" {
     cwd = _make_project();
     try {
         meta_old = create_checkpoint(
-            cwd, [{"role": "user", "content": "hello"}],
-            "mock", "mockllm", name="cp-old", modified_files=[],
+            cwd,
+            [{"role": "user", "content": "hello"}],
+            "mock",
+            "mockllm",
+            name="cp-old",
+            modified_files=[],
         );
-        meta_new = create_checkpoint(
-            cwd, [], "mock", "mockllm", name="cp-new", modified_files=[],
-        );
+        meta_new = create_checkpoint(cwd, [], "mock", "mockllm", name="cp-new", modified_files=[]);
         assert meta_old["name"] == "cp-old";
         assert meta_new["name"] == "cp-new";
 
@@ -419,7 +401,6 @@ test "checkpoint entries expose newest-first names with overlay rows" {
     }
 }
 
-
 def _touch(cwd: str, rel: str) {
     full: str = os.path.join(cwd, rel);
     parent: str = str(os.path.dirname(full));
@@ -430,7 +411,6 @@ def _touch(cwd: str, rel: str) {
     fh.write("x");
     fh.close();
 }
-
 
 def _seed_skill(cwd: str, dir_name: str, name: str, description: str, hidden: bool = False) {
     sk_dir = os.path.join(cwd, ".jackal", "skills", dir_name);
@@ -444,7 +424,6 @@ def _seed_skill(cwd: str, dir_name: str, name: str, description: str, hidden: bo
     fh.write(fm);
     fh.close();
 }
-
 
 # --- explorer / skills / mention tests ------------------------------------
 
@@ -532,7 +511,6 @@ test "mention formatting dedupes and trails a space" {
     got = _format_mentions(["a.py", "sub/b.py", "a.py"]);
     assert got == "@a.py @sub/b.py ";
 }
-
 
 # --- explorer filter / quoted mention / mcp status tests ------
 
@@ -625,4 +603,3 @@ test "quoted context expansion attaches real file slices" {
         shutil.rmtree(cwd, ignore_errors=True);
     }
 }
-

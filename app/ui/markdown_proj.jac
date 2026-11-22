@@ -7,15 +7,9 @@ cell blit / transcript spans (OSPUI §16).
 
 import re;
 
-import from ui.cells {
-    StyleAttrs,
-}
+import from ui.cells { StyleAttrs }
 
-import from ui.width {
-    wrap_text,
-    display_width,
-}
-
+import from ui.width { wrap_text, display_width }
 
 obj ProjSpan {
     has text: str = "",
@@ -23,21 +17,16 @@ obj ProjSpan {
         attrs: StyleAttrs = StyleAttrs();
 }
 
-
 obj ProjLine {
     has spans: list[ProjSpan] = [];
 }
-
 
 glob _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$");
 glob _FENCE_RE = re.compile(r"^(`{3,}|~{3,})(.*)$");
 glob _HR_RE = re.compile(r"^(\s*([-*_]\s*){3,})$");
 glob _UL_RE = re.compile(r"^(\s*)([-*+])\s+(.*)$");
 glob _OL_RE = re.compile(r"^(\s*)(\d{1,9})[.)]\s+(.*)$");
-glob _INLINE_RE = re.compile(
-    r"(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|~~[^~]+~~)"
-);
-
+glob _INLINE_RE = re.compile(r"(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|~~[^~]+~~)");
 
 def style_attrs_for(style_id: str) -> StyleAttrs {
     if style_id == "heading" {
@@ -67,15 +56,9 @@ def style_attrs_for(style_id: str) -> StyleAttrs {
     return StyleAttrs();
 }
 
-
 def _span(text: str, style_id: str = "default") -> ProjSpan {
-    return ProjSpan(
-        text=text,
-        style_id=style_id,
-        attrs=style_attrs_for(style_id),
-    );
+    return ProjSpan(text=text, style_id=style_id, attrs=style_attrs_for(style_id));
 }
-
 
 """Split one plain line into inline styled spans."""
 def project_inline_spans(text: str) -> list[ProjSpan] {
@@ -117,16 +100,13 @@ def project_inline_spans(text: str) -> list[ProjSpan] {
     return out;
 }
 
-
 def _line_plain(text: str, style_id: str = "default") -> ProjLine {
     return ProjLine(spans=[_span(text, style_id)]);
 }
 
-
 def _line_inline(text: str) -> ProjLine {
     return ProjLine(spans=project_inline_spans(text));
 }
-
 
 """Project markdown source into display lines of styled spans (no OSP nodes)."""
 def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
@@ -184,9 +164,7 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
             prefix = "│ ";
             room = max(1, width - display_width(prefix));
             for wrapped in wrap_text(body if body else " ", room) {
-                spans = [_span(prefix, "blockquote")] + project_inline_spans(
-                    wrapped
-                );
+                spans = [_span(prefix, "blockquote")] + project_inline_spans(wrapped);
                 # Dim the body too.
                 for s in spans[1:] {
                     if s.style_id == "default" {
@@ -207,14 +185,10 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
             first = True;
             for wrapped in wrap_text(body if body else " ", room) {
                 if first {
-                    spans = [_span(marker, "list_marker")] + project_inline_spans(
-                        wrapped
-                    );
+                    spans = [_span(marker, "list_marker")] + project_inline_spans(wrapped);
                     first = False;
                 } else {
-                    spans = [_span("  ", "default")] + project_inline_spans(
-                        wrapped
-                    );
+                    spans = [_span("  ", "default")] + project_inline_spans(wrapped);
                 }
                 lines_out.append(ProjLine(spans=spans));
             }
@@ -230,15 +204,11 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
             first = True;
             for wrapped in wrap_text(body if body else " ", room) {
                 if first {
-                    spans = [_span(marker, "list_marker")] + project_inline_spans(
-                        wrapped
-                    );
+                    spans = [_span(marker, "list_marker")] + project_inline_spans(wrapped);
                     first = False;
                 } else {
                     pad = " " * display_width(marker);
-                    spans = [_span(pad, "default")] + project_inline_spans(
-                        wrapped
-                    );
+                    spans = [_span(pad, "default")] + project_inline_spans(wrapped);
                 }
                 lines_out.append(ProjLine(spans=spans));
             }
@@ -261,7 +231,6 @@ def project_markdown(source: str, width: int = 80) -> list[ProjLine] {
     return lines_out;
 }
 
-
 """Flatten projected lines to the span dicts used by transcript / blit."""
 def proj_lines_to_span_dicts(lines: list[ProjLine]) -> list[dict[str, any]] {
     out: list[dict[str, any]] = [];
@@ -278,7 +247,6 @@ def proj_lines_to_span_dicts(lines: list[ProjLine]) -> list[dict[str, any]] {
     }
     return out;
 }
-
 
 """True when content likely benefits from markdown projection."""
 def looks_like_markdown(text: str) -> bool {

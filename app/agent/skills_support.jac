@@ -62,7 +62,7 @@ def _is_abs(p: str) -> bool {
 }
 
 
-def _user_home() -> str {
+def _user_home -> str {
     tilde: any = "~";
     return str(os.path.expanduser(tilde));
 }

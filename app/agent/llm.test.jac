@@ -7,11 +7,12 @@ tool_call block verdicts.
 Test-only transports and helpers live here, not in llm.jac.
 """
 
-
 obj RetryTransport {
     has calls: int = 0;
 
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    def stream(
+        messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+    ) -> Iterator[dict[str, any]] {
         self.calls += 1;
         if self.calls == 1 {
             yield {"error": "HTTP 503: temporarily unavailable"};
@@ -21,34 +22,38 @@ obj RetryTransport {
     }
 }
 
-
 obj TwoCallTransport {
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    def stream(
+        messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+    ) -> Iterator[dict[str, any]] {
         saw = False;
         for m in messages {
             msg: any = m;
-            if msg.get("role") == "tool" { saw = True; }
+            if msg.get("role") == "tool" {
+                saw = True;
+            }
         }
         if not saw {
             yield {"content": "working"};
-            yield {"tool_calls": [
-                {
-                    "id": "call_1",
-                    "type": "function",
-                    "function": {"name": "echo", "arguments": "{\"text\": \"one\"}"},
-                },
-                {
-                    "id": "call_2",
-                    "type": "function",
-                    "function": {"name": "echo", "arguments": "{\"text\": \"two\"}"},
-                },
-            ]};
+            yield {
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "echo", "arguments": "{\"text\": \"one\"}"},
+                    },
+                    {
+                        "id": "call_2",
+                        "type": "function",
+                        "function": {"name": "echo", "arguments": "{\"text\": \"two\"}"},
+                    },
+                ],
+            };
         } else {
             yield {"content": "done"};
         }
     }
 }
-
 
 # Test doubles are duck-typed transports; call sites cast with
 # `as Transport` so react_loop's typed parameter accepts them under native
@@ -59,19 +64,27 @@ obj ScriptedTransport {
         tool_args: str = "{\"text\": \"hi\"}",
         final_text: str = "done";
 
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    def stream(
+        messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+    ) -> Iterator[dict[str, any]] {
         saw_tool_result = False;
         for m in messages {
             msg: any = m;
-            if msg.get("role") == "tool" { saw_tool_result = True; }
+            if msg.get("role") == "tool" {
+                saw_tool_result = True;
+            }
         }
         if not saw_tool_result {
             yield {"content": "let me check"};
-            yield {"tool_calls": [{
-                "id": self.tool_call_id,
-                "type": "function",
-                "function": {"name": self.tool_name, "arguments": self.tool_args},
-            }]};
+            yield {
+                "tool_calls": [
+                    {
+                        "id": self.tool_call_id,
+                        "type": "function",
+                        "function": {"name": self.tool_name, "arguments": self.tool_args},
+                    },
+                ],
+            };
         } else {
             yield {"content": self.final_text};
         }
@@ -81,7 +94,6 @@ obj ScriptedTransport {
 def _echo(text: str) -> str {
     return "ECHO:" + text;
 }
-
 
 def _tool_echo(args: dict[str, any]) -> str {
     return _echo(str(args.get("text", "")));
@@ -93,22 +105,31 @@ def _noop_event(kind: str, data: dict[str, any]) {
 
 glob _events: list[any] = [];
 
-
 test "react loop runs a tool then finishes" {
     messages = [{"role": "user", "content": "echo hi"}];
-    specs = [ToolSpec(
-        name="echo",
-        description="echo the text",
-        parameters={"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]},
-        handler=_tool_echo,
-    )];
+    specs = [
+        ToolSpec(
+            name="echo",
+            description="echo the text",
+            parameters={
+                "type": "object",
+                "properties": {"text": {"type": "string"}},
+                "required": ["text"],
+            },
+            handler=_tool_echo,
+        ),
+    ];
     _events.clear();
     answer = react_loop(messages, specs, ScriptedTransport() as Transport, _noop_event);
     assert answer == "done";
     kinds = [e[0] for e in _events];
     assert kinds == [
-        "chunk", "approval_request", "approval_decision",
-        "tool_call", "tool_result", "chunk",
+        "chunk",
+        "approval_request",
+        "approval_decision",
+        "tool_call",
+        "tool_result",
+        "chunk",
     ];
     tc = _events[3][1];
     assert tc["tool"] == "echo" and tc["args"] == {"text": "hi"};
@@ -118,7 +139,6 @@ test "react loop runs a tool then finishes" {
     assert roles == ["user", "assistant", "tool", "assistant"];
     assert messages[2]["tool_call_id"] == "call_1";
 }
-
 
 test "react loop retries transient transport errors" {
     messages = [{"role": "user", "content": "hello"}];
@@ -131,11 +151,12 @@ test "react loop retries transient transport errors" {
     assert _events[1][0] == "chunk";
 }
 
-
 obj CancelMidStreamTransport {
     has flag: any = None;
 
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    def stream(
+        messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+    ) -> Iterator[dict[str, any]] {
         yield {"content": "partial"};
         if self.flag is not None {
             self.flag.cancelled = True;
@@ -143,7 +164,6 @@ obj CancelMidStreamTransport {
         yield {"content": " never seen"};
     }
 }
-
 
 test "react loop stops mid-stream on cancel without touching history" {
     messages = [{"role": "user", "content": "hello"}];
@@ -158,15 +178,16 @@ test "react loop stops mid-stream on cancel without touching history" {
     assert _events[1][1]["phase"] == "streaming";
 }
 
-
 test "cancel before tool calls fills cancelled tool results" {
     messages = [{"role": "user", "content": "echo hi"}];
-    specs = [ToolSpec(
-        name="echo",
-        description="echo",
-        parameters={"type": "object", "properties": {"text": {"type": "string"}}},
-        handler=_tool_echo,
-    )];
+    specs = [
+        ToolSpec(
+            name="echo",
+            description="echo",
+            parameters={"type": "object", "properties": {"text": {"type": "string"}}},
+            handler=_tool_echo,
+        ),
+    ];
     _events.clear();
     cancel = TurnCancel();
     transport = TwoCallTransport();
@@ -191,27 +212,28 @@ test "cancel before tool calls fills cancelled tool results" {
     assert _events[-1][1]["phase"] == "tool";
 }
 
-
 def _deny_all(name: str, args: dict[str, any]) -> any {
     return "denied by test policy";
 }
-
 
 def _allow_all(name: str, args: dict[str, any]) -> any {
     return True;
 }
 
-
 test "approve hook denial yields error tool result without executing" {
     messages = [{"role": "user", "content": "echo hi"}];
-    specs = [ToolSpec(
-        name="echo",
-        description="echo",
-        parameters={"type": "object", "properties": {"text": {"type": "string"}}},
-        handler=_tool_echo,
-    )];
+    specs = [
+        ToolSpec(
+            name="echo",
+            description="echo",
+            parameters={"type": "object", "properties": {"text": {"type": "string"}}},
+            handler=_tool_echo,
+        ),
+    ];
     _events.clear();
-    answer = react_loop(messages, specs, ScriptedTransport() as Transport, _noop_event, approve=_deny_all);
+    answer = react_loop(
+        messages, specs, ScriptedTransport() as Transport, _noop_event, approve=_deny_all
+    );
     # The loop continues past a denial — the model sees the ERROR result
     # and produces a final answer.
     roles = [m["role"] for m in messages];
@@ -227,52 +249,59 @@ test "approve hook denial yields error tool result without executing" {
 
 test "approve hook allow runs the tool unchanged" {
     messages = [{"role": "user", "content": "echo hi"}];
-    specs = [ToolSpec(
-        name="echo",
-        description="echo",
-        parameters={"type": "object", "properties": {"text": {"type": "string"}}},
-        handler=_tool_echo,
-    )];
+    specs = [
+        ToolSpec(
+            name="echo",
+            description="echo",
+            parameters={"type": "object", "properties": {"text": {"type": "string"}}},
+            handler=_tool_echo,
+        ),
+    ];
     _events.clear();
-    answer = react_loop(messages, specs, ScriptedTransport() as Transport, _noop_event, approve=_allow_all);
+    answer = react_loop(
+        messages, specs, ScriptedTransport() as Transport, _noop_event, approve=_allow_all
+    );
     assert messages[2]["content"] == "ECHO:hi";
 }
 
-
 test "react loop emits loop limit" {
     messages = [{"role": "user", "content": "echo"}];
-    specs = [ToolSpec(
-        name="echo",
-        description="echo the text",
-        parameters={"type": "object", "properties": {"text": {"type": "string"}}},
-        handler=_tool_echo,
-    )];
+    specs = [
+        ToolSpec(
+            name="echo",
+            description="echo the text",
+            parameters={"type": "object", "properties": {"text": {"type": "string"}}},
+            handler=_tool_echo,
+        ),
+    ];
     _events.clear();
-    answer = react_loop(messages, specs, ScriptedTransport() as Transport, _noop_event, max_iters=1);
+    answer = react_loop(
+        messages, specs, ScriptedTransport() as Transport, _noop_event, max_iters=1
+    );
     assert answer == "";
     assert _events[-1][0] == "loop_limit";
     assert _events[-1][1]["max_iters"] == 1;
 }
 
-
 test "tool defs are openai function shape" {
-    specs = [ToolSpec(name="x", description="d", parameters={"type": "object", "properties": {}}, handler=_tool_echo)];
+    specs = [
+        ToolSpec(
+            name="x",
+            description="d",
+            parameters={"type": "object", "properties": {}},
+            handler=_tool_echo,
+        ),
+    ];
     defs = _tool_defs(specs);
     assert defs[0]["type"] == "function";
     assert defs[0]["function"]["name"] == "x";
     assert defs[0]["function"]["parameters"]["type"] == "object";
 }
 
-
 test "request body omits reasoning when thinking unset" {
     t = Transport(model="test-model");
-    assert t._build_body([], []) == {
-        "model": "test-model",
-        "messages": [],
-        "stream": True,
-    };
+    assert t._build_body([], []) == {"model": "test-model", "messages": [], "stream": True};
 }
-
 
 test "request body carries reasoning effort when thinking set" {
     t = Transport(model="test-model", thinking="high");
@@ -289,7 +318,6 @@ test "request body carries reasoning effort when thinking set" {
         assert body["reasoning"] == {"effort": level};
     }
 }
-
 
 test "make_transport binds explicit model and thinking per provider" {
     tr = make_transport("openrouter/vendor/model-x", thinking="medium");
@@ -319,7 +347,6 @@ test "make_transport binds explicit model and thinking per provider" {
     assert defaulted.model == "";
 }
 
-
 test "routed_model_id prefixes bare ids and passes routed ids through" {
     assert routed_model_id("deepseek", "deepseek-chat") == "deepseek/deepseek-chat";
     assert routed_model_id("openrouter", "anthropic/claude-sonnet-5")
@@ -328,7 +355,6 @@ test "routed_model_id prefixes bare ids and passes routed ids through" {
     assert routed_model_id("openai_compat", "gpt-4o") == "gpt-4o";
     assert routed_model_id("mock", "mock") == "mock";
 }
-
 
 test "unknown tool yields error result without crashing" {
     messages = [{"role": "user", "content": "go"}];
@@ -340,14 +366,9 @@ test "unknown tool yields error result without crashing" {
     assert messages[2]["content"].startswith("ERROR");
 }
 
-
 test "react loop invokes js tool via registry bridge" {
     import from .registry { create_registry }
-    import from .plugin_bridge {
-        create_bridge,
-        load_extension,
-        dispose_bridge,
-    }
+    import from .plugin_bridge { create_bridge, load_extension, dispose_bridge }
 
     def _js_echo(text: str) -> str {
         return "JS:" + text;
@@ -360,15 +381,17 @@ test "react loop invokes js tool via registry bridge" {
         bridge,
         reg,
         "stub.echo",
-        [{
-            "name": "echo",
-            "description": "echo via js",
-            "parameters": {
-                "type": "object",
-                "properties": {"text": {"type": "string"}},
-                "required": ["text"],
+        [
+            {
+                "name": "echo",
+                "description": "echo via js",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"],
+                },
             },
-        }],
+        ],
         {"echo": _js_echo},
     );
     transport = ScriptedTransport();
@@ -381,16 +404,9 @@ test "react loop invokes js tool via registry bridge" {
     dispose_bridge(bridge);
 }
 
-
 test "react loop honors tool_call block verdicts from a plugin bridge" {
-    import from .plugin_bridge {
-        create_bridge,
-        dispose_bridge,
-    }
-    import from .fake_host {
-        ensure_host,
-        register_fake_listener,
-    }
+    import from .plugin_bridge { create_bridge, dispose_bridge }
+    import from .fake_host { ensure_host, register_fake_listener }
     import from .registry { create_registry }
 
     def _block_no_terminate(data: dict[str, any], ctx: any) -> dict[str, any] {
@@ -413,16 +429,9 @@ test "react loop honors tool_call block verdicts from a plugin bridge" {
     dispose_bridge(bridge);
 }
 
-
 test "react loop stops early on terminating block verdict" {
-    import from .plugin_bridge {
-        create_bridge,
-        dispose_bridge,
-    }
-    import from .fake_host {
-        ensure_host,
-        register_fake_listener,
-    }
+    import from .plugin_bridge { create_bridge, dispose_bridge }
+    import from .fake_host { ensure_host, register_fake_listener }
     import from .registry { create_registry }
 
     def _terminate_block(data: dict[str, any], ctx: any) -> dict[str, any] {
@@ -445,22 +454,14 @@ test "react loop stops early on terminating block verdict" {
     dispose_bridge(bridge);
 }
 
-
 test "make_ext_transport wires provider config without network" {
-    import from .plugin_bridge {
-        create_bridge,
-        dispose_bridge,
-    }
-    import from .fake_host {
-        register_fake_provider,
-    }
+    import from .plugin_bridge { create_bridge, dispose_bridge }
+    import from .fake_host { register_fake_provider }
 
     bridge = create_bridge("p10-transport");
-    register_fake_provider(bridge, {
-        "name": "acme",
-        "models": ["sonnet-x"],
-        "base_url": "https://acme.example/v1",
-    });
+    register_fake_provider(
+        bridge, {"name": "acme", "models": ["sonnet-x"], "base_url": "https://acme.example/v1"}
+    );
 
     t = make_ext_transport(bridge as PluginBridge, "ext/fake.provider/sonnet-x");
     assert t is not None;
@@ -474,7 +475,6 @@ test "make_ext_transport wires provider config without network" {
     assert make_ext_transport(None, "ext/a/b") is None;
     dispose_bridge(bridge);
 }
-
 
 test "react loop applies tool_result rewrites from a plugin bridge" {
     import from .plugin_bridge {
@@ -511,11 +511,13 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
         bridge as PluginBridge,
         reg as ToolRegistry,
         "stub.echo",
-        [{
-            "name": "echo",
-            "description": "echo",
-            "parameters": {"type": "object", "properties": {"text": {"type": "string"}}},
-        }],
+        [
+            {
+                "name": "echo",
+                "description": "echo",
+                "parameters": {"type": "object", "properties": {"text": {"type": "string"}}},
+            },
+        ],
         {"echo": _echo},
     );
     transport = ScriptedTransport();
@@ -528,7 +530,6 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
     assert messages[2]["content"] == "ECHO:hi+REWRITTEN";
     dispose_bridge(bridge);
 }
-
 
 test "react loop skips tool execution when cancelled during the gate" {
     import from .plugin_bridge {
@@ -559,17 +560,21 @@ test "react loop skips tool execution when cancelled during the gate" {
         bridge as PluginBridge,
         reg as ToolRegistry,
         "stub.echo",
-        [{
-            "name": "echo",
-            "description": "echo",
-            "parameters": {"type": "object", "properties": {"text": {"type": "string"}}},
-        }],
+        [
+            {
+                "name": "echo",
+                "description": "echo",
+                "parameters": {"type": "object", "properties": {"text": {"type": "string"}}},
+            },
+        ],
         {"echo": _echo},
     );
     transport = ScriptedTransport();
     transport.tool_name = "echo";
     _events.clear();
-    answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge, cancel=cancel);
+    answer = react_loop(
+        messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge, cancel=cancel
+    );
     # The gate fired; the tool itself must NOT have executed. Cancelled
     # calls get a terminal tool MESSAGE but no tool_result event (matching
     # the pre-existing cancel-before-invoke semantics).
@@ -596,31 +601,23 @@ test "make_transport wires hook_bridge through every provider branch" {
     dispose_bridge(bridge);
 }
 
-
 test "make_ext_transport attaches the hook bridge" {
     import from .plugin_bridge { create_bridge, dispose_bridge }
-    import from .fake_host {
-        register_fake_provider,
-    }
+    import from .fake_host { register_fake_provider }
 
     bridge = create_bridge("apr-ext");
-    register_fake_provider(bridge, {
-        "name": "acme",
-        "models": ["sonnet-x"],
-        "base_url": "https://acme.example/v1",
-    });
+    register_fake_provider(
+        bridge, {"name": "acme", "models": ["sonnet-x"], "base_url": "https://acme.example/v1"}
+    );
     t = make_ext_transport(bridge as PluginBridge, "ext/fake.provider/sonnet-x");
     assert t is not None;
     assert t.hook_bridge is bridge;
     dispose_bridge(bridge);
 }
 
-
 test "_notify_response fires after_provider_response with status and headers" {
     import from .plugin_bridge { create_bridge, dispose_bridge }
-    import from .fake_host {
-        register_fake_listener,
-    }
+    import from .fake_host { register_fake_listener }
 
     bridge = create_bridge("apr-notify");
     seen: list[dict[str, any]] = [];
@@ -646,7 +643,6 @@ test "_notify_response fires after_provider_response with status and headers" {
     bare._notify_response(200, {});
     dispose_bridge(bridge);
 }
-
 
 test "_open_stream fires hook before the first delta from a live SSE server" {
     import from .fake_host { register_fake_listener }
@@ -683,7 +679,6 @@ test "_open_stream fires hook before the first delta from a live SSE server" {
     }
 }
 
-
 test "_open_stream fires the hook even when the provider answers non-200" {
     import from .fake_host { register_fake_listener }
     import from .plugin_bridge { create_bridge, dispose_bridge }
@@ -717,7 +712,6 @@ test "_open_stream fires the hook even when the provider answers non-200" {
 }
 
 import from sse_test_server { make_sse_server }
-
 
 test "after_provider_response refires per retry attempt through react_loop" {
     import from .fake_host { register_fake_listener }
@@ -757,7 +751,6 @@ test "after_provider_response refires per retry attempt through react_loop" {
     }
 }
 
-
 # ===================== provider-first routing (fx-style) =====================
 
 test "provider_for dispatches by case-sensitive prefix" {
@@ -778,7 +771,6 @@ test "provider_for dispatches by case-sensitive prefix" {
     assert provider_for("openrouter/a") == provider_for("openrouter/a");
 }
 
-
 test "credential_error is empty when each routed key is set" {
     import os;
     cases = [
@@ -795,12 +787,14 @@ test "credential_error is empty when each routed key is set" {
             os.environ[k] = "sk-test";
             assert credential_error(m) == "";
         } finally {
-            if saved is None { os.environ.pop(k, None); }
-            else { os.environ[k] = saved; }
+            if saved is None {
+                os.environ.pop(k, None);
+            } else {
+                os.environ[k] = saved;
+            }
         }
     }
 }
-
 
 test "credential_error names provider, key, and /model escape hatch" {
     import os;
@@ -811,8 +805,11 @@ test "credential_error names provider, key, and /model escape hatch" {
         assert "OPENROUTER_API_KEY" in msg;
         assert "/model" in msg;
     } finally {
-        if saved is None { os.environ.pop("OPENROUTER_API_KEY", None); }
-        else { os.environ["OPENROUTER_API_KEY"] = saved; }
+        if saved is None {
+            os.environ.pop("OPENROUTER_API_KEY", None);
+        } else {
+            os.environ["OPENROUTER_API_KEY"] = saved;
+        }
     }
 
     # openai_compat failures also mention OPENAI_COMPAT_BASE.
@@ -822,11 +819,13 @@ test "credential_error names provider, key, and /model escape hatch" {
         assert "OPENAI_API_KEY" in msg;
         assert "OPENAI_COMPAT_BASE" in msg;
     } finally {
-        if saved2 is None { os.environ.pop("OPENAI_API_KEY", None); }
-        else { os.environ["OPENAI_API_KEY"] = saved2; }
+        if saved2 is None {
+            os.environ.pop("OPENAI_API_KEY", None);
+        } else {
+            os.environ["OPENAI_API_KEY"] = saved2;
+        }
     }
 }
-
 
 test "credential_error never fires for keyless or ext providers" {
     import os;
@@ -837,7 +836,6 @@ test "credential_error never fires for keyless or ext providers" {
     # Never raises even on nonsense input.
     assert isinstance(credential_error(""), str);
 }
-
 
 test "every provider route declares usable metadata" {
     import os;
@@ -859,14 +857,17 @@ test "every provider route declares usable metadata" {
         env_name = str(PROVIDER_ROUTES[pid]["key_env"]);
         saved = os.environ.get(env_name);
         try {
-            if saved is not None { os.environ.pop(env_name); }
+            if saved is not None {
+                os.environ.pop(env_name);
+            }
             assert credential_error(pid + "/probe-model") != "";
         } finally {
-            if saved is not None { os.environ[env_name] = saved; }
+            if saved is not None {
+                os.environ[env_name] = saved;
+            }
         }
     }
 }
-
 
 test "make_transport keeps historical wiring via the table" {
     import os;
@@ -894,7 +895,10 @@ test "make_transport keeps historical wiring via the table" {
         assert mk.base_url == PROVIDER_ROUTES["mock"]["base_url"];
         assert mk.api_key == "";
     } finally {
-        if saved is None { os.environ.pop("OPENAI_COMPAT_BASE", None); }
-        else { os.environ["OPENAI_COMPAT_BASE"] = saved; }
+        if saved is None {
+            os.environ.pop("OPENAI_COMPAT_BASE", None);
+        } else {
+            os.environ["OPENAI_COMPAT_BASE"] = saved;
+        }
     }
 }

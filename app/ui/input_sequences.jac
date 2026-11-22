@@ -1,13 +1,6 @@
 """Terminal escape-sequence parsing and decoding."""
 
-import from ui.input_events {
-    ESC,
-    HostEvent,
-    TextEvent,
-    KeyEvent,
-    MouseEvent,
-}
-
+import from ui.input_events { ESC, HostEvent, TextEvent, KeyEvent, MouseEvent }
 
 def _is_complete_csi(data: str) -> str {
     if not data.startswith(ESC + "[") {
@@ -35,7 +28,6 @@ def _is_complete_csi(data: str) -> str {
     return "incomplete";
 }
 
-
 def _is_complete_osc(data: str) -> str {
     if not data.startswith(ESC + "]") {
         return "complete";
@@ -45,7 +37,6 @@ def _is_complete_osc(data: str) -> str {
     }
     return "incomplete";
 }
-
 
 def sequence_status(data: str) -> str {
     if not data.startswith(ESC) {
@@ -78,7 +69,6 @@ def sequence_status(data: str) -> str {
     }
     return "complete";
 }
-
 
 """Split a buffer into complete sequences and an incomplete remainder."""
 def extract_sequences(buffer: str) -> dict[str, list[str] | str] {
@@ -114,7 +104,6 @@ def extract_sequences(buffer: str) -> dict[str, list[str] | str] {
     return {"sequences": sequences, "remainder": ""};
 }
 
-
 glob LEGACY_KEYS: dict[str, str] = {
     "\x1b[A": "up",
     "\x1bOA": "up",
@@ -146,11 +135,9 @@ glob LEGACY_KEYS: dict[str, str] = {
     "\x1b[24~": "f12",
 };
 
-
 def _parse_sgr_mouse(seq: str) -> MouseEvent | None {
     return _parse_sgr_mouse_native(seq);
 }
-
 
 glob MODIFIER_NAMES: dict[int, str] = {
     2: "shift",
@@ -160,7 +147,6 @@ glob MODIFIER_NAMES: dict[int, str] = {
     6: "ctrl+shift",
 };
 
-
 def _modified_key(modifier: int, base: str) -> str | None {
     prefix = MODIFIER_NAMES.get(modifier);
     if prefix is None {
@@ -168,7 +154,6 @@ def _modified_key(modifier: int, base: str) -> str | None {
     }
     return prefix + "+" + base;
 }
-
 
 glob CSI_LETTER_KEYS: dict[str, str] = {
     "A": "up",
@@ -178,7 +163,6 @@ glob CSI_LETTER_KEYS: dict[str, str] = {
     "H": "home",
     "F": "end",
 };
-
 
 """Decode modified CSI keys: ESC [ 1 ; <mod> <ABCDHF> and ESC [ <n> ; <mod> ~."""
 def _parse_modified_csi(seq: str) -> KeyEvent | None {
@@ -204,7 +188,6 @@ def _parse_modified_csi(seq: str) -> KeyEvent | None {
     }
     return None;
 }
-
 
 def decode_sequence(seq: str) -> HostEvent {
     if not seq {
@@ -310,7 +293,6 @@ def _parse_int_seq(text: str, start: int) -> list[int] | None {
     return out;
 }
 
-
 # Equivalent to prior `re.match(r"^<\d+;\d+;\d+[Mm]$", payload)`.
 def _match_sgr_mouse_body(payload: str) -> bool {
     if not payload.startswith("<") or len(payload) < 5 {
@@ -326,7 +308,6 @@ def _match_sgr_mouse_body(payload: str) -> bool {
     }
     return True;
 }
-
 
 # Equivalent to prior `re.match(r"^\x1b\[<(\d+);(\d+);(\d+)([Mm])$", seq)`.
 def _parse_sgr_mouse_native(seq: str) -> MouseEvent | None {
@@ -346,15 +327,8 @@ def _parse_sgr_mouse_native(seq: str) -> MouseEvent | None {
     y = parts[2];
     pressed = last == "M";
     motion = (button & 32) != 0;
-    return MouseEvent(
-        button=button & ~32,
-        x=x,
-        y=y,
-        pressed=pressed,
-        motion=motion,
-    );
+    return MouseEvent(button=button & ~32, x=x, y=y, pressed=pressed, motion=motion);
 }
-
 
 # Equivalent to prior `re.match(r"^\x1b\[1?;(\d+)([ABCDHF])$", seq)`.
 def _parse_modified_letter_csi(seq: str) -> tuple[int, str] | None {

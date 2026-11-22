@@ -52,38 +52,12 @@ import from ui.layout_types {
     rect_of,
     _copy_rect,
 }
-import from ui.layout_compile {
-    CompileResult,
-    PartitionInfo,
-    compile_layout,
-}
-import from ui.layout_measure {
-    natural_width,
-    wrapped_lines_at,
-    invalidate_measurement_cache,
-}
-import from ui.layout_quantize {
-    PartitionRequest,
-    quantize_partition,
-    snap_edge,
-}
-import from ui.model {
-    UiNode,
-    UiContainer,
-    Screen,
-    Overlay,
-    node_id,
-    ordered_children,
-}
-import from ui.width {
-    wrap_text_joined,
-}
-import from ui.layout_scope {
-    _ScopedNode,
-    _Scope,
-    _collect_scope,
-}
-
+import from ui.layout_compile { CompileResult, PartitionInfo, compile_layout }
+import from ui.layout_measure { natural_width, wrapped_lines_at, invalidate_measurement_cache }
+import from ui.layout_quantize { PartitionRequest, quantize_partition, snap_edge }
+import from ui.model { UiNode, UiContainer, Screen, Overlay, node_id, ordered_children }
+import from ui.width { wrap_text_joined }
+import from ui.layout_scope { _ScopedNode, _Scope, _collect_scope }
 
 # ----------------------------------------------------------------------
 # Compute pipeline (plan §7.1).
@@ -92,11 +66,9 @@ import from ui.layout_scope {
 # the public pipeline and frame publication seam.
 # ----------------------------------------------------------------------
 
-
 def _fail(diagnostics: list[LayoutDiagnostic]) -> LayoutResult {
     return LayoutResult(ok=False, frame=None, diagnostics=diagnostics);
 }
-
 
 def _overflow_warning(node_ids: list[str]) -> LayoutDiagnostic {
     return LayoutDiagnostic(
@@ -106,7 +78,6 @@ def _overflow_warning(node_ids: list[str]) -> LayoutDiagnostic {
         node_ids=node_ids,
     );
 }
-
 
 """Non-overlay ordered child ids of one scoped parent.
 
@@ -121,7 +92,6 @@ def _child_ids(scope_order: list[_ScopedNode], parent_id: str) -> list[str] {
     }
     return out;
 }
-
 
 """Place one axis of the tree top-down.
 
@@ -160,12 +130,14 @@ def _place_axis(
             }
         }
         if not aligned {
-            warnings.append(LayoutDiagnostic(
-                code=LayoutError.INTERNAL_INVARIANT,
-                severity=LayoutSeverity.ERROR,
-                message="partition child order misaligned with scope walk",
-                node_ids=[parent_id],
-            ));
+            warnings.append(
+                LayoutDiagnostic(
+                    code=LayoutError.INTERNAL_INVARIANT,
+                    severity=LayoutSeverity.ERROR,
+                    message="partition child order misaligned with scope walk",
+                    node_ids=[parent_id],
+                ),
+            );
         }
     }
     if info is not None and aligned {
@@ -208,13 +180,20 @@ def _place_axis(
 
     for kid in kids {
         _place_axis(
-            result, values, order, kid,
-            starts[kid], ends[kid], infos,
-            starts, ends, warnings, horizontal,
+            result,
+            values,
+            order,
+            kid,
+            starts[kid],
+            ends[kid],
+            infos,
+            starts,
+            ends,
+            warnings,
+            horizontal,
         );
     }
 }
-
 
 """Structural naturals, mirroring the frozen legacy measure semantics:
 leaf size from wrapped content at the hint width; containers sum along
@@ -222,9 +201,7 @@ their flow axis and take the max across it; FIXED uses preferred;
 FILL/GROW contribute their content natural (legacy grow measured value).
 Computed bottom-up over reversed BFS order."""
 def _structural_naturals(
-    order: list[_ScopedNode],
-    state: LayoutState,
-    wrap_widths: dict[str, int],
+    order: list[_ScopedNode], state: LayoutState, wrap_widths: dict[str, int]
 ) -> dict[str, Size] {
     out: dict[str, Size] = {};
     rev: list[_ScopedNode] = [];
@@ -250,10 +227,7 @@ def _structural_naturals(
 
         kids = _child_ids(order, id_str);
         if spec is None or len(kids) == 0 {
-            out[id_str] = Size(
-                width=natural_width(lines),
-                height=leaf_h,
-            );
+            out[id_str] = Size(width=natural_width(lines), height=leaf_h);
             continue;
         }
         flow_horiz = False;
@@ -268,12 +242,10 @@ def _structural_naturals(
             kid_h: float = float(nat.height);
             kspec = state.specs.get(kid_id);
             if kspec is not None {
-                if kspec.width.mode == SizeMode.FIXED
-                    and kspec.width.preferred is not None {
+                if kspec.width.mode == SizeMode.FIXED and kspec.width.preferred is not None {
                     kid_w = kspec.width.preferred;
                 }
-                if kspec.height.mode == SizeMode.FIXED
-                    and kspec.height.preferred is not None {
+                if kspec.height.mode == SizeMode.FIXED and kspec.height.preferred is not None {
                     kid_h = kspec.height.preferred;
                 }
             }
@@ -290,27 +262,16 @@ def _structural_naturals(
             }
         }
         if flow_horiz {
-            out[id_str] = Size(
-                width=int(sum_flow),
-                height=int(max_cross),
-            );
+            out[id_str] = Size(width=int(sum_flow), height=int(max_cross));
         } else {
-            out[id_str] = Size(
-                width=int(max_cross),
-                height=int(sum_flow),
-            );
+            out[id_str] = Size(width=int(max_cross), height=int(sum_flow));
         }
     }
     return out;
 }
 
-
 """Full pipeline: registry + topology -> published LayoutFrame."""
-def compute_layout(
-    state: LayoutState,
-    layout_root: UiNode,
-    viewport: Viewport,
-) -> LayoutResult {
+def compute_layout(state: LayoutState, layout_root: UiNode, viewport: Viewport) -> LayoutResult {
     scope = _collect_scope(layout_root);
     if scope.error is not None {
         return _fail([scope.error]);
@@ -344,10 +305,7 @@ def compute_layout(
         }
     }
     warnings: list[LayoutDiagnostic] = [];
-    _place_axis(
-        ch, hv, order, root_id, 0, viewport.columns,
-        hinfos, L, R, warnings, True,
-    );
+    _place_axis(ch, hv, order, root_id, 0, viewport.columns, hinfos, L, R, warnings, True);
     # Overlays sit outside every flow partition: snap each axis's cells
     # in its own phase before that axis is consumed.
     for scoped in order {
@@ -367,30 +325,27 @@ def compute_layout(
         id_str = scoped.id_str;
         w = R[id_str] - L[id_str];
         if w < 0 {
-            return _fail([LayoutDiagnostic(
-                code=LayoutError.INTERNAL_INVARIANT,
-                severity=LayoutSeverity.ERROR,
-                message="negative derived width",
-                node_ids=[id_str],
-            )]);
+            return _fail([
+                LayoutDiagnostic(
+                    code=LayoutError.INTERNAL_INVARIANT,
+                    severity=LayoutSeverity.ERROR,
+                    message="negative derived width",
+                    node_ids=[id_str],
+                ),
+            ]);
         }
         widths[id_str] = w;
         ent_w = state.content.get(id_str);
         if ent_w is not None {
             wrapped_by_node[id_str] = list(
                 wrapped_lines_at(
-                    ent_w.lines,
-                    ent_w.content_revision,
-                    ent_w.style_revision,
-                    id_str,
-                    w
-                )
+                    ent_w.lines, ent_w.content_revision, ent_w.style_revision, id_str, w
+                ),
             );
         } else {
             wrapped_by_node[id_str] = [];
         }
     }
-
 
     # ---- Phase V -----------------------------------------------------
     # Leaves rewrap at their quantized integer widths; containers use
@@ -413,10 +368,7 @@ def compute_layout(
             vinfos[info.parent_id] = info;
         }
     }
-    _place_axis(
-        cv, vv, order, root_id, 0, viewport.rows,
-        vinfos, T, B, warnings, False,
-    );
+    _place_axis(cv, vv, order, root_id, 0, viewport.rows, vinfos, T, B, warnings, False);
     for scoped in order {
         if not scoped.is_overlay {
             continue;
@@ -426,7 +378,6 @@ def compute_layout(
         T[id_str] = snap_edge(vv[ev.top.id]);
         B[id_str] = snap_edge(vv[ev.bottom.id]);
     }
-
 
     # ---- Frame construction ------------------------------------------
     entries: dict[str, FrameEntry] = {};
@@ -452,12 +403,14 @@ def compute_layout(
             }
         }
         if w < 0 or h < 0 {
-            return _fail([LayoutDiagnostic(
-                code=LayoutError.INTERNAL_INVARIANT,
-                severity=LayoutSeverity.ERROR,
-                message="negative derived size",
-                node_ids=[id_str],
-            )]);
+            return _fail([
+                LayoutDiagnostic(
+                    code=LayoutError.INTERNAL_INVARIANT,
+                    severity=LayoutSeverity.ERROR,
+                    message="negative derived size",
+                    node_ids=[id_str],
+                ),
+            ]);
         }
         rect = Rect(x=l, y=t, width=w, height=h);
 

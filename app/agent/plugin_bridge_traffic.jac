@@ -84,7 +84,6 @@ def _absorb_payload(bridge: any, payload: dict[str, any]) {
     }
 }
 
-
 """Shortcut bindings registered by loaded extensions (key -> meta dict with
 description + extension_id). Listed for host UIs; not yet bound to keys."""
 def list_shortcuts(bridge: any | None) -> dict[str, any] {
@@ -94,7 +93,6 @@ def list_shortcuts(bridge: any | None) -> dict[str, any] {
     return dict(bridge.shortcuts);
 }
 
-
 """Labels set by loaded extensions via pi.setLabel (id -> meta dict)."""
 def list_labels(bridge: any | None) -> dict[str, any] {
     if bridge is None {
@@ -102,7 +100,6 @@ def list_labels(bridge: any | None) -> dict[str, any] {
     }
     return dict(bridge.labels);
 }
-
 
 """Drain pending extension setModel/setThinkingLevel requests.
 
@@ -119,7 +116,6 @@ def drain_model_requests(bridge: any | None) -> dict[str, any] {
     bridge.pending_thinking_level = "";
     return out;
 }
-
 
 """Pull per-listener ui_events buckets out of hook results."""
 def _absorb_pending_fake(bridge: any, h: FakePluginHost) {

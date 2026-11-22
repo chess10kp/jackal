@@ -33,7 +33,7 @@ obj ApprovalQueue {
 }
 
 
-def create_queue() -> ApprovalQueue {
+def create_queue -> ApprovalQueue {
     return ApprovalQueue();
 }
 

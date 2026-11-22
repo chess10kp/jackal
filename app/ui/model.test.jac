@@ -1,6 +1,5 @@
 """Behavior tests for the OSP-native semantic UI graph model."""
 
-
 test "Child edges order siblings by sparse rank" {
     screen = MainScreen(key="main");
     header = Header(key="header", title="Jackal");
@@ -13,16 +12,10 @@ test "Child edges order siblings by sparse rank" {
     screen +>:Child(rank=3072):+> status;
     screen +>:Child(rank=4096):+> prompt;
 
-    assert ordered_child_keys(screen) == [
-        "header",
-        "transcript",
-        "status",
-        "prompt",
-    ];
+    assert ordered_child_keys(screen) == ["header", "transcript", "status", "prompt"];
     assert child_rank(screen, header) == 1024;
     assert child_rank(screen, transcript) == 2048;
 }
-
 
 test "duplicate sibling keys are detectable under one parent" {
     screen = MainScreen(key="main");
@@ -32,7 +25,6 @@ test "duplicate sibling keys are detectable under one parent" {
     screen +>:Child(rank=2048):+> second;
     assert duplicate_sibling_keys(screen) == ["dup"];
 }
-
 
 test "semantic nodes expose stable jid identity and local state only" {
     prompt = Prompt(key="prompt", draft="hello");
@@ -45,7 +37,6 @@ test "semantic nodes expose stable jid identity and local state only" {
     assert not hasattr(prompt, "cached_lines");
 }
 
-
 test "overlay layer edges attach outside Child containment" {
     screen = MainScreen(key="main");
     overlay = ApprovalOverlay(key="approval");
@@ -54,7 +45,6 @@ test "overlay layer edges attach outside Child containment" {
     assert overlay in [screen ->:Layer:->];
     assert enclosing_screen(overlay) is screen;
 }
-
 
 test "Feeds and FocusNext edges connect semantic regions" {
     screen = MainScreen(key="main");
@@ -68,7 +58,6 @@ test "Feeds and FocusNext edges connect semantic regions" {
     assert prompt in [transcript ->:FocusNext:->];
 }
 
-
 test "Owns edge scopes UI-local ownership without Child containment" {
     screen = MainScreen(key="main");
     prompt = Prompt(key="prompt");
@@ -79,14 +68,10 @@ test "Owns edge scopes UI-local ownership without Child containment" {
     assert draft_holder not in [screen ->:Child:->];
 }
 
-
 test "product archetypes keep only semantic fields on the node" {
     screen = MainScreen(key="main");
     tv = TranscriptView(
-        key="transcript",
-        source_id="session.events",
-        follow_tail=True,
-        scroll_offset=3,
+        key="transcript", source_id="session.events", follow_tail=True, scroll_offset=3
     );
     status = Status(key="status", phase="streaming");
     prompt = Prompt(key="prompt", draft="partial", mode="insert");
@@ -110,7 +95,6 @@ test "product archetypes keep only semantic fields on the node" {
         assert not hasattr(overlay, field);
     }
 }
-
 
 test "UiSessionRoot is a detachable session root with stable identity" {
     ui_root = UiSessionRoot(key="session");

@@ -7,23 +7,16 @@ test "decl_from_dict defaults activation from runtime" {
     assert n.activation == "native";
 }
 
-
 test "node_sidecar_decls skips lazy and native" {
     rows = [
         decl_from_dict({"id": "a", "path": "a.js", "runtime": "node"}),
-        decl_from_dict({
-            "id": "b",
-            "path": "b.js",
-            "runtime": "node",
-            "activation": "lazy",
-        }),
+        decl_from_dict({"id": "b", "path": "b.js", "runtime": "node", "activation": "lazy"}),
         decl_from_dict({"id": "c", "path": "c.jac", "runtime": "native"}),
     ];
     side = node_sidecar_decls(rows);
     assert len(side) == 1;
     assert side[0].id == "a";
 }
-
 
 test "extensions_label formats loading n/m" {
     st = ExtensionStatus(phase="loading", loaded=2, total=5, ready=False);

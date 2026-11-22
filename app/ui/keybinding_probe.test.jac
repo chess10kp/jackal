@@ -28,7 +28,6 @@ test "extension shortcut shadows navigation key and carries result" {
     }
 }
 
-
 test "ctrl+c keeps precedence over a registered shortcut" {
     (app, bridge, fired) = make_key_probe([("ctrl+c", "never")]);
     try {
@@ -41,7 +40,6 @@ test "ctrl+c keeps precedence over a registered shortcut" {
         drop_key_probe(bridge);
     }
 }
-
 
 test "pending approval swallows shortcut keys" {
     (app, bridge, fired) = make_key_probe([("q", "never")]);
@@ -58,7 +56,6 @@ test "pending approval swallows shortcut keys" {
     }
 }
 
-
 test "extension-UI modal swallows keys ahead of shortcuts" {
     (app, bridge, fired) = make_key_probe([("x", "never")]);
     try {
@@ -70,7 +67,6 @@ test "extension-UI modal swallows keys ahead of shortcuts" {
         drop_key_probe(bridge);
     }
 }
-
 
 test "escape aborts streaming and quits an idle shell when unregistered" {
     (app, bridge, fired) = make_key_probe([("up", "unused")]);

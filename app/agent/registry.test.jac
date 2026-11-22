@@ -8,26 +8,21 @@ import json;
 import tempfile;
 import shutil;
 
-
 def _echo(text: str) -> str {
     return "ECHO:" + text;
 }
-
 
 def _tool_echo(args: dict[str, any]) -> str {
     return _echo(str(args.get("text", "")));
 }
 
-
 def _boom(x: int) -> str {
     raise ValueError("boom");
 }
 
-
 def _tool_boom(args: dict[str, any]) -> str {
     return _boom(int(args.get("x", 0)));
 }
-
 
 test "register_native and get_tool" {
     reg = create_registry();
@@ -35,11 +30,7 @@ test "register_native and get_tool" {
         reg,
         "echo",
         "echo text",
-        {
-            "type": "object",
-            "properties": {"text": {"type": "string"}},
-            "required": ["text"],
-        },
+        {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]},
         _tool_echo,
     );
     assert ent.origin == "native";
@@ -49,16 +40,9 @@ test "register_native and get_tool" {
     assert got.name == "echo";
 }
 
-
 test "register_js requires extension_id and has no handler" {
     reg = create_registry();
-    ent = register_js(
-        reg,
-        "echo_js",
-        "js echo",
-        {"type": "object", "properties": {}},
-        "ext.stub",
-    );
+    ent = register_js(reg, "echo_js", "js echo", {"type": "object", "properties": {}}, "ext.stub");
     assert ent.origin == "js";
     assert ent.extension_id == "ext.stub";
     assert ent.handler is None;
@@ -71,22 +55,13 @@ test "register_js requires extension_id and has no handler" {
     assert raised;
 }
 
-
 test "invoke native success and error" {
     reg = create_registry();
     register_native(
-        reg,
-        "echo",
-        "d",
-        {"type": "object", "properties": {"text": {"type": "string"}}},
-        _tool_echo,
+        reg, "echo", "d", {"type": "object", "properties": {"text": {"type": "string"}}}, _tool_echo
     );
     register_native(
-        reg,
-        "boom",
-        "d",
-        {"type": "object", "properties": {"x": {"type": "integer"}}},
-        _tool_boom,
+        reg, "boom", "d", {"type": "object", "properties": {"x": {"type": "integer"}}}, _tool_boom
     );
     assert invoke(reg, "echo", {"text": "hi"}) == "ECHO:hi";
     err = invoke(reg, "boom", {"x": 1});
@@ -94,7 +69,6 @@ test "invoke native success and error" {
     assert "boom" in err;
     assert invoke(reg, "missing", {}) == "ERROR: unknown tool missing";
 }
-
 
 test "invoke js without bridge returns error" {
     reg = create_registry();
@@ -104,15 +78,10 @@ test "invoke js without bridge returns error" {
     assert "bridge" in out;
 }
 
-
 test "as_tool_specs and openai_tools cover both origins" {
     reg = create_registry();
     register_native(
-        reg,
-        "echo",
-        "d",
-        {"type": "object", "properties": {"text": {"type": "string"}}},
-        _tool_echo,
+        reg, "echo", "d", {"type": "object", "properties": {"text": {"type": "string"}}}, _tool_echo
     );
     register_js(reg, "remote", "rd", {"type": "object"}, "ext.a");
     specs = as_tool_specs(reg);
@@ -124,7 +93,6 @@ test "as_tool_specs and openai_tools cover both origins" {
     assert len(defs) == 2;
     assert defs[0]["type"] == "function";
 }
-
 
 test "unregister and unregister_extension" {
     reg = create_registry();
@@ -138,7 +106,6 @@ test "unregister and unregister_extension" {
     assert get_tool(reg, "a") is None;
     assert get_tool(reg, "b") is None;
 }
-
 
 test "a failing native handler is logged without changing the ERROR contract" {
     tmp: str = tempfile.mkdtemp(prefix="jackal-registry-log-");

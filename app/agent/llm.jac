@@ -15,11 +15,7 @@ import from .llm_transport {
     make_transport,
     make_ext_transport,
 }
-import from .model_catalog {
-    catalog_models,
-    warm_model_catalog,
-    refresh_model_catalog,
-}
+import from .model_catalog { catalog_models, warm_model_catalog, refresh_model_catalog }
 import from .llm_loop {
     ToolSpec,
     MAX_TOOL_RESULT,

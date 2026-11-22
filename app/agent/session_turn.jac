@@ -225,7 +225,7 @@ def _maybe_auto_compact(bridge: PluginBridge | None) {
 
 
 """Manual compaction (/compact): status line for the UI."""
-def compact_now() -> str {
+def compact_now -> str {
     try {
         res = compact_history(plugins.bridge, True);
     } except Exception as e {

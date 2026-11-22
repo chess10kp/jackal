@@ -6,35 +6,26 @@ uses jid(node). Renderer geometry, caches, and closures live in process-local
 runtime side tables (layout.jac, renderer.jac, runtime.jac), not on nodes.
 """
 
-
 node UiNode {
     has key: str = "";
 }
 
-
 node UiContainer(UiNode) {}
-
 
 node UiRegion(UiNode) {}
 
-
 node UiSessionRoot(UiContainer) {}
-
 
 node Screen(UiContainer) {}
 
-
 node Overlay(UiContainer) {}
-
 
 """Jackal shell and shared semantic region archetypes."""
 node MainScreen(Screen) {}
 
-
 node Header(UiRegion) {
     has title: str = "";
 }
-
 
 node TranscriptView(UiRegion) {
     has scroll_offset: int = 0;
@@ -42,7 +33,6 @@ node TranscriptView(UiRegion) {
     has source_id: str = "";
     has observed_revision: int = 0;
 }
-
 
 node Prompt(UiRegion) {
     has draft: str = "";
@@ -54,32 +44,25 @@ node Prompt(UiRegion) {
     has history_index: int = -1;
 }
 
-
 node Status(UiRegion) {
     has phase: str = "";
 }
 
-
 node ApprovalOverlay(Overlay) {}
-
 
 """Visual containment with deterministic sibling order."""
 edge Child: UiContainer --> UiNode {
     has rank: int;
 }
 
-
 """UI-local disposal responsibility."""
 edge Owns: UiNode --> UiNode {}
-
 
 """UI-local invalidation dependency within the detached graph."""
 edge Feeds: UiNode --> UiNode {}
 
-
 """Explicit focus order override."""
 edge FocusNext: UiNode --> UiNode {}
-
 
 """Overlay layering outside normal-flow containment."""
 edge Layer: Screen --> Overlay {
@@ -87,23 +70,19 @@ edge Layer: Screen --> Overlay {
     has modal: bool = False;
 }
 
-
 obj RankedChild {
     has rank: int,
         nd: UiNode;
 }
-
 
 """Return the stable 32-char node identifier for side-table keys."""
 def node_id(n: UiNode) -> str {
     return jid(n);
 }
 
-
 def _ranked_child_key(pair: RankedChild) -> int {
     return pair.rank;
 }
-
 
 """Return direct Child descendants of parent in ascending rank order."""
 def ordered_children(parent: UiContainer) -> list[UiNode] {
@@ -117,12 +96,10 @@ def ordered_children(parent: UiContainer) -> list[UiNode] {
     return [pair.nd for pair in pairs];
 }
 
-
 """Return ordered keys for direct Child descendants."""
 def ordered_child_keys(parent: UiContainer) -> list[str] {
     return [child.key for child in ordered_children(parent)];
 }
-
 
 """Return the Child rank for one mounted child, or -1 when absent."""
 def child_rank(parent: UiContainer, child: UiNode) -> int {
@@ -132,7 +109,6 @@ def child_rank(parent: UiContainer, child: UiNode) -> int {
     return -1;
 }
 
-
 """Return the single Child parent when mounted, else None."""
 def child_parent(child: UiNode) -> UiContainer | None {
     parents = [child <-:Child:<-];
@@ -141,7 +117,6 @@ def child_parent(child: UiNode) -> UiContainer | None {
     }
     return parents[0];
 }
-
 
 """Walk upward through Child containment to the nearest Screen ancestor."""
 def enclosing_screen(n: UiNode) -> Screen | None {
@@ -159,7 +134,6 @@ def enclosing_screen(n: UiNode) -> Screen | None {
     return None;
 }
 
-
 """Collect duplicate sibling keys under one parent."""
 def duplicate_sibling_keys(parent: UiContainer) -> list[str] {
     seen: dict[str, int] = {};
@@ -176,7 +150,6 @@ def duplicate_sibling_keys(parent: UiContainer) -> list[str] {
     }
     return dups;
 }
-
 
 """True when ancestor is reachable upward from child via Child edges."""
 def is_child_ancestor(ancestor: UiNode, child: UiNode) -> bool {

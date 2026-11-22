@@ -10,13 +10,8 @@ test "overlapping seeds are processed once" {
     ui_ids.add(jid(first));
     ui_ids.add(jid(second));
 
-    assert ui_jids_reachable_from_nodes(seeds, ui_ids) == [
-        jid(first),
-        jid(second),
-    ];
+    assert ui_jids_reachable_from_nodes(seeds, ui_ids) == [jid(first), jid(second)];
     neighbor_ids: set[str] = set();
     neighbor_ids.add(jid(second));
-    assert ui_jids_reachable_from_nodes([first], neighbor_ids) == [
-        jid(second),
-    ];
+    assert ui_jids_reachable_from_nodes([first], neighbor_ids) == [jid(second)];
 }

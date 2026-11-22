@@ -75,7 +75,7 @@ obj TuiHarness {
         self.step(2);
     }
 
-    def screen() -> str {
+    def screen -> str {
         return self.term.viewport_text();
     }
 
@@ -114,7 +114,7 @@ obj TuiHarness {
     }
 
     """Model calls recorded by the mock transport."""
-    def calls() -> list[dict[str, any]] {
+    def calls -> list[dict[str, any]] {
         if not os.path.exists(self.log_path) { return []; }
         out: list[dict[str, any]] = [];
         fh: any = open(self.log_path, "r", encoding="utf-8");
@@ -137,7 +137,7 @@ obj TuiHarness {
     }
 
     """Screen + cursor + phase, for assertion messages."""
-    def dump() -> str {
+    def dump -> str {
         (x, y) = self.term.cursor();
         border: str = "+" + "-" * self.term.columns + "+";
         rows: list[str] = [border];
@@ -152,7 +152,7 @@ obj TuiHarness {
         );
     }
 
-    def close() {
+    def close  {
         if self.closed { return; }
         self.closed = True;
         try {

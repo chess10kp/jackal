@@ -1,14 +1,8 @@
 """Host loop tick tests (virtual terminal, no TTY)."""
 
-import from ui.virtual_terminal {
-    VirtualTerminal,
-}
+import from ui.virtual_terminal { VirtualTerminal }
 
-import from ui.input {
-    TextEvent,
-    KeyEvent,
-}
-
+import from ui.input { TextEvent, KeyEvent }
 
 test "host tick drains inject and maps interrupt" {
     loop = create_host_loop(esc_timeout_ms=50);
@@ -24,7 +18,6 @@ test "host tick drains inject and maps interrupt" {
     assert "interrupt" in kinds;
     term.stop();
 }
-
 
 test "host tick esc timeout" {
     loop = create_host_loop(esc_timeout_ms=30);

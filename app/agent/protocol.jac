@@ -5,10 +5,7 @@ turn/subprocess-group cancellation. External workers enqueue immutable events;
 they never mutate the UI graph.
 """
 
-import from ui.screen {
-    ShellScreen,
-}
-
+import from ui.screen { ShellScreen }
 
 obj Envelope {
     has version: int = 1,
@@ -22,13 +19,11 @@ obj Envelope {
         payload: dict[str, any] = {};
 }
 
-
 obj QueueStats {
     has depth: int = 0,
         dropped: int = 0,
         coalesced: int = 0;
 }
-
 
 obj BoundedEventQueue {
     has capacity: int = 256,
@@ -37,13 +32,11 @@ obj BoundedEventQueue {
         coalesced: int = 0;
 }
 
-
 obj CancelToken {
     has turn_id: str = "",
         group_id: str = "",
         cancelled: bool = False;
 }
-
 
 obj InProcessAdapter {
     has queue: BoundedEventQueue,
@@ -57,19 +50,13 @@ obj InProcessAdapter {
         busy: bool = False;
 }
 
-
 def create_queue(capacity: int = 256) -> BoundedEventQueue {
     return BoundedEventQueue(capacity=capacity);
 }
 
-
 def create_adapter(session_id: str, capacity: int = 256) -> InProcessAdapter {
-    return InProcessAdapter(
-        session_id=session_id,
-        queue=create_queue(capacity),
-    );
+    return InProcessAdapter(session_id=session_id, queue=create_queue(capacity));
 }
-
 
 def make_envelope(
     kind: str,
@@ -99,15 +86,9 @@ def make_envelope(
     );
 }
 
-
 def queue_stats(queue: BoundedEventQueue) -> QueueStats {
-    return QueueStats(
-        depth=len(queue.items),
-        dropped=queue.dropped,
-        coalesced=queue.coalesced,
-    );
+    return QueueStats(depth=len(queue.items), dropped=queue.dropped, coalesced=queue.coalesced);
 }
-
 
 """True when two envelopes are compatible text deltas that may coalesce."""
 def can_coalesce(a: Envelope, b: Envelope) -> bool {
@@ -122,7 +103,6 @@ def can_coalesce(a: Envelope, b: Envelope) -> bool {
     }
     return True;
 }
-
 
 """Merge two compatible text-delta envelopes into one."""
 def coalesce_text_deltas(a: Envelope, b: Envelope) -> Envelope {
@@ -142,15 +122,12 @@ def coalesce_text_deltas(a: Envelope, b: Envelope) -> Envelope {
     );
 }
 
-
 """Enqueue an envelope, coalescing compatible text deltas when possible."""
 def enqueue(queue: BoundedEventQueue, envelope: Envelope) -> bool {
     if queue.items {
         last = queue.items[len(queue.items) - 1];
         if can_coalesce(last, envelope) {
-            queue.items[len(queue.items) - 1] = coalesce_text_deltas(
-                last, envelope
-            );
+            queue.items[len(queue.items) - 1] = coalesce_text_deltas(last, envelope);
             queue.coalesced += 1;
             return True;
         }
@@ -164,7 +141,6 @@ def enqueue(queue: BoundedEventQueue, envelope: Envelope) -> bool {
     return True;
 }
 
-
 """Dequeue the next envelope in structural order, or None if empty."""
 def dequeue(queue: BoundedEventQueue) -> Envelope | None {
     if not queue.items {
@@ -172,7 +148,6 @@ def dequeue(queue: BoundedEventQueue) -> Envelope | None {
     }
     return queue.items.pop(0);
 }
-
 
 """Cancel a turn; subsequent completion events must carry correlation."""
 def cancel_turn(adapter: InProcessAdapter, turn_id: str) -> CancelToken {
@@ -191,7 +166,6 @@ def cancel_turn(adapter: InProcessAdapter, turn_id: str) -> CancelToken {
     return token;
 }
 
-
 """Cancel a subprocess/tool group with correlated completion events."""
 def cancel_group(adapter: InProcessAdapter, group_id: str) -> CancelToken {
     token = CancelToken(group_id=group_id, cancelled=True);
@@ -208,7 +182,6 @@ def cancel_group(adapter: InProcessAdapter, group_id: str) -> CancelToken {
     );
     return token;
 }
-
 
 """Drive one envelope into the product TUI shell (in-process adapter)."""
 def drive_screen(adapter: InProcessAdapter, shell: any, envelope: Envelope) {
@@ -281,7 +254,6 @@ def drive_screen(adapter: InProcessAdapter, shell: any, envelope: Envelope) {
     }
 }
 
-
 """Drain the adapter queue and drive each envelope into the shell."""
 def drain_and_drive(adapter: InProcessAdapter, shell: any) -> int {
     count = 0;
@@ -295,7 +267,6 @@ def drain_and_drive(adapter: InProcessAdapter, shell: any) -> int {
     }
     return count;
 }
-
 
 # -- Plugin-channel kinds (brain <-> JS host). drive_screen ignores these. --
 
@@ -339,16 +310,13 @@ glob PLUGIN_KINDS: set[str] = {
     "ui_cancel",
 };
 
-
 def is_ui_kind(kind: str) -> bool {
     return kind in UI_KINDS;
 }
 
-
 def is_plugin_kind(kind: str) -> bool {
     return kind in PLUGIN_KINDS;
 }
-
 
 """Build a plugin-channel envelope (same Envelope type; not for drive_screen)."""
 def make_plugin_envelope(

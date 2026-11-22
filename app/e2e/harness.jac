@@ -21,7 +21,7 @@ glob E2E_TIMEOUT_S: int = 300;
 
 
 """app/ directory (this file lives in app/e2e/)."""
-def app_dir() -> str {
+def app_dir -> str {
     env_root: str = os.environ.get("JACKAL_ROOT", "");
     if env_root and os.path.isfile(os.path.join(env_root, "app", "main.jac")) {
         return os.path.join(env_root, "app");
@@ -40,7 +40,7 @@ def app_dir() -> str {
 }
 
 
-def jac_bin() -> str {
+def jac_bin -> str {
     got: str | None = os.environ.get("JAC") or shutil.which("jac");
     if not got {
         raise RuntimeError("e2e: jac not on PATH (set JAC)");
@@ -85,7 +85,7 @@ obj Sandbox {
     }
 
     """Model calls recorded by the mock transport, in order."""
-    def calls() -> list[dict[str, any]] {
+    def calls -> list[dict[str, any]] {
         if not os.path.exists(self.log_path) {
             return [];
         }
@@ -98,7 +98,7 @@ obj Sandbox {
         return out;
     }
 
-    def cleanup() {
+    def cleanup  {
         shutil.rmtree(self.base_dir, ignore_errors=True);
     }
 
@@ -141,7 +141,7 @@ obj RunResult {
         stderr: str = "";
 
     """stdout parsed as JSONL (non-JSON lines skipped)."""
-    def events() -> list[dict[str, any]] {
+    def events -> list[dict[str, any]] {
         out: list[dict[str, any]] = [];
         for line in self.stdout.splitlines() {
             line = line.strip();
@@ -155,11 +155,11 @@ obj RunResult {
         return out;
     }
 
-    def event_types() -> list[str] {
+    def event_types -> list[str] {
         return [str(e.get("type", "")) for e in self.events()];
     }
 
-    def describe() -> str {
+    def describe -> str {
         return "exit=" + str(self.code) + "\n--- stdout ---\n" + self.stdout[-4000:]
             + "\n--- stderr ---\n" + self.stderr[-4000:];
     }
@@ -237,7 +237,7 @@ obj TuiSession {
         reader: any = None,
         alive: bool = True;
 
-    def _read_loop() {
+    def _read_loop  {
         import os;
         import codecs;
         dec: any = codecs.getincrementaldecoder("utf-8")("replace");
@@ -277,7 +277,7 @@ obj TuiSession {
         self.send(KEYS.get(key, key));
     }
 
-    def screen_text() -> str {
+    def screen_text -> str {
         self.lock.acquire();
         try {
             return self.screen.viewport_text() if self.screen is not None else "";
@@ -286,7 +286,7 @@ obj TuiSession {
         }
     }
 
-    def raw_output() -> str {
+    def raw_output -> str {
         self.lock.acquire();
         try {
             return "".join(self.raw);
@@ -340,7 +340,7 @@ obj TuiSession {
         }
     }
 
-    def close() {
+    def close  {
         if self.proc is not None and self.proc.poll() is None {
             try {
                 os.killpg(int(self.proc.pid), 15);  # SIGTERM

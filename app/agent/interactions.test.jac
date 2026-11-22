@@ -2,7 +2,6 @@
 
 import time;
 
-
 def _req(method: str = "select", parent: str = "corr-1", **extra: any) -> dict[str, any] {
     req: dict[str, any] = {
         "method": method,
@@ -12,14 +11,17 @@ def _req(method: str = "select", parent: str = "corr-1", **extra: any) -> dict[s
         "created": time.monotonic(),
         "timeout_ms": 30000.0,
     };
-    if method == "select" { req["options"] = ["a", "b"]; }
-    if method == "confirm" { req["message"] = "sure?"; }
+    if method == "select" {
+        req["options"] = ["a", "b"];
+    }
+    if method == "confirm" {
+        req["message"] = "sure?";
+    }
     for k in extra {
         req[k] = extra[k];
     }
     return req;
 }
-
 
 test "enqueue validates method and parent correlation" {
     q = new_ui_queue();
@@ -30,7 +32,6 @@ test "enqueue validates method and parent correlation" {
     ok3 = q.enqueue(_req(parent=""));
     assert ok3[0] is False;
 }
-
 
 test "caller-supplied child correlations are honored; duplicates rejected" {
     q = new_ui_queue();
@@ -44,7 +45,6 @@ test "caller-supplied child correlations are honored; duplicates rejected" {
     r4 = q.enqueue(_req(parent="p"));
     assert r4[1] == "ui-1" or r4[1] != "child-7";
 }
-
 
 test "poll peeks FIFO head without detaching" {
     q = new_ui_queue();
@@ -61,7 +61,6 @@ test "poll peeks FIFO head without detaching" {
     assert second[0] is not None and second[0].method == "confirm";
 }
 
-
 test "expired requests are reaped into the cancelled bucket" {
     q = new_ui_queue();
     q.enqueue(_req(timeout_ms=50.0));
@@ -70,7 +69,6 @@ test "expired requests are reaped into the cancelled bucket" {
     assert res[0] is None;
     assert len(res[1]) == 1 and res[1][0].corr == "ui-1";
 }
-
 
 test "respond takes by child corr; unknown corr is a no-op" {
     q = new_ui_queue();
@@ -81,7 +79,6 @@ test "respond takes by child corr; unknown corr is a no-op" {
     assert q.take(corr) is None;
 }
 
-
 test "cancel_by_parent cancels only that parent's children" {
     q = new_ui_queue();
     q.enqueue(_req(parent="pa"));
@@ -90,7 +87,6 @@ test "cancel_by_parent cancels only that parent's children" {
     assert len(dead) == 1 and dead[0].parent_corr == "pa";
     assert len(q.records) == 1 and q.records[0].parent_corr == "pb";
 }
-
 
 test "cancel_all drains everything" {
     q = new_ui_queue();

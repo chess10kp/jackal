@@ -4,14 +4,9 @@ Core enqueue/dequeue/coalesce/cancel/drive_screen are stubbed until Unit 9
 implementation (OSPUI-P0-PLAN Unit 9). Companion scope provides protocol APIs.
 """
 
-import from ui.runtime {
-    create_session,
-    dispose_session,
-}
+import from ui.runtime { create_session, dispose_session }
 
-import from ui.screen {
-    build_main_shell,
-}
+import from ui.screen { build_main_shell }
 
 test "make_envelope carries versioned identity fields" {
     env = make_envelope(
@@ -32,35 +27,21 @@ test "make_envelope carries versioned identity fields" {
     assert env.payload["text"] == "hi";
 }
 
-
 test "can_coalesce accepts same-turn text deltas only" {
     a = make_envelope(
-        kind="text_delta",
-        payload={"text": "a"},
-        session_id="s",
-        turn_id="t",
-        correlation_id="c",
+        kind="text_delta", payload={"text": "a"}, session_id="s", turn_id="t", correlation_id="c"
     );
     b = make_envelope(
-        kind="text_delta",
-        payload={"text": "b"},
-        session_id="s",
-        turn_id="t",
-        correlation_id="c",
+        kind="text_delta", payload={"text": "b"}, session_id="s", turn_id="t", correlation_id="c"
     );
     other_turn = make_envelope(
-        kind="text_delta",
-        payload={"text": "x"},
-        session_id="s",
-        turn_id="t2",
-        correlation_id="c",
+        kind="text_delta", payload={"text": "x"}, session_id="s", turn_id="t2", correlation_id="c"
     );
     tool = make_envelope(kind="tool_result", payload={"ok": True}, turn_id="t");
     assert can_coalesce(a, b);
     assert not can_coalesce(a, other_turn);
     assert not can_coalesce(a, tool);
 }
-
 
 test "enqueue preserves structural order for non-delta events" {
     q = create_queue(capacity=8);
@@ -79,7 +60,6 @@ test "enqueue preserves structural order for non-delta events" {
     assert d3 is not None and d3.kind == "turn_end";
     assert d4 is None;
 }
-
 
 test "compatible text deltas coalesce into one envelope" {
     q = create_queue(capacity=8);
@@ -110,27 +90,17 @@ test "compatible text deltas coalesce into one envelope" {
     assert merged.payload["text"] == "hello";
 }
 
-
 test "coalesce_text_deltas merges payload text" {
     a = make_envelope(
-        kind="text_delta",
-        payload={"text": "ab"},
-        turn_id="t",
-        correlation_id="c",
-        sequence=1,
+        kind="text_delta", payload={"text": "ab"}, turn_id="t", correlation_id="c", sequence=1
     );
     b = make_envelope(
-        kind="text_delta",
-        payload={"text": "cd"},
-        turn_id="t",
-        correlation_id="c",
-        sequence=2,
+        kind="text_delta", payload={"text": "cd"}, turn_id="t", correlation_id="c", sequence=2
     );
     m = coalesce_text_deltas(a, b);
     assert m.payload["text"] == "abcd";
     assert m.sequence == 2 or m.sequence == 1;
 }
-
 
 test "bounded queue drops oldest or rejects when full" {
     q = create_queue(capacity=2);
@@ -141,7 +111,6 @@ test "bounded queue drops oldest or rejects when full" {
     assert stats.depth <= 2;
     assert (not accepted) or stats.dropped >= 1;
 }
-
 
 test "cancel_turn marks token and enqueues correlated completion" {
     adapter = create_adapter("s1");
@@ -163,14 +132,12 @@ test "cancel_turn marks token and enqueues correlated completion" {
     assert found;
 }
 
-
 test "cancel_group correlates tool-group completion" {
     adapter = create_adapter("s1");
     token = cancel_group(adapter, "group-1");
     assert token.group_id == "group-1";
     assert token.cancelled;
 }
-
 
 test "drive_screen accepts envelopes without mutating queue ownership" {
     adapter = create_adapter("s1");
@@ -190,7 +157,6 @@ test "drive_screen accepts envelopes without mutating queue ownership" {
     assert failed or True;
 }
 
-
 test "drain_and_drive applies status tool approval and cancel" {
     handle = create_session();
     session = handle.session;
@@ -199,30 +165,15 @@ test "drain_and_drive applies status tool approval and cancel" {
     enqueue(adapter.queue, make_envelope(kind="turn_start", turn_id="t1"));
     enqueue(
         adapter.queue,
-        make_envelope(
-            kind="text_delta",
-            payload={"text": "hi"},
-            turn_id="t1",
-            correlation_id="c",
-        ),
+        make_envelope(kind="text_delta", payload={"text": "hi"}, turn_id="t1", correlation_id="c"),
     );
     enqueue(
         adapter.queue,
-        make_envelope(
-            kind="tool_start",
-            tool_id="bash",
-            payload={"tool": "bash"},
-            turn_id="t1",
-        ),
+        make_envelope(kind="tool_start", tool_id="bash", payload={"tool": "bash"}, turn_id="t1"),
     );
     enqueue(
         adapter.queue,
-        make_envelope(
-            kind="approval_request",
-            correlation_id="ap-1",
-            tool_id="bash",
-            turn_id="t1",
-        ),
+        make_envelope(kind="approval_request", correlation_id="ap-1", tool_id="bash", turn_id="t1"),
     );
     n = drain_and_drive(adapter, shell);
     assert n == 4;
@@ -230,14 +181,7 @@ test "drain_and_drive applies status tool approval and cancel" {
     assert adapter.last_tool == "bash";
     assert adapter.pending_approval_id == "ap-1";
     assert shell.status.phase == "approval";
-    enqueue(
-        adapter.queue,
-        make_envelope(
-            kind="turn_cancelled",
-            turn_id="t1",
-            correlation_id="t1",
-        ),
-    );
+    enqueue(adapter.queue, make_envelope(kind="turn_cancelled", turn_id="t1", correlation_id="t1"));
     drain_and_drive(adapter, shell);
     assert shell.status.phase == "cancelled";
     assert adapter.busy == False;

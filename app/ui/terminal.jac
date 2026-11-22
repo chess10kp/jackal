@@ -57,7 +57,7 @@ obj Terminal {
         # Input stream closed (host loop exits).
         eof: bool = False;
 
-    def size() -> tuple[int, int] {
+    def size -> tuple[int, int] {
         return (self.columns, self.rows);
     }
 
@@ -70,54 +70,54 @@ obj Terminal {
         raise NotImplementedError("Terminal.write");
     }
 
-    def start() -> None {
+    def start -> None {
         raise NotImplementedError("Terminal.start");
     }
 
-    def stop() -> None {
+    def stop -> None {
         raise NotImplementedError("Terminal.stop");
     }
 
-    def enter_alternate_screen() -> None {
+    def enter_alternate_screen -> None {
         self.write(ENTER_ALT_SCREEN);
         self.alternate_screen = True;
     }
 
-    def leave_alternate_screen() -> None {
+    def leave_alternate_screen -> None {
         self.write(LEAVE_ALT_SCREEN);
         self.alternate_screen = False;
     }
 
-    def begin_synchronized_update() -> None {
+    def begin_synchronized_update -> None {
         self.write(SYNC_BEGIN);
         self.sync_active = True;
     }
 
-    def end_synchronized_update() -> None {
+    def end_synchronized_update -> None {
         self.write(SYNC_END);
         self.sync_active = False;
     }
 
-    def hide_cursor() -> None {
+    def hide_cursor -> None {
         self.write(HIDE_CURSOR);
         self.cursor_visible = False;
     }
 
-    def show_cursor() -> None {
+    def show_cursor -> None {
         self.write(SHOW_CURSOR);
         self.cursor_visible = True;
     }
 
-    def clear_screen() -> None {
+    def clear_screen -> None {
         self.write(CLEAR_SCREEN);
     }
 
-    def enable_bracketed_paste() -> None {
+    def enable_bracketed_paste -> None {
         self.write(ENABLE_BRACKETED_PASTE);
         self.bracketed_paste = True;
     }
 
-    def disable_bracketed_paste() -> None {
+    def disable_bracketed_paste -> None {
         self.write(DISABLE_BRACKETED_PASTE);
         self.bracketed_paste = False;
     }
@@ -131,7 +131,7 @@ obj Terminal {
     }
 
     """Restore host terminal modes. Safe to call more than once."""
-    def restore() -> None {
+    def restore -> None {
         self.stop();
     }
 }
@@ -159,7 +159,7 @@ U+FFFD replacement characters without losing the surrounding text.
 obj Utf8StreamDecoder {
     has _pending: bytes = b"";
 
-    def init() {}
+    def init  {}
 
     def feed(data: bytes) -> str {
         buf: bytes = self._pending;
@@ -328,7 +328,7 @@ obj ProcessTerminal(Terminal) {
         sys.stdout.flush();
     }
 
-    def _refresh_size() {
+    def _refresh_size  {
         (cols, rows) = read_terminal_size(self.columns, self.rows);
         changed = cols != self.columns or rows != self.rows;
         self.columns = cols;
@@ -363,7 +363,7 @@ obj ProcessTerminal(Terminal) {
         }
     }
 
-    def start() -> None {
+    def start -> None {
         if self.started {
             return;
         }
@@ -395,7 +395,7 @@ obj ProcessTerminal(Terminal) {
         }
     }
 
-    def stop() -> None {
+    def stop -> None {
         if self.restored and not self.started {
             return;
         }

@@ -61,7 +61,7 @@ obj TranscriptProjection {
 }
 
 
-def create_measure_cache() -> MeasureCache {
+def create_measure_cache -> MeasureCache {
     return MeasureCache();
 }
 

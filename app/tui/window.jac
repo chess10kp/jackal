@@ -16,14 +16,12 @@ import from ui.width { display_width, truncate_text }
 # Modal anchor placement stays in _paint_overlay; picker drop-ups render
 # above the prompt in tui/overlay.jac.
 
-
 obj WindowSpec {
     has title: str = "",
         width: int = 46,
         hint: str = "",
         max_rows: int = 8;
 }
-
 
 obj WindowState {
     has spec: WindowSpec,
@@ -44,7 +42,6 @@ obj WindowState {
         refresh: any = None;
 }
 
-
 def _wpad(text: str, width: int) -> str {
     w = display_width(text);
     if w >= width {
@@ -52,7 +49,6 @@ def _wpad(text: str, width: int) -> str {
     }
     return text + (" " * (width - w));
 }
-
 
 """One framed window: ╭─╮ title / body rows / hint footer / ╰─╯.
 
@@ -74,7 +70,6 @@ def window_frame(spec: WindowSpec, body: list[str]) -> list[str] {
     return lines;
 }
 
-
 """Sliding viewport over rows for a cursor position.
 
 selected < 0 (or a short list) shows every row verbatim. Otherwise the
@@ -82,9 +77,7 @@ cursor row is kept visible: the window scrolls only when the cursor leaves
 the viewport (selection-stable, like the existing pickers), '… N more'
 markers mark truncated tails, and the cursor gets a '> ' mark. Returns
 (display rows, scroll offset)."""
-def window_view(
-    rows: list[str], selected: int, max_rows: int
-) -> tuple[list[str], int] {
+def window_view(rows: list[str], selected: int, max_rows: int) -> tuple[list[str], int] {
     count = len(rows);
     if count == 0 {
         return ([], 0);
@@ -131,14 +124,11 @@ def window_view(
     return (out2, offset);
 }
 
-
 """Render a WindowState: viewport + frame in one call."""
 def window_lines(state: WindowState) -> list[str] {
     body: list[str] = [];
     if state.selected >= 0 {
-        pair: tuple[list[str], int] = window_view(
-            state.rows, state.selected, state.spec.max_rows
-        );
+        pair: tuple[list[str], int] = window_view(state.rows, state.selected, state.spec.max_rows);
         body = pair[0];
     } else {
         body = list(state.rows);

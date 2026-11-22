@@ -240,7 +240,7 @@ def shell_resize(
 # Permanent layout configuration (LAYOUT-ENGINE-PLAN §4 invariant 9).
 # ----------------------------------------------------------------------
 
-def _fill() -> AxisSize {
+def _fill -> AxisSize {
     return AxisSize(mode=SizeMode.FILL);
 }
 

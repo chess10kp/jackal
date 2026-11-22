@@ -18,7 +18,7 @@ import shutil;
 import time;
 
 
-def _make_tmp() -> str {
+def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-sessions-test-");
 }
 

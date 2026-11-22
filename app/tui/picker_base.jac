@@ -2,6 +2,7 @@
 import from tui.state { LiveShell }
 import from tui.window { WindowSpec, WindowState }
 import from tui.windows { _open_window, _close_top_window, _picker_state, _ui_modal_state }
+
 """Open a generic list-picker in the prompt-anchored drop-up (one at a time).
 Rows are display labels; ids map 1:1 onto action payloads. When
 extra_last_input is set, a trailing "type name…" row flips the picker into
@@ -37,11 +38,7 @@ def _open_picker(
         "toggled": [],
         "filter": "",
     };
-    win = WindowState(
-        spec=WindowSpec(title="? " + title, width=46),
-        kind="picker",
-        payload=state,
-    );
+    win = WindowState(spec=WindowSpec(title="? " + title, width=46), kind="picker", payload=state);
     if not _open_window(app, win) {
         return False;
     }
@@ -50,7 +47,6 @@ def _open_picker(
     return True;
 }
 
-
 """Dismiss the picker and restore the pre-open status hint."""
 def _close_picker(app: LiveShell) {
     if _picker_state(app) is None {
@@ -58,6 +54,7 @@ def _close_picker(app: LiveShell) {
     }
     _close_top_window(app);
 }
+
 """Picker rows narrowed by type-to-filter text.
 
 Case-insensitive substring match over option labels; empty filter returns
@@ -80,7 +77,6 @@ def _picker_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
     }
     return (vis_options, vis_ids);
 }
-
 
 def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
     return _picker_filtered(p);

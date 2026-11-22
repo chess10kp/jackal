@@ -1,23 +1,14 @@
 """Slash-command routing through builtins and extension commands."""
 
 import from agent.session { plugins, session_boot, session_dispose }
-import from agent.plugin_bridge {
-    PluginBridge,
-    create_bridge,
-    dispose_bridge,
-}
-import from agent.fake_host {
-    ensure_host,
-    register_fake_command,
-}
-
+import from agent.plugin_bridge { PluginBridge, create_bridge, dispose_bridge }
+import from agent.fake_host { ensure_host, register_fake_command }
 
 def _upper(args: str, ctx: any) -> str {
     out = str(args).strip().upper();
     ctx["ui"].notify("UPPER:" + out);
     return out;
 }
-
 
 def _with_fake_bridge -> PluginBridge {
     b = create_bridge("main-cmd-test");
@@ -27,7 +18,6 @@ def _with_fake_bridge -> PluginBridge {
     return b;
 }
 
-
 test "handle_command builtins" {
     assert handle_command("/clear") == "history cleared";
     assert handle_command("/model ") == "usage: /model NAME";
@@ -36,7 +26,6 @@ test "handle_command builtins" {
     # No turn in flight -> abort is a no-op with a clear reply.
     assert handle_command("/abort") == "no active turn";
 }
-
 
 test "handle_command routes slash args into extension commands" {
     b = _with_fake_bridge();
@@ -65,7 +54,6 @@ test "handle_command routes slash args into extension commands" {
     }
 }
 
-
 test "session_boot dispose round trip (no extensions)" {
     import os;
     import tempfile;
@@ -89,7 +77,6 @@ test "session_boot dispose round trip (no extensions)" {
     assert plugins.reg is None;
 }
 
-
 test "handle_command sessions resume export round-trip" {
     import os;
     import tempfile;
@@ -106,8 +93,7 @@ test "handle_command sessions resume export round-trip" {
             {"role": "user", "content": "hello"},
             {"role": "assistant", "content": "hi there"},
         ];
-        meta = save_session(tmp, hist, name="round trip",
-                            model="test/model-x");
+        meta = save_session(tmp, hist, name="round trip", model="test/model-x");
         sid = str(meta["id"]);
 
         listing = handle_command("/sessions");
@@ -153,7 +139,6 @@ test "handle_command sessions resume export round-trip" {
     }
 }
 
-
 test "headless approver follows the dev-mode policy" {
     _session.set_mode("normal");
     deny = make_approver(None);
@@ -173,14 +158,12 @@ test "headless approver follows the dev-mode policy" {
     _session.set_mode("normal");
 }
 
-
 test "mode command shows and sets the dev mode" {
     assert handle_command("/mode yolo") == "mode -> yolo";
     assert handle_command("/mode") == "mode: yolo";
     assert "invalid mode" in str(handle_command("/mode turbo"));
     handle_command("/mode normal");
 }
-
 
 test "logout and compact commands answer without a live turn" {
     assert handle_command("/logout") == "usage: /logout PROVIDER";

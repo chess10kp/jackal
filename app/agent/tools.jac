@@ -52,7 +52,7 @@ def _normalize_abs(path: str) -> str {
 
 
 """Absolute sandbox root from JACKAL_SANDBOX_ROOT, or "" when unset."""
-def _sandbox_root() -> str {
+def _sandbox_root -> str {
     raw: str = str(os.environ.get(SANDBOX_ROOT_ENV, "")).strip();
     if not raw {
         return "";
@@ -177,7 +177,7 @@ glob JAC_CHILD_ENV_DROP: list[str] = ["JAC_HANDOFF"];
 
 """Environment for a child `jac` process: the harness's coordination vars
 removed, so the child is a plain CLI invocation."""
-def _jac_child_env() -> dict[str, str] {
+def _jac_child_env -> dict[str, str] {
     env: dict[str, str] = {};
     for pair in os.environ.items() {
         env[str(pair[0])] = str(pair[1]);
@@ -393,7 +393,7 @@ def _grep_tool(args: dict[str, any]) -> str {
 """Explicit tool specs for the owned loop (replaces byllm sem-string schema
 derivation). When tools become Cordis fibers, live providers of "tools.*"
 keys build this list dynamically."""
-def tool_specs() -> list[ToolSpec] {
+def tool_specs -> list[ToolSpec] {
     return [
         make_tool_spec(
             name="read_file",
@@ -543,7 +543,7 @@ def tool_specs() -> list[ToolSpec] {
 
 
 """Fresh registry seeded with native tool_specs(). Js tools join via plugin_bridge."""
-def default_registry() -> ToolRegistry {
+def default_registry -> ToolRegistry {
     reg = create_registry();
     for spec in tool_specs() {
         register_native_spec(reg, spec);

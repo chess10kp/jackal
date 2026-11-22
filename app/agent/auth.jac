@@ -39,12 +39,5 @@ import from .auth_display {
     format_provider_label,
     format_model_label,
 }
-import from .auth_flow {
-    initial_auth_flow_state,
-    step_is_pending,
-    transition_auth_flow,
-}
-import from .auth_network {
-    oauth_refresh_credentials,
-    oauth_start_login,
-}
+import from .auth_flow { initial_auth_flow_state, step_is_pending, transition_auth_flow }
+import from .auth_network { oauth_refresh_credentials, oauth_start_login }

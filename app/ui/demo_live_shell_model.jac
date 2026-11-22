@@ -6,7 +6,6 @@ import from ui.renderer { Renderer }
 import from ui.terminal { ProcessTerminal }
 import from ui.progress_bar { ProgressBar }
 
-
 obj LiveShell {
     has session: UiSession,
         # `shell`/`normalizer` are `any`: their real types (ShellScreen in
@@ -35,7 +34,6 @@ obj LiveShell {
         rows: int = 24,
         status_hint: str = "enter · ↑↓ history · esc quit";
 }
-
 
 """Native factory seam: server modules (ui.demo_live_shell) cannot construct
 a native-pinned obj class directly. `shell`/`normalizer` are `any` because

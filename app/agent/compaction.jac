@@ -17,9 +17,7 @@ import os;
 
 import from .llm { make_transport }
 
-
 # ── Checker shims ───────────────────────────────────────────────────────
-
 
 """Checker shims: the Jac type checker cannot bind AnyStr when plain str
 values flow into os.path abspath/dirname, so route those calls through
@@ -28,16 +26,13 @@ def _path_abspath(p: str) -> str {
     return str(os.path.abspath(p));
 }
 
-
 def _path_dirname(p: str) -> str {
     return str(os.path.dirname(p));
 }
 
-
 glob CHARS_PER_TOKEN: int = 4,
      DEFAULT_CONTEXT_MAX: int = 128000,
      SUMMARY_RESERVE_TOKENS: int = 8192;
-
 
 """Defaults mirror AutoCompactConfig in src/session/auto-compact.ts."""
 glob DEFAULT_AUTO_COMPACT: dict[str, any] = {
@@ -48,14 +43,12 @@ glob DEFAULT_AUTO_COMPACT: dict[str, any] = {
     "strategy": "llm",
 };
 
-
 def estimate_tokens(text: str) -> int {
     if not text {
         return 0;
     }
     return (len(text) + CHARS_PER_TOKEN - 1) // CHARS_PER_TOKEN;
 }
-
 
 def _message_to_text(message: dict[str, any]) -> str {
     content: any = message.get("content");
@@ -85,7 +78,6 @@ def _message_to_text(message: dict[str, any]) -> str {
     return "";
 }
 
-
 def estimate_messages_tokens(messages: list[dict[str, any]]) -> int {
     total = 0;
     for msg in messages {
@@ -97,8 +89,9 @@ def estimate_messages_tokens(messages: list[dict[str, any]]) -> int {
     return total;
 }
 
-
-def compute_context_usage(messages: list[dict[str, any]], context_max_override: any = None) -> dict[str, int] {
+def compute_context_usage(
+    messages: list[dict[str, any]], context_max_override: any = None
+) -> dict[str, int] {
     used = estimate_messages_tokens(messages);
     max_tokens: int = DEFAULT_CONTEXT_MAX;
     if isinstance(context_max_override, int) and context_max_override > 0 {
@@ -107,7 +100,6 @@ def compute_context_usage(messages: list[dict[str, any]], context_max_override: 
     percent = min(100, round((used / max_tokens) * 100));
     return {"used": used, "max": max_tokens, "percent": percent};
 }
-
 
 """Walk up from cwd for a `.jackal` JSON config file (mirrors
 lib/jac/config/_project_config_toolchain.py find/load)."""
@@ -140,8 +132,9 @@ def load_project_config(cwd: str) -> dict[str, any] {
     }
 }
 
-
-def resolve_auto_compact_config(raw: dict[str, any] | None = None, compact_strategy: str = "") -> dict[str, any] {
+def resolve_auto_compact_config(
+    raw: dict[str, any] | None = None, compact_strategy: str = ""
+) -> dict[str, any] {
     cfg: any = None;
     if raw is not None {
         cfg = raw.get("autoCompact");
@@ -159,7 +152,7 @@ def resolve_auto_compact_config(raw: dict[str, any] | None = None, compact_strat
     }
     merged = dict(DEFAULT_AUTO_COMPACT);
     if isinstance(cfg, dict) {
-        merged.update(cfg);
+        merged.update(cfg as dict[str, any]);
     }
     # Top-level strategy override (`.jackal` compactStrategy key).
     if compact_strategy == "llm" or compact_strategy == "mechanical" {
@@ -167,7 +160,6 @@ def resolve_auto_compact_config(raw: dict[str, any] | None = None, compact_strat
     }
     return merged;
 }
-
 
 def should_auto_compact(usage: dict[str, int], config: dict[str, any]) -> bool {
     if not config.get("enabled", True) {
@@ -177,7 +169,6 @@ def should_auto_compact(usage: dict[str, int], config: dict[str, any]) -> bool {
     pct: any = usage.get("percent", 0);
     return float(pct) >= float(threshold);
 }
-
 
 def _extract_content_text(content: any) -> str {
     if isinstance(content, str) {
@@ -209,7 +200,6 @@ def _extract_content_text(content: any) -> str {
     return "";
 }
 
-
 def build_mechanical_summary(messages: list[dict[str, any]]) -> str {
     lines: list[str] = [
         "<context-summary>",
@@ -234,7 +224,6 @@ def build_mechanical_summary(messages: list[dict[str, any]]) -> str {
     lines.append("</context-summary>");
     return "\n".join(lines);
 }
-
 
 def build_llm_summary_prompt(messages: list[dict[str, any]]) -> str {
     previews: list[str] = [];
@@ -265,7 +254,6 @@ def build_llm_summary_prompt(messages: list[dict[str, any]]) -> str {
     return "\n".join(lines);
 }
 
-
 def wrap_compaction_summary(text: str) -> str {
     trimmed = text.strip();
     if not trimmed {
@@ -279,7 +267,6 @@ def wrap_compaction_summary(text: str) -> str {
         "(The above is an automated summary of earlier conversation. Continue from the most recent message.)",
     ]);
 }
-
 
 """Summarize dropped messages with the active model via its transport.
 

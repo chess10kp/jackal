@@ -3,16 +3,13 @@
 Companion scope provides gate runners and report types.
 """
 
-
 test "Gate 1 detached lifecycle passes" {
     assert run_gate1_detached_lifecycle() == True;
 }
 
-
 test "Gate 3 layout and damage harness passes" {
     assert run_gate3_layout_damage() == True;
 }
-
 
 test "Gate 4 invalidation bench reports required counters" {
     metrics: Gate4Report = run_gate4_invalidation_bench();
@@ -24,11 +21,9 @@ test "Gate 4 invalidation bench reports required counters" {
     }
 }
 
-
 test "Gate 5 external ProgressBar package works without framework edits" {
     assert run_gate5_external_widget() == True;
 }
-
 
 test "Gate 6 authoring scale lowers large markup without manual ranks" {
     assert run_gate6_authoring_scale() == True;

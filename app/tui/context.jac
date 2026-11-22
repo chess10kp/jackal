@@ -2,11 +2,17 @@
 import os;
 import re;
 import from tui.state {
-    LiveShell, _QUOTED_MENTION_PATTERN, _EXPLORER_SKIP_DIRS,
-    _EXPLORER_MAX_FILES, _EXPLORER_MAX_DEPTH,
+    LiveShell,
+    _QUOTED_MENTION_PATTERN,
+    _EXPLORER_SKIP_DIRS,
+    _EXPLORER_MAX_FILES,
+    _EXPLORER_MAX_DEPTH,
 }
 import from agent.context_input {
-    expand_context_input, is_valid_file_path, parse_line_range, _load_file_slice,
+    expand_context_input,
+    is_valid_file_path,
+    parse_line_range,
+    _load_file_slice,
 }
 import from agent.skills { _load_ignore_rules, _match_ignore_pattern }
 import from tui.picker_base { _open_picker }
@@ -45,8 +51,7 @@ def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
             if _match_ignore_pattern(rel_cmp, rules) {
                 continue;
             }
-        } except Exception {
-        }
+        } except Exception {}
         if is_dir {
             if name.startswith(".") or name in _EXPLORER_SKIP_DIRS {
                 continue;
@@ -66,13 +71,11 @@ def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
     }
 }
 
-
 def _explorer_file_entries(cwd: str) -> dict[str, list[str]] {
     out: list[str] = [];
     _explorer_walk(cwd, cwd, 1, out);
     return {"rows": list(out), "ids": list(out)};
 }
-
 
 """SKILLS picker rows from a load_jackal_skills() result's skill list: one
 "name — description" row per skill (model-hidden skills tagged "· hidden");
@@ -96,7 +99,6 @@ def _skills_picker_entries(skills: list[dict[str, any]]) -> dict[str, list[str]]
     }
     return {"rows": rows, "ids": ids};
 }
-
 
 """Editor-draft mention text for picked paths: deduped `@a @b ` with a
 trailing space so typing continues cleanly. Paths containing whitespace
@@ -124,7 +126,6 @@ def _format_mentions(paths: list[str]) -> str {
     return " ".join(parts) + " ";
 }
 
-
 """Extract @\"path\" / @\"path:N[-M]\" mentions (whitespace-tolerant form).
 
 Returns (remaining_text, mentions); each mention is a dict with keys
@@ -150,9 +151,7 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
         outer_end: any = m.group(3);
         if outer_start {
             # Range AFTER the closing quote: @"path":10-20.
-            outer_range: str = str(outer_start) + (
-                "-" + str(outer_end) if outer_end else ""
-            );
+            outer_range: str = str(outer_start) + ("-" + str(outer_end) if outer_end else "");
             parsed_outer: dict[str, any] | None = parse_line_range(outer_range);
             if parsed_outer is not None {
                 rng = parsed_outer;
@@ -194,7 +193,6 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
     parts.append(text[last:]);
     return ("".join(parts), mentions);
 }
-
 
 """Expand user text INCLUDING the quoted-mention form.
 
@@ -239,7 +237,6 @@ def _expand_quoted_context(cwd: str, text: str) -> str {
     return head + "Attached context:\n" + "\n".join(blocks);
 }
 
-
 """Append text to the prompt draft (picker/skill insertion point moves to
 the end; manual edits drop history-browse mode as editor_insert does)."""
 def _insert_into_draft(app: LiveShell, addition: str) {
@@ -252,7 +249,6 @@ def _insert_into_draft(app: LiveShell, addition: str) {
     app.shell.prompt.history_index = -1;
     app.dirty = True;
 }
-
 
 """Open the EXPLORER multi-select overlay over the project tree."""
 def _open_explorer_picker(app: LiveShell) -> str {

@@ -1,6 +1,5 @@
 """EmulatedTerminal (pyte-backed) fidelity tests (merged with emulated_terminal.jac)."""
 
-
 test "cursor addressing, erase, and trailing trim" {
     t = EmulatedTerminal(20, 4);
     t.write("hello world");
@@ -10,7 +9,6 @@ test "cursor addressing, erase, and trailing trim" {
     assert t.viewport()[2] == "    xy";
     assert t.cursor() == (6, 2);
 }
-
 
 test "wrapping and scrollback" {
     t = EmulatedTerminal(10, 3, 100);
@@ -26,7 +24,6 @@ test "wrapping and scrollback" {
     assert t.viewport()[1] == "KL";
 }
 
-
 test "styles are readable per cell" {
     t = EmulatedTerminal(20, 2);
     t.write("\x1b[1;31mR\x1b[0m\x1b[7mV\x1b[0mn");
@@ -36,14 +33,12 @@ test "styles are readable per cell" {
     assert not t.cell(0, 2)["bold"];
 }
 
-
 test "wide characters take two cells" {
     t = EmulatedTerminal(10, 2);
     t.write("界x");
     assert t.cursor() == (3, 0);
     assert t.viewport()[0].startswith("界");
 }
-
 
 test "mode flags track start and stop" {
     t = EmulatedTerminal(20, 4);
@@ -55,7 +50,6 @@ test "mode flags track start and stop" {
     assert not t.alternate_screen and not t.bracketed_paste and t.cursor_visible;
     assert t.restored;
 }
-
 
 test "input queue, keys, paste, resize" {
     t = EmulatedTerminal(20, 4);

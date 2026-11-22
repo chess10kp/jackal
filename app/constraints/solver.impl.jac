@@ -34,10 +34,7 @@ def _journal_kind_of(s: Solver, symbol: int) -> SymbolKind {
 }
 
 def _journal_begin(s: Solver) -> MutationJournal {
-    return MutationJournal(
-        id_tick_start=s.id_tick,
-        infeasible_start=len(s.infeasible_rows),
-    );
+    return MutationJournal(id_tick_start=s.id_tick, infeasible_start=len(s.infeasible_rows));
 }
 
 def _journal_witness_for_key(s: Solver, key: str) -> list[str] {
@@ -85,10 +82,7 @@ def _journal_get_var_symbol(s: Solver, v: Variable, jnl: MutationJournal | None 
 }
 
 def _journal_insert_row(s: Solver, symbol: int, row: Row, jnl: MutationJournal) -> None {
-    if (
-        symbol not in jnl.inserted_rows
-        and symbol not in jnl.row_snapshots
-    ) {
+    if (symbol not in jnl.inserted_rows and symbol not in jnl.row_snapshots) {
         jnl.inserted_rows.append(symbol);
     }
     s.rows[symbol] = row;
@@ -96,11 +90,7 @@ def _journal_insert_row(s: Solver, symbol: int, row: Row, jnl: MutationJournal) 
 
 def _journal_touch_row(s: Solver, symbol: int, jnl: MutationJournal) -> None {
     rows: dict[int, Row] = s.rows;
-    if (
-        symbol in rows
-        and symbol not in jnl.row_snapshots
-        and symbol not in jnl.inserted_rows
-    ) {
+    if (symbol in rows and symbol not in jnl.row_snapshots and symbol not in jnl.inserted_rows) {
         jnl.row_snapshots[symbol] = rows[symbol].clone();
     }
 }
@@ -157,15 +147,10 @@ def _solver_add_core(s: Solver, c: Constraint, tag: Tag, jnl: MutationJournal) -
     # No valid entering subject: an all-dummy row is redundant when its
     # constant is zero (the dummy marker may enter the basis) and
     # unsatisfiable otherwise (kiwi addConstraint).
-    if (
-        _journal_kind_of(s, subject) == SymbolKind.INVALID
-        and _solver_all_dummies(s, row)
-    ) {
+    if (_journal_kind_of(s, subject) == SymbolKind.INVALID and _solver_all_dummies(s, row)) {
         if not near_zero(row.constant) {
             return SolveResult(
-                ok=False,
-                error=SolveError.UNSATISFIABLE,
-                message="required system inconsistent",
+                ok=False, error=SolveError.UNSATISFIABLE, message="required system inconsistent"
             );
         }
         subject = tag.marker;
@@ -323,11 +308,8 @@ def _solver_add_with_artificial_variable(s: Solver, row: Row, jnl: MutationJourn
     return success;
 }
 
-def _solver_substitute(s: Solver,
-    symbol: int,
-    row: Row,
-    jnl: MutationJournal,
-    extra: Row | None = None,
+def _solver_substitute(
+    s: Solver, symbol: int, row: Row, jnl: MutationJournal, extra: Row | None = None
 ) -> None {
     for row_symbol in sorted(s.rows.keys()) {
         _journal_touch_row(s, row_symbol, jnl);
@@ -356,11 +338,7 @@ def _solver_substitute(s: Solver,
     }
 }
 
-def _solver_add_objective(s: Solver, 
-    symbol: int,
-    weight: LexWeight,
-    jnl: MutationJournal,
-) -> None {
+def _solver_add_objective(s: Solver, symbol: int, weight: LexWeight, jnl: MutationJournal) -> None {
     if lex_is_zero(weight) {
         return;
     }
@@ -373,12 +351,14 @@ def _solver_add_objective(s: Solver,
 
 def _solver_rebuild_admitting(s: Solver, candidate: Constraint) -> Solver | None {
     stored: list[StoredConstraint] = list(s.history);
-    stored.append(StoredConstraint(
-        expression=candidate.expression,
-        relation=candidate.relation,
-        strength=candidate.strength,
-        content_key=constraint_key(candidate),
-    ));
+    stored.append(
+        StoredConstraint(
+            expression=candidate.expression,
+            relation=candidate.relation,
+            strength=candidate.strength,
+            content_key=constraint_key(candidate),
+        ),
+    );
 
     orders: list[list[StoredConstraint]] = [
         stored,
@@ -399,10 +379,7 @@ def _solver_rebuild_admitting(s: Solver, candidate: Constraint) -> Solver | None
 def _solver_terms_reversed(s: Solver, st: StoredConstraint) -> StoredConstraint {
     terms_rev = [];
     for t in st.expression.terms {
-        terms_rev.append(Term(
-            variable=Variable(id=t.variable.id),
-            coefficient=t.coefficient,
-        ));
+        terms_rev.append(Term(variable=Variable(id=t.variable.id), coefficient=t.coefficient));
     }
     return StoredConstraint(
         expression=Expression(terms=terms_rev, constant=st.expression.constant),
@@ -419,11 +396,7 @@ def _solver_replay_all(s: Solver, order: list[StoredConstraint]) -> Solver | Non
     scratch = _new_solver();
     tags: dict[str, Tag] = {};
     for st in order {
-        c = Constraint(
-            expression=st.expression,
-            relation=st.relation,
-            strength=st.strength,
-        );
+        c = Constraint(expression=st.expression, relation=st.relation, strength=st.strength);
         jnl = _journal_begin(scratch);
         tag = Tag();
         res = _solver_add_core(scratch, c, tag, jnl);
@@ -440,7 +413,8 @@ def _solver_replay_all(s: Solver, order: list[StoredConstraint]) -> Solver | Non
     return scratch;
 }
 
-def _solver_pivot(s: Solver, 
+def _solver_pivot(
+    s: Solver,
     entering: int,
     leaving: int,
     jnl: MutationJournal,
@@ -473,10 +447,8 @@ def _solver_optimize_cost(s: Solver, jnl: MutationJournal) -> SolveResult {
     }
 }
 
-def _solver_optimize_toward(s: Solver, 
-    target: Row,
-    jnl: MutationJournal,
-    extra: Row | None = None,
+def _solver_optimize_toward(
+    s: Solver, target: Row, jnl: MutationJournal, extra: Row | None = None
 ) -> SolveResult {
     while True {
         entering = _solver_get_entering_symbol(s, target);
@@ -486,9 +458,7 @@ def _solver_optimize_toward(s: Solver,
         leaving = _solver_get_leaving_row(s, entering);
         if leaving == 0 {
             return SolveResult(
-                ok=False,
-                error=SolveError.INTERNAL_INVARIANT,
-                message="objective unbounded",
+                ok=False, error=SolveError.INTERNAL_INVARIANT, message="objective unbounded"
             );
         }
         _solver_pivot(s, entering, leaving, jnl, extra);
@@ -497,10 +467,7 @@ def _solver_optimize_toward(s: Solver,
 
 def _solver_get_entering_symbol(s: Solver, objective: Row) -> int {
     for symbol in sorted(objective.cells.keys()) {
-        if (
-            _journal_kind_of(s, symbol) != SymbolKind.DUMMY
-            and objective.cells[symbol] < 0.0
-        ) {
+        if (_journal_kind_of(s, symbol) != SymbolKind.DUMMY and objective.cells[symbol] < 0.0) {
             return symbol;
         }
     }
@@ -542,7 +509,9 @@ def _solver_get_leaving_row(s: Solver, entering: int) -> int {
 # Constraint removal and dual simplex algorithm.
 # ---------------------------------------------------------------------------
 
-def _solver_remove_core(s: Solver, tag: Tag, strength: StrengthTier, jnl: MutationJournal) -> SolveResult {
+def _solver_remove_core(
+    s: Solver, tag: Tag, strength: StrengthTier, jnl: MutationJournal
+) -> SolveResult {
     # Remove the error effects from the objective BEFORE pivoting, or
     # substitutions into the objective would double-count them.
     _solver_remove_constraint_effects(s, tag, strength, jnl);
@@ -555,9 +524,7 @@ def _solver_remove_core(s: Solver, tag: Tag, strength: StrengthTier, jnl: Mutati
         leaving = _solver_get_marker_leaving_row(s, marker);
         if leaving == 0 {
             return SolveResult(
-                ok=False,
-                error=SolveError.INTERNAL_INVARIANT,
-                message="failed to find leaving row",
+                ok=False, error=SolveError.INTERNAL_INVARIANT, message="failed to find leaving row"
             );
         }
         _solver_pivot(s, marker, leaving, jnl, reinsert=False);
@@ -566,10 +533,8 @@ def _solver_remove_core(s: Solver, tag: Tag, strength: StrengthTier, jnl: Mutati
     return _solver_optimize_cost(s, jnl);
 }
 
-def _solver_remove_constraint_effects(s: Solver, 
-    tag: Tag,
-    strength: StrengthTier,
-    jnl: MutationJournal,
+def _solver_remove_constraint_effects(
+    s: Solver, tag: Tag, strength: StrengthTier, jnl: MutationJournal
 ) -> None {
     weight = strength_weight(strength);
     if lex_is_zero(weight) {
@@ -583,10 +548,8 @@ def _solver_remove_constraint_effects(s: Solver,
     }
 }
 
-def _solver_remove_marker_effects(s: Solver, 
-    marker: int,
-    weight: LexWeight,
-    jnl: MutationJournal,
+def _solver_remove_marker_effects(
+    s: Solver, marker: int, weight: LexWeight, jnl: MutationJournal
 ) -> None {
     _journal_touch_objective(s, jnl);
     row = s.rows.get(marker);
@@ -637,19 +600,13 @@ def _solver_dual_optimize(s: Solver, jnl: MutationJournal) -> SolveResult {
     while len(s.infeasible_rows) > 0 {
         leaving = s.infeasible_rows.pop();
         row = s.rows.get(leaving);
-        if (
-            row is None
-            or near_zero(row.constant)
-            or row.constant >= 0.0
-        ) {
+        if (row is None or near_zero(row.constant) or row.constant >= 0.0) {
             continue;
         }
         entering = _solver_get_dual_entering_symbol(s, row);
         if entering == 0 {
             return SolveResult(
-                ok=False,
-                error=SolveError.INTERNAL_INVARIANT,
-                message="dual optimize failed",
+                ok=False, error=SolveError.INTERNAL_INVARIANT, message="dual optimize failed"
             );
         }
         _solver_pivot(s, entering, leaving, jnl);
@@ -665,12 +622,15 @@ def _solver_get_dual_entering_symbol(s: Solver, row: Row) -> int {
         if cell <= 0.0 or _journal_kind_of(s, symbol) == SymbolKind.DUMMY {
             continue;
         }
-        if entering == 0 or _solver_dual_ratio_less(s, 
-            _solver_objective_weight(s, symbol),
-            cell,
-            _solver_objective_weight(s, entering),
-            best_coeff,
-        ) {
+        if entering == 0
+            or _solver_dual_ratio_less(
+                s,
+                _solver_objective_weight(s, symbol),
+                cell,
+                _solver_objective_weight(s, entering),
+                best_coeff,
+            )
+        {
             entering = symbol;
             best_coeff = cell;
         }
@@ -682,19 +642,12 @@ def _solver_objective_weight(s: Solver, symbol: int) -> LexWeight {
     return s.objective.cells.get(symbol, lex_zero());
 }
 
-def _solver_dual_ratio_less(s: Solver, 
-    w1: LexWeight,
-    c1: float,
-    w2: LexWeight,
-    c2: float,
-) -> bool {
+def _solver_dual_ratio_less(s: Solver, w1: LexWeight, c1: float, w2: LexWeight, c2: float) -> bool {
     return lex_compare(lex_scale(w1, c2), lex_scale(w2, c1)) < 0;
 }
 
-def _solver_apply_suggestion(s: Solver, 
-    info: EditInfo,
-    delta: float,
-    jnl: MutationJournal,
+def _solver_apply_suggestion(
+    s: Solver, info: EditInfo, delta: float, jnl: MutationJournal
 ) -> None {
     marker = s.cns[info.key].marker;
     other = s.cns[info.key].other;

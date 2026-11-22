@@ -25,8 +25,8 @@ def resolve_host_mjs(explicit: str = "") -> str {
         os.path.join(cwd, "plugin_host", "host.mjs"),
         os.path.join(cwd, "app", "plugin_host", "host.mjs"),
     ];
-    here = _path_dirname(_path_abspath(str(__file__)));
-    candidates.append(os.path.join(here, "..", "plugin_host", "host.mjs"));
+    mod_dir = _path_dirname(_path_abspath(str(__file__)));
+    candidates.append(os.path.join(mod_dir, "..", "plugin_host", "host.mjs"));
     for c in candidates {
         if os.path.isfile(c) {
             return _path_abspath(c);

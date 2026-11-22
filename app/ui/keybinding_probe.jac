@@ -12,17 +12,8 @@ filtering, shortcut invocation, result/notification plumbing. Only
 replicated (not exercised): the branch ordering inside tui._handle_key.
 """
 
-import from agent.session {
-    plugins,
-    list_extension_shortcuts,
-    run_extension_shortcut,
-}
-import from agent.plugin_bridge {
-    create_bridge,
-    register_fake_shortcut,
-    dispose_bridge,
-}
-
+import from agent.session { plugins, list_extension_shortcuts, run_extension_shortcut }
+import from agent.plugin_bridge { create_bridge, register_fake_shortcut, dispose_bridge }
 
 """Minimal LiveShell-shaped target. Only attributes read by the replicated
 branches are present."""
@@ -35,7 +26,6 @@ obj KeyProbeShell {
         approval: any = None,
         tool_replies: list[str] = [];
 }
-
 
 """Replica of the tui._handle_key precedence guard, trimmed to the branches
 under test (extension-UI modal shares the overlay-node shape; heavier
@@ -83,7 +73,6 @@ def probe_handle_key(app: KeyProbeShell, key: str) {
     }
 }
 
-
 """Build a probe shell wired to a fake plugin host bridge with shortcuts
 registered for each (key, handler_result) pair. Returns (app, bridge, fired)
 where `fired` records invoked keys. Caller MUST reset plugins.bridge and
@@ -103,15 +92,11 @@ def make_key_probe(bindings: list[tuple[str, str]]) -> tuple[KeyProbeShell, any,
     for binding in bindings {
         key: str = binding[0];
         result: str = binding[1];
-        register_fake_shortcut(
-            bridge, key, _make_handler(result),
-            description="Probe " + key,
-        );
+        register_fake_shortcut(bridge, key, _make_handler(result), description="Probe " + key);
     }
     plugins.bridge = bridge;
     return (KeyProbeShell(), bridge, fired);
 }
-
 
 """Teardown helper shared by the tests."""
 def drop_key_probe(bridge: any) {

@@ -46,13 +46,10 @@ no UI types, no solver, no measurement.
 # which cannot cross the boundary. Keep in sync if algebra's constant moves.
 glob EPSILON: float = 1e-8;
 
-
-
 # Bounds sentinels for PartitionRequest.minimums/maximums (full-length
 # parallel lists; entries at the sentinels mean "unbounded" on that side).
 glob _NO_MIN: float = -1e308;
 glob _NO_MAX: float = 1e308;
-
 
 """Largest-remainder request for one flow partition along one axis."""
 obj PartitionRequest {
@@ -68,7 +65,6 @@ obj PartitionRequest {
         maximums: list[float] = [];
 }
 
-
 """Quantization outcome. On ok=False sizes is empty and `index` names
 the offending child when one exists (-1 for structural failures like
 span exhaustion)."""
@@ -79,7 +75,6 @@ obj QuantizeResult {
         index: int = -1;
 }
 
-
 def _floor(value: float) -> int {
     t = int(value);
     if value >= 0.0 or float(t) == value {
@@ -88,13 +83,11 @@ def _floor(value: float) -> int {
     return t - 1;
 }
 
-
 def _ceil(value: float) -> int {
     neg = -value;
     f = _floor(neg);
     return -f;
 }
-
 
 """§7.2 edge snap: EPSILON-close integers win; otherwise nearest
 integer with exact halves toward the smaller coordinate."""
@@ -113,7 +106,6 @@ def snap_edge(value: float) -> int {
     return fl;  # Exact halves land here: toward the smaller coordinate.
 }
 
-
 """Snap a group of REQUIRED-equal edge expressions once.
 
 All members receive the representative's snapped value; members are
@@ -129,11 +121,9 @@ def snap_edge_group(values: list[float]) -> list[int] {
     return out;
 }
 
-
 def _quant_fail(message: str, index: int) -> QuantizeResult {
     return QuantizeResult(ok=False, message=message, index=index);
 }
-
 
 def _bounds_ok_shape(req: PartitionRequest) -> bool {
     n = len(req.targets);
@@ -148,7 +138,6 @@ def _bounds_ok_shape(req: PartitionRequest) -> bool {
     }
     return True;
 }
-
 
 """§7.2 largest-remainder quantization of one sibling partition.
 
@@ -217,9 +206,7 @@ def quantize_partition(req: PartitionRequest) -> QuantizeResult {
             }
         }
         if recoverable {
-            return _quant_fail(
-                "fixed integer claims exceed parent span", -1
-            );
+            return _quant_fail("fixed integer claims exceed parent span", -1);
         }
         return _quant_fail(
             "flexible floors exceed remaining span under largest-remainder policy", -1
@@ -260,7 +247,6 @@ def quantize_partition(req: PartitionRequest) -> QuantizeResult {
     return res;
 }
 
-
 """Integer-validity pass: ceil(min)/floor(max) emptiness rejection plus
 a bounded number of clamp-and-redistribute repairs to restore exact
 partition closure after a bound clamp moves cells.
@@ -273,10 +259,7 @@ beats every other policy (same rule as cross-axis STRETCH losing to
 FIXED), so their requests never enter imin/imax. Do not add them there
 without revisiting that decision."""
 def _apply_bounds(
-    req: PartitionRequest,
-    sizes: list[int],
-    flexible: list[int],
-    remainders: list[float],
+    req: PartitionRequest, sizes: list[int], flexible: list[int], remainders: list[float]
 ) -> QuantizeResult {
     if len(req.minimums) == 0 and len(req.maximums) == 0 {
         if sum(sizes) != req.span {
@@ -304,9 +287,7 @@ def _apply_bounds(
         lo = _ceil(mn);
         hi = _floor(mx);
         if lo > hi {
-            return _quant_fail(
-                "bound interval contains no integer cell size", i
-            );
+            return _quant_fail("bound interval contains no integer cell size", i);
         }
         imin.append(lo);
         imax.append(hi);
@@ -374,9 +355,7 @@ def _apply_bounds(
                 }
             }
             if best == -1 {
-                return _quant_fail(
-                    "bound repair could not restore closure", -1
-                );
+                return _quant_fail("bound repair could not restore closure", -1);
             }
             if delta > 0 {
                 sizes[best] += 1;

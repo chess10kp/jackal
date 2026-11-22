@@ -10,7 +10,6 @@
 # runtime to perform this step, then persist returned credentials via
 # credential_set/save_auth_file".
 
-
 """SEAM: exchange an OAuth refresh token for fresh credentials.
 
 Would POST the refresh grant to the provider's token endpoint. Returns
@@ -22,14 +21,11 @@ def oauth_refresh_credentials(provider_id: str, credentials: dict[str, any]) -> 
         "ok": False,
         "error": "network_not_supported",
         "provider": provider_id,
-        "detail": (
-            "OAuth token refresh needs HTTP against the provider token "
+        "detail": ("OAuth token refresh needs HTTP against the provider token "
             "endpoint; the runtime loop must perform it and persist the "
-            "resulting credential."
-        ),
+            "resulting credential."),
     };
 }
-
 
 """SEAM: start an interactive OAuth login for a provider.
 
@@ -42,10 +38,8 @@ def oauth_start_login(provider_id: str) -> dict[str, any] {
         "ok": False,
         "error": "network_not_supported",
         "provider": provider_id,
-        "detail": (
-            "Interactive OAuth login needs a browser + callback server; "
+        "detail": ("Interactive OAuth login needs a browser + callback server; "
             "the runtime loop must drive it and persist the resulting "
-            "credential."
-        ),
+            "credential."),
     };
 }

@@ -76,7 +76,7 @@ obj McpClient {
         return mcp_call_tool(self, name, arguments, timeout_s);
     }
 
-    def stop() -> dict[str, any] {
+    def stop -> dict[str, any] {
         return mcp_stop(self);
     }
 }
@@ -403,7 +403,7 @@ def _request(client: McpClient, method: str, params: dict[str, any], timeout_s: 
                 "error": {"code": -32000, "message": "http server accepted without a response"},
             };
         }
-        return got_h as dict;
+        return got_h as dict[str, any];
     }
     _ensure_io(client);
     rid = client.next_id;
@@ -432,7 +432,7 @@ def _request(client: McpClient, method: str, params: dict[str, any], timeout_s: 
         if waiter.get("msg") is not None {
             client.pending.pop(key, None);
             got: any = waiter["msg"];
-            return got as dict;
+            return got as dict[str, any];
         }
         if waiter.get("eof") {
             # Reader hit EOF: the server is gone — fail fast, honestly.

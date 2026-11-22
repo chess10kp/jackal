@@ -28,16 +28,13 @@ import from ui.model {
     ordered_children,
 }
 
-
 glob RANK_GAP: int = 1024;
 glob MIN_RANK: int = 0;
-
 
 obj MutationResult {
     has graph_revision: int,
         layout_root_id: str = "";
 }
-
 
 def _next_rank_after(parent: UiContainer, sibling: UiNode | None) -> int {
     children = ordered_children(parent);
@@ -75,7 +72,6 @@ def _next_rank_after(parent: UiContainer, sibling: UiNode | None) -> int {
     return _next_rank_after(parent, sibling);
 }
 
-
 def _normalize_child_ranks(parent: UiContainer) {
     children = ordered_children(parent);
     rank = RANK_GAP;
@@ -86,7 +82,6 @@ def _normalize_child_ranks(parent: UiContainer) {
         rank += RANK_GAP;
     }
 }
-
 
 def _validate_mount(parent: UiContainer, child: UiNode) {
     existing = child_parent(child);
@@ -105,7 +100,6 @@ def _validate_mount(parent: UiContainer, child: UiNode) {
     }
 }
 
-
 def _connect_child(parent: UiContainer, child: UiNode, rank: int) -> MutationResult {
     _validate_mount(parent, child);
     if rank < MIN_RANK {
@@ -118,24 +112,15 @@ def _connect_child(parent: UiContainer, child: UiNode, rank: int) -> MutationRes
         }
     }
     parent +>:Child(rank=rank):+> child;
-    return MutationResult(
-        graph_revision=1,
-        layout_root_id=jid(parent),
-    );
+    return MutationResult(graph_revision=1, layout_root_id=jid(parent));
 }
-
 
 def append_child(parent: UiContainer, child: UiNode) -> MutationResult {
     rank = _next_rank_after(parent, None);
     return _connect_child(parent, child, rank);
 }
 
-
-def insert_before(
-    parent: UiContainer,
-    child: UiNode,
-    sibling: UiNode,
-) -> MutationResult {
+def insert_before(parent: UiContainer, child: UiNode, sibling: UiNode) -> MutationResult {
     if sibling not in ordered_children(parent) {
         raise ValueError("insert_before sibling is not a child of parent");
     }
@@ -143,12 +128,7 @@ def insert_before(
     return _connect_child(parent, child, rank);
 }
 
-
-def insert_after(
-    parent: UiContainer,
-    child: UiNode,
-    sibling: UiNode,
-) -> MutationResult {
+def insert_after(parent: UiContainer, child: UiNode, sibling: UiNode) -> MutationResult {
     children = ordered_children(parent);
     if sibling not in children {
         raise ValueError("insert_after sibling is not a child of parent");
@@ -159,7 +139,6 @@ def insert_after(
     }
     return append_child(parent, child);
 }
-
 
 def move_before(child: UiNode, sibling: UiNode) -> MutationResult {
     parent = child_parent(child);
@@ -178,7 +157,6 @@ def move_before(child: UiNode, sibling: UiNode) -> MutationResult {
     rank = _next_rank_after(parent, sibling);
     return _connect_child(parent, child, rank);
 }
-
 
 def move_after(child: UiNode, sibling: UiNode) -> MutationResult {
     parent = child_parent(child);
@@ -199,7 +177,6 @@ def move_after(child: UiNode, sibling: UiNode) -> MutationResult {
     return append_child(parent, child);
 }
 
-
 def detach(child: UiNode) -> MutationResult {
     parent = child_parent(child);
     if parent is None {
@@ -210,7 +187,6 @@ def detach(child: UiNode) -> MutationResult {
     }
     return MutationResult(graph_revision=1, layout_root_id=jid(parent));
 }
-
 
 def replace(old: UiNode, new: UiNode) -> MutationResult {
     parent = child_parent(old);
@@ -234,9 +210,9 @@ def replace(old: UiNode, new: UiNode) -> MutationResult {
     return append_child(parent, new);
 }
 
-
 """Remove one detached subtree's typed UI edges without deleting nodes."""
 def clear_ui_edges(n: UiNode) {
+    e: any;
     if isinstance(n, UiContainer) {
         for child in list([n ->:Child:->]) {
             clear_ui_edges(child);
@@ -291,7 +267,6 @@ def clear_ui_edges(n: UiNode) {
         }
     }
 }
-
 
 """Post-order teardown: clear edges for subtree then delete nodes."""
 def dispose_subtree(n: UiNode) {

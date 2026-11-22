@@ -13,7 +13,6 @@ the queue. Writes and shell commands still require confirmation in normal
 mode.
 """
 
-
 test "read-only tool is auto-approved and never enqueued outside normal mode" {
     for mode in ["auto-accept", "yolo", "plan", "ask"] {
         q = create_queue();
@@ -24,9 +23,17 @@ test "read-only tool is auto-approved and never enqueued outside normal mode" {
     }
 }
 
-
 test "read-only tools are auto-approved in normal mode too" {
-    for tool in ["read_file", "list_dir", "glob", "grep", "web_search", "web_fetch", "list_tasks", "jac_check"] {
+    for tool in [
+        "read_file",
+        "list_dir",
+        "glob",
+        "grep",
+        "web_search",
+        "web_fetch",
+        "list_tasks",
+        "jac_check",
+    ] {
         q = create_queue();
         res = request_approval(q, tool, "", "normal", 1000.0);
         assert res["decision"] == "auto";
@@ -34,7 +41,6 @@ test "read-only tools are auto-approved in normal mode too" {
         assert len(q.items) == 0;
     }
 }
-
 
 test "write and shell tools in normal mode still require confirmation" {
     q = create_queue();
@@ -46,7 +52,6 @@ test "write and shell tools in normal mode still require confirmation" {
     assert len(q.items) == 1;
 }
 
-
 test "destructive command in plan mode is blocked without enqueueing" {
     q = create_queue();
     res = request_approval(q, "run_command", "rm -rf /", "plan", 1000.0);
@@ -57,7 +62,6 @@ test "destructive command in plan mode is blocked without enqueueing" {
     assert res2["decision"] == "blocked";
     assert len(q.items) == 0;
 }
-
 
 test "destructive command in normal mode pends then resolves approved" {
     q = create_queue();
@@ -76,7 +80,6 @@ test "destructive command in normal mode pends then resolves approved" {
     assert len(q.items) == 0;
 }
 
-
 test "deny path returns approved=False and drops the request" {
     q = create_queue();
     res = request_approval(q, "write_file", "/tmp/x.txt", "normal", 1000.0);
@@ -86,7 +89,6 @@ test "deny path returns approved=False and drops the request" {
     assert out["id"] == res["id"];
     assert len(q.items) == 0;
 }
-
 
 test "resolving an unknown or already-resolved id errors cleanly" {
     q = create_queue();
@@ -100,7 +102,6 @@ test "resolving an unknown or already-resolved id errors cleanly" {
     assert "error" in again;
     assert again["error"] == "unknown_approval_id";
 }
-
 
 test "multiple pending requests come out FIFO by id order" {
     q = create_queue();
@@ -127,7 +128,6 @@ test "multiple pending requests come out FIFO by id order" {
     assert pending(q) is None;
 }
 
-
 test "cancel_all drains the queue exactly once" {
     q = create_queue();
     request_approval(q, "write_file", "", "normal", 1000.0);
@@ -141,7 +141,6 @@ test "cancel_all drains the queue exactly once" {
     assert res["decision"] == "pending";
     assert resolve(q, res["id"], True)["approved"] is True;
 }
-
 
 test "expire_older_than drops only entries past the age window" {
     q = create_queue();

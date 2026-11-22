@@ -20,6 +20,7 @@ import ipaddress;
 import urllib.parse;
 import urllib.request;
 import urllib.error;
+import from urllib.request { Request }
 import from .tool_spec { MAX_TOOL_RESULT }
 
 glob WEB_TIMEOUT_SECS: int = 15,
@@ -54,7 +55,7 @@ glob WEB_TIMEOUT_SECS: int = 15,
 """True when the SSRF guard is explicitly relaxed (offline test servers).
 Never set this in a normal session: it exists so the harness can bind a
 loopback HTTP server and fetch from it."""
-def private_hosts_allowed() -> bool {
+def private_hosts_allowed -> bool {
     raw: str = str(os.environ.get(ALLOW_PRIVATE_ENV, "")).strip().lower();
     return raw in ("1", "on", "true", "yes");
 }
@@ -187,7 +188,14 @@ sem validate_web_url = "Reject non-http(s) and loopback/private/metadata URLs be
 Location header before issuing the next request (urllib would otherwise
 fetch a private/metadata target given a public redirector)."""
 obj _NoRedirectHandler(urllib.request.HTTPRedirectHandler) {
-    def redirect_request(req: any, fp: any, code: any, msg: any, headers: any, newurl: any) -> any {
+    def redirect_request(
+        req: Request,
+        fp: any,
+        code: int,
+        msg: str,
+        headers: any,
+        newurl: str,
+    ) -> Request | None {
         raise urllib.error.HTTPError(str(newurl), int(code), "redirect", headers, fp);
     }
 }
@@ -410,7 +418,7 @@ def _web_fetch_tool(args: dict[str, any]) -> str {
 """Legacy schema export retained for callers outside agent.tools.
 The production registry uses typed `make_tool_spec` calls in tools.jac so it
 does not unpack untyped dictionaries into a constructor."""
-def tool_specs_web() -> list[dict[str, any]] {
+def tool_specs_web -> list[dict[str, any]] {
     return [
         {
             "name": "web_search",

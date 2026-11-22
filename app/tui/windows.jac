@@ -16,24 +16,25 @@ import from tui.window { WindowState, window_lines }
 import from tui.core { _push_turn }
 import from ui.screen { shell_open_approval, shell_close_approval }
 
-
 """Push a window onto the stack.
 
 Non-choice windows take over the overlay node; pickers use the prompt
 drop-up instead. Returns False while a picker or extension modal owns the
 screen. Stacking a window on another window is allowed."""
 def _open_window(app: LiveShell, win: WindowState, force: bool = False) -> bool {
-    if not force and app.windows and (
-        app.windows[len(app.windows) - 1].kind == "picker"
-        or app.windows[len(app.windows) - 1].kind == "ui_modal"
-    ) {
+    if not force
+        and app.windows
+        and (
+            app.windows[len(app.windows) - 1].kind == "picker"
+            or app.windows[len(app.windows) - 1].kind == "ui_modal"
+        )
+    {
         return False;
     }
     if win.refresh is not None {
         try {
             win.refresh(app, win);
-        } except Exception {
-        }
+        } except Exception {}
     }
     ui_method: str = "";
     if win.kind == "ui_modal" and isinstance(win.payload, dict) {
@@ -49,7 +50,6 @@ def _open_window(app: LiveShell, win: WindowState, force: bool = False) -> bool 
     return True;
 }
 
-
 """Pop the top window. Releases the overlay node only when the stack
 empties."""
 def _close_top_window(app: LiveShell) -> bool {
@@ -63,7 +63,6 @@ def _close_top_window(app: LiveShell) -> bool {
     app.dirty = True;
     return True;
 }
-
 
 """Route one key to the top window. Consumes EVERY key while a window is
 up (windows are modal) except that an active tool approval keeps
@@ -100,8 +99,7 @@ def _handle_window_key(app: LiveShell, key: str) -> bool {
         if win.refresh is not None {
             try {
                 win.refresh(app, win);
-            } except Exception {
-            }
+            } except Exception {}
         }
         # Keep the cursor honest after a refresh reshuffles rows.
         if win.selected >= len(win.rows) {
@@ -113,7 +111,6 @@ def _handle_window_key(app: LiveShell, key: str) -> bool {
     return True;
 }
 
-
 """Paint rows for the top window (caller resolved precedence). Refreshes
 live data first so status windows never show a stale snapshot."""
 def _window_paint_lines(app: LiveShell) -> list[str] | None {
@@ -124,8 +121,7 @@ def _window_paint_lines(app: LiveShell) -> list[str] | None {
     if win.refresh is not None {
         try {
             win.refresh(app, win);
-        } except Exception {
-        }
+        } except Exception {}
     }
     return window_lines(win);
 }

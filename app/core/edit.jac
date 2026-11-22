@@ -45,7 +45,11 @@ def apply_multi_edit(source: str, edits: list[list[str]]) -> str {
         result = apply_edit(work, old_text, new_text);
         if result.startswith("ERROR:") {
             return "ERROR: multi-edit pair "
-                + str(i + 1) + " of " + str(len(edits)) + " failed: " + result;
+                + str(i + 1)
+                + " of "
+                + str(len(edits))
+                + " failed: "
+                + result;
         }
         work = result;
     }
@@ -73,16 +77,17 @@ def replace_lines(source: str, start_line: int, end_line: int, replacement: str)
     }
     n = len(lines);
     if start_line < 1 or start_line > n {
-        return "ERROR: start_line " + str(start_line)
-            + " out of range (file has " + str(n) + " lines)";
+        return "ERROR: start_line "
+            + str(start_line)
+            + " out of range (file has "
+            + str(n)
+            + " lines)";
     }
     if end_line < start_line {
-        return "ERROR: end_line " + str(end_line)
-            + " is before start_line " + str(start_line);
+        return "ERROR: end_line " + str(end_line) + " is before start_line " + str(start_line);
     }
     if end_line > n {
-        return "ERROR: end_line " + str(end_line)
-            + " out of range (file has " + str(n) + " lines)";
+        return "ERROR: end_line " + str(end_line) + " out of range (file has " + str(n) + " lines)";
     }
     repl_lines = replacement.split("\n");
     if replacement == "" {
@@ -263,8 +268,7 @@ def compute_unified_diff(old_text: str, new_text: str, context: int = 3) -> str 
             new_start -= 1;
         }
         out.append(
-            "@@ -" + _fmt_range(old_start, old_len)
-            + " +" + _fmt_range(new_start, new_len) + " @@"
+            "@@ -" + _fmt_range(old_start, old_len) + " +" + _fmt_range(new_start, new_len) + " @@"
         );
         for t in range(ws, we) {
             if tags[t] == "e" {

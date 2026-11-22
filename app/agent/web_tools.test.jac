@@ -9,7 +9,7 @@ never depends on egress.
 """
 
 
-def _canned_page() -> str {
+def _canned_page -> str {
     parts: list[str] = [];
     parts.append("<html><head><title>Canned Page</title>");
     parts.append("<style>p { color: red; } .x { display: none; }</style>");
@@ -37,7 +37,7 @@ def _start_server(body_text: str) -> int {
         + f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n"
     ).encode("utf-8");
 
-    def runner() -> None {
+    def runner -> None {
         srv.settimeout(15);
         served = 0;
         while served < 8 {
@@ -67,7 +67,7 @@ def _start_server(body_text: str) -> int {
 }
 
 
-def _egress_available() -> bool {
+def _egress_available -> bool {
     try {
         conn = socket.create_connection(("html.duckduckgo.com", 443), timeout=3);
         conn.close();

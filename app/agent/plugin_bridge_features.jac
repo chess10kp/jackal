@@ -54,9 +54,9 @@ def transform_markdown(
     }
     for t in h.md_transformers {
         try {
-            out: dict[str, any] = t["fn"](md, mctx);
-            if isinstance(out, str) {
-                md = out;
+            xformed: any = t["fn"](md, mctx);
+            if isinstance(xformed, str) {
+                md = xformed;
             }
         } except Exception {
             # Keep prior output, continue the chain.
@@ -228,7 +228,7 @@ def _fake_content_lines(out: any) -> list[str] {
 lines ({ok, lines}). Renderer errors degrade to unstyled fallback lines.
 No bridge/host/renderer -> {ok: False, lines: []} (caller uses defaults)."""
 def render_extension_block(
-    bridge: PluginBridge | None, kind: str, type: str, payload: any
+    bridge: PluginBridge | None, kind: str, entry_type: str, payload: any
 ) -> dict[str, any] {
     none_out: dict[str, any] = {"ok": False, "lines": []};
     if bridge is None {
@@ -241,7 +241,7 @@ def render_extension_block(
             kind="render_message",
             session_id=bridge.session_id,
             correlation_id=corr,
-            payload={"kind": kind, "type": type, "payload": payload},
+            payload={"kind": kind, "type": entry_type, "payload": payload},
         );
         try {
             _write_node(bridge, req);
@@ -262,7 +262,7 @@ def render_extension_block(
         return none_out;
     }
     table = h.message_renderers if kind != "entry" else h.entry_renderers;
-    renderer: any = table.get(str(type));
+    renderer: any = table.get(str(entry_type));
     if renderer is None or not isinstance(renderer, dict) {
         return none_out;
     }

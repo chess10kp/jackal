@@ -36,7 +36,6 @@ def _iso_to_epoch(stamp: str) -> float | None {
     }
 }
 
-
 """Delete sessions beyond the retention policy; returns the count pruned.
 
 max_count: keep only the N most recently updated sessions (0 disables).
@@ -89,7 +88,6 @@ def prune_sessions(cwd: str, max_count: int = 0, retention_days: int = 0) -> int
     return pruned;
 }
 
-
 """Id of the most recently updated session, or None when there are none."""
 def latest_session_id(cwd: str) -> str | None {
     entries: list[dict[str, any]] = list_sessions(cwd);
@@ -98,7 +96,6 @@ def latest_session_id(cwd: str) -> str | None {
     }
     return str(entries[0].get("id"));
 }
-
 
 """Export one session transcript as readable Markdown.
 
@@ -142,14 +139,16 @@ def export_session(cwd: str, session_id: str, path: str) -> bool {
             calls: any = msg.get("tool_calls");
             if isinstance(calls, list) and calls {
                 for call in calls {
-                    if not isinstance(call, dict) { continue; }
+                    if not isinstance(call, dict) {
+                        continue;
+                    }
                     cd: dict[str, any] = call;
                     fn: any = cd.get("function", {});
-                    if not isinstance(fn, dict) { continue; }
+                    if not isinstance(fn, dict) {
+                        continue;
+                    }
                     fd: dict[str, any] = fn;
-                    lines.append(
-                        "**tool call: " + str(fd.get("name", "")) + "**"
-                    );
+                    lines.append("**tool call: " + str(fd.get("name", "")) + "**");
                     lines.append("");
                     lines.append("```json");
                     lines.append(str(fd.get("arguments", "{}")));

@@ -8,7 +8,6 @@ This file is tested merged with agent/modes.jac (same-stem convention), so
 all symbols under test are referenced directly without imports.
 """
 
-
 test "read-only modes are exactly plan and ask" {
     assert is_read_only_mode("plan");
     assert is_read_only_mode("ask");
@@ -16,7 +15,6 @@ test "read-only modes are exactly plan and ask" {
     assert not is_read_only_mode("auto-accept");
     assert not is_read_only_mode("yolo");
 }
-
 
 test "write-family tools are blocked in read-only mode" {
     assert is_tool_blocked_in_read_only_mode("write");
@@ -34,7 +32,6 @@ test "write-family tools are blocked in read-only mode" {
     assert not is_tool_blocked_in_read_only_mode("list_dir");
 }
 
-
 test "is_tool_blocked applies only in read-only modes" {
     for mode in DEV_MODES {
         blocked = is_tool_blocked(mode, "write_file");
@@ -48,7 +45,6 @@ test "is_tool_blocked applies only in read-only modes" {
     }
 }
 
-
 test "cycle_mode walks the full ring and resets unknown modes" {
     assert cycle_mode("normal") == "auto-accept";
     assert cycle_mode("auto-accept") == "yolo";
@@ -58,7 +54,6 @@ test "cycle_mode walks the full ring and resets unknown modes" {
     assert cycle_mode("bogus") == "normal";
 }
 
-
 test "parse_mode_flag accepts both flag forms and valid values" {
     assert parse_mode_flag(["--mode", "plan"]) == "plan";
     assert parse_mode_flag(["--mode=yolo"]) == "yolo";
@@ -66,7 +61,6 @@ test "parse_mode_flag accepts both flag forms and valid values" {
     assert parse_mode_flag([]) is None;
     assert parse_mode_flag(["--verbose"]) is None;
 }
-
 
 test "parse_mode_flag rejects invalid values with an error payload" {
     res = parse_mode_flag(["--mode", "chaos"]);
@@ -76,7 +70,6 @@ test "parse_mode_flag rejects invalid values with an error payload" {
     assert isinstance(res2, dict);
     assert res2["error"] == "nonsense";
 }
-
 
 test "destructive bash variants are detected" {
     assert is_destructive_bash("rm -rf /");
@@ -98,7 +91,6 @@ test "destructive bash variants are detected" {
     assert is_destructive_bash("  RM -RF /  ");
 }
 
-
 test "benign commands are not flagged destructive" {
     assert not is_destructive_bash("");
     assert not is_destructive_bash("   ");
@@ -109,14 +101,12 @@ test "benign commands are not flagged destructive" {
     assert not is_destructive_bash("echo hello > out.txt");
 }
 
-
 test "yolo auto-approves everything including risky commands" {
     for tool in ["read_file", "write_file", "edit_file", "run_command"] {
         assert requires_approval("yolo", tool, "") == "auto";
     }
     assert requires_approval("yolo", "run_command", "rm -rf /") == "auto";
 }
-
 
 test "plan and ask block write family but auto-approve reads" {
     for mode in ["plan", "ask"] {
@@ -131,7 +121,6 @@ test "plan and ask block write family but auto-approve reads" {
     }
 }
 
-
 test "auto-accept approves safe work but confirms destructive shell" {
     assert requires_approval("auto-accept", "write_file", "") == "auto";
     assert requires_approval("auto-accept", "edit_file", "") == "auto";
@@ -140,23 +129,29 @@ test "auto-accept approves safe work but confirms destructive shell" {
     assert requires_approval("auto-accept", "run_command", "git push --force") == "confirm";
 }
 
-
 test "normal mode auto-approves reads but confirms everything else" {
     assert requires_approval("normal", "write_file", "") == "confirm";
     assert requires_approval("normal", "run_command", "ls") == "confirm";
     assert requires_approval("normal", "subagent", "") == "confirm";
-    for tool in ["read_file", "list_dir", "glob", "grep", "web_search", "web_fetch", "list_tasks", "jac_check"] {
+    for tool in [
+        "read_file",
+        "list_dir",
+        "glob",
+        "grep",
+        "web_search",
+        "web_fetch",
+        "list_tasks",
+        "jac_check",
+    ] {
         assert requires_approval("normal", tool, "") == "auto";
     }
 }
-
 
 test "unknown mode falls back to normal-mode confirmation" {
     assert requires_approval("", "write_file", "") == "confirm";
     assert requires_approval("bogus", "run_command", "rm -rf /") == "confirm";
     assert requires_approval("bogus", "read_file", "") == "auto";
 }
-
 
 test "system prompt gains the matching appendix once per mode" {
     base = "You are helpful.";
@@ -169,7 +164,6 @@ test "system prompt gains the matching appendix once per mode" {
     assert system_prompt_for_mode(base, "normal") == base;
     assert system_prompt_for_mode(base, "yolo") == base;
 }
-
 
 test "block reason names the tool and mode with a recovery hint" {
     r = read_only_mode_block_reason("write_file", "ask");
@@ -186,7 +180,6 @@ test "mcp tools confirm in normal mode and run in yolo/auto-accept" {
     assert requires_approval("auto-accept", "mcp_db_query", "") == "auto";
 }
 
-
 test "plan and ask block unmarked mcp tools with an actionable reason" {
     for mode in ["plan", "ask"] {
         assert requires_approval(mode, "mcp_db_write", "") == "blocked";
@@ -197,7 +190,6 @@ test "plan and ask block unmarked mcp tools with an actionable reason" {
         assert "mcp_db_write" in reason;
     }
 }
-
 
 test "registered read-only mcp tools stay usable in plan/ask" {
     register_mcp_read_only_tools(["mcp_docs_search", "mcp_db_query"]);
@@ -213,7 +205,6 @@ test "registered read-only mcp tools stay usable in plan/ask" {
     assert requires_approval("plan", "mcp_docs_search", "") == "blocked";
     assert requires_approval("ask", "mcp_db_query", "") == "blocked";
 }
-
 
 test "native tools never trip the mcp namespace check" {
     assert is_mcp_tool("write_file") is False;

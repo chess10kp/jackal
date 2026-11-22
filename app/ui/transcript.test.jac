@@ -3,10 +3,7 @@
 Companion scope provides transcript APIs.
 """
 
-import from ui.model {
-    TranscriptView,
-}
-
+import from ui.model { TranscriptView }
 
 def _msgs(n: int, prefix: str = "m") -> list[TranscriptMessage] {
     out: list[TranscriptMessage] = [];
@@ -17,12 +14,11 @@ def _msgs(n: int, prefix: str = "m") -> list[TranscriptMessage] {
                 content="line-" + str(i) + " " + ("x" * 20),
                 content_rev=1,
                 style_rev=1,
-            )
+            ),
         );
     }
     return out;
 }
-
 
 test "measure_cache_key includes id width and revisions" {
     k1 = measure_cache_key("a", 40, 1, 1);
@@ -33,7 +29,6 @@ test "measure_cache_key includes id width and revisions" {
     assert len(create_measure_cache().entries) == 0;
 }
 
-
 test "bind_transcript sets source_id on view" {
     view = TranscriptView(key="transcript", follow_tail=True);
     proj = bind_transcript(view, source_id="session.events", width=40, height=8);
@@ -42,7 +37,6 @@ test "bind_transcript sets source_id on view" {
     assert proj.viewport_width == 40;
     assert proj.viewport_height == 8;
 }
-
 
 test "materialize_visible returns at most height plus overscan lines" {
     view = TranscriptView(key="transcript", follow_tail=True);
@@ -53,15 +47,11 @@ test "materialize_visible returns at most height plus overscan lines" {
     assert len(win.lines) <= (5 + 2 * proj.overscan) * 4;
 }
 
-
 test "measurement cache reuses height for unchanged message width" {
     view = TranscriptView(key="transcript");
     proj = bind_transcript(view, "src", width=20, height=5);
     msg = TranscriptMessage(
-        message_id="m0",
-        content="abcdefghijKLMNOPQRST",
-        content_rev=1,
-        style_rev=1,
+        message_id="m0", content="abcdefghijKLMNOPQRST", content_rev=1, style_rev=1
     );
     apply_transcript_revision(proj, 1, [msg]);
     h1 = measure_message_height(proj, msg, 20);
@@ -71,7 +61,6 @@ test "measurement cache reuses height for unchanged message width" {
     key = measure_cache_key("m0", 20, 1, 1);
     assert key in proj.measure_cache.entries;
 }
-
 
 test "follow_tail true keeps window on newest content after append" {
     view = TranscriptView(key="transcript", follow_tail=True);
@@ -85,7 +74,6 @@ test "follow_tail true keeps window on newest content after append" {
     assert ("line-11" in joined) or ("m11" in joined) or (len(win.lines) > 0);
 }
 
-
 test "follow_tail false preserves visible anchor across inserts above" {
     view = TranscriptView(key="transcript", follow_tail=False, scroll_offset=5);
     proj = bind_transcript(view, "src", width=40, height=4);
@@ -95,21 +83,13 @@ test "follow_tail false preserves visible anchor across inserts above" {
     anchor = before.anchor_message_id;
     assert anchor != "";
     grown = (
-        [
-            TranscriptMessage(
-                message_id="pre0",
-                content="preamble",
-                content_rev=1,
-                style_rev=1,
-            )
-        ]
+        [TranscriptMessage(message_id="pre0", content="preamble", content_rev=1, style_rev=1)]
         + _msgs(20)
     );
     apply_transcript_revision(proj, 2, grown);
     after = materialize_visible(proj);
     assert after.anchor_message_id == anchor;
 }
-
 
 test "off-screen revision does not require terminal damage" {
     view = TranscriptView(key="transcript", follow_tail=False, scroll_offset=0);
@@ -123,7 +103,6 @@ test "off-screen revision does not require terminal damage" {
     assert transcript_needs_damage(proj, 1, 2) == False;
 }
 
-
 test "on-screen content change requires damage" {
     view = TranscriptView(key="transcript", follow_tail=True);
     proj = bind_transcript(view, "src", width=40, height=5);
@@ -134,7 +113,6 @@ test "on-screen content change requires damage" {
     apply_transcript_revision(proj, 2, msgs);
     assert transcript_needs_damage(proj, 1, 2) == True;
 }
-
 
 test "project_visible_spans uses markdown styles for md messages" {
     view = TranscriptView(key="transcript", follow_tail=True);
@@ -149,7 +127,7 @@ test "project_visible_spans uses markdown styles for md messages" {
                 content_rev=1,
                 style_rev=1,
                 format="markdown",
-            )
+            ),
         ],
     );
     spans = project_visible_spans(proj);

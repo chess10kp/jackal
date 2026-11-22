@@ -36,7 +36,7 @@ glob NATIVE_TOOL_NAMES: dict[str, str] = {
 };
 
 
-def _cwd() -> str {
+def _cwd -> str {
     return plugins.cwd if plugins.cwd else os.getcwd();
 }
 
@@ -199,7 +199,7 @@ def _subagent_tool(args: dict[str, any]) -> str {
 }
 
 
-def agent_tool_specs() -> list[ToolSpec] {
+def agent_tool_specs -> list[ToolSpec] {
     return [
         make_tool_spec(
             name="list_tasks",

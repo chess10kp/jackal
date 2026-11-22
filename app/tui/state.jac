@@ -11,8 +11,15 @@ import from tui.window { WindowState }
 # /explorer walk bounds + skip list (dot-dirs are always skipped; dot-FILES
 # stay selectable). Caps keep huge trees responsive inside an 8-row overlay.
 glob _EXPLORER_SKIP_DIRS: list[str] = [
-         "node_modules", "__pycache__", ".git", ".jac", ".jackal",
-         ".venv", "venv", ".mypy_cache", ".pytest_cache",
+         "node_modules",
+         "__pycache__",
+         ".git",
+         ".jac",
+         ".jackal",
+         ".venv",
+         "venv",
+         ".mypy_cache",
+         ".pytest_cache",
      ],
      _EXPLORER_MAX_FILES: int = 400,
      _EXPLORER_MAX_DEPTH: int = 6;
@@ -53,7 +60,6 @@ glob SLASH_BUILTINS: dict[str, str] = {
     "mcp": "show MCP server status (/mcp restart NAME)",
     "skills": "list available skills (/skill:name)",
 };
-
 
 obj LiveShell {
     has session: UiSession,

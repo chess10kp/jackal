@@ -1,12 +1,12 @@
 """E2E: the --json JSONL protocol used by UI clients."""
 
-
-
 test "jsonl session lifecycle and a turn" {
     sb = make_sandbox();
     try {
         sb.script([{"text": "pong"}]);
-        r = run_jackal(sb, ["--json"], stdin_text=jsonl("user", "ping") + jsonl("command", "/exit"));
+        r = run_jackal(
+            sb, ["--json"], stdin_text=jsonl("user", "ping") + jsonl("command", "/exit")
+        );
         assert r.code == 0, sb.explain(r);
         types = r.event_types();
         assert types[0] == "session_ready", sb.explain(r);
@@ -14,7 +14,9 @@ test "jsonl session lifecycle and a turn" {
         assert types[-1] == "session_end", sb.explain(r);
         contents: list[str] = [];
         for e in r.events() {
-            if e.get("type") == "message" { contents.append(str(e.get("content"))); }
+            if e.get("type") == "message" {
+                contents.append(str(e.get("content")));
+            }
         }
         assert contents == ["pong"], sb.explain(r);
     } finally {
@@ -22,19 +24,26 @@ test "jsonl session lifecycle and a turn" {
     }
 }
 
-
 test "jsonl approval round-trip gates a write" {
     sb = make_sandbox();
     try {
         sb.script([
-            {"text": "", "tool_calls": [{"name": "write_file", "args": {"path": "a.txt", "content": "A"}}]},
+            {
+                "text": "",
+                "tool_calls": [{"name": "write_file", "args": {"path": "a.txt", "content": "A"}}],
+            },
             {"text": "wrote it"},
-            {"text": "", "tool_calls": [{"name": "write_file", "args": {"path": "b.txt", "content": "B"}}]},
+            {
+                "text": "",
+                "tool_calls": [{"name": "write_file", "args": {"path": "b.txt", "content": "B"}}],
+            },
             {"text": "skipped"},
         ]);
         stdin = (
-            jsonl("user", "write a") + jsonl("approval", "", {"approved": True})
-            + jsonl("user", "write b") + jsonl("approval", "", {"approved": False})
+            jsonl("user", "write a")
+            + jsonl("approval", "", {"approved": True})
+            + jsonl("user", "write b")
+            + jsonl("approval", "", {"approved": False})
             + jsonl("command", "/exit")
         );
         r = run_jackal(sb, ["--json"], stdin_text=stdin);
@@ -47,17 +56,24 @@ test "jsonl approval round-trip gates a write" {
     }
 }
 
-
 test "jsonl rejects malformed requests without dying" {
     sb = make_sandbox();
     try {
-        r = run_jackal(sb, ["--json"], stdin_text="not json\n" + jsonl("command", "/mode") + jsonl("command", "/exit"));
+        r = run_jackal(
+            sb,
+            ["--json"],
+            stdin_text="not json\n" + jsonl("command", "/mode") + jsonl("command", "/exit"),
+        );
         assert r.code == 0, sb.explain(r);
         saw_bad: bool = False;
         saw_mode: bool = False;
         for e in r.events() {
-            if e.get("type") == "error" and "bad json" in str(e.get("message")) { saw_bad = True; }
-            if e.get("type") == "info" and "mode: normal" in str(e.get("text")) { saw_mode = True; }
+            if e.get("type") == "error" and "bad json" in str(e.get("message")) {
+                saw_bad = True;
+            }
+            if e.get("type") == "info" and "mode: normal" in str(e.get("text")) {
+                saw_mode = True;
+            }
         }
         assert saw_bad, sb.explain(r);
         assert saw_mode, sb.explain(r);

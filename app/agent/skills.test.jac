@@ -19,7 +19,7 @@ str()/dict() casts before use.
 """
 
 
-def _make_tmp() -> str {
+def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-skills-test-");
 }
 

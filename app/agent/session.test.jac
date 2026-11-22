@@ -23,7 +23,6 @@ import from .fake_host {
 import from .registry { invoke, get_tool, ToolRegistry }
 import from .extensions { load_extension_decls }
 
-
 test "session_boot with no decls never starts node" {
     session_dispose();
     st = session_boot("t-none", os.getcwd(), []);
@@ -35,7 +34,6 @@ test "session_boot with no decls never starts node" {
     assert st.t_ext_ready_s > 0.0;
     session_dispose();
 }
-
 
 test "session_boot parallel sidecar loads fixture and run_turn uses bridge" {
     session_dispose();
@@ -69,19 +67,13 @@ test "session_boot parallel sidecar loads fixture and run_turn uses bridge" {
     session_dispose();
 }
 
-
 test "unsupported requires fail loud at load" {
     session_dispose();
     stub = resolve_stub_echo();
     st = session_boot(
         "t-unsup",
         os.getcwd(),
-        [{
-            "id": "stub.echo",
-            "path": stub,
-            "runtime": "node",
-            "requires": ["events"],
-        }],
+        [{"id": "stub.echo", "path": stub, "runtime": "node", "requires": ["events"]}],
         wait_budget_s=10.0,
     );
     ready = wait_extensions_ready(0.0);
@@ -90,7 +82,6 @@ test "unsupported requires fail loud at load" {
     assert "unsupported" in ready.detail or "events" in ready.detail;
     session_dispose();
 }
-
 
 test "load_extension_decls reads .jackal/extensions.json" {
     tmp = str(tempfile.mkdtemp());
@@ -101,11 +92,7 @@ test "load_extension_decls reads .jackal/extensions.json" {
         path = os.path.join(jackal, "extensions.json");
         fh: any = open(path, "w");
         try {
-            fh.write(
-                '{"extensions":[{"id":"stub.echo","path":"'
-                + stub
-                + '","runtime":"node"}]}'
-            );
+            fh.write('{"extensions":[{"id":"stub.echo","path":"' + stub + '","runtime":"node"}]}');
         } finally {
             fh.close();
         }
@@ -119,7 +106,6 @@ test "load_extension_decls reads .jackal/extensions.json" {
     }
 }
 
-
 test "enqueue_prompt queues while loading" {
     session_dispose();
     n = enqueue_prompt("hello");
@@ -129,12 +115,10 @@ test "enqueue_prompt queues while loading" {
     assert drain_prompt_queue() == [];
 }
 
-
 # ===================== T2-partial: commands + hooks =====================
 
 import from .plugin_bridge { resolve_stub_commands }
 import from .fake_host { register_fake_command, register_fake_listener }
-
 
 test "session_boot mirrors extension commands and run_command round-trips" {
     session_dispose();
@@ -161,7 +145,6 @@ test "session_boot mirrors extension commands and run_command round-trips" {
     assert list_commands() == {};
 }
 
-
 test "run_command without a bridge degrades gracefully" {
     session_dispose();
     st = session_boot("t-t2-nobridge", os.getcwd(), []);
@@ -170,7 +153,6 @@ test "run_command without a bridge degrades gracefully" {
     assert out.startswith("ERROR:");
     session_dispose();
 }
-
 
 test "turn_start and turn_end hooks fire around a turn" {
     session_dispose();
@@ -208,7 +190,6 @@ test "turn_start and turn_end hooks fire around a turn" {
     dispose_bridge(b);
     session_dispose();
 }
-
 
 # ===================== full-compat Phase A: event coverage =====================
 
@@ -252,7 +233,6 @@ test "relay_tool_hooks fires pi-named tool events and delegates" {
     session_dispose();
 }
 
-
 test "session_dispose fires session_shutdown before teardown" {
     session_dispose();
     st = session_boot("t-shutdown", os.getcwd(), []);
@@ -273,7 +253,6 @@ test "session_dispose fires session_shutdown before teardown" {
     session_dispose();
     assert seen == ["bye"];
 }
-
 
 test "extension traffic joins history and emits entry events" {
     session_dispose();
@@ -304,7 +283,6 @@ test "extension traffic joins history and emits entry events" {
     clear_history();
     session_dispose();
 }
-
 
 # ===================== batch-2: input gate + before_agent_start =====================
 
@@ -346,7 +324,6 @@ test "run_turn short-circuits on handled input verdict" {
     session_dispose();
 }
 
-
 test "agent_start_gate collects systemPrompt without touching history" {
     session_dispose();
     st = session_boot("t-b2-sys", os.getcwd(), []);
@@ -374,7 +351,6 @@ test "agent_start_gate collects systemPrompt without touching history" {
     session_dispose();
 }
 
-
 test "set_model refuses when provider credential is missing" {
     session_dispose();
     st = session_boot("t-model-refusal", tempfile.mkdtemp(), []);
@@ -396,7 +372,6 @@ test "set_model refuses when provider credential is missing" {
     assert set_model("mock") == "mock";
     session_dispose();
 }
-
 
 test "set_model persists per-provider last-model prefs to .jackal" {
     tmp = tempfile.mkdtemp();

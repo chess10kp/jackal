@@ -15,7 +15,7 @@ import from .plugin_bridge {
 import from .sessions { new_session_id }
 
 
-def get_history() -> list[dict[str, any]] {
+def get_history -> list[dict[str, any]] {
     return list(history);
 }
 
@@ -39,7 +39,7 @@ def set_current_session_id(sid: str) {
 """Request cooperative abort of the active turn (if any). Safe to call from
 the UI thread while run_turn is streaming. Returns True when a live turn was
 flagged; False when no turn is in flight or it was already cancelled."""
-def cancel_active_turn() -> bool {
+def cancel_active_turn -> bool {
     c = plugins.active_cancel;
     if c is not None and not c.cancelled {
         c.cancelled = True;
@@ -54,7 +54,7 @@ def cancel_active_turn() -> bool {
 The bridge owns the authoritative set; this re-syncs from it so commands
 registered/unloaded after warm-up are reflected immediately.
 """
-def list_commands() -> dict[str, any] {
+def list_commands -> dict[str, any] {
     b = plugins.bridge;
     if b is not None {
         plugins.commands = dict((b as PluginBridge).commands);
@@ -123,13 +123,13 @@ def run_extension_shortcut(key: str) -> str {
 """Shortcut bindings registered by loaded extensions (key -> meta with
 extension_id + description). Listed for host UIs; the TUI input loop matches
 keypresses against these and fires them via run_extension_shortcut."""
-def list_extension_shortcuts() -> dict[str, any] {
+def list_extension_shortcuts -> dict[str, any] {
     return list_shortcuts(plugins.bridge);
 }
 
 
 """Labels set by loaded extensions via pi.setLabel (id -> meta)."""
-def list_extension_labels() -> dict[str, any] {
+def list_extension_labels -> dict[str, any] {
     return list_labels(plugins.bridge);
 }
 

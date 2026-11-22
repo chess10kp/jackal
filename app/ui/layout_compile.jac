@@ -17,23 +17,12 @@ import from ui.layout_types {
     Viewport,
 }
 import from ui.model { UiContainer, UiNode, node_id }
-import from ui.layout_compile_model {
-    CompileResult,
-    NodeEdges,
-    PartitionInfo,
-    _Entry,
-    _Scope,
-}
+import from ui.layout_compile_model { CompileResult, NodeEdges, PartitionInfo, _Entry, _Scope }
 import from ui.layout_compile_scope { _collect_scope }
-import from ui.layout_compile_emit {
-    _emit_invariants,
-    _emit_root,
-    _req,
-}
+import from ui.layout_compile_emit { _emit_invariants, _emit_root, _req }
 import from ui.layout_compile_flow { _emit_partition }
 import from ui.layout_compile_overlays { _emit_overlay }
 import from ui.layout_compile_relations { _emit_relation }
-
 
 def compile_layout(
     state: LayoutState,
@@ -58,12 +47,14 @@ def compile_layout(
     }
     if missing {
         r = CompileResult(ok=False);
-        r.diagnostics.append(LayoutDiagnostic(
-            code=LayoutError.INVALID_SPEC,
-            severity=LayoutSeverity.ERROR,
-            message="scoped nodes missing LayoutSpec registration",
-            node_ids=missing,
-        ));
+        r.diagnostics.append(
+            LayoutDiagnostic(
+                code=LayoutError.INVALID_SPEC,
+                severity=LayoutSeverity.ERROR,
+                message="scoped nodes missing LayoutSpec registration",
+                node_ids=missing,
+            ),
+        );
         return r;
     }
 
@@ -78,12 +69,14 @@ def compile_layout(
         for endpoint in [rel.source_id, rel.target_id] {
             if endpoint not in scope_ids {
                 r = CompileResult(ok=False);
-                r.diagnostics.append(LayoutDiagnostic(
-                    code=LayoutError.OUT_OF_SCOPE,
-                    severity=LayoutSeverity.ERROR,
-                    message="relation endpoint outside compiled scope",
-                    node_ids=[endpoint],
-                ));
+                r.diagnostics.append(
+                    LayoutDiagnostic(
+                        code=LayoutError.OUT_OF_SCOPE,
+                        severity=LayoutSeverity.ERROR,
+                        message="relation endpoint outside compiled scope",
+                        node_ids=[endpoint],
+                    ),
+                );
                 return r;
             }
         }
@@ -92,13 +85,14 @@ def compile_layout(
             or scope.parent_of.get(rel.target_id) != rel.owner_id
         ) {
             r = CompileResult(ok=False);
-            r.diagnostics.append(LayoutDiagnostic(
-                code=LayoutError.INVALID_TOPOLOGY,
-                severity=LayoutSeverity.ERROR,
-                message="relation owner is not the direct Child parent "
-                        "of both endpoints",
-                node_ids=[rel.source_id, rel.target_id],
-            ));
+            r.diagnostics.append(
+                LayoutDiagnostic(
+                    code=LayoutError.INVALID_TOPOLOGY,
+                    severity=LayoutSeverity.ERROR,
+                    message="relation owner is not the direct Child parent " "of both endpoints",
+                    node_ids=[rel.source_id, rel.target_id],
+                ),
+            );
             return r;
         }
     }
@@ -158,13 +152,7 @@ def compile_layout(
             continue;
         }
         ov_entry = entries_by_id[scoped.id_str];
-        if not _emit_overlay(
-            result,
-            ov_entry,
-            root_entry.edges,
-            natural_sizes,
-            phase,
-        ) {
+        if not _emit_overlay(result, ov_entry, root_entry.edges, natural_sizes, phase) {
             result.solver = None;
             return result;
         }
@@ -178,13 +166,7 @@ def compile_layout(
                 ov_h = _req(ov_entry.spec.height.preferred);
             }
             if not _emit_partition(
-                result,
-                ov_entry,
-                entries_by_id,
-                natural_sizes,
-                ov_w,
-                ov_h,
-                phase,
+                result, ov_entry, entries_by_id, natural_sizes, ov_w, ov_h, phase
             ) {
                 result.solver = None;
                 return result;
@@ -202,7 +184,6 @@ def compile_layout(
     }
     return result;
 }
-
 
 # ----------------------------------------------------------------------
 # Engine-facing helpers (compute pipeline lives in ui.layout).

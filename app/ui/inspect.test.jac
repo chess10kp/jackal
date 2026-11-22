@@ -3,12 +3,7 @@
 Companion scope provides inspect APIs.
 """
 
-import from ui.model {
-    MainScreen,
-    Prompt,
-    TranscriptView,
-    node_id,
-}
+import from ui.model { MainScreen, Prompt, TranscriptView, node_id }
 
 import from ui.runtime {
     append_child_session,
@@ -18,14 +13,9 @@ import from ui.runtime {
     record_invalidation,
 }
 
-import from ui.bindings {
-    subscribe,
-}
+import from ui.bindings { subscribe }
 
-import from ui.events {
-    InsertText,
-}
-
+import from ui.events { InsertText }
 
 test "dump_graph is deterministic for the same topology" {
     handle = create_session();
@@ -44,7 +34,6 @@ test "dump_graph is deterministic for the same topology" {
     assert "prompt" in a;
 }
 
-
 test "dump_bindings lists source target and event type" {
     handle = create_session();
     session = handle.session;
@@ -60,7 +49,6 @@ test "dump_bindings lists source target and event type" {
     assert (node_id(transcript) in text) or ("transcript" in text);
     assert "TranscriptChanged" in text;
 }
-
 
 test "dump_event_path includes target and ancestors" {
     handle = create_session();
@@ -78,7 +66,6 @@ test "dump_event_path includes target and ancestors" {
     assert ("main" in path) or (node_id(screen) in path);
 }
 
-
 test "explain_invalidation links origin layout root and damage reason" {
     handle = create_session();
     session = handle.session;
@@ -94,7 +81,6 @@ test "explain_invalidation links origin layout root and damage reason" {
     assert expl.layout_root_id == node_id(screen) or expl.layout_root_id != "";
     assert expl.origin != "" or expl.damage_reason != "";
 }
-
 
 test "dump_layout dump_damage dump_lifetimes return non-empty text" {
     handle = create_session();
@@ -116,7 +102,6 @@ test "dump_layout dump_damage dump_lifetimes return non-empty text" {
     assert (node_id(prompt) in life_txt) or ("prompt" in life_txt);
 }
 
-
 test "validate_invariants returns empty for a healthy session" {
     handle = create_session();
     session = handle.session;
@@ -131,7 +116,6 @@ test "validate_invariants returns empty for a healthy session" {
     findings = validate_invariants(session);
     assert findings == [];
 }
-
 
 test "validate_invariants flags invalid focus" {
     handle = create_session();

@@ -18,7 +18,7 @@ import from ui.osp_walk { ui_jids_reachable_from_nodes }
 
 Covers both directions: the BFS itself walks `-->` and `<--`, so seeds
 must include nodes that edge INTO root as well as root's out-neighbors."""
-def ui_persistent_root_seeds() -> list[any] {
+def ui_persistent_root_seeds -> list[any] {
     seeds: list[any] = [];
     for n_any in [root -->] {
         seeds.append(n_any);

@@ -2,7 +2,6 @@
 
 import json;
 import time;
-import from collections.abc { Generator }
 import from .tool_spec { ToolSpec, MAX_TOOL_RESULT }
 import from .llm_transport { Transport }
 import from .registry { ToolRegistry, as_tool_specs, invoke }
@@ -106,7 +105,7 @@ def react_loop(
     cancel: TurnCancel | None = None,
     approve: any = None,
 ) -> str {
-    def _is_cancelled() -> bool {
+    def _is_cancelled -> bool {
         return cancel is not None and cancel.cancelled;
     }
 

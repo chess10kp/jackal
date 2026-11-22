@@ -167,7 +167,7 @@ obj InputNormalizer {
     }
 
     """Flush an incomplete escape remainder as a literal sequence."""
-    def flush_buffer() -> list[HostEvent] {
+    def flush_buffer -> list[HostEvent] {
         out: list[HostEvent] = [];
         if self.buffer {
             out.append(decode_sequence(self.buffer));
@@ -184,7 +184,7 @@ obj InputNormalizer {
     }
 
     """Emit coalesced resize / mouse-motion / stream events."""
-    def flush_coalesced() -> list[HostEvent] {
+    def flush_coalesced -> list[HostEvent] {
         out: list[HostEvent] = [];
         if self.pending_resize is not None {
             out.append(self.pending_resize as HostEvent);
@@ -201,7 +201,7 @@ obj InputNormalizer {
         return out;
     }
 
-    def clear() {
+    def clear  {
         self.buffer = "";
         self.paste_mode = False;
         self.paste_buffer = "";

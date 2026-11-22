@@ -27,37 +27,39 @@ import from agent.sessions {
     is_valid_session_id,
 }
 
-
 def print_banner {
     print("jackal - all-Jac agent harness");
     print(f"model: {_session.get_model()}   cwd: {os.getcwd()}");
     print("/help for commands, /exit to quit");
 }
 
-
 def print_help {
     print(
         "commands:\n"
-        "  /help          this help\n"
-        "  /model NAME    switch model (e.g. openrouter/anthropic/claude-sonnet-5)\n"
-        "  /clear         clear conversation history\n"
-        "  /abort         cancel the active turn (streaming or tool)\n"
-        "  /sessions      list saved sessions\n"
-        "  /resume [ID]   load a session transcript (default: latest)\n"
-        "  /export [PATH] write the current transcript as markdown\n"
-        "  /logout PROV   remove a stored provider credential\n"
-        "  /compact       summarize older history to free context\n"
-        "  /mode [NAME]   show or set dev mode (normal|auto-accept|yolo|plan|ask)\n"
-        "  /commands      list extension commands\n"
-        "  /exit          quit"
+            "  /help          this help\n"
+            "  /model NAME    switch model (e.g. openrouter/anthropic/claude-sonnet-5)\n"
+            "  /clear         clear conversation history\n"
+            "  /abort         cancel the active turn (streaming or tool)\n"
+            "  /sessions      list saved sessions\n"
+            "  /resume [ID]   load a session transcript (default: latest)\n"
+            "  /export [PATH] write the current transcript as markdown\n"
+            "  /logout PROV   remove a stored provider credential\n"
+            "  /compact       summarize older history to free context\n"
+            "  /mode [NAME]   show or set dev mode (normal|auto-accept|yolo|plan|ask)\n"
+            "  /commands      list extension commands\n"
+            "  /exit          quit",
     );
 }
 
-
 """Handle a /command. Returns reply text, or None to exit, or '' for none."""
 def handle_command(line: str) -> str | None {
-    if line in ("/exit", "/quit") { return None; }
-    if line == "/help" { print_help(); return ""; }
+    if line in ("/exit", "/quit") {
+        return None;
+    }
+    if line == "/help" {
+        print_help();
+        return "";
+    }
     if line in ("/clear", "/new") {
         _session.clear_history();
         # Fresh id: the next save must not overwrite the previous transcript.
@@ -66,7 +68,9 @@ def handle_command(line: str) -> str | None {
     }
     if line == "/mcp" {
         mcp_rows: list[str] = _session.mcp_status_lines();
-        if not mcp_rows { return "no mcp servers configured"; }
+        if not mcp_rows {
+            return "no mcp servers configured";
+        }
         return "mcp servers:\n" + "\n".join(mcp_rows);
     }
     if line.startswith("/mcp ") {
@@ -93,19 +97,20 @@ def handle_command(line: str) -> str | None {
         }
         return "usage: /mcp [restart [NAME] | resources [SERVER [URI]] | SERVER PROMPT [JSON_ARGS]]";
     }
-    if line == "/compact" { return _session.compact_now(); }
+    if line == "/compact" {
+        return _session.compact_now();
+    }
     if line == "/abort" {
         return "turn aborted" if _session.cancel_active_turn() else "no active turn";
     }
     if line == "/sessions" {
         rows = list_sessions(os.getcwd());
-        if not rows { return "no saved sessions"; }
+        if not rows {
+            return "no saved sessions";
+        }
         lines: list[str] = ["saved sessions:"];
         for row in rows[:20] {
-            lines.append(
-                "  " + str(row.get("id", "")) + "  "
-                + str(row.get("name", ""))
-            );
+            lines.append("  " + str(row.get("id", "")) + "  " + str(row.get("name", "")));
         }
         return "\n".join(lines);
     }
@@ -123,15 +128,15 @@ def handle_command(line: str) -> str | None {
                 break;
             }
         }
-        if not has_content { return "nothing to export yet"; }
+        if not has_content {
+            return "nothing to export yet";
+        }
         # Export needs a saved record; persist the live transcript first.
         if not is_valid_session_id(str(_session.plugins.session_id)) {
             _session.set_current_session_id("");
         }
         try {
-            meta = save_session(
-                os.getcwd(), hist, session_id=_session.plugins.session_id,
-            );
+            meta = save_session(os.getcwd(), hist, session_id=_session.plugins.session_id);
         } except Exception as e {
             return "ERROR: could not save transcript: " + str(e);
         }
@@ -142,7 +147,9 @@ def handle_command(line: str) -> str | None {
     }
     if line == "/commands" {
         cmds = _session.list_commands();
-        if not cmds { return "no extension commands loaded"; }
+        if not cmds {
+            return "no extension commands loaded";
+        }
         lines: list[str] = ["extension commands:"];
         for raw_name in sorted(cmds.keys()) {
             ent = cmds[raw_name];
@@ -150,7 +157,9 @@ def handle_command(line: str) -> str | None {
             desc = "";
             if isinstance(ent, dict) {
                 got = ent.get("description", "");
-                if isinstance(got, str) { desc = got; }
+                if isinstance(got, str) {
+                    desc = got;
+                }
             }
             if desc {
                 lines.append("  /" + name + "  " + desc);
@@ -162,10 +171,14 @@ def handle_command(line: str) -> str | None {
     }
     if line.startswith("/logout") {
         prov = line[len("/logout"):].strip();
-        if not prov { return "usage: /logout PROVIDER"; }
+        if not prov {
+            return "usage: /logout PROVIDER";
+        }
         return logout_provider(prov);
     }
-    if line == "/mode" { return "mode: " + _session.get_mode(); }
+    if line == "/mode" {
+        return "mode: " + _session.get_mode();
+    }
     if line.startswith("/mode ") {
         want = line[len("/mode "):].strip();
         try {
@@ -176,7 +189,9 @@ def handle_command(line: str) -> str | None {
     }
     if line.startswith("/model ") {
         name = line[len("/model "):].strip();
-        if name { return "model -> " + _session.set_model(name); }
+        if name {
+            return "model -> " + _session.set_model(name);
+        }
         return "usage: /model NAME";
     }
     if line.startswith("/") {
@@ -193,23 +208,26 @@ def handle_command(line: str) -> str | None {
     return "";
 }
 
-
 """Load a saved session (latest when `sid` is empty) into the live history
 and keep persisting under the same id. Returns a status line; failures start
 with "unknown"/"no"/"session"."""
 def resume_session(sid: str) -> str {
     if not sid {
         got = latest_session_id(os.getcwd());
-        if got is None { return "no saved sessions to resume"; }
+        if got is None {
+            return "no saved sessions to resume";
+        }
         sid = got;
     }
     rec: dict[str, any] | None = get_session_record(os.getcwd(), sid);
-    if rec is None { return "unknown session: " + sid; }
+    if rec is None {
+        return "unknown session: " + sid;
+    }
     msgs: any = rec.get("messages", []);
     if not isinstance(msgs, list) or not msgs {
         return "session has no transcript: " + sid;
     }
-    _session.restore_history(msgs as list);
+    _session.restore_history(msgs as list[dict[str, any]]);
     _session.set_current_session_id(sid);
     rec_model: any = rec.get("model");
     reply: str = "resumed " + sid + " (" + str(len(msgs)) + " messages)";
@@ -219,17 +237,20 @@ def resume_session(sid: str) -> str {
     return reply;
 }
 
-
 """Mode-policy tool approver for headless frontends. `ask(name, args)`
 answers "confirm" verdicts; ask=None (non-interactive) denies them with a
 hint, so `-p` never runs a confirm-gated tool silently."""
 def make_approver(ask: any) -> any {
     def approve(name: str, args: dict[str, any]) -> any {
         cmd: str = "";
-        if isinstance(args, dict) { cmd = str(args.get("cmd", "")); }
+        if isinstance(args, dict) {
+            cmd = str(args.get("cmd", ""));
+        }
         mode: str = _session.get_mode();
         policy: str = requires_approval(mode, name, cmd);
-        if policy == "auto" { return True; }
+        if policy == "auto" {
+            return True;
+        }
         if policy == "blocked" {
             if is_read_only_mode(mode) {
                 return read_only_mode_block_reason(name, mode);
@@ -238,16 +259,20 @@ def make_approver(ask: any) -> any {
         }
         if ask is None {
             return (
-                "tool \"" + name + "\" needs approval in " + mode
+                "tool \""
+                + name
+                + "\" needs approval in "
+                + mode
                 + " mode; rerun with --mode auto-accept or --mode yolo"
             );
         }
-        if ask(name, args) { return True; }
+        if ask(name, args) {
+            return True;
+        }
         return "denied by user";
     }
     return approve;
 }
-
 
 def _args_preview(args: dict[str, any]) -> str {
     try {
@@ -256,7 +281,6 @@ def _args_preview(args: dict[str, any]) -> str {
         return str(args)[:400];
     }
 }
-
 
 """Line-REPL approval prompt on the controlling terminal."""
 def term_ask(name: str, args: dict[str, any]) -> bool {
@@ -271,7 +295,6 @@ def term_ask(name: str, args: dict[str, any]) -> bool {
     return got in ("y", "yes");
 }
 
-
 """JSONL approval round-trip: after react_loop's approval_request event, read stdin until an
 {"type": "approval", "approved": bool} line arrives (EOF denies). Other
 requests are rejected while the turn is blocked on the decision."""
@@ -279,9 +302,13 @@ def json_ask(name: str, args: dict[str, any]) -> bool {
     # react_loop already emitted approval_request on the event stream.
     while True {
         raw = sys.stdin.readline();
-        if not raw { return False; }
+        if not raw {
+            return False;
+        }
         text_in: str = str(raw).strip();
-        if not text_in { continue; }
+        if not text_in {
+            continue;
+        }
         try {
             req: any = json.loads(text_in);
         } except ValueError {
@@ -296,24 +323,30 @@ def json_ask(name: str, args: dict[str, any]) -> bool {
     return False;
 }
 
-
 """Apply --model/--thinking/--mode/--continue/--resume after boot. Returns
 an error message, or "" on success."""
 def apply_cli_options(opts: dict[str, any]) -> str {
     if opts["continue"] or opts["resume"] {
         got = resume_session(str(opts["resume"]));
-        if not got.startswith("resumed") { return got; }
+        if not got.startswith("resumed") {
+            return got;
+        }
     }
     model_name: str = str(opts["model"]);
     if model_name {
         result = _session.set_model(model_name);
-        if result != model_name { return result; }
+        if result != model_name {
+            return result;
+        }
     }
-    if opts["thinking"] { _session.set_thinking_level(str(opts["thinking"])); }
-    if opts["mode"] { _session.set_mode(str(opts["mode"])); }
+    if opts["thinking"] {
+        _session.set_thinking_level(str(opts["thinking"]));
+    }
+    if opts["mode"] {
+        _session.set_mode(str(opts["mode"]));
+    }
     return "";
 }
-
 
 """One-shot run (-p): execute `prompt`, write the answer per output_format,
 return the process exit code (0 ok, 1 error)."""
@@ -323,9 +356,15 @@ def run_print(prompt: str, opts: dict[str, any]) -> int {
     stats: dict[str, any] = {"tools": 0, "secs": 0.0};
 
     def on_event(kind: str, data: dict[str, any]) {
-        if kind == "error" { errors.append(str(data.get("message", ""))); }
-        if kind == "tool_call" { stats["tools"] = int(stats["tools"]) + 1; }
-        if kind == "turn_end" { stats["secs"] = data.get("secs", 0.0); }
+        if kind == "error" {
+            errors.append(str(data.get("message", "")));
+        }
+        if kind == "tool_call" {
+            stats["tools"] = int(stats["tools"]) + 1;
+        }
+        if kind == "turn_end" {
+            stats["secs"] = data.get("secs", 0.0);
+        }
         if fmt == "stream-json" {
             _session.json_event(kind, data);
         } elif kind == "error" {
@@ -337,7 +376,7 @@ def run_print(prompt: str, opts: dict[str, any]) -> int {
     answer: str = "";
     try {
         answer = _session.run_turn(
-            prompt, on_event, approve=make_approver(None), max_iters=max_turns,
+            prompt, on_event, approve=make_approver(None), max_iters=max_turns
         );
     } except KeyboardInterrupt {
         errors.append("interrupted");
@@ -352,27 +391,35 @@ def run_print(prompt: str, opts: dict[str, any]) -> int {
             sys.stdout.flush();
         }
     } else {
-        _session.json_event("result", {
-            "result": answer,
-            "is_error": is_error,
-            "errors": errors,
-            "session_id": str(_session.plugins.session_id),
-            "model": _session.get_model(),
-            "num_tools": stats["tools"],
-            "duration_s": stats["secs"],
-        });
+        _session.json_event(
+            "result",
+            {
+                "result": answer,
+                "is_error": is_error,
+                "errors": errors,
+                "session_id": str(_session.plugins.session_id),
+                "model": _session.get_model(),
+                "num_tools": stats["tools"],
+                "duration_s": stats["secs"],
+            },
+        );
     }
     return 1 if is_error else 0;
 }
-
 
 with entry:__main__ {
     # Pi lifecycle: boot loads .jackal/extensions.json and warms the Node
     # sidecar without blocking the first frame; run_turn awaits extension
     # readiness before the first model request.
     opts: dict[str, any] = parse_cli(user_argv(list(sys.argv)));
-    if opts["help"] { print(CLI_USAGE); sys.exit(0); }
-    if opts["version"] { print("jackal " + CLI_VERSION); sys.exit(0); }
+    if opts["help"] {
+        print(CLI_USAGE);
+        sys.exit(0);
+    }
+    if opts["version"] {
+        print("jackal " + CLI_VERSION);
+        sys.exit(0);
+    }
     if opts["error"] {
         sys.stderr.write("jackal: " + str(opts["error"]) + "\n" + CLI_USAGE + "\n");
         sys.exit(2);
@@ -381,7 +428,9 @@ with entry:__main__ {
     prompt: str = str(opts["prompt"]);
     if print_mode {
         piped: str = "";
-        if not sys.stdin.isatty() { piped = sys.stdin.read(); }
+        if not sys.stdin.isatty() {
+            piped = sys.stdin.read();
+        }
         prompt = combine_prompt(prompt, piped);
         if not prompt {
             sys.stderr.write("jackal: -p needs a prompt (argument or stdin)\n");
@@ -435,10 +484,14 @@ with entry:__main__ {
             }
             if json_mode {
                 raw = sys.stdin.readline();
-                if not raw { break; }
+                if not raw {
+                    break;
+                }
                 raw_line: any = raw;
                 text_in: str = str(raw_line).strip();
-                if not text_in { continue; }
+                if not text_in {
+                    continue;
+                }
                 try {
                     req: any = json.loads(text_in);
                 } except ValueError {
@@ -457,18 +510,26 @@ with entry:__main__ {
                     print("");
                     continue;
                 }
-                if not text { continue; }
+                if not text {
+                    continue;
+                }
                 kind = "command" if text.startswith("/") else "user";
             }
             if kind == "command" {
                 reply = handle_command(text);
                 if reply is None {
-                    if json_mode { _session.json_event("session_end", {}); ended = True; }
+                    if json_mode {
+                        _session.json_event("session_end", {});
+                        ended = True;
+                    }
                     break;
                 }
                 if reply {
-                    if json_mode { _session.json_event("info", {"text": reply}); }
-                    else { print(reply); }
+                    if json_mode {
+                        _session.json_event("info", {"text": reply});
+                    } else {
+                        print(reply);
+                    }
                 }
                 continue;
             }
@@ -479,8 +540,11 @@ with entry:__main__ {
                     _session.run_turn(text, approve=approver);
                 }
             } except KeyboardInterrupt {
-                if json_mode { _session.json_event("error", {"message": "interrupted"}); }
-                else { print("\n[interrupted]"); }
+                if json_mode {
+                    _session.json_event("error", {"message": "interrupted"});
+                } else {
+                    print("\n[interrupted]");
+                }
             }
         }
     } finally {
@@ -489,6 +553,10 @@ with entry:__main__ {
         _session.session_dispose();
     }
     if json_mode {
-        if not ended { _session.json_event("session_end", {}); }
-    } else { print("bye."); }
+        if not ended {
+            _session.json_event("session_end", {});
+        }
+    } else {
+        print("bye.");
+    }
 }

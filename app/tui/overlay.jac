@@ -1,23 +1,26 @@
 """Painting and overlay rendering for the native LiveShell."""
 import os;
 import from tui.state { LiveShell }
-import from tui.core {
-    _rule, _pad_to, _prompt_prefix, _prompt_lines,
-}
+import from tui.core { _rule, _pad_to, _prompt_prefix, _prompt_lines }
 import from core.edit { compute_unified_diff }
 import from ui.model { UiNode }
 import from ui.transcript { materialize_visible }
 import from ui.layout { LayoutSpec, OverlayAnchor, fill_axis, fixed_axis }
 import from ui.renderer {
-    render_frame, set_node_content, set_node_contract,
-    mark_semantic_dirty, mark_layout_dirty, request_cursor,
+    render_frame,
+    set_node_content,
+    set_node_contract,
+    mark_semantic_dirty,
+    mark_layout_dirty,
+    request_cursor,
 }
 import from ui.width { display_width, truncate_text }
 import from tui.picker_base { _picker_filtered }
-import from tui.windows {  _picker_state, _window_paint_lines, _ui_modal_state, _approval_state }
+import from tui.windows { _picker_state, _window_paint_lines, _ui_modal_state, _approval_state }
 import from agent.session { get_model, model_preferences }
 import from agent.llm { PROVIDER_ROUTES, catalog_models, routed_model_id, provider_for }
 import from tui.window { WindowSpec, window_frame, window_view }
+
 """Unified-diff preview lines for a pending write_file/edit_file approval.
 Capped at 20 diff lines with a trailing truncation marker; returns [] when
 no old/new text pair can be assembled (missing args, unreadable baseline)."""
@@ -71,7 +74,6 @@ def _approval_diff_preview(name: str, args: dict[str, any]) -> list[str] {
     return out;
 }
 
-
 """Approval overlay body — REAL pending-approval data: tool name plus cmd
 (run_command), target path and old/new char counts (write_file/edit_file)
 or generic key=value pairs, then a capped unified-diff preview."""
@@ -95,8 +97,11 @@ def _approval_lines(app: LiveShell) -> list[str] {
         } elif tool_name == "edit_file" {
             body.append(str(args.get("path", "")));
             body.append(
-                "- " + str(len(str(args.get("old_text", ""))))
-                + " / + " + str(len(str(args.get("new_text", "")))) + " chars"
+                "- "
+                    + str(len(str(args.get("old_text", ""))))
+                    + " / + "
+                    + str(len(str(args.get("new_text", ""))))
+                    + " chars",
             );
         } else {
             parts: list[str] = [];
@@ -115,7 +120,6 @@ def _approval_lines(app: LiveShell) -> list[str] {
     body.append("  [a] Accept    [r] Reject    [esc]");
     return window_frame(WindowSpec(title=head, width=inner), body);
 }
-
 
 """Foreground extension-ui modal content — painted into the shared
 overlay node while app.ui_modal is set."""
@@ -157,7 +161,6 @@ def _ui_modal_lines(app: LiveShell) -> list[str] {
     }
     return window_frame(WindowSpec(title=head, width=inner), body);
 }
-
 
 """Prompt-anchored drop-up for every explicit picker.
 The same selection pattern handles provider login, sessions, skills, tasks,
@@ -213,7 +216,6 @@ def _picker_popup_rows(app: LiveShell) -> list[str] {
     return [truncate_text(row, width, ellipsis="…") for row in out];
 }
 
-
 """Prompt-anchored drop-up for extension select requests."""
 def _ui_select_popup_rows(app: LiveShell) -> list[str] {
     m: any = _ui_modal_state(app);
@@ -247,7 +249,6 @@ def _ui_select_popup_rows(app: LiveShell) -> list[str] {
     return [truncate_text(row, width, ellipsis="…") for row in out];
 }
 
-
 """Paint a centered modal/approval into the shared overlay node.
 The caller has already decided ownership; this guards the optional node."""
 def _paint_overlay(app: LiveShell, lines: list[str], outer_width: int = 48) {
@@ -268,7 +269,6 @@ def _paint_overlay(app: LiveShell, lines: list[str], outer_width: int = 48) {
     mark_semantic_dirty(app.renderer, ov);
     mark_layout_dirty(app.renderer, ov);
 }
-
 
 # ==================== model completion ====================
 
@@ -336,7 +336,6 @@ def _model_completion_candidates(prefix: str) -> list[list[str]] {
     return out;
 }
 
-
 """Dismissal gate for the slash/model popup. The dismissed value is the
 RAW draft captured at esc/tab/enter time, and the popup stays hidden only
 while the draft is unchanged. This used to compare the STRIPPED draft,
@@ -347,12 +346,14 @@ def _popup_suppressed(raw: str, dismissed: str) -> bool {
     return raw == dismissed;
 }
 
-
 """Model completion visibility + candidates in one shot: hidden while any
 modal, picker or approval owns the screen. The popup only appears for
 `/model` and `/model <prefix>`, not as a global command-search palette."""
 def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
-    if _picker_state(app) is not None or _ui_modal_state(app) is not None or app.shell.approval is not None {
+    if _picker_state(app) is not None
+        or _ui_modal_state(app) is not None
+        or app.shell.approval is not None
+    {
         return None;
     }
     raw = app.shell.prompt.draft;
@@ -375,7 +376,6 @@ def _slash_popup_state(app: LiveShell) -> list[list[str]] | None {
     return None;
 }
 
-
 """Resolve a tab/enter press against model completion. Enter on a candidate
 identical to the current draft returns submit=True, so /model can open on
 one Enter. Pure so the decision stays testable headless."""
@@ -391,7 +391,6 @@ def _slash_popup_pick(matches: list[list[str]], draft: str, sel: int) -> tuple[s
     chosen = str(matches[idx][0]);
     return (chosen, chosen == draft.strip());
 }
-
 
 """>-cursor rows for the popup (selected entry marked, description
 truncated to the terminal width). Selection clamps into range so stale
@@ -420,7 +419,6 @@ def _slash_popup_rows(app: LiveShell, matches: list[list[str]]) -> list[str] {
     return rows;
 }
 
-
 def _transcript_lines(app: LiveShell) -> list[str] {
     win = materialize_visible(app.proj);
     if win.lines {
@@ -439,7 +437,6 @@ def _transcript_lines(app: LiveShell) -> list[str] {
     ];
 }
 
-
 def _paint(app: LiveShell) {
     lines = _transcript_lines(app);
     prompt_lines = _prompt_lines(app);
@@ -451,7 +448,8 @@ def _paint(app: LiveShell) {
     if _picker_state(app) is not None {
         popup_rows = _picker_popup_rows(app);
     } elif _ui_modal_state(app) is not None
-        and str(_ui_modal_state(app).get("method", "")) == "select" {
+        and str(_ui_modal_state(app).get("method", "")) == "select"
+    {
         popup_rows = _ui_select_popup_rows(app);
     } elif popup is not None {
         popup_rows = _slash_popup_rows(app, popup);
@@ -459,10 +457,7 @@ def _paint(app: LiveShell) {
     set_node_contract(
         app.renderer,
         app.shell.prompt,
-        LayoutSpec(
-            width=fill_axis(),
-            height=fixed_axis(3 + len(popup_rows)),
-        ),
+        LayoutSpec(width=fill_axis(), height=fixed_axis(3 + len(popup_rows))),
     );
 
     # Shared overlay node: real approvals take precedence; non-choice
@@ -471,16 +466,19 @@ def _paint(app: LiveShell) {
     if app.phase == "approval" {
         overlay = _approval_lines(app);
     } elif _ui_modal_state(app) is not None
-        and str(_ui_modal_state(app).get("method", "")) != "select" {
+        and str(_ui_modal_state(app).get("method", "")) != "select"
+    {
         overlay = _ui_modal_lines(app);
     }
     win_lines: list[str] | None = None;
-    if overlay is None and _picker_state(app) is None
+    if overlay is None
+        and _picker_state(app) is None
         and app.phase != "approval"
         and not (
             _ui_modal_state(app) is not None
             and str(_ui_modal_state(app).get("method", "")) == "select"
-        ) {
+        )
+    {
         win_lines = _window_paint_lines(app);
         if win_lines is not None {
             _paint_overlay(app, win_lines, len(win_lines[0]));
@@ -505,13 +503,9 @@ def _paint(app: LiveShell) {
         cursor_col = max_col;
     }
     request_cursor(
-        app.renderer,
-        app.shell.prompt,
-        row_offset=1 + len(popup_rows),
-        col_offset=cursor_col,
+        app.renderer, app.shell.prompt, row_offset=1 + len(popup_rows), col_offset=cursor_col
     );
 }
-
 
 def _render(app: LiveShell) {
     if not app.dirty {

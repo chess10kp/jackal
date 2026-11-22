@@ -97,30 +97,25 @@ glob DESTRUCTIVE_BASH_PATTERNS: list[str] = [
     r"\btruncate\s+table\b",
 ];
 
-
 """True when the mode restricts the session to read-only behavior."""
 def is_read_only_mode(mode: str) -> bool {
     return mode in READ_ONLY_MODES;
 }
-
 
 """True when a tool is on the read-only-mode blocked list."""
 def is_tool_blocked_in_read_only_mode(tool_name: str) -> bool {
     return tool_name in READ_ONLY_MODE_BLOCKED_TOOLS;
 }
 
-
 """True when the given mode blocks the given tool."""
 def is_tool_blocked(mode: str, tool_name: str) -> bool {
     return is_read_only_mode(mode) and is_tool_blocked_in_read_only_mode(tool_name);
 }
 
-
 """True when the tool name belongs to the MCP namespace."""
 def is_mcp_tool(tool_name: str) -> bool {
     return tool_name.startswith("mcp_");
 }
-
 
 """Mark MCP tools (sanitized registry names) as safe for read-only modes."""
 def register_mcp_read_only_tools(names: list[str]) {
@@ -129,7 +124,6 @@ def register_mcp_read_only_tools(names: list[str]) {
     }
 }
 
-
 """Drop MCP tools from the read-only registry (refresh/restart housekeeping)."""
 def unregister_mcp_read_only_tools(names: list[str]) {
     for n in names {
@@ -137,21 +131,26 @@ def unregister_mcp_read_only_tools(names: list[str]) {
     }
 }
 
-
 """Human-facing reason string for a blocked tool in a read-only mode."""
 def read_only_mode_block_reason(tool_name: str, mode: str) -> str {
     if is_mcp_tool(tool_name) {
         return (
-            'MCP tool "' + tool_name + '" is not marked read-only, so it is blocked in '
-            + mode + ' mode. Mark the server "read_only": true (or list "read_only_tools") in the mcp config to allow it.'
+            'MCP tool "'
+            + tool_name
+            + '" is not marked read-only, so it is blocked in '
+            + mode
+            + ' mode. Mark the server "read_only": true (or list "read_only_tools") in the mcp config to allow it.'
         );
     }
     if mode == "ask" {
-        return 'Tool "' + tool_name + '" cannot modify files in ask mode. Switch to normal mode (Shift+Tab) to make changes.';
+        return 'Tool "'
+            + tool_name
+            + '" cannot modify files in ask mode. Switch to normal mode (Shift+Tab) to make changes.';
     }
-    return 'Tool "' + tool_name + '" cannot modify files in plan mode. Switch to normal mode (Shift+Tab) to implement changes.';
+    return 'Tool "'
+        + tool_name
+        + '" cannot modify files in plan mode. Switch to normal mode (Shift+Tab) to implement changes.';
 }
-
 
 """Advance the Shift+Tab mode cycle; unknown modes reset to normal."""
 def cycle_mode(current: str) -> str {
@@ -167,7 +166,6 @@ def cycle_mode(current: str) -> str {
     }
     return DEV_MODES[(idx + 1) % len(DEV_MODES)];
 }
-
 
 """Parse a --mode[=value] CLI flag; invalid values yield {"error": raw}."""
 def parse_mode_flag(args: list[str]) -> str | dict[str, str] | None {
@@ -190,7 +188,6 @@ def parse_mode_flag(args: list[str]) -> str | dict[str, str] | None {
     return None;
 }
 
-
 """True when the shell command matches a destructive-bash pattern."""
 def is_destructive_bash(cmd: str) -> bool {
     command = cmd.strip();
@@ -204,7 +201,6 @@ def is_destructive_bash(cmd: str) -> bool {
     }
     return False;
 }
-
 
 """Appendix text the system prompt gains in plan/ask modes."""
 def system_prompt_for_mode(base_prompt: str, mode: str) -> str {
@@ -222,7 +218,6 @@ def system_prompt_for_mode(base_prompt: str, mode: str) -> str {
     }
     return base_prompt;
 }
-
 
 """Resolve the approval policy for a tool call under a mode.
 

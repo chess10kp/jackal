@@ -2,14 +2,8 @@
 
 import from constraints.algebra { Variable }
 import from constraints.solver { Solver }
-import from ui.layout_types {
-    AxisSize,
-    LayoutDiagnostic,
-    LayoutSpec,
-    Size,
-}
+import from ui.layout_types { AxisSize, LayoutDiagnostic, LayoutSpec, Size }
 import from ui.model { UiNode }
-
 
 """Axis-phase gate: does this phase emit constraints on the horizontal
 axis? Phase full emits both; h only left/right facts; v only
@@ -24,7 +18,6 @@ def _wants(phase: str, horizontal: bool) -> bool {
     return True;
 }
 
-
 """The four edge variables for one laid-out node (plan §6)."""
 obj NodeEdges {
     has id_str: str,
@@ -35,7 +28,6 @@ obj NodeEdges {
         bottom: Variable;
 }
 
-
 """Compilation outcome. On ok=False the solver is absent (atomic abort)."""
 obj CompileResult {
     has ok: bool = True,
@@ -44,7 +36,6 @@ obj CompileResult {
         diagnostics: list[LayoutDiagnostic] = [],
         partitions: list[PartitionInfo] = [];
 }
-
 
 """One container flow partition recorded for largest-remainder
 quantization by the layout engine."""
@@ -59,7 +50,6 @@ obj PartitionInfo {
         maximums: list[float] = [];
 }
 
-
 obj _ScopedNode {
     has target: UiNode,
         id_str: str = "",
@@ -70,13 +60,11 @@ obj _ScopedNode {
         z_index: int = 0;
 }
 
-
 obj _Scope {
     has order: list[_ScopedNode] = [],
         parent_of: dict[str, str] = {},
         error: LayoutDiagnostic | None = None;
 }
-
 
 obj _Entry {
     has scoped: _ScopedNode,
@@ -84,13 +72,11 @@ obj _Entry {
         spec: LayoutSpec;
 }
 
-
 obj _FlowChild {
     has ent: _Entry,
         size: AxisSize,
         natural: float | None = None;
 }
-
 
 obj _Allocation {
     has targets: list[float] = [],

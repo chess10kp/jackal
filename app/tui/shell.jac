@@ -136,7 +136,7 @@ def shutdown_tui(app: LiveShell) {
 }
 
 
-def run_tui() {
+def run_tui  {
     try {
         app = boot_tui();
     } except ValueError as e {

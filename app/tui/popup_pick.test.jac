@@ -26,7 +26,6 @@ def _slash_popup_pick(matches: list[list[str]], draft: str, sel: int) -> tuple[s
     return (chosen, chosen == draft.strip());
 }
 
-
 test "exact match must submit, not re-complete" {
     matches: list[list[str]] = [["/model", "show or set the model"]];
     (chosen, submit) = _slash_popup_pick(matches, "/model", 0);
@@ -47,7 +46,7 @@ test "tab decision is unaffected by the submit rule" {
     matches: list[list[str]] = [["/model", ""]];
     (chosen, submit) = _slash_popup_pick(matches, "/model", 0);
     assert chosen == "/model";  # completion target; submit flag ignored for tab
-    assert submit;      # input.jac only honors it for enter
+    assert submit;  # input.jac only honors it for enter
 }
 
 test "stale selection clamps into range" {
@@ -67,12 +66,10 @@ test "exact match among several candidates still submits" {
     assert submit;
 }
 
-
 """Verbatim replica of tui.overlay._popup_suppressed."""
 def _popup_suppressed(raw: str, dismissed: str) -> bool {
     return raw == dismissed;
 }
-
 
 test "completed /model must not suppress the argument window" {
     # THE regression: tab-completing /model stores dismissed="/model";
@@ -82,7 +79,6 @@ test "completed /model must not suppress the argument window" {
     assert _popup_suppressed("/model", "/model");
     assert not _popup_suppressed("/model ", "/model");
 }
-
 
 test "esc hides the exact draft and typing reopens" {
     # esc stores the raw draft (trailing space included); any further

@@ -9,7 +9,6 @@ Same-stem test module: ui/layout_quantize.jac symbols are ambient here
 (importing them explicitly would self-cycle the module init).
 """
 
-
 def _req(
     span: int,
     targets: list[float],
@@ -18,14 +17,9 @@ def _req(
     maximums: list[float] = [],
 ) -> PartitionRequest {
     return PartitionRequest(
-        span=span,
-        targets=targets,
-        fixed=fixed,
-        minimums=minimums,
-        maximums=maximums,
+        span=span, targets=targets, fixed=fixed, minimums=minimums, maximums=maximums
     );
 }
-
 
 test "snap_edge rounds halves toward the smaller coordinate" {
     assert snap_edge(2.5) == 2;
@@ -33,7 +27,6 @@ test "snap_edge rounds halves toward the smaller coordinate" {
     assert snap_edge(-2.5) == -3;
     assert snap_edge(-0.5) == -1;
 }
-
 
 test "snap_edge handles ordinary rounding and negatives" {
     assert snap_edge(2.7) == 3;
@@ -43,13 +36,11 @@ test "snap_edge handles ordinary rounding and negatives" {
     assert snap_edge(0.0) == 0;
 }
 
-
 test "snap_edge snaps EPSILON-close values to integers" {
     assert snap_edge(4.0 + 1e-10) == 4;
     assert snap_edge(4.0 - 1e-10) == 4;
     assert snap_edge(6.99999999999) == 7;
 }
-
 
 test "snap_edge_group snaps once for the whole group" {
     g = snap_edge_group([3.0, 3.0 + 5e-11, 3.0 - 5e-11]);
@@ -58,13 +49,11 @@ test "snap_edge_group snaps once for the whole group" {
     assert g[2] == 3;
 }
 
-
 test "partition with exact integer targets is identity" {
     r = quantize_partition(_req(24, [1.0, 20.0, 3.0]));
     assert r.ok;
     assert r.sizes == [1, 20, 3];
 }
-
 
 test "largest remainder ties break to the lowest index (rank order)" {
     # Legacy engine biased leftover cells to the LAST grow child; the
@@ -76,7 +65,6 @@ test "largest remainder ties break to the lowest index (rank order)" {
     assert sum(r.sizes) == 10;
 }
 
-
 test "two flexible children bias leftover to the last (legacy parity)" {
     # Plan 8.3: LR applies only at three or more fractional targets.
     # Two equal shares of 5: legacy gives [2, 3], not [3, 2].
@@ -86,13 +74,11 @@ test "two flexible children bias leftover to the last (legacy parity)" {
     assert sum(r.sizes) == 5;
 }
 
-
 test "single flexible child absorbs the whole leftover" {
     r = quantize_partition(_req(7, [6.5]));
     assert r.ok;
     assert r.sizes == [7];
 }
-
 
 test "unequal weights below three still match int-share-then-remainder" {
     # Legacy: share0 = int(7 * 2/3) = 4, last child gets 7 - 4 = 3.
@@ -101,7 +87,6 @@ test "unequal weights below three still match int-share-then-remainder" {
     assert r.sizes == [4, 3];
 }
 
-
 test "distinct remainders distribute by descending fraction" {
     r = quantize_partition(_req(10, [2.9, 3.6, 3.5]));
     assert r.ok;
@@ -109,29 +94,22 @@ test "distinct remainders distribute by descending fraction" {
     assert sum(r.sizes) == 10;
 }
 
-
 test "second distribution pass when leftover exceeds child count" {
     r = quantize_partition(_req(11, [3.7, 3.7, 3.6]));
     assert r.ok;
     assert r.sizes == [4, 4, 3];
 }
 
-
 test "fixed claims stay fixed during distribution" {
     # Two flexible children: below the three-target threshold, so the
     # leftover cell biases to the final flexible child (legacy parity).
-    r = quantize_partition(
-        _req(10, [3.0, 3.5, 3.5], fixed=[True, False, False])
-    );
+    r = quantize_partition(_req(10, [3.0, 3.5, 3.5], fixed=[True, False, False]));
     assert r.ok;
     assert r.sizes == [3, 3, 4];
 }
 
-
 test "every flexible child stays within one cell of its target" {
-    r = quantize_partition(
-        _req(40, [7.3, 12.9, 19.8])
-    );
+    r = quantize_partition(_req(40, [7.3, 12.9, 19.8]));
     assert r.ok;
     assert abs(float(r.sizes[0]) - 7.3) < 1.0;
     assert abs(float(r.sizes[1]) - 12.9) < 1.0;
@@ -139,20 +117,14 @@ test "every flexible child stays within one cell of its target" {
     assert sum(r.sizes) == 40;
 }
 
-
 test "bound interval without an integer cell size is rejected" {
-    r = quantize_partition(
-        _req(10, [2.5], minimums=[], maximums=[]),
-    );
+    r = quantize_partition(_req(10, [2.5], minimums=[], maximums=[]));
     _ = r;
-    r2 = quantize_partition(
-        _req(10, [2.5, 7.5], minimums=[2.2, 0.0], maximums=[2.8, 100.0])
-    );
+    r2 = quantize_partition(_req(10, [2.5, 7.5], minimums=[2.2, 0.0], maximums=[2.8, 100.0]));
     assert not r2.ok;
     assert r2.index == 0;
     assert r2.sizes == [];
 }
-
 
 test "negative residual after overflow clips reports failure not lies" {
     # Fixed claims alone exceed the span: no honest integer partition.
@@ -161,25 +133,20 @@ test "negative residual after overflow clips reports failure not lies" {
     assert r.index == -1;
 }
 
-
 test "flexible floors that cannot close the deficit report failure" {
     # All-flexible but targets floor above the span: floors 4+4 > 5.
     r = quantize_partition(_req(5, [4.2, 4.8]));
     assert not r.ok;
 }
 
-
 test "bound clamp triggers repair that restores closure" {
     # Child 1 caps at 2; distribution wants to give it a third cell;
     # the clamp must push the cell back to the other flexible child.
-    r = quantize_partition(
-        _req(5, [2.1, 2.9], minimums=[0.0, 0.0], maximums=[100.0, 2.5])
-    );
+    r = quantize_partition(_req(5, [2.1, 2.9], minimums=[0.0, 0.0], maximums=[100.0, 2.5]));
     assert r.ok;
     assert r.sizes == [3, 2];
     assert sum(r.sizes) == 5;
 }
-
 
 test "empty partition requires empty span" {
     ok = quantize_partition(_req(0, []));
@@ -188,10 +155,7 @@ test "empty partition requires empty span" {
     assert not bad.ok;
 }
 
-
 test "negative span or malformed shapes are rejected" {
     assert not quantize_partition(_req(-1, [1.0])).ok;
-    assert not quantize_partition(
-        _req(4, [2.0, 2.0], minimums=[1.0])
-    ).ok;
+    assert not quantize_partition(_req(4, [2.0, 2.0], minimums=[1.0])).ok;
 }

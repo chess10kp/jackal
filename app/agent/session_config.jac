@@ -61,7 +61,7 @@ def set_mode(next_mode: str) -> str {
 
 
 """Return the active dev mode for native UI clients."""
-def get_mode() -> str {
+def get_mode -> str {
     return get_mode_state();
 }
 
@@ -327,7 +327,7 @@ def mcp_server_specs(cfg: dict[str, any]) -> dict[str, list[str]] {
 
 """User-level config path: JACKAL_AGENT_DIR/config.json first, then the
 home-level ~/.jackal/config.json. Empty string when neither exists."""
-def _user_config_path() -> str {
+def _user_config_path -> str {
     agent_dir: str = os.environ.get("JACKAL_AGENT_DIR", "");
     if agent_dir {
         cand: str = os.path.join(agent_dir, "config.json");
@@ -393,7 +393,7 @@ def mcp_config(cwd: str) -> dict[str, any] {
 
 """Configured MCP servers (all sources merged) as {name: argv} for UI glue
 that must not parse config itself."""
-def mcp_configured_specs() -> dict[str, list[str]] {
+def mcp_configured_specs -> dict[str, list[str]] {
     cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
     return mcp_server_specs(mcp_config(cwd));
 }
@@ -630,7 +630,7 @@ def _revive_client(server_name: str) -> bool {
 `connected` but whose process is gone (or whose reader hit EOF) flips to
 `failed` with a notice. Frontends call this via drain_mcp_notices, so a
 death surfaces within one tick/turn without extra threads."""
-def mcp_health_check() {
+def mcp_health_check  {
     for (name, client) in list(plugins.mcp_clients.items()) {
         st: dict[str, any] = plugins.mcp_status.get(name, {});
         if str(st.get("state", "")) != "connected" {
@@ -654,7 +654,7 @@ def mcp_health_check() {
 """Pop queued MCP notices for display (frontends call this each tick/turn).
 Also pumps buffered server notifications (list_changed diff) and runs the
 death health check first, so both surface within one tick/turn."""
-def drain_mcp_notices() -> list[str] {
+def drain_mcp_notices -> list[str] {
     mcp_health_check();
     mcp_pump_notifications();
     out: list[str] = list(plugins.mcp_notices);
@@ -669,7 +669,7 @@ tools/list_changed triggers a bounded re-list + diff (register new tools,
 unregister vanished ones) without a respawn; progress and logging
 notifications are dropped safely. Bounded work only: the refresh uses a
 short list timeout so a wedged server cannot stall the caller for long."""
-def mcp_pump_notifications() {
+def mcp_pump_notifications  {
     for (name, client) in list(plugins.mcp_clients.items()) {
         st: dict[str, any] = plugins.mcp_status.get(name, {});
         if str(st.get("state", "")) != "connected" {
@@ -1031,7 +1031,7 @@ def _attach_one_mcp_server(server_name: str, spec_json: str) {
 """Parse the effective (user + project) MCP config and background-spawn
 each declared server. Disabled servers get a `disabled` status entry and
 never attach."""
-def _attach_mcp_servers() {
+def _attach_mcp_servers  {
     cwd: str = plugins.cwd if plugins.cwd else os.getcwd();
     imported: list[str] = mcp_import_legacy();
     if imported {
@@ -1217,7 +1217,7 @@ def mcp_prompt(server_name: str, prompt_name: str, args_json: str) -> str {
 
 """Restart every server whose status is `failed` (bare /mcp restart).
 Returns a summary line; servers that were fine are left alone."""
-def mcp_restart_failed() -> str {
+def mcp_restart_failed -> str {
     doomed: list[str] = [];
     for name in sorted(plugins.mcp_status.keys()) {
         if str(plugins.mcp_status[name].get("state", "")) == "failed" {
@@ -1262,7 +1262,7 @@ def wait_mcp_ready(timeout_s: float = -1.0) -> bool {
 
 
 """One status line per known MCP server (REPL /mcp)."""
-def mcp_status_lines() -> list[str] {
+def mcp_status_lines -> list[str] {
     lines: list[str] = [];
     for name in sorted(plugins.mcp_status.keys()) {
         st = plugins.mcp_status[name];
@@ -1277,7 +1277,7 @@ def mcp_status_lines() -> list[str] {
 
 
 
-def _model_prefs_path() -> str {
+def _model_prefs_path -> str {
     cwd = plugins.cwd if plugins.cwd else os.getcwd();
     return os.path.join(cwd, ".jackal", "model_prefs.json");
 }
@@ -1328,7 +1328,7 @@ def _record_model_pref(name: str) {
 
 """Snapshot of persisted last-model preferences ("last" + provider keys).
 For the TUI /model picker to preselect per-provider defaults."""
-def model_preferences() -> dict[str, any] {
+def model_preferences -> dict[str, any] {
     _load_model_prefs();
     return dict(_model_prefs);
 }
@@ -1384,7 +1384,7 @@ def clear_history {
 
 
 """Apply extension-issued model and thinking-level requests."""
-def _apply_pending_model_requests() {
+def _apply_pending_model_requests  {
     b = plugins.bridge;
     if b is None {
         return;

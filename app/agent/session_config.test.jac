@@ -11,7 +11,6 @@ import json;
 import tempfile;
 import shutil;
 
-
 def _write_project_cfg(base: str, cfg: dict[str, any]) {
     os.makedirs(os.path.join(base, ".jackal", "sessions"), exist_ok=True);
     fh: any = open(os.path.join(base, ".jackal", "config.json"), "w");
@@ -19,20 +18,23 @@ def _write_project_cfg(base: str, cfg: dict[str, any]) {
     fh.close();
 }
 
-
 test "mcp server specs parse env, cwd, enabled, and timeout" {
-    cfg = {"mcp": {"servers": {
-        "full": {
-            "command": "uvx",
-            "args": ["some-server"],
-            "env": {"TOKEN": "abc", "N": 3},
-            "cwd": "/tmp/srv",
-            "timeout": 30,
+    cfg = {
+        "mcp": {
+            "servers": {
+                "full": {
+                    "command": "uvx",
+                    "args": ["some-server"],
+                    "env": {"TOKEN": "abc", "N": 3},
+                    "cwd": "/tmp/srv",
+                    "timeout": 30,
+                },
+                "off": {"command": "true", "enabled": False},
+                "minimal": {"command": ["jac", "mcp"]},
+                "bad": {"args": ["no-command"]},
+            },
         },
-        "off": {"command": "true", "enabled": False},
-        "minimal": {"command": ["jac", "mcp"]},
-        "bad": {"args": ["no-command"]},
-    }}};
+    };
     specs = _mcp_server_specs(cfg);
     names = sorted(list(specs.keys()));
     assert names == ["full", "minimal", "off"];
@@ -55,7 +57,6 @@ test "mcp server specs parse env, cwd, enabled, and timeout" {
     assert "off" in argv;
 }
 
-
 test "user-level config merges beneath the project config" {
     tmp_dir = tempfile.mkdtemp(prefix="jackal-mcp-cfg-");
     agent_dir = os.path.join(tmp_dir, "agentdir");
@@ -65,17 +66,30 @@ test "user-level config merges beneath the project config" {
     try {
         # User level: a user-only server and a shared server (user flavor).
         fh: any = open(os.path.join(agent_dir, "config.json"), "w");
-        fh.write(json.dumps({"mcp": {"servers": {
-            "useronly": {"command": "user-cmd"},
-            "shared": {"command": "user-shared", "env": {"U": "1"}},
-        }}}));
+        fh.write(
+            json.dumps({
+                "mcp": {
+                    "servers": {
+                        "useronly": {"command": "user-cmd"},
+                        "shared": {"command": "user-shared", "env": {"U": "1"}},
+                    },
+                },
+            }),
+        );
         fh.close();
         # Project level: shared overrides wholesale; project-only added.
         proj = os.path.join(tmp_dir, "proj");
-        _write_project_cfg(proj, {"mcp": {"servers": {
-            "shared": {"command": "proj-shared", "cwd": "/w"},
-            "projonly": {"command": "proj-cmd"},
-        }}});
+        _write_project_cfg(
+            proj,
+            {
+                "mcp": {
+                    "servers": {
+                        "shared": {"command": "proj-shared", "cwd": "/w"},
+                        "projonly": {"command": "proj-cmd"},
+                    },
+                },
+            },
+        );
         eff = mcp_config(proj);
         servers: any = eff["mcp"]["servers"];
         snames = sorted(list(servers.keys()));
@@ -100,7 +114,6 @@ test "user-level config merges beneath the project config" {
     }
 }
 
-
 test "missing user config yields project-only mcp config" {
     tmp_dir = tempfile.mkdtemp(prefix="jackal-mcp-cfg-");
     agent_dir = os.path.join(tmp_dir, "empty-agent");
@@ -109,9 +122,7 @@ test "missing user config yields project-only mcp config" {
     os.environ["JACKAL_AGENT_DIR"] = agent_dir;
     try {
         proj = os.path.join(tmp_dir, "proj");
-        _write_project_cfg(proj, {"mcp": {"servers": {
-            "p": {"command": "pcmd"},
-        }}});
+        _write_project_cfg(proj, {"mcp": {"servers": {"p": {"command": "pcmd"}}}});
         eff = mcp_config(proj);
         servers: any = eff["mcp"]["servers"];
         assert sorted(list(servers.keys())) == ["p"];
@@ -168,7 +179,6 @@ for raw in sys.stdin:
             "code": -32601, "message": "method not found"}})
 """;
 
-
 def _reset_mcp_plugin_state {
     plugins.mcp_clients.clear();
     plugins.mcp_status.clear();
@@ -179,7 +189,6 @@ def _reset_mcp_plugin_state {
     plugins.mcp_tools = 0;
     plugins.reg = None;
 }
-
 
 def _spec_for(cmd: list[str]) -> dict[str, any] {
     return {
@@ -192,7 +201,6 @@ def _spec_for(cmd: list[str]) -> dict[str, any] {
         "read_only_tools": [],
     };
 }
-
 
 test "tools/list_changed refresh diffs the registry without a respawn" {
     tmp = tempfile.mkdtemp(prefix="jackal-mcp-ref-");
@@ -210,24 +218,37 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
         plugins.mcp_clients["t"] = client;
         plugins.mcp_specs["t"] = _spec_for(cmd);
         plugins.mcp_status["t"] = {"state": "connected", "error": "", "tools": 0, "cmd": cmd};
-        stats = _register_server_tools(reg, "t", client, plugins.mcp_specs["t"], [
-            {"name": "alpha", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-        ]);
+        stats = _register_server_tools(
+            reg,
+            "t",
+            client,
+            plugins.mcp_specs["t"],
+            [
+                {
+                    "name": "alpha",
+                    "description": "d",
+                    "inputSchema": {"type": "object", "properties": {}, "required": []},
+                },
+            ],
+        );
         assert int(stats["registered"]) == 1;
         assert get_tool(reg, "mcp_t_alpha") is not None;
         assert plugins.mcp_owned.get("mcp_t_alpha", "") == "t";
 
         # Server now serves "beta"; a buffered list_changed must diff.
         client.notifications.append({
-            "jsonrpc": "2.0", "method": "notifications/tools/list_changed",
+            "jsonrpc": "2.0",
+            "method": "notifications/tools/list_changed",
         });
         mcp_pump_notifications();
         reg_names = sorted([str(k) for k in reg.tools.keys()]);
         notes = " | ".join(plugins.mcp_notices);
         assert get_tool(reg, "mcp_t_alpha") is None, (
-            "alpha still registered: " + str(reg_names) + " notices: " + notes);
+            "alpha still registered: " + str(reg_names) + " notices: " + notes
+        );
         assert get_tool(reg, "mcp_t_beta") is not None, (
-            "beta missing: " + str(reg_names) + " notices: " + notes);
+            "beta missing: " + str(reg_names) + " notices: " + notes
+        );
         assert plugins.mcp_owned.get("mcp_t_beta", "") == "t";
         assert int(plugins.mcp_status["t"]["tools"]) == 1;
         joined = " ".join(plugins.mcp_notices);
@@ -239,22 +260,41 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
     }
 }
 
-
 test "cross-server tool name collisions rename deterministically" {
     reg = ToolRegistry();
     plugins.reg = reg;
     dummy = create_mcp_client();
     try {
         spec = _spec_for(["noop"]);
-        s1 = _register_server_tools(reg, "a.b", dummy, spec, [
-            {"name": "x", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-        ]);
+        s1 = _register_server_tools(
+            reg,
+            "a.b",
+            dummy,
+            spec,
+            [
+                {
+                    "name": "x",
+                    "description": "d",
+                    "inputSchema": {"type": "object", "properties": {}, "required": []},
+                },
+            ],
+        );
         assert int(s1["registered"]) == 1 and int(s1["lost"]) == 0;
         assert get_tool(reg, "mcp_a_b_x") is not None;
         # "a-b" sanitizes to the same chunk: second registration must rename
-        s2 = _register_server_tools(reg, "a-b", dummy, spec, [
-            {"name": "x", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-        ]);
+        s2 = _register_server_tools(
+            reg,
+            "a-b",
+            dummy,
+            spec,
+            [
+                {
+                    "name": "x",
+                    "description": "d",
+                    "inputSchema": {"type": "object", "properties": {}, "required": []},
+                },
+            ],
+        );
         assert int(s2["registered"]) == 1 and int(s2["lost"]) == 0;
         assert get_tool(reg, "mcp_a_b_x_2") is not None;
         assert plugins.mcp_owned.get("mcp_a_b_x", "") == "a.b";
@@ -262,9 +302,19 @@ test "cross-server tool name collisions rename deterministically" {
         joined = " ".join(plugins.mcp_notices);
         assert "collision" in joined;
         # same-server re-registration replaces silently (no _3)
-        s3 = _register_server_tools(reg, "a-b", dummy, spec, [
-            {"name": "x", "description": "d2", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-        ]);
+        s3 = _register_server_tools(
+            reg,
+            "a-b",
+            dummy,
+            spec,
+            [
+                {
+                    "name": "x",
+                    "description": "d2",
+                    "inputSchema": {"type": "object", "properties": {}, "required": []},
+                },
+            ],
+        );
         assert int(s3["registered"]) == 1;
         assert get_tool(reg, "mcp_a_b_x_2") is not None;
         assert get_tool(reg, "mcp_a_b_x_3") is None;
@@ -302,7 +352,6 @@ test "health check flips dead servers to failed with a notice" {
         _reset_mcp_plugin_state();
     }
 }
-
 
 test "a tool call against a dead server revives once and succeeds" {
     tmp = tempfile.mkdtemp(prefix="jackal-mcp-rv-");
@@ -348,9 +397,21 @@ test "allow_tools and deny_tools gate registration (deny wins)" {
         spec["allow_tools"] = ["read_*"];
         spec["deny_tools"] = ["read_secret*"];
         tools = [
-            {"name": "read_docs", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-            {"name": "read_secret", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-            {"name": "write_docs", "description": "d", "inputSchema": {"type": "object", "properties": {}, "required": []}},
+            {
+                "name": "read_docs",
+                "description": "d",
+                "inputSchema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "read_secret",
+                "description": "d",
+                "inputSchema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "write_docs",
+                "description": "d",
+                "inputSchema": {"type": "object", "properties": {}, "required": []},
+            },
         ];
         stats = _register_server_tools(reg, "g", dummy, spec, tools);
         assert int(stats["registered"]) == 1;
@@ -388,7 +449,6 @@ test "mcp_restart_failed restarts only failed servers" {
     }
 }
 
-
 test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
     tmp = tempfile.mkdtemp(prefix="jackal-mcp-import-");
     old_agent_dir = os.environ.get("JACKAL_AGENT_DIR", "");
@@ -402,25 +462,30 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
         os.environ.pop("JACKAL_MCP_NO_IMPORT", None);
         src1 = os.path.join(tmp, "cursor.json");
         with open(src1, "w") as f {
-            f.write(json.dumps({"mcpServers": {
-                "leg_one": {"command": "uvx", "args": ["srv-one"]},
-                "leg_off": {"command": ["jac", "mcp"], "disabled": True},
-                "leg_web": {"url": "https://x.example/mcp"},
-                "leg_bare": {"args": ["no-command"]},
-            }}));
+            f.write(
+                json.dumps({
+                    "mcpServers": {
+                        "leg_one": {"command": "uvx", "args": ["srv-one"]},
+                        "leg_off": {"command": ["jac", "mcp"], "disabled": True},
+                        "leg_web": {"url": "https://x.example/mcp"},
+                        "leg_bare": {"args": ["no-command"]},
+                    },
+                }),
+            );
         }
         src2 = os.path.join(tmp, "vscode.json");
         with open(src2, "w") as f {
-            f.write(json.dumps({"mcpServers": {
-                # duplicate name loses to the first source
-                "leg_one": {"command": "other"},
-                "leg_two": {"command": "npx", "args": ["srv-two"],
-                             "env": {"K": "V"}},
-            }}));
+            f.write(
+                json.dumps({
+                    "mcpServers": {
+                        # duplicate name loses to the first source
+                        "leg_one": {"command": "other"},
+                        "leg_two": {"command": "npx", "args": ["srv-two"], "env": {"K": "V"}},
+                    },
+                }),
+            );
         }
-        imported = mcp_import_legacy(
-            home_dir=home_dir, sources=[src1, src2],
-        );
+        imported = mcp_import_legacy(home_dir=home_dir, sources=[src1, src2]);
         assert sorted(imported) == ["leg_off", "leg_one", "leg_two"], imported;
         # user config written with mapped entries
         user_cfg: any = json.load(open(os.path.join(home_dir, ".jackal", "config.json")));
@@ -452,7 +517,6 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
     }
 }
 
-
 test "legacy import respects JACKAL_MCP_NO_IMPORT and existing names" {
     tmp = tempfile.mkdtemp(prefix="jackal-mcp-import2-");
     old_agent_dir = os.environ.get("JACKAL_AGENT_DIR", "");
@@ -467,16 +531,15 @@ test "legacy import respects JACKAL_MCP_NO_IMPORT and existing names" {
         target = os.path.join(home_dir, ".jackal", "config.json");
         os.makedirs(os.path.dirname(target), exist_ok=True);
         with open(target, "w") as f {
-            f.write(json.dumps({"mcp": {"servers": {
-                "leg_one": {"command": "already-here"},
-            }}}));
+            f.write(json.dumps({"mcp": {"servers": {"leg_one": {"command": "already-here"}}}}));
         }
         src1 = os.path.join(tmp, "cursor.json");
         with open(src1, "w") as f {
-            f.write(json.dumps({"mcpServers": {
-                "leg_one": {"command": "uvx"},
-                "leg_two": {"command": "npx"},
-            }}));
+            f.write(
+                json.dumps({
+                    "mcpServers": {"leg_one": {"command": "uvx"}, "leg_two": {"command": "npx"}},
+                }),
+            );
         }
         imported = mcp_import_legacy(home_dir=home_dir, sources=[src1]);
         assert imported == ["leg_two"], imported;

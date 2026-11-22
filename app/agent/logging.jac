@@ -51,7 +51,7 @@ glob _FALSEY: list[str] = ["0", "off", "false", "no", "none", ""],
 """The configured sink path, or "" when logging is disabled.
 `JACKAL_LOG=1` (or on/true/yes) means the default per-process file under
 <cwd>/.jackal/logs; any other non-falsey value is used as a literal path."""
-def log_sink() -> str {
+def log_sink -> str {
     raw: str = str(os.environ.get(LOG_ENV, "")).strip();
     low: str = raw.lower();
     if low in _FALSEY {
@@ -73,7 +73,7 @@ sem log_sink = "Resolve the JSONL sink path from JACKAL_LOG; empty means disable
 
 """Numeric threshold from JACKAL_LOG_LEVEL (default `info`). Unknown values
 fall back to `info` rather than disabling logging silently."""
-def log_threshold() -> int {
+def log_threshold -> int {
     raw: str = str(os.environ.get(LEVEL_ENV, DEFAULT_LEVEL)).strip().lower();
     if raw in LOG_LEVELS {
         return LOG_LEVELS[raw];

@@ -1,6 +1,5 @@
 """Behavior tests for the OSPUI domain/UI binding registry."""
 
-
 test "subscribe and unsubscribe round trip" {
     registry = BindingRegistry();
     assert subscribe(registry, "session.events", "target-1", "TranscriptChanged");
@@ -10,7 +9,6 @@ test "subscribe and unsubscribe round trip" {
     assert is_empty(registry);
     assert binding_count(registry) == 0;
 }
-
 
 test "deliver routes to correct targets" {
     registry = BindingRegistry();
@@ -28,14 +26,12 @@ test "deliver routes to correct targets" {
     assert len(deliver(registry, "session.events", "PhaseChanged")) == 0;
 }
 
-
 test "duplicate subscribe is rejected" {
     registry = BindingRegistry();
     assert subscribe(registry, "session.events", "target-1", "TranscriptChanged");
     assert not subscribe(registry, "session.events", "target-1", "TranscriptChanged");
     assert binding_count(registry) == 1;
 }
-
 
 test "unsubscribe_target clears all bindings for one target" {
     registry = BindingRegistry();
@@ -52,7 +48,6 @@ test "unsubscribe_target clears all bindings for one target" {
     assert len(bindings_for_target(registry, "other")) == 1;
 }
 
-
 test "find_orphan_bindings detects stale target" {
     registry = BindingRegistry();
     subscribe(registry, "session.events", "live-target", "TranscriptChanged");
@@ -67,7 +62,6 @@ test "find_orphan_bindings detects stale target" {
     assert orphans[0].event_type == "PhaseChanged";
 }
 
-
 test "dump_bindings returns deterministic ordering" {
     registry = BindingRegistry();
     subscribe(registry, "b.source", "z-target", "ZEvent");
@@ -78,24 +72,11 @@ test "dump_bindings returns deterministic ordering" {
     dump2 = dump_bindings(registry);
     assert dump1 == dump2;
     assert dump1 == [
-        {
-            "source_id": "a.source",
-            "target_id": "a-target",
-            "event_type": "AEvent",
-        },
-        {
-            "source_id": "a.source",
-            "target_id": "b-target",
-            "event_type": "BEvent",
-        },
-        {
-            "source_id": "b.source",
-            "target_id": "z-target",
-            "event_type": "ZEvent",
-        },
+        {"source_id": "a.source", "target_id": "a-target", "event_type": "AEvent"},
+        {"source_id": "a.source", "target_id": "b-target", "event_type": "BEvent"},
+        {"source_id": "b.source", "target_id": "z-target", "event_type": "ZEvent"},
     ];
 }
-
 
 test "clear_bindings empties registry" {
     registry = BindingRegistry();
@@ -106,7 +87,6 @@ test "clear_bindings empties registry" {
     assert binding_count(registry) == 0;
     assert len(dump_bindings(registry)) == 0;
 }
-
 
 test "subscribe rejects empty source or target ids" {
     registry = BindingRegistry();

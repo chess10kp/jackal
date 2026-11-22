@@ -326,7 +326,7 @@ obj LCG {
         return self.state % bound;
     }
 
-    def next_float() -> float {
+    def next_float -> float {
         return float(self.next_int(20001) - 10000) / 1000.0;
     }
 }

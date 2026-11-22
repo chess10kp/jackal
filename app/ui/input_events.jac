@@ -87,14 +87,14 @@ obj StreamChunkEvent(HostEvent) {
 }
 
 obj EofEvent(HostEvent) {
-    def init() {
+    def init  {
         self.kind = "eof";
     }
 }
 
 
 obj InterruptEvent(HostEvent) {
-    def init() {
+    def init  {
         self.kind = "interrupt";
     }
 }

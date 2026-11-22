@@ -1,6 +1,5 @@
 """CLI argument parsing tests (merged with agent/cli.jac by stem)."""
 
-
 test "no args yields defaults" {
     opts = parse_cli([]);
     assert opts["error"] == "";
@@ -9,13 +8,11 @@ test "no args yields defaults" {
     assert opts["prompt"] == "";
 }
 
-
 test "print mode joins positional words into the prompt" {
     opts = parse_cli(["-p", "fix", "the", "bug"]);
     assert opts["print"];
     assert opts["prompt"] == "fix the bug";
 }
-
 
 test "value flags accept separate and inline forms" {
     opts = parse_cli(["--model", "openrouter/x", "--mode=yolo", "-r", "abc", "--max-turns", "5"]);
@@ -26,13 +23,11 @@ test "value flags accept separate and inline forms" {
     assert opts["max_turns"] == 5;
 }
 
-
 test "double dash ends flag parsing" {
     opts = parse_cli(["-p", "--", "--not-a-flag"]);
     assert opts["error"] == "";
     assert opts["prompt"] == "--not-a-flag";
 }
-
 
 test "invalid values and unknown flags set error" {
     assert parse_cli(["--bogus"])["error"].startswith("unknown option");
@@ -44,19 +39,16 @@ test "invalid values and unknown flags set error" {
     assert parse_cli(["-p", "--json"])["error"] != "";
 }
 
-
 test "help and version flags" {
     assert parse_cli(["-h"])["help"];
     assert parse_cli(["--version"])["version"];
 }
-
 
 test "combine_prompt appends piped stdin" {
     assert combine_prompt("summarize", "file body\n") == "summarize\n\nfile body";
     assert combine_prompt("", "only stdin\n") == "only stdin";
     assert combine_prompt("only arg", "  ") == "only arg";
 }
-
 
 test "user_argv strips the jac run prefix and separator" {
     assert user_argv(["main.jac", "-p", "hi"]) == ["-p", "hi"];

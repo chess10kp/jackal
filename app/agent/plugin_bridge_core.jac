@@ -4,11 +4,7 @@ import json;
 
 import from .protocol { Envelope, make_envelope }
 import from .fake_host { FakePluginHost, ensure_host, touch_bridge }
-import from .plugin_bridge_io {
-    _write_node,
-    _prepare_corr,
-    _read_node_until,
-}
+import from .plugin_bridge_io { _write_node, _prepare_corr, _read_node_until }
 import from .plugin_bridge_host { maybe_restart_host, host_status }
 import from .plugin_bridge_traffic { _absorb_payload }
 
@@ -52,17 +48,16 @@ obj PluginBridge {
     }
 }
 
-
 # ── Checker shims ───────────────────────────────────────────────────────
 def create_bridge(session_id: str) -> PluginBridge {
     return PluginBridge(session_id=session_id);
 }
+
 def _alloc_corr(bridge: PluginBridge) -> str {
     corr = "corr-" + str(bridge.next_corr);
     bridge.next_corr += 1;
     return corr;
 }
-
 
 def _node_alive(bridge: PluginBridge) -> bool {
     if bridge.host_kind != "node" or bridge.proc is None {
@@ -70,7 +65,6 @@ def _node_alive(bridge: PluginBridge) -> bool {
     }
     return bridge.proc.poll() is None;
 }
-
 
 """Push host_status into inbox and record phase (D13 degraded visibility)."""
 def _emit_host_status(bridge: PluginBridge, phase: str, detail: str = "") {
@@ -80,10 +74,9 @@ def _emit_host_status(bridge: PluginBridge, phase: str, detail: str = "") {
             kind="host_status",
             session_id=bridge.session_id,
             payload={"phase": phase, "detail": detail},
-        )
+        ),
     );
 }
-
 
 """Invoke a js tool via tool_invoke / tool_result (fake or Node)."""
 def invoke_tool(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
@@ -104,7 +97,6 @@ def invoke_tool(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
     }
     return result;
 }
-
 
 def _invoke_tool_fake(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
     ensure_host(bridge);
@@ -132,7 +124,7 @@ def _invoke_tool_fake(bridge: PluginBridge, name: str, args: dict[str, any]) -> 
                 tool_id=name,
                 correlation_id=corr,
                 payload={"ok": False, "error": f"unknown tool {name}"},
-            )
+            ),
         );
         return f"ERROR: unknown js tool {name}";
     }
@@ -145,7 +137,7 @@ def _invoke_tool_fake(bridge: PluginBridge, name: str, args: dict[str, any]) -> 
                 tool_id=name,
                 correlation_id=corr,
                 payload={"ok": False, "error": f"tool {name} is not active"},
-            )
+            ),
         );
         return f"ERROR: tool {name} is not active";
     }
@@ -173,14 +165,13 @@ def _invoke_tool_fake(bridge: PluginBridge, name: str, args: dict[str, any]) -> 
             tool_id=name,
             correlation_id=corr,
             payload=payload,
-        )
+        ),
     );
     if ok {
         return result;
     }
     return f"ERROR: {payload['error']}";
 }
-
 
 def _invoke_tool_node(bridge: PluginBridge, name: str, args: dict[str, any]) -> str {
     if not _node_alive(bridge) {
@@ -200,9 +191,7 @@ def _invoke_tool_node(bridge: PluginBridge, name: str, args: dict[str, any]) -> 
     );
     try {
         _write_node(bridge, req);
-        reply = _read_node_until(
-            bridge, "tool_result", correlation_id=corr, timeout=10.0
-        );
+        reply = _read_node_until(bridge, "tool_result", correlation_id=corr, timeout=10.0);
     } except Exception as e {
         return f"ERROR: {e}";
     }

@@ -1,6 +1,5 @@
 """Acceptance tests for the complex OSP UI shell demo."""
 
-
 test "complex shell demo passes all validation steps" {
     demo = run_complex_shell_demo(columns=80, rows=24, verbose=False);
     assert demo.passed == True;
@@ -14,7 +13,6 @@ test "complex shell demo passes all validation steps" {
         assert step.ok == True;
     }
 }
-
 
 test "complex shell demo report is printable" {
     demo = run_complex_shell_demo(columns=60, rows=20, verbose=False);

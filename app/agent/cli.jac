@@ -62,7 +62,7 @@ def user_argv(raw: list[str]) -> list[str] {
 
 
 """Default option set: every key parse_cli may fill."""
-def default_cli_options() -> dict[str, any] {
+def default_cli_options -> dict[str, any] {
     return {
         "print": False,
         "json": False,

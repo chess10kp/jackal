@@ -486,7 +486,7 @@ tui/mcp.jac stays pure over (specs, status); only this module touches the
 agent facade, so the MCP annex tests run without agent.session imports."""
 
 
-def _mcp_current_specs() -> dict[str, list[str]] {
+def _mcp_current_specs -> dict[str, list[str]] {
     specs: dict[str, list[str]] = {};
     try {
         specs = mcp_configured_specs();

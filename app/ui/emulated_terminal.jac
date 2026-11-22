@@ -88,7 +88,7 @@ obj EmulatedTerminal(Terminal) {
         self.write(f"\x1b[{row};{col}H");
     }
 
-    def start() -> None {
+    def start -> None {
         if self.started {
             return;
         }
@@ -99,7 +99,7 @@ obj EmulatedTerminal(Terminal) {
         self.restored = False;
     }
 
-    def stop() -> None {
+    def stop -> None {
         if self.restored and not self.started {
             return;
         }
@@ -144,23 +144,23 @@ obj EmulatedTerminal(Terminal) {
     }
 
     """Simulate stdin closing (ctrl+d on an empty tty / pipe EOF)."""
-    def close_input() {
+    def close_input  {
         self.eof = True;
     }
 
     # ---------------------------------------------------------- read-back
 
     """Visible rows, trailing spaces trimmed (Pi: getViewport)."""
-    def viewport() -> list[str] {
+    def viewport -> list[str] {
         return [str(line).rstrip() for line in self.screen.display];
     }
 
-    def viewport_text() -> str {
+    def viewport_text -> str {
         return "\n".join(self.viewport());
     }
 
     """Scrollback above the viewport plus the viewport (Pi: getScrollBuffer)."""
-    def scroll_buffer() -> list[str] {
+    def scroll_buffer -> list[str] {
         out: list[str] = [];
         for row in self.screen.history.top {
             chars: list[str] = [];
@@ -174,7 +174,7 @@ obj EmulatedTerminal(Terminal) {
     }
 
     """(x, y) zero-based cursor position (Pi: getCursorPosition)."""
-    def cursor() -> tuple[int, int] {
+    def cursor -> tuple[int, int] {
         return (int(self.screen.cursor.x), int(self.screen.cursor.y));
     }
 
@@ -211,7 +211,7 @@ obj EmulatedTerminal(Terminal) {
     }
 
     """Clear screen state (keeps size and flags)."""
-    def reset_screen() {
+    def reset_screen  {
         self.screen.reset();
     }
 }

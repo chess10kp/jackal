@@ -3,6 +3,11 @@ name = "jackal"
 version = "0.1.0"
 description = "Jackal - all-Jac na-codespace coding agent harness"
 entry-point = "main"
+archwire = false
+
+[check.lint]
+select = ["style"]
+ignore = ["strip-comments", "strip-docstrings", "separate-impls", "impls-in-annex"]
 
 # Model config for the ambient `llm` builtin. api_key here is a fallback;
 # provider env vars (e.g. OPENROUTER_API_KEY) take precedence.

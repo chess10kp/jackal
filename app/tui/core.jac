@@ -2,7 +2,10 @@
 import from tui.state { LiveShell }
 import from agent.modes { is_read_only_mode }
 import from ui.transcript {
-    TranscriptMessage, apply_transcript_revision, measure_message_height, set_follow_tail,
+    TranscriptMessage,
+    apply_transcript_revision,
+    measure_message_height,
+    set_follow_tail,
 }
 import from ui.layout { LayoutSpec, fill_axis, fixed_axis }
 import from ui.screen { configure_main_shell_layout }
@@ -17,7 +20,6 @@ def _rule(width: int, ch: str = "─") -> str {
     return ch * width;
 }
 
-
 def _pad_to(text: str, width: int) -> str {
     w = display_width(text);
     if w >= width {
@@ -25,7 +27,6 @@ def _pad_to(text: str, width: int) -> str {
     }
     return text + (" " * (width - w));
 }
-
 
 """Block progress meter — denser than ASCII #/-."""
 def _meter(value: float, width: int) -> str {
@@ -40,12 +41,10 @@ def _meter(value: float, width: int) -> str {
     return "▐" + ("█" * filled) + ("░" * (inner - filled)) + "▌";
 }
 
-
 def _next_id(app: LiveShell) -> str {
     app.msg_n += 1;
     return "m" + str(app.msg_n);
 }
-
 
 def _commit_messages(app: LiveShell) {
     app.rev += 1;
@@ -53,20 +52,14 @@ def _commit_messages(app: LiveShell) {
     app.dirty = True;
 }
 
-
 def _push_turn(app: LiveShell, role: str, body: str) -> str {
     mid = _next_id(app);
     app.messages = app.messages + [
-        TranscriptMessage(
-            message_id=mid,
-            content=format_turn(role, body),
-            content_rev=1,
-        )
+        TranscriptMessage(message_id=mid, content=format_turn(role, body), content_rev=1),
     ];
     _commit_messages(app);
     return mid;
 }
-
 
 def _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
     updated: list[TranscriptMessage] = [];
@@ -77,7 +70,7 @@ def _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
                     message_id=message_id,
                     content=format_turn(role, body),
                     content_rev=message.content_rev + 1,
-                )
+                ),
             );
         } else {
             updated.append(message);
@@ -86,7 +79,6 @@ def _rewrite_turn(app: LiveShell, message_id: str, role: str, body: str) {
     app.messages = updated;
     _commit_messages(app);
 }
-
 
 """Finish a turn: rewrite it as `body` and keep it LAST.
 
@@ -114,16 +106,11 @@ def _finish_turn(app: LiveShell, message_id: str, role: str, body: str) {
         return;
     }
     kept.append(
-        TranscriptMessage(
-            message_id=_next_id(app),
-            content=format_turn(role, body),
-            content_rev=1,
-        )
+        TranscriptMessage(message_id=_next_id(app), content=format_turn(role, body), content_rev=1)
     );
     app.messages = kept;
     _commit_messages(app);
 }
-
 
 def _install_layout(app: LiveShell) {
     # Permanent shell specs first (screen fill/fill, transcript grow+scroll,
@@ -131,22 +118,15 @@ def _install_layout(app: LiveShell) {
     # hide the framework header and status row, keep the prompt at three rows.
     configure_main_shell_layout(app.renderer.layout, app.shell);
     set_node_contract(
-        app.renderer,
-        app.shell.header,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(0)),
+        app.renderer, app.shell.header, LayoutSpec(width=fill_axis(), height=fixed_axis(0))
     );
     set_node_contract(
-        app.renderer,
-        app.shell.status,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(0)),
+        app.renderer, app.shell.status, LayoutSpec(width=fill_axis(), height=fixed_axis(0))
     );
     set_node_contract(
-        app.renderer,
-        app.shell.prompt,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(3)),
+        app.renderer, app.shell.prompt, LayoutSpec(width=fill_axis(), height=fixed_axis(3))
     );
 }
-
 
 """Prompt-box draft prefix — read-only modes get an unmistakable marker."""
 def _prompt_prefix(mode: str) -> str {
@@ -158,7 +138,6 @@ def _prompt_prefix(mode: str) -> str {
     }
     return "❯ ";
 }
-
 
 def _prompt_lines(app: LiveShell) -> list[str] {
     draft = app.shell.prompt.draft;
@@ -185,21 +164,15 @@ def _prompt_lines(app: LiveShell) -> list[str] {
     return [top, body, foot];
 }
 
-
 """Total wrapped-line height of the transcript (local copy of the private
 projection helper — keeps this file free of underscore imports)."""
 def _transcript_total_height(app: LiveShell) -> int {
     total = 0;
     for message in app.proj.messages {
-        total += measure_message_height(
-            app.proj,
-            message,
-            app.proj.viewport_width,
-        );
+        total += measure_message_height(app.proj, message, app.proj.viewport_width);
     }
     return total;
 }
-
 
 """Scroll the transcript viewport by delta lines (negative = up).
 

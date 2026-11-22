@@ -1,17 +1,8 @@
 """Behavior tests for UiSession runtime ownership and Gate 1 lifecycle."""
 
-import from ui.model {
-    MainScreen,
-    Prompt,
-    TranscriptView,
-    node_id,
-}
+import from ui.model { MainScreen, Prompt, TranscriptView, node_id }
 
-import from ui.bindings {
-    is_empty,
-    subscribe,
-}
-
+import from ui.bindings { is_empty, subscribe }
 
 test "create_session builds detached ui_root not connected to persistent root" {
     handle = create_session();
@@ -24,7 +15,6 @@ test "create_session builds detached ui_root not connected to persistent root" {
     # OSP module here would poison this unit's native dep scan (PERSIST).
     assert not session.disposed;
 }
-
 
 test "append_child_session only accepts parents under ui_root" {
     handle = create_session();
@@ -40,7 +30,6 @@ test "append_child_session only accepts parents under ui_root" {
     assert failed;
     assert node_id(child) not in session.tracked_node_ids;
 }
-
 
 test "set_focus and get_focus round trip" {
     handle = create_session();
@@ -58,7 +47,6 @@ test "set_focus and get_focus round trip" {
     assert get_focus_node(session) is None;
 }
 
-
 test "graph_revision increments on append_child_session" {
     handle = create_session();
     session = handle.session;
@@ -73,7 +61,6 @@ test "graph_revision increments on append_child_session" {
     assert session.graph_revision == 2;
 }
 
-
 test "Gate 1 lifecycle dispose releases bindings renderer and capabilities" {
     handle = create_session();
     session = handle.session;
@@ -83,12 +70,7 @@ test "Gate 1 lifecycle dispose releases bindings renderer and capabilities" {
     prompt = Prompt(key="prompt", draft="");
     append_child_session(session, ui_root, screen);
     append_child_session(session, screen, prompt);
-    subscribe(
-        session.bindings,
-        "session.events",
-        node_id(prompt),
-        "TranscriptChanged",
-    );
+    subscribe(session.bindings, "session.events", node_id(prompt), "TranscriptChanged");
     register_capability(session, node_id(prompt), "input");
     session.renderer.layout[node_id(prompt)] = {"width": 80};
     assert not is_empty(session.bindings);
@@ -100,21 +82,16 @@ test "Gate 1 lifecycle dispose releases bindings renderer and capabilities" {
     assert validate_session(session) == [];
 }
 
-
 test "validate_session detects orphan binding" {
     handle = create_session();
     session = handle.session;
     subscribe(
-        session.bindings,
-        "fake.source",
-        "00000000000000000000000000000000",
-        "TranscriptChanged",
+        session.bindings, "fake.source", "00000000000000000000000000000000", "TranscriptChanged"
     );
     leaks = validate_session(session);
     kinds = [leak.kind for leak in leaks];
     assert "orphan_binding" in kinds;
 }
-
 
 test "validate_session detects invalid focus_id" {
     handle = create_session();
@@ -124,7 +101,6 @@ test "validate_session detects invalid focus_id" {
     kinds = [leak.kind for leak in leaks];
     assert "invalid_focus" in kinds;
 }
-
 
 test "validate_session detects stale Feeds edge to untracked node" {
     handle = create_session();
@@ -142,7 +118,6 @@ test "validate_session detects stale Feeds edge to untracked node" {
     assert "stale_edge" in kinds;
 }
 
-
 test "dispose clears renderer layout keys" {
     handle = create_session();
     session = handle.session;
@@ -151,7 +126,6 @@ test "dispose clears renderer layout keys" {
     dispose_session(session);
     assert len(session.renderer.layout) == 0;  # == {} dict-compare pending native dict deep-eq
 }
-
 
 test "failed mutation under session does not bump graph_revision" {
     handle = create_session();

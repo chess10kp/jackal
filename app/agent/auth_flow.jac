@@ -8,7 +8,7 @@ import from .auth_display { validate_provider_entry, validate_model_entry }
 
 
 """Initial flow state: the idle step."""
-def initial_auth_flow_state() -> dict[str, any] {
+def initial_auth_flow_state -> dict[str, any] {
     return {"step": {"kind": "idle"}};
 }
 

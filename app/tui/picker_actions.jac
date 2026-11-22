@@ -27,7 +27,7 @@ import from tui.windows { _picker_state }
 """Provider rows for /login. Native routes use API-key auth today; routes
 that advertise an OAuth authType are retained so their explicit network seam
 can report a useful error instead of pretending to log in."""
-def _login_provider_entries() -> dict[str, any] {
+def _login_provider_entries -> dict[str, any] {
     stored = load_auth_file(resolve_auth_path());
     rows: list[str] = [];
     ids: list[str] = [];
@@ -60,7 +60,7 @@ def _login_provider_entries() -> dict[str, any] {
 
 
 """Apply stored API keys to the environment (see agent.auth_env)."""
-def _hydrate_auth_environment() {
+def _hydrate_auth_environment  {
     hydrate_auth_environment();
 }
 

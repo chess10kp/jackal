@@ -17,6 +17,7 @@ stale catalogs refresh in a deduplicated background flow.
 
 import os;
 import time;
+import httpx;
 import from .llm_transport { PROVIDER_ROUTES }
 
 glob _CATALOG_REFRESHING: dict[str, bool] = {};
@@ -33,14 +34,14 @@ only by _merge_catalog_result/refresh_model_catalog."""
 glob _CATALOG_CACHE: dict[str, dict[str, any]] = {};
 
 
-def _now_ms() -> int {
+def _now_ms -> int {
     return int(time.time() * 1000);
 }
 
 
 """Read the env TTL override once per call (tests and power users both win).
 Invalid/negative values fall back to the default window."""
-def _ttl_ms() -> int {
+def _ttl_ms -> int {
     raw = os.environ.get("JACKAL_CATALOG_TTL_MS", "");
     if not raw {
         return CATALOG_TTL_MS;
@@ -169,7 +170,6 @@ def _fetch_route_models(route: dict[str, any]) -> list[str] {
         return [];
     }
     try {
-        import httpx;
         base = str(route.get("base_url", ""));
         url = base.rstrip("/") + "/models";
         headers: dict[str, str] = {};
@@ -222,7 +222,7 @@ def catalog_models(provider: str) -> list[str] {
 """Fire-and-forget warm of every fetchable route. Called from the TUI boot
 seam right after credentials are hydrated so `/model` opens with live
 catalogs already cached (fx's preload thread, in flow form)."""
-def warm_model_catalog() {
+def warm_model_catalog  {
     for prov in PROVIDER_ROUTES {
         _schedule_catalog_refresh(str(prov));
     }
@@ -232,7 +232,7 @@ def warm_model_catalog() {
 """Force-refresh every fetchable route. Returns {provider: model_count}
 mirroring what the picker would show (a failed fetch contributes its
 cache/static fallback count). Never raises."""
-def refresh_model_catalog() -> dict[str, int] {
+def refresh_model_catalog -> dict[str, int] {
     counts: dict[str, int] = {};
     for prov in PROVIDER_ROUTES {
         provider = str(prov);

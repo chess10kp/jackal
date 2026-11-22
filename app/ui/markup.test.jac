@@ -5,11 +5,7 @@ native unit (hard pin), so it must not import the server-placed screen/runtime
 modules — the cross-context cases live in `ui/screen.test.jac` instead.
 """
 
-import from ui.model {
-    MainScreen,
-    ordered_child_keys,
-}
-
+import from ui.model { MainScreen, ordered_child_keys }
 
 test "default_shell_registry has Jackal shell tags" {
     reg = default_shell_registry();
@@ -18,7 +14,6 @@ test "default_shell_registry has Jackal shell tags" {
     assert "Prompt" in reg.tags;
     assert "ApprovalOverlay" in reg.tags;
 }
-
 
 test "register_tag rejects empty name" {
     reg = create_tag_registry();
@@ -31,7 +26,6 @@ test "register_tag rejects empty name" {
     assert failed;
 }
 
-
 test "unknown tag is a lowering error" {
     source = "<Nope key=\"x\" />";
     result = lower_markup(source, default_shell_registry());
@@ -41,13 +35,11 @@ test "unknown tag is a lowering error" {
     assert ("Nope" in msg) or ("unknown" in msg.lower());
 }
 
-
 test "unknown property is a lowering error" {
     source = "<Prompt key=\"prompt\" not_a_real_prop=\"1\" />";
     result = lower_markup(source, default_shell_registry());
     assert len(result.errors) >= 1;
 }
-
 
 test "shell markup lowers to MainScreen with expected children" {
     source = """
@@ -66,7 +58,6 @@ test "shell markup lowers to MainScreen with expected children" {
     keys = ordered_child_keys(screen);
     assert keys == ["header", "transcript", "status", "prompt"];
 }
-
 
 test "print_generated emits direct-construction Jac" {
     source = """

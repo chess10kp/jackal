@@ -1,6 +1,5 @@
 """Input normalization: escapes, paste, and coalescing."""
 
-
 test "plain ascii becomes text events" {
     norm = InputNormalizer();
     events = norm.feed("ab");
@@ -11,7 +10,6 @@ test "plain ascii becomes text events" {
     assert b.text == "b";
 }
 
-
 test "arrow escape stays one key event" {
     norm = InputNormalizer();
     events = norm.feed("\x1b[A");
@@ -19,7 +17,6 @@ test "arrow escape stays one key event" {
     key = events[0] as KeyEvent;
     assert key.key == "up";
 }
-
 
 test "fragmented escape is held until complete" {
     norm = InputNormalizer();
@@ -33,7 +30,6 @@ test "fragmented escape is held until complete" {
     assert norm.buffer == "";
 }
 
-
 test "flush_buffer emits incomplete escape remainder" {
     norm = InputNormalizer();
     norm.feed("\x1b[");
@@ -43,7 +39,6 @@ test "flush_buffer emits incomplete escape remainder" {
     assert norm.buffer == "";
 }
 
-
 test "bracketed paste becomes one PasteEvent including newlines" {
     norm = InputNormalizer();
     payload = "line1\nline2\n你好";
@@ -52,7 +47,6 @@ test "bracketed paste becomes one PasteEvent including newlines" {
     paste = events[0] as PasteEvent;
     assert paste.text == payload;
 }
-
 
 test "fragmented bracketed paste waits for end marker" {
     norm = InputNormalizer();
@@ -64,7 +58,6 @@ test "fragmented bracketed paste waits for end marker" {
     paste = done[0] as PasteEvent;
     assert paste.text == "hello world";
 }
-
 
 test "enter tab backspace and ctrl keys decode" {
     norm = InputNormalizer();
@@ -78,7 +71,6 @@ test "enter tab backspace and ctrl keys decode" {
     assert ctrl_c.key == "ctrl+c";
 }
 
-
 test "lone escape is held then flushed as escape key" {
     norm = InputNormalizer();
     held = norm.feed("\x1b");
@@ -89,7 +81,6 @@ test "lone escape is held then flushed as escape key" {
     escape = flushed[0] as KeyEvent;
     assert escape.key == "escape";
 }
-
 
 test "sgr mouse click decodes; motion is coalesced" {
     norm = InputNormalizer();
@@ -113,7 +104,6 @@ test "sgr mouse click decodes; motion is coalesced" {
     assert moved.motion;
 }
 
-
 test "resize storms keep only the last size" {
     norm = InputNormalizer();
     norm.feed_resize(80, 24);
@@ -126,7 +116,6 @@ test "resize storms keep only the last size" {
     assert resize.height == 40;
 }
 
-
 test "stream chunks concatenate on flush" {
     norm = InputNormalizer();
     norm.feed_stream("hel");
@@ -136,7 +125,6 @@ test "stream chunks concatenate on flush" {
     chunk = out[0] as StreamChunkEvent;
     assert chunk.text == "hello";
 }
-
 
 test "coalesce_events merges mixed resize mouse and stream" {
     events: list[HostEvent] = [
@@ -161,7 +149,6 @@ test "coalesce_events merges mixed resize mouse and stream" {
     assert s.text == "xy";
 }
 
-
 test "mixed printable and escape stay ordered" {
     norm = InputNormalizer();
     events = norm.feed("x\x1b[Cy");
@@ -174,13 +161,11 @@ test "mixed printable and escape stay ordered" {
     assert t2.text == "y";
 }
 
-
 test "extract_sequences leaves incomplete csi as remainder" {
     part = extract_sequences("a\x1b[");
     assert part["sequences"] == ["a"];
     assert part["remainder"] == "\x1b[";
 }
-
 
 test "host events never include raw unparsed escape bytes as TextEvent" {
     norm = InputNormalizer();
@@ -190,7 +175,6 @@ test "host events never include raw unparsed escape bytes as TextEvent" {
     assert not isinstance(events[0], TextEvent);
 }
 
-
 test "unicode text survives normalization as TextEvent" {
     norm = InputNormalizer();
     events = norm.feed("你");
@@ -199,7 +183,6 @@ test "unicode text survives normalization as TextEvent" {
     assert text.text == "你";
 }
 
-
 test "shift tab decodes from csi z" {
     norm = InputNormalizer();
     events = norm.feed("\x1b[Z");
@@ -207,7 +190,6 @@ test "shift tab decodes from csi z" {
     k = events[0] as KeyEvent;
     assert k.key == "shift+tab";
 }
-
 
 test "modified arrows decode with modifier prefixes" {
     norm = InputNormalizer();
@@ -221,7 +203,6 @@ test "modified arrows decode with modifier prefixes" {
     assert k4.key == "ctrl+shift+down";
 }
 
-
 test "alt ctrl j and k decode from control bytes" {
     norm = InputNormalizer();
     k_up = norm.feed("\x1b\x0b")[0] as KeyEvent;
@@ -229,7 +210,6 @@ test "alt ctrl j and k decode from control bytes" {
     k_down = norm.feed("\x1b\x0a")[0] as KeyEvent;
     assert k_down.key == "alt+ctrl+j";
 }
-
 
 test "modified home end and tilde keys decode" {
     norm = InputNormalizer();
@@ -241,7 +221,6 @@ test "modified home end and tilde keys decode" {
     assert k3.key == "ctrl+delete";
 }
 
-
 test "unmapped modifier falls back to unknown key event" {
     norm = InputNormalizer();
     events = norm.feed("\x1b[1;9C");
@@ -249,7 +228,6 @@ test "unmapped modifier falls back to unknown key event" {
     k = events[0] as KeyEvent;
     assert k.key.startswith("unknown:");
 }
-
 
 test "esc timeout emits escape after armed delay" {
     norm = InputNormalizer();

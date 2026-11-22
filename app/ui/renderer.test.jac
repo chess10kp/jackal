@@ -49,17 +49,17 @@ def _sp(width: AxisSize, height: AxisSize) -> LayoutSpec {
 }
 
 
-def _fill_fill() -> LayoutSpec {
+def _fill_fill -> LayoutSpec {
     return _sp(fill_axis(), fill_axis());
 }
 
 
-def _grow_region() -> LayoutSpec {
+def _grow_region -> LayoutSpec {
     return _sp(fill_axis(), grow_axis(1.0));
 }
 
 
-def _intrinsic_spec() -> LayoutSpec {
+def _intrinsic_spec -> LayoutSpec {
     return _sp(intrinsic_axis(), intrinsic_axis());
 }
 

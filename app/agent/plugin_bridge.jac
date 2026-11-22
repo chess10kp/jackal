@@ -100,9 +100,4 @@ import from .plugin_bridge_features {
     _fake_content_lines,
     render_extension_block,
 }
-import from .plugin_bridge_ui {
-    poll_ui_request,
-    respond_ui,
-    cancel_ui,
-    cancel_all_ui,
-}
+import from .plugin_bridge_ui { poll_ui_request, respond_ui, cancel_ui, cancel_all_ui }

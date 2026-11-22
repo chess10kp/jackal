@@ -21,7 +21,9 @@ test "parse extracts string ids in order and dedupes" {
         ],
     };
     assert _parse_models_payload(payload) == [
-        "openai/gpt-5", "anthropic/claude-sonnet-5", "zai/glm-5"
+        "openai/gpt-5",
+        "anthropic/claude-sonnet-5",
+        "zai/glm-5",
     ];
 }
 
@@ -50,12 +52,8 @@ test "freshness needs a nonempty entry inside the window" {
     assert not _entry_is_fresh(None, 1_000_000, 60_000);
     assert not _entry_is_fresh({"models": ["a"], "fetched_ms": 0}, 1_000_000, 60_000);
     assert not _entry_is_fresh({"models": [], "fetched_ms": 999_000}, 1_000_000, 60_000);
-    assert not _entry_is_fresh(
-        {"models": ["a"], "fetched_ms": 999_000}, 1_060_000, 60_000
-    );  # exactly at the boundary is stale
-    assert _entry_is_fresh(
-        {"models": ["a"], "fetched_ms": 999_000}, 1_058_999, 60_000
-    );
+    assert not _entry_is_fresh({"models": ["a"], "fetched_ms": 999_000}, 1_060_000, 60_000);  # exactly at the boundary is stale
+    assert _entry_is_fresh({"models": ["a"], "fetched_ms": 999_000}, 1_058_999, 60_000);
 }
 
 # ── _merge_catalog_result ────────────────────────────────────────────────────

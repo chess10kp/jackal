@@ -42,12 +42,12 @@ def tasks_path(cwd: str) -> str {
 
 
 """Fresh 8-hex-char task id (uuid4 prefix, like the legacy toolchain)."""
-def generate_task_id() -> str {
+def generate_task_id -> str {
     return uuid.uuid4().hex[:8];
 }
 
 
-def _now_iso() -> str {
+def _now_iso -> str {
     return datetime.datetime.now(datetime.timezone.utc).isoformat();
 }
 
@@ -68,7 +68,7 @@ def _is_task(value: any) -> bool {
 """All valid tasks from tasks.json; [] when missing, corrupt, or not a
 list (invalid entries are filtered out rather than failing the load)."""
 def load_tasks(cwd: str) -> list[dict[str, any]] {
-    fh = None;
+    fh: any = None;
     try {
         fh = open(tasks_path(cwd), "r");
         parsed = json.load(fh);
@@ -100,7 +100,7 @@ def save_tasks(cwd: str, tasks: list[dict[str, any]]) -> bool {
     } except OSError {
         return False;
     }
-    fh = None;
+    fh: any = None;
     try {
         fh = open(tasks_path(cwd), "w");
         fh.write(json_pretty(json.dumps(tasks)));

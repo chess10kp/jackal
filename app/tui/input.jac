@@ -5,29 +5,27 @@ import from tui.state { LiveShell }
 import from tui.core { _push_turn, _scroll_transcript }
 import from tui.overlay { _slash_popup_state, _slash_popup_pick }
 import from tui.picker_base { _close_picker, _multi_filtered }
-import from tui.windows {  _picker_state, _handle_window_key, _ui_modal_state }
+import from tui.windows { _picker_state, _handle_window_key, _ui_modal_state }
 import from tui.picker_actions { _complete_api_key_login, _start_login_provider, _cancel_login }
-import from tui.context {
-    _format_mentions, _expand_quoted_context, _insert_into_draft,
-}
-import from tui.commands {
-    _resume_session, _handle_ui_modal_key, _tick_ui_modal,
-    _run_slash,
-}
+import from tui.context { _format_mentions, _expand_quoted_context, _insert_into_draft }
+import from tui.commands { _resume_session, _handle_ui_modal_key, _tick_ui_modal, _run_slash }
 import from tui.picker_actions { _restore_checkpoint }
 import from tui.runtime {
-    _begin_assistant_reply, _finish_stream, _tick_stream,
-    _accept_approval, _reject_approval,
+    _begin_assistant_reply,
+    _finish_stream,
+    _tick_stream,
+    _accept_approval,
+    _reject_approval,
 }
 import from agent.session {
-    cancel_active_turn, list_extension_shortcuts, run_extension_shortcut,
+    cancel_active_turn,
+    list_extension_shortcuts,
+    run_extension_shortcut,
     set_mode,
 }
 import from agent.modes { cycle_mode, is_read_only_mode }
 import from agent.tasks { load_tasks, format_tasks_list }
-import from ui.screen {
-    shell_insert_text, shell_submit, shell_cancel,
-}
+import from ui.screen { shell_insert_text, shell_submit, shell_cancel }
 import from ui.editor { editor_backspace, editor_history_prev, editor_history_next }
 import from ui.transcript { set_follow_tail }
 import from ui.input { HostEvent, TextEvent, KeyEvent, PasteEvent, coalesce_events }
@@ -199,19 +197,20 @@ def _handle_picker_key(app: LiveShell, key: str) {
             _insert_into_draft(app, "/skill:" + chosen_id + " ");
         }
         app.dirty = True;
+    }
 }
-}
+
 """Prompt history via the shared editor API (ui/editor.jac)."""
 def _history_up(app: LiveShell) {
     editor_history_prev(app.shell.prompt);
     app.dirty = True;
 }
 
-
 def _history_down(app: LiveShell) {
     editor_history_next(app.shell.prompt);
     app.dirty = True;
 }
+
 """Drain extension-command worker completions."""
 def _tick_cmd(app: LiveShell) {
     if app.cmd_q is None {
@@ -242,7 +241,6 @@ def _tick_cmd(app: LiveShell) {
     }
 }
 
-
 """Unified per-frame tick: UI modals + command workers + stream events."""
 def _tick_app(app: LiveShell) {
     _tick_cmd(app);
@@ -257,7 +255,6 @@ def _tick_app(app: LiveShell) {
         }
     }
 }
-
 
 def _handle_key(app: LiveShell, key: str) {
     if key == "ctrl+c" {
@@ -290,7 +287,7 @@ def _handle_key(app: LiveShell, key: str) {
         _handle_window_key(app, key);
         return;
     }
-    
+
     # Extension keyboard shortcuts (pi.registerShortcut) from loaded
     # extensions shadow built-in navigation when no modal owner is active.
     scs = list_extension_shortcuts();
@@ -314,7 +311,7 @@ def _handle_key(app: LiveShell, key: str) {
             note += "  (write tools blocked)";
         }
         _push_turn(app, "system", note);
-            app.dirty = True;
+        app.dirty = True;
         return;
     }
     # Model completion drop-up: owns up/down/tab/enter/escape while visible;
@@ -334,9 +331,7 @@ def _handle_key(app: LiveShell, key: str) {
             return;
         }
         if key == "tab" or key == "enter" {
-            (chosen, submit) = _slash_popup_pick(
-                popup, app.shell.prompt.draft, int(app.slash_sel),
-            );
+            (chosen, submit) = _slash_popup_pick(popup, app.shell.prompt.draft, int(app.slash_sel));
             # Enter on a fully-typed command name falls through to the
             # submit branch below: completing /model to /model is a visual
             # no-op that swallowed the keypress (the picker opened only on
@@ -472,7 +467,6 @@ def _handle_key(app: LiveShell, key: str) {
     }
 }
 
-
 def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
     for event in coalesce_events(events) {
         if isinstance(event, TextEvent) {
@@ -547,5 +541,4 @@ def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
             }
         }
     }
-
 }

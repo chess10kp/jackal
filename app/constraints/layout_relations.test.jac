@@ -11,7 +11,6 @@ import from constraints.algebra {
     normalize_expression,
 }
 
-
 def _coefficients(c: Constraint) -> dict[int, float] {
     result: dict[int, float] = {};
     for t in c.expression.terms {
@@ -20,11 +19,9 @@ def _coefficients(c: Constraint) -> dict[int, float] {
     return result;
 }
 
-
 def _assert_coefficients(c: Constraint, expected: dict[int, float]) {
     assert _coefficients(c) == expected;
 }
-
 
 def _assert_single(
     constraints: list[Constraint],
@@ -41,7 +38,6 @@ def _assert_single(
     assert c.strength == strength;
 }
 
-
 test "node_vars uses four deterministic geometry variables" {
     vars_a: dict[str, Variable] = node_vars(10);
     assert vars_a["left"].id == 10;
@@ -54,51 +50,57 @@ test "node_vars uses four deterministic geometry variables" {
     assert vars_b["height"].id == vars_a["height"].id;
 }
 
-
 test "directional relations encode affine geometry and gap" {
     a: dict[str, Variable] = node_vars(10);
     b: dict[str, Variable] = node_vars(20);
 
     _assert_single(
-        above(a, b, 2.0),
-        {11: 1.0, 13: 1.0, 21: -1.0},
-        2.0,
-        Relation.EQ,
-        StrengthTier.REQUIRED,
+        above(a, b, 2.0), {11: 1.0, 13: 1.0, 21: -1.0}, 2.0, Relation.EQ, StrengthTier.REQUIRED
     );
     _assert_single(
-        below(a, b, 2.0),
-        {11: 1.0, 21: -1.0, 23: -1.0},
-        -2.0,
-        Relation.EQ,
-        StrengthTier.REQUIRED,
+        below(a, b, 2.0), {11: 1.0, 21: -1.0, 23: -1.0}, -2.0, Relation.EQ, StrengthTier.REQUIRED
     );
     _assert_single(
-        left_of(a, b, 3.0),
-        {10: 1.0, 12: 1.0, 20: -1.0},
-        3.0,
-        Relation.EQ,
-        StrengthTier.REQUIRED,
+        left_of(a, b, 3.0), {10: 1.0, 12: 1.0, 20: -1.0}, 3.0, Relation.EQ, StrengthTier.REQUIRED
     );
     _assert_single(
-        right_of(a, b, 3.0),
-        {10: 1.0, 20: -1.0, 22: -1.0},
-        -3.0,
-        Relation.EQ,
-        StrengthTier.REQUIRED,
+        right_of(a, b, 3.0), {10: 1.0, 20: -1.0, 22: -1.0}, -3.0, Relation.EQ, StrengthTier.REQUIRED
     );
 }
-
 
 test "alignment and size relations use strong defaults" {
     a: dict[str, Variable] = node_vars(10);
     b: dict[str, Variable] = node_vars(20);
     _assert_single(align_left(a, b), {10: 1.0, 20: -1.0}, 0.0, Relation.EQ, StrengthTier.STRONG);
-    _assert_single(align_right(a, b), {10: 1.0, 12: 1.0, 20: -1.0, 22: -1.0}, 0.0, Relation.EQ, StrengthTier.STRONG);
+    _assert_single(
+        align_right(a, b),
+        {10: 1.0, 12: 1.0, 20: -1.0, 22: -1.0},
+        0.0,
+        Relation.EQ,
+        StrengthTier.STRONG,
+    );
     _assert_single(align_top(a, b), {11: 1.0, 21: -1.0}, 0.0, Relation.EQ, StrengthTier.STRONG);
-    _assert_single(align_bottom(a, b), {11: 1.0, 13: 1.0, 21: -1.0, 23: -1.0}, 0.0, Relation.EQ, StrengthTier.STRONG);
-    _assert_single(center_x(a, b), {10: 1.0, 12: 0.5, 20: -1.0, 22: -0.5}, 0.0, Relation.EQ, StrengthTier.STRONG);
-    _assert_single(center_y(a, b), {11: 1.0, 13: 0.5, 21: -1.0, 23: -0.5}, 0.0, Relation.EQ, StrengthTier.STRONG);
+    _assert_single(
+        align_bottom(a, b),
+        {11: 1.0, 13: 1.0, 21: -1.0, 23: -1.0},
+        0.0,
+        Relation.EQ,
+        StrengthTier.STRONG,
+    );
+    _assert_single(
+        center_x(a, b),
+        {10: 1.0, 12: 0.5, 20: -1.0, 22: -0.5},
+        0.0,
+        Relation.EQ,
+        StrengthTier.STRONG,
+    );
+    _assert_single(
+        center_y(a, b),
+        {11: 1.0, 13: 0.5, 21: -1.0, 23: -0.5},
+        0.0,
+        Relation.EQ,
+        StrengthTier.STRONG,
+    );
     _assert_single(same_width(a, b), {12: 1.0, 22: -1.0}, 0.0, Relation.EQ, StrengthTier.STRONG);
     _assert_single(same_height(a, b), {13: 1.0, 23: -1.0}, 0.0, Relation.EQ, StrengthTier.STRONG);
 
@@ -110,7 +112,6 @@ test "alignment and size relations use strong defaults" {
     }
 }
 
-
 test "size defaults expose required bounds and weak preferences" {
     a: dict[str, Variable] = node_vars(10);
     _assert_single(width_nonnegative(a), {12: 1.0}, 0.0, Relation.GEQ, StrengthTier.REQUIRED);
@@ -119,22 +120,23 @@ test "size defaults expose required bounds and weak preferences" {
     _assert_single(preferred_height(a, 5.0), {13: 1.0}, -5.0, Relation.EQ, StrengthTier.WEAK);
 }
 
-
 test "raw affine escape hatch normalizes duplicate variables" {
     x: Variable = Variable(id=7);
-    c: Constraint = affine_constraint(Expression(
-        terms=[
-            Term(variable=x, coefficient=1.0),
-            Term(variable=Variable(id=7), coefficient=2.0),
-        ],
-        constant=-9.0,
-    ));
+    c: Constraint = affine_constraint(
+        Expression(
+            terms=[
+                Term(variable=x, coefficient=1.0),
+                Term(variable=Variable(id=7), coefficient=2.0),
+            ],
+            constant=-9.0,
+        ),
+    );
     _assert_single([c], {7: 3.0}, -9.0, Relation.EQ, StrengthTier.REQUIRED);
-    assert constraint_key(c) == constraint_key(affine_constraint(
-        Expression(terms=[Term(variable=x, coefficient=3.0)], constant=-9.0)
-    ));
+    assert constraint_key(c)
+        == constraint_key(
+            affine_constraint(Expression(terms=[Term(variable=x, coefficient=3.0)], constant=-9.0))
+        );
 }
-
 
 test "vertical_flow is transparent and stacks with gap" {
     parent: dict[str, Variable] = node_vars(100);
@@ -145,7 +147,8 @@ test "vertical_flow is transparent and stacks with gap" {
 
     expanded: list[Constraint] = vertical_flow(parent, children, 2.0);
     assert len(expanded) == 3;
-    assert constraint_key(expanded[0]) == constraint_key(align_top(first, parent, StrengthTier.REQUIRED)[0]);
+    assert constraint_key(expanded[0])
+        == constraint_key(align_top(first, parent, StrengthTier.REQUIRED)[0]);
     assert constraint_key(expanded[1]) == constraint_key(above(first, second, 2.0)[0]);
     assert constraint_key(expanded[2]) == constraint_key(above(second, third, 2.0)[0]);
     assert expanded[1].expression.constant == 2.0;
@@ -160,7 +163,6 @@ test "vertical_flow is transparent and stacks with gap" {
     assert vertical_flow(parent, [], 2.0) == [];
 }
 
-
 test "horizontal_flow and aliases preserve transparent expansion" {
     parent: dict[str, Variable] = node_vars(100);
     first: dict[str, Variable] = node_vars(200);
@@ -169,7 +171,8 @@ test "horizontal_flow and aliases preserve transparent expansion" {
 
     expanded: list[Constraint] = horizontal_flow(parent, children, 4.0, True);
     assert len(expanded) == 6;
-    assert constraint_key(expanded[0]) == constraint_key(align_left(first, parent, StrengthTier.REQUIRED)[0]);
+    assert constraint_key(expanded[0])
+        == constraint_key(align_left(first, parent, StrengthTier.REQUIRED)[0]);
     assert constraint_key(expanded[1]) == constraint_key(left_of(first, second, 4.0)[0]);
     assert constraint_key(expanded[2]) == constraint_key(fill_height(first, parent)[0]);
     assert constraint_key(expanded[5]) == constraint_key(fill_height(second, parent)[1]);

@@ -11,7 +11,6 @@ import shutil;
 import subprocess;
 import sys;
 
-
 def _jac_launcher(repo_root: str) -> str {
     workspace = os.path.join(repo_root, "jac");
     if os.path.isfile(workspace) and os.access(workspace, os.X_OK) {

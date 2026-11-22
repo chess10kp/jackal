@@ -32,7 +32,7 @@ obj UiInteraction {
 glob UI_METHODS: list[str] = ["select", "confirm", "input"];
 
 
-def new_ui_queue() -> UiInteractionQueue {
+def new_ui_queue -> UiInteractionQueue {
     return UiInteractionQueue(lock=threading.Lock());
 }
 
@@ -163,7 +163,7 @@ every tick and answers later via take(). Expired ones reap into element 2."""
     }
 
     """Cancel everything; returns how many."""
-    def cancel_all() -> int {
+    def cancel_all -> int {
         n = 0;
         if self.lock is None {
             return n;

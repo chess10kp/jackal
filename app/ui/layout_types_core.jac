@@ -21,15 +21,15 @@ obj Rect {
         width: int = 0,
         height: int = 0;
 
-    def right() -> int {
+    def right -> int {
         return self.x + self.width;
     }
 
-    def bottom() -> int {
+    def bottom -> int {
         return self.y + self.height;
     }
 
-    def is_empty() -> bool {
+    def is_empty -> bool {
         return self.width <= 0 or self.height <= 0;
     }
 
@@ -54,7 +54,7 @@ obj Rect {
         );
     }
 
-    def copy() -> Rect {
+    def copy -> Rect {
         return Rect(
             x=self.x,
             y=self.y,
@@ -86,10 +86,30 @@ def rect_union(a: Rect, b: Rect) -> Rect {
 }
 
 
-enum Axis { HORIZONTAL = "horizontal", VERTICAL = "vertical" }
-enum SizeMode { FIXED = "fixed", INTRINSIC = "intrinsic", BOUNDED = "bounded", FILL = "fill", GROW = "grow" }
-enum Align { START = "start", CENTER = "center", END = "end", STRETCH = "stretch" }
-enum OverlayAnchor { CENTER = "center", TOP = "top", BOTTOM = "bottom", LEFT = "left", RIGHT = "right" }
+enum Axis {
+    HORIZONTAL = "horizontal",
+    VERTICAL = "vertical",
+}
+enum SizeMode {
+    FIXED = "fixed",
+    INTRINSIC = "intrinsic",
+    BOUNDED = "bounded",
+    FILL = "fill",
+    GROW = "grow",
+}
+enum Align {
+    START = "start",
+    CENTER = "center",
+    END = "end",
+    STRETCH = "stretch",
+}
+enum OverlayAnchor {
+    CENTER = "center",
+    TOP = "top",
+    BOTTOM = "bottom",
+    LEFT = "left",
+    RIGHT = "right",
+}
 
 
 """Per-axis sizing policy (plan §4.1)."""
@@ -116,7 +136,10 @@ obj LayoutSpec {
 }
 
 
-enum LayoutSeverity { WARNING = "warning", ERROR = "error" }
+enum LayoutSeverity {
+    WARNING = "warning",
+    ERROR = "error",
+}
 enum LayoutError {
     INVALID_SPEC = "invalid_spec",
     INVALID_RELATION = "invalid_relation",
@@ -126,7 +149,7 @@ enum LayoutError {
     UNSATISFIABLE = "unsatisfiable",
     OVERFLOW = "overflow",
     UNSUPPORTED_AXIS_COUPLING = "unsupported_axis_coupling",
-    INTERNAL_INVARIANT = "internal_invariant"
+    INTERNAL_INVARIANT = "internal_invariant",
 }
 
 
@@ -184,10 +207,14 @@ obj LayoutResult {
 
 
 enum LayoutRelationKind {
-    LEFT_OF = "left_of", RIGHT_OF = "right_of",
-    ABOVE = "above", BELOW = "below",
-    ALIGN_START = "align_start", ALIGN_END = "align_end",
-    ALIGN_CENTER = "align_center", SAME_SIZE = "same_size"
+    LEFT_OF = "left_of",
+    RIGHT_OF = "right_of",
+    ABOVE = "above",
+    BELOW = "below",
+    ALIGN_START = "align_start",
+    ALIGN_END = "align_end",
+    ALIGN_CENTER = "align_center",
+    SAME_SIZE = "same_size",
 }
 
 

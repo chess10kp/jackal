@@ -3,8 +3,6 @@ stem). Guards the general windowing contract: uniform chrome, per-width
 truncation, the selection-stable sliding viewport with more-markers, and
 cursor/no-cursor modes."""
 
-
-
 test "frame draws title, body and an exact box" {
     spec = WindowSpec(title="T", width=10, hint="esc close");
     lines = window_frame(spec, ["alpha", "beta"]);
@@ -17,14 +15,12 @@ test "frame draws title, body and an exact box" {
     assert lines[6] == "╰" + "─" * 10 + "╯", lines[6];
 }
 
-
 test "frame omits the hint footer when hint is empty" {
     spec = WindowSpec(title="T", width=8);
     lines = window_frame(spec, ["x"]);
     assert len(lines) == 4, str(len(lines));
     assert lines[3] == "╰" + "─" * 8 + "╯", lines[3];
 }
-
 
 test "frame truncates overlong body lines to the inner width" {
     spec = WindowSpec(title="T", width=8);
@@ -35,20 +31,17 @@ test "frame truncates overlong body lines to the inner width" {
     assert len(lines[2]) == 10, lines[2];
 }
 
-
 test "short list with cursor shows every row marked, no markers" {
     (vis, off) = window_view(["a", "b"], 0, 8);
     assert vis == ["> a", "  b"], str(vis);
     assert off == 0;
 }
 
-
 test "no cursor renders rows verbatim" {
     (vis, off) = window_view(["a", "b"], -1, 8);
     assert vis == ["a", "b"], str(vis);
     assert off == 0;
 }
-
 
 test "long list scrolls only when the cursor leaves the viewport" {
     rows: list[str] = [];
@@ -77,7 +70,6 @@ test "long list scrolls only when the cursor leaves the viewport" {
     assert vis3[8] == "… 2 more", vis3[8];
 }
 
-
 test "viewport clamps a stale cursor past the end" {
     rows: list[str] = [];
     for i in range(1, 13) {
@@ -88,37 +80,26 @@ test "viewport clamps a stale cursor past the end" {
     assert off == 4;
 }
 
-
 test "empty rows render an empty body" {
     (vis, off) = window_view([], -1, 8);
     assert vis == [];
     assert off == 0;
 }
 
-
 test "window_lines composes viewport and frame" {
     rows: list[str] = [];
     for i in range(1, 13) {
         rows.append("r" + str(i));
     }
-    state = WindowState(
-        spec=WindowSpec(title="MCP", width=20, hint="esc"),
-        rows=rows,
-        selected=0,
-    );
+    state = WindowState(spec=WindowSpec(title="MCP", width=20, hint="esc"), rows=rows, selected=0);
     lines = window_lines(state);
     assert lines[1] == "│" + _wpad("  MCP", 20) + "│", lines[1];
     assert lines[2] == "│" + _wpad("  > r1", 20) + "│", lines[2];
     assert lines[len(lines) - 2] == "│" + _wpad("  esc", 20) + "│", lines[len(lines) - 2];
 }
 
-
 test "window_lines without a cursor shows rows verbatim" {
-    state = WindowState(
-        spec=WindowSpec(title="INFO", width=10),
-        rows=["plain"],
-        selected=-1,
-    );
+    state = WindowState(spec=WindowSpec(title="INFO", width=10), rows=["plain"], selected=-1);
     lines = window_lines(state);
     assert lines[2] == "│" + _wpad("  plain", 10) + "│", lines[2];
 }

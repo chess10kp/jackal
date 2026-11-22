@@ -45,7 +45,7 @@ import from constraints.solver_types {
     EditInfo,
 }
 
-def _new_solver() -> Solver { return Solver(); }
+def _new_solver -> Solver { return Solver(); }
 
 obj Solver {
     has rows: dict[int, Row] = {},
@@ -76,7 +76,7 @@ obj Solver {
     Variable ids and symbol ids share the id_tick sequence but never mix:
     each allocated variable later receives its own distinct external
     symbol via _get_var_symbol (kiwi keeps them in separate namespaces)."""
-    def new_variable() -> Variable {
+    def new_variable -> Variable {
         v = Variable(id=self.next_var_id);
         self.next_var_id += 1;
         return v;
@@ -288,7 +288,7 @@ obj Solver {
         return SolveResult(ok=True);
     }
 
-    def snapshot() -> SolverSnapshot {
+    def snapshot -> SolverSnapshot {
         vals: dict[int, float] = {};
         for vid in sorted(self.var_symbols.keys()) {
             symbol = self.var_symbols[vid];
@@ -301,7 +301,7 @@ obj Solver {
         return SolverSnapshot(generation=self.generation, values=vals);
     }
 
-    def reset() -> None {
+    def reset -> None {
         self.rows = {};
         self.kinds = {};
         self.var_symbols = {};

@@ -67,7 +67,7 @@ def _fixed(n: float) -> AxisSize {
 }
 
 
-def _fill() -> AxisSize {
+def _fill -> AxisSize {
     return AxisSize(mode=SizeMode.FILL);
 }
 
@@ -81,7 +81,7 @@ def _grow(weight: float) -> AxisSize {
 # Registry lifecycle tests.
 # ----------------------------------------------------------------------
 
-def _intrinsic() -> AxisSize {
+def _intrinsic -> AxisSize {
     return AxisSize(mode=SizeMode.INTRINSIC);
 }
 

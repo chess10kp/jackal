@@ -6,19 +6,9 @@ dedupes, and trades off by strength tier. No UI types (LAYOUT-ENGINE-PLAN §3);
 node identity stays caller-owned base-id ranges.
 """
 
-import from constraints.algebra {
-    Constraint,
-    Expression,
-    StrengthTier,
-    Term,
-    Variable,
-}
-import from constraints.results {
-    SolveError,
-}
-import from constraints.solver {
-    Solver,
-}
+import from constraints.algebra { Constraint, Expression, StrengthTier, Term, Variable }
+import from constraints.results { SolveError }
+import from constraints.solver { Solver }
 import from constraints.layout_relations {
     affine_constraint,
     align_bottom,
@@ -29,27 +19,20 @@ import from constraints.layout_relations {
     width_nonnegative,
 }
 
-
 glob TOL: float = 1e-6;
 
-
 def _pin_zero(v: Variable) -> Constraint {
-    return affine_constraint(
-        Expression(terms=[Term(variable=v, coefficient=1.0)], constant=0.0)
-    );
+    return affine_constraint(Expression(terms=[Term(variable=v, coefficient=1.0)], constant=0.0));
 }
-
 
 def _assert_near(actual: float, expected: float) {
     assert abs(actual - expected) < TOL;
 }
 
-
 def _value(s: Solver, v: Variable) -> float {
     snap = s.snapshot();
     return snap.values[v.id];
 }
-
 
 def _add_all(s: Solver, cs: list[Constraint], tag: str) {
     for c in cs {
@@ -57,7 +40,6 @@ def _add_all(s: Solver, cs: list[Constraint], tag: str) {
         assert r.ok;
     }
 }
-
 
 test "vertical_flow solves end-to-end with framework default strengths" {
     s = Solver();
@@ -76,15 +58,16 @@ test "vertical_flow solves end-to-end with framework default strengths" {
 
     # Caller pins the viewport-sized parent; children flow inside it.
     _add_all(s, [_pin_zero(parent["left"]), _pin_zero(parent["top"])], "viewport");
-    _add_all(s, [affine_constraint(Expression(
-        terms=[Term(variable=parent["width"], coefficient=1.0)],
-        constant=-40.0,
-    ))], "viewport");
     _add_all(
         s,
-        vertical_flow(parent, [first, second], 2.0, True),
-        "flow",
+        [
+            affine_constraint(
+                Expression(terms=[Term(variable=parent["width"], coefficient=1.0)], constant=-40.0)
+            ),
+        ],
+        "viewport",
     );
+    _add_all(s, vertical_flow(parent, [first, second], 2.0, True), "flow");
 
     # First child anchors to the parent's top edge with its preferred size.
     _assert_near(_value(s, first["top"]), 0.0);
@@ -98,7 +81,6 @@ test "vertical_flow solves end-to-end with framework default strengths" {
     _assert_near(_value(s, second["left"]), 0.0);
     _assert_near(_value(s, second["width"]), 40.0);
 }
-
 
 test "weak size preferences yield to a required container bound" {
     s = Solver();
@@ -115,10 +97,15 @@ test "weak size preferences yield to a required container bound" {
     # Parent top pinned; total inner height forced to 6 by REQUIRED facts:
     # anchor, gap 2, and last-child-bottom == parent-bottom.
     _add_all(s, [_pin_zero(parent["top"])], "viewport");
-    _add_all(s, [affine_constraint(Expression(
-        terms=[Term(variable=parent["height"], coefficient=1.0)],
-        constant=-6.0,
-    ))], "viewport");
+    _add_all(
+        s,
+        [
+            affine_constraint(
+                Expression(terms=[Term(variable=parent["height"], coefficient=1.0)], constant=-6.0)
+            ),
+        ],
+        "viewport",
+    );
     _add_all(s, vertical_flow(parent, [first, second], 2.0), "flow");
     _add_all(s, align_bottom(second, parent, StrengthTier.REQUIRED), "flow");
 
@@ -134,7 +121,6 @@ test "weak size preferences yield to a required container bound" {
     _assert_near(_value(s, first["top"]), 0.0);
     _assert_near(_value(s, second["top"]), h1 + 2.0);
 }
-
 
 test "re-expanded flow patterns dedupe by content hash" {
     s = Solver();

@@ -35,16 +35,9 @@ Deviations from the Python toolchain:
 
 import os;
 import re;
-import from .subagents {
-    resolve_jackal_root,
-    frontmatter_string,
-    parse_frontmatter,
-    _abs_path,
-}
-
+import from .subagents { resolve_jackal_root, frontmatter_string, parse_frontmatter, _abs_path }
 
 # ============================ chain discovery ============================
-
 
 """Recursively list .chain.md files under *dir_path*, sorted by path."""
 def list_chain_files(dir_path: str) -> list[str] {
@@ -74,9 +67,7 @@ def list_chain_files(dir_path: str) -> list[str] {
     return found;
 }
 
-
 # ============================= step parsing ==============================
-
 
 """Parse one step's config lines + task text.
 
@@ -131,9 +122,7 @@ def parse_step_body(agent: str, section_body: str) -> dict[str, any] {
     return step;
 }
 
-
 # ========================== chain markdown parse =========================
-
 
 """Parse a chain .chain.md file into a ChainDefinition dict.
 
@@ -147,9 +136,7 @@ def parse_chain_markdown(content: str, source: str, file_path: str) -> dict[str,
     description = (raw_desc or "").strip();
 
     if not name or not description {
-        raise ValueError(
-            "Chain frontmatter must include name and description (" + file_path + ")"
-        );
+        raise ValueError("Chain frontmatter must include name and description (" + file_path + ")");
     }
 
     # Find all ## heading sections, line by line (see docstring note).
@@ -187,9 +174,7 @@ def parse_chain_markdown(content: str, source: str, file_path: str) -> dict[str,
     };
 }
 
-
 # ================================ loading ================================
-
 
 """Load all valid chain definitions from *dir_path* (invalid skipped)."""
 def load_chains_from_dir(dir_path: str, source: str) -> list[dict[str, any]] {
@@ -210,7 +195,6 @@ def load_chains_from_dir(dir_path: str, source: str) -> list[dict[str, any]] {
     return chains;
 }
 
-
 """Discovery roots: {"packageDir": <root>/chains, "projectDir": <cwd>/chains}."""
 def discover_chain_dirs(cwd: str, agent_dir: str = "") -> dict[str, str] {
     base_root = agent_dir if agent_dir else resolve_jackal_root();
@@ -219,7 +203,6 @@ def discover_chain_dirs(cwd: str, agent_dir: str = "") -> dict[str, str] {
         "projectDir": os.path.join(_abs_path(cwd), "chains"),
     };
 }
-
 
 """Merged chain map keyed by name (project overrides package)."""
 def load_chains(cwd: str, agent_dir: str = "") -> dict[str, dict[str, any]] {
@@ -234,11 +217,9 @@ def load_chains(cwd: str, agent_dir: str = "") -> dict[str, dict[str, any]] {
     return merged;
 }
 
-
 def _chain_sort_key(chain: dict[str, any]) -> str {
     return str(chain.get("name", ""));
 }
-
 
 """Name-sorted list of merged chain definitions."""
 def list_chains(cwd: str, agent_dir: str = "") -> list[dict[str, any]] {
@@ -246,15 +227,12 @@ def list_chains(cwd: str, agent_dir: str = "") -> list[dict[str, any]] {
     return sorted(chains, key=_chain_sort_key);
 }
 
-
 """Look up one merged chain by name; None when unknown."""
 def get_chain(cwd: str, name: str, agent_dir: str = "") -> dict[str, any] | None {
     return load_chains(cwd, agent_dir).get(name.strip());
 }
 
-
 # ============================ catalog display ============================
-
 
 """Human-readable chain catalog ('No chains found.' when empty)."""
 def format_chain_catalog(cwd: str, agent_dir: str = "") -> str {
@@ -271,14 +249,17 @@ def format_chain_catalog(cwd: str, agent_dir: str = "") -> str {
             agents_seq.append(str(step_dict.get("agent", "")));
         }
         lines.append(
-            "- " + str(chain["name"]) + " (" + str(chain["source"]) + ") — "
-            + str(chain["description"])
+            "- "
+                + str(chain["name"])
+                + " ("
+                + str(chain["source"])
+                + ") — "
+                + str(chain["description"]),
         );
         lines.append("  steps: " + " → ".join(agents_seq));
     }
     return "\n".join(lines);
 }
-
 
 """True when either discovery root exists as a directory."""
 def chain_dirs_exist(cwd: str, agent_dir: str = "") -> bool {

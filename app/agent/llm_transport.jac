@@ -14,13 +14,9 @@ dicts as they arrive:
 import os;
 import json;
 import time;
-import from collections.abc { Generator }
+import httpx;
 import from .tool_spec { ToolSpec, MAX_TOOL_RESULT }
-import from .registry {
-    ToolRegistry,
-    as_tool_specs,
-    invoke,
-}
+import from .registry { ToolRegistry, as_tool_specs, invoke }
 import from .plugin_bridge {
     PluginBridge,
     context_gate,
@@ -30,9 +26,6 @@ import from .plugin_bridge {
     tool_call_gate,
     tool_result_gate,
 }
-
-
-
 
 """Cooperative turn-abort flag. Session owns one per active turn; the UI
 thread flips `cancelled` and the ReAct loop checks it between stream chunks
@@ -51,31 +44,36 @@ obj Transport {
     has hook_bridge: any = None,
         hook_timeout: float = 2.0;
 
-    def _build_body(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> dict[str, any] {
+    def _build_body(
+        messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+    ) -> dict[str, any] {
         # Single source of truth for the request body so tests can assert its
         # exact shape without network I/O. With thinking == "" the returned
         # dict is byte-identical to the pre-thinking-level body (no extra keys).
         # dict[str, any]: "reasoning" carries a nested dict while other
         # values are scalars, so the bare inference collapses to literals.
-        body: dict[str, any] = {
-            "model": self.model,
-            "messages": messages,
-            "stream": True,
-        };
-        if tool_defs { body["tools"] = tool_defs; }
+        body: dict[str, any] = {"model": self.model, "messages": messages, "stream": True};
+        if tool_defs {
+            body["tools"] = tool_defs;
+        }
         # Reasoning effort: these bodies are OpenAI/OpenRouter chat-completion
         # style, and OpenRouter's documented form is top-level
         # `reasoning: {"effort": ...}` (OpenAI-compatible too via mapping).
         # Omitted entirely when no level was requested.
-        if self.thinking { body["reasoning"] = {"effort": self.thinking}; }
+        if self.thinking {
+            body["reasoning"] = {"effort": self.thinking};
+        }
         return body;
     }
 
-    def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
-        import httpx;
+    def stream(
+        messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+    ) -> Iterator[dict[str, any]] {
         body = self._build_body(messages, tool_defs);
         headers: dict[str, str] = {};
-        if self.api_key { headers["Authorization"] = "Bearer " + self.api_key; }
+        if self.api_key {
+            headers["Authorization"] = "Bearer " + self.api_key;
+        }
         url = self.base_url.rstrip("/") + "/chat/completions";
         yield from self._open_stream(url, headers, body);
     }
@@ -101,8 +99,9 @@ obj Transport {
 
     """POST `body` to `url` and yield normalized chunks (shared by native
     and P10 provider transports)."""
-    def _open_stream(url: str, headers: dict[str, str], body: dict[str, any]) -> Generator[dict[str, any], None, None] {
-        import httpx;
+    def _open_stream(
+        url: str, headers: dict[str, str], body: dict[str, any]
+    ) -> Iterator[dict[str, any]] {
         calls: dict[int, dict[str, any]] = {};
         client_obj: any = httpx.Client(timeout=300.0);
         r: any = None;
@@ -117,51 +116,61 @@ obj Transport {
                 yield {"error": f"HTTP {r.status_code}: {detail}"};
                 return;
             }
-                for raw_line in r.iter_lines() {
-                    line: any = raw_line;
-                    if not line.startswith("data: ") { continue; }
-                    payload: any = line[len("data: "):];
-                    if payload == "[DONE]" { break; }
-                    chunk: any = json.loads(payload);
-                    delta: any = chunk["choices"][0].get("delta", {});
-                    piece: any = delta.get("content");
-                    if piece {
-                        yield {"content": str(piece)};
+            for raw_line in r.iter_lines() {
+                line: any = raw_line;
+                if not line.startswith("data: ") {
+                    continue;
+                }
+                payload: any = line[len("data: "):];
+                if payload == "[DONE]" {
+                    break;
+                }
+                chunk: any = json.loads(payload);
+                delta: any = chunk["choices"][0].get("delta", {});
+                piece: any = delta.get("content");
+                if piece {
+                    yield {"content": str(piece)};
+                }
+                for raw_tc in delta.get("tool_calls", []) {
+                    tc: any = raw_tc;
+                    idx = int(tc.get("index", 0));
+                    acc = calls.get(idx);
+                    if acc is None {
+                        acc = {
+                            "id": tc.get("id", ""),
+                            "type": "function",
+                            "function": {"name": "", "arguments": ""},
+                        };
+                        calls[idx] = acc;
                     }
-                    for raw_tc in delta.get("tool_calls", []) {
-                        tc: any = raw_tc;
-                        idx = int(tc.get("index", 0));
-                        acc = calls.get(idx);
-                        if acc is None {
-                            acc = {
-                                "id": tc.get("id", ""),
-                                "type": "function",
-                                "function": {"name": "", "arguments": ""},
-                            };
-                            calls[idx] = acc;
-                        }
-                        fn: any = tc.get("function", {});
-                        if fn.get("id") { acc["id"] = fn["id"]; }
-                        if fn.get("name") {
-                            acc["function"]["name"] = str(acc["function"]["name"]) + str(fn["name"]);
-                        }
-                        if fn.get("arguments") {
-                            acc["function"]["arguments"] = str(acc["function"]["arguments"]) + str(fn["arguments"]);
-                        }
+                    fn: any = tc.get("function", {});
+                    if fn.get("id") {
+                        acc["id"] = fn["id"];
+                    }
+                    if fn.get("name") {
+                        acc["function"]["name"] = str(acc["function"]["name"]) + str(fn["name"]);
+                    }
+                    if fn.get("arguments") {
+                        acc["function"]["arguments"] = str(acc["function"]["arguments"])
+                            + str(fn["arguments"]);
                     }
                 }
+            }
         } finally {
-            if r is not None { r.close(); }
+            if r is not None {
+                r.close();
+            }
             client_obj.close();
         }
         if calls {
             ordered: list[dict[str, any]] = [];
-            for i in sorted(calls) { ordered.append(calls[i]); }
+            for i in sorted(calls) {
+                ordered.append(calls[i]);
+            }
             yield {"tool_calls": ordered};
         }
     }
 }
-
 
 """Scripted, offline transport behind the `mock` route (models `mock`,
 `mockllm`, `mock/*`) — the backbone of the e2e test harness.
@@ -209,8 +218,10 @@ def _mock_next_response(script_path: str) -> dict[str, any] | None {
     return steps[idx];
 }
 
-obj MockTransport (Transport) {
-    override def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+obj MockTransport(Transport) {
+    override def stream(
+        messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+    ) -> Iterator[dict[str, any]] {
         script_path: str = os.environ.get("JACKAL_MOCK_SCRIPT", "");
         step: dict[str, any] | None = _mock_next_response(script_path);
         log_path: str = os.environ.get("JACKAL_MOCK_LOG", "");
@@ -224,15 +235,17 @@ obj MockTransport (Transport) {
             log_entry: dict[str, any] = {
                 "call": _mock_cursor.get(script_path, 0),
                 "messages": len(messages),
-                "last": {"role": str(last.get("role", "")), "content": str(last.get("content", ""))},
+                "last": {
+                    "role": str(last.get("role", "")),
+                    "content": str(last.get("content", "")),
+                },
                 "tools": tool_names,
             };
             try {
                 lf: any = open(log_path, "a", encoding="utf-8");
                 lf.write(json.dumps(log_entry) + "\n");
                 lf.close();
-            } except Exception {
-            }
+            } except Exception {}
         }
         if step is None {
             step = {"text": "mock: " + _mock_last_user(messages)};
@@ -246,7 +259,9 @@ obj MockTransport (Transport) {
         # chunk (tests assert exact chunk lists), long ones split into
         # ~80-char pieces so frontends exercise per-chunk drain paths.
         if len(text) <= 160 {
-            if text { yield {"content": text}; }
+            if text {
+                yield {"content": text};
+            }
         } else {
             i: int = 0;
             while i < len(text) {
@@ -259,7 +274,9 @@ obj MockTransport (Transport) {
             calls: list[dict[str, any]] = [];
             n: int = 0;
             for rc in raw_calls {
-                if not isinstance(rc, dict) { continue; }
+                if not isinstance(rc, dict) {
+                    continue;
+                }
                 n += 1;
                 calls.append({
                     "id": "mock_call_" + str(n),
@@ -274,7 +291,6 @@ obj MockTransport (Transport) {
         }
     }
 }
-
 
 """fx-style provider-first routing (see ~/notes/fx-model-routing.md).
 
@@ -332,7 +348,6 @@ glob PROVIDER_ROUTES: dict[str, dict[str, any]] = {
     },
 };
 
-
 """Map a model id to its provider id (pure function — reads nothing).
 
 Dispatch:
@@ -344,16 +359,23 @@ Dispatch:
   anything else                 -> "openai_compat"
 """
 def provider_for(model: str) -> str {
-    if model.startswith("openrouter/") { return "openrouter"; }
-    if model.startswith("deepseek/") { return "deepseek"; }
-    if model.startswith("zai/") { return "zai"; }
+    if model.startswith("openrouter/") {
+        return "openrouter";
+    }
+    if model.startswith("deepseek/") {
+        return "deepseek";
+    }
+    if model.startswith("zai/") {
+        return "zai";
+    }
     if model == "mock" or model == "mockllm" or model.startswith("mock/") {
         return "mock";
     }
-    if model.startswith("ext/") { return "ext"; }
+    if model.startswith("ext/") {
+        return "ext";
+    }
     return "openai_compat";
 }
-
 
 """The id the MODEL picker must advertise for `name` under `provider`.
 
@@ -368,7 +390,6 @@ def routed_model_id(provider: str, name: str) -> str {
     return provider + "/" + name;
 }
 
-
 """fx-style actionable credential check. Returns "" when the model is
 usable; otherwise ONE sentence naming the exact fix. Reads only os.environ
 and never raises.
@@ -376,12 +397,20 @@ and never raises.
 def credential_error(model: str) -> str {
     try {
         provider = provider_for(model);
-        if provider == "ext" { return ""; }
+        if provider == "ext" {
+            return "";
+        }
         route: any = PROVIDER_ROUTES.get(provider);
-        if route is None { return ""; }
+        if route is None {
+            return "";
+        }
         key_env = str(route.get("key_env", ""));
-        if not key_env { return ""; }
-        if os.environ.get(key_env, "") { return ""; }
+        if not key_env {
+            return "";
+        }
+        if os.environ.get(key_env, "") {
+            return "";
+        }
         fix = f'set {key_env}';
         if provider == "openai_compat" {
             fix += " (or point OPENAI_COMPAT_BASE at your endpoint)";
@@ -394,7 +423,6 @@ def credential_error(model: str) -> str {
         return "";
     }
 }
-
 
 """Pick a transport from the model name. Provider table lives here so the
 whole model edge is one swappable module.
@@ -410,15 +438,21 @@ the table's local:// marker instead of silently billing a real endpoint.
 """
 def make_transport(model: str = "", thinking: str = "", hook_bridge: any = None) -> Transport {
     provider = provider_for(model);
-    if provider == "ext" { provider = "openai_compat"; }
+    if provider == "ext" {
+        provider = "openai_compat";
+    }
     route: dict[str, any] = PROVIDER_ROUTES[provider];
     prefix = provider + "/";
     stripped = model;
-    if model.startswith(prefix) { stripped = model[len(prefix):]; }
+    if model.startswith(prefix) {
+        stripped = model[len(prefix):];
+    }
     key_env = str(route.get("key_env", ""));
     api_key = os.environ.get(key_env, "") if key_env else "";
     base_url_env = str(route.get("base_url_env", ""));
-    base_url = os.environ.get(base_url_env, str(route["base_url"])) if base_url_env else str(route["base_url"]);
+    base_url = os.environ.get(base_url_env, str(route["base_url"]))
+        if base_url_env
+        else str(route["base_url"]);
     if provider == "mock" {
         return MockTransport(base_url=base_url, model=stripped, thinking=thinking);
     }
@@ -431,38 +465,41 @@ def make_transport(model: str = "", thinking: str = "", hook_bridge: any = None)
     );
 }
 
-
 """P10 provider transport: serves `ext/<extension>/<model>` model ids.
 
 Resolves the owning extension's provider via bridge state, fires Pi's
 `before_provider_request` hook before each POST (body/url/headers mutation —
 full request control, trusted in-process code), then streams identically to
 the native transport."""
-obj ProviderTransport (Transport) {
+obj ProviderTransport(Transport) {
     has ext_bridge: any = None,
         ext_cfg: dict[str, any] = {};
 
-    override def stream(messages: list[dict[str, any]], tool_defs: list[dict[str, any]]) -> Generator[dict[str, any], None, None] {
+    override def stream(
+        messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+    ) -> Iterator[dict[str, any]] {
         body = self._build_body(messages, tool_defs);
         headers: dict[str, str] = {};
-        if self.api_key { headers["Authorization"] = "Bearer " + self.api_key; }
+        if self.api_key {
+            headers["Authorization"] = "Bearer " + self.api_key;
+        }
         # Typed intermediate: the literal-arg rstrip chain infers LiteralString,
         # which the hook rewrite below cannot assign back into.
         url: str = self.base_url.rstrip("/") + "/chat/completions";
         if self.ext_bridge is not None {
             try {
                 prepped = prepare_provider_request(
-                    self.ext_bridge as PluginBridge,
-                    self.model,
-                    url,
-                    headers,
-                    body,
+                    self.ext_bridge as PluginBridge, self.model, url, headers, body
                 );
                 url = str(prepped.get("url", url));
                 h2: any = prepped.get("headers");
-                if isinstance(h2, dict) { headers = h2; }
+                if isinstance(h2, dict) {
+                    headers = h2;
+                }
                 b2: any = prepped.get("body");
-                if isinstance(b2, dict) { body = b2; }
+                if isinstance(b2, dict) {
+                    body = b2;
+                }
             } except Exception {
                 # Hook failure never blocks the request.
             }
@@ -471,12 +508,13 @@ obj ProviderTransport (Transport) {
     }
 }
 
-
 """Build a transport for an extension-declared model id.
 
 Returns None when the id is not in the ext/ namespace or no extension
 declared it — callers fall back to native routing."""
-def make_ext_transport(bridge: PluginBridge | None, model_id: str, thinking: str = "") -> ProviderTransport | None {
+def make_ext_transport(
+    bridge: PluginBridge | None, model_id: str, thinking: str = ""
+) -> ProviderTransport | None {
     cfg = resolve_ext_model(bridge, model_id);
     if cfg is None {
         return None;

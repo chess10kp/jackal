@@ -45,9 +45,7 @@ import from .skills_discovery {
     load_jackal_skills,
 }
 
-
 # ========================== prompt formatting ============================
-
 
 def _escape_xml(s: str) -> str {
     out = s.replace("&", "&amp;");
@@ -57,7 +55,6 @@ def _escape_xml(s: str) -> str {
     out = out.replace("'", "&apos;");
     return out;
 }
-
 
 """Render the <available_skills> system-prompt block ('' when all hidden)."""
 def format_skills_for_prompt(skills: list[dict[str, any]]) -> str {
@@ -75,7 +72,7 @@ def format_skills_for_prompt(skills: list[dict[str, any]]) -> str {
     lines.append("Use the read tool to load a skill's file when the task matches its description.");
     lines.append(
         "When a skill file references a relative path, resolve it against the skill directory "
-        + "(parent of SKILL.md / dirname of the path) and use that absolute path in tool commands."
+            + "(parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
     );
     lines.append("");
     lines.append("<available_skills>");
@@ -92,7 +89,6 @@ def format_skills_for_prompt(skills: list[dict[str, any]]) -> str {
     return "\n".join(lines);
 }
 
-
 """Append the skills catalog to a system prompt (unchanged when empty)."""
 def append_skills_to_prompt(system_prompt: str, skills: list[dict[str, any]]) -> str {
     catalog = format_skills_for_prompt(skills);
@@ -102,9 +98,7 @@ def append_skills_to_prompt(system_prompt: str, skills: list[dict[str, any]]) ->
     return system_prompt;
 }
 
-
 # ========================= /skill:name expansion =========================
-
 
 """Expand '/skill:name args...' into an inline <skill> block + args.
 
@@ -144,8 +138,14 @@ def expand_skill_command(text: str, skills: list[dict[str, any]]) -> str {
         }
         (_fm, body) = parse_frontmatter(raw);
         block = (
-            '<skill name="' + skill_name + '" location="' + skill_path + '">\n'
-            + "References are relative to " + skill_base + ".\n\n"
+            '<skill name="'
+            + skill_name
+            + '" location="'
+            + skill_path
+            + '">\n'
+            + "References are relative to "
+            + skill_base
+            + ".\n\n"
             + body.strip()
             + "\n</skill>"
         );
@@ -158,9 +158,7 @@ def expand_skill_command(text: str, skills: list[dict[str, any]]) -> str {
     }
 }
 
-
 # ====================== builtin lookup + allowlist =======================
-
 
 """Stripped body of a built-in skill's SKILL.md ('' when absent/broken)."""
 def load_skill_by_dir(dir_name: str, package_root: str = "") -> str {
@@ -182,7 +180,6 @@ def load_skill_by_dir(dir_name: str, package_root: str = "") -> str {
         return "";
     }
 }
-
 
 """Read-permission seeds for loaded skills: exact files plus rooted dirs."""
 def skill_read_allowlist(skills: list[dict[str, any]]) -> dict[str, list[str]] {

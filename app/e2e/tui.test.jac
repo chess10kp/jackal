@@ -1,7 +1,5 @@
 """E2E: the native TUI driven through a real pseudo-terminal."""
 
-
-
 test "tui boots, streams a reply, and quits cleanly on esc" {
     sb = make_sandbox();
     tui: TuiSession | None = None;
@@ -21,18 +19,22 @@ test "tui boots, streams a reply, and quits cleanly on esc" {
         assert "\x1b[?1049l" in raw;
         assert "\x1b[?25h" in raw;
     } finally {
-        if tui is not None { tui.close(); }
+        if tui is not None {
+            tui.close();
+        }
         sb.cleanup();
     }
 }
-
 
 test "tui approval modal accepts with y" {
     sb = make_sandbox();
     tui: TuiSession | None = None;
     try {
         sb.script([
-            {"text": "", "tool_calls": [{"name": "write_file", "args": {"path": "t.txt", "content": "tui"}}]},
+            {
+                "text": "",
+                "tool_calls": [{"name": "write_file", "args": {"path": "t.txt", "content": "tui"}}],
+            },
             {"text": "file written"},
         ]);
         tui = spawn_tui(sb);
@@ -43,18 +45,22 @@ test "tui approval modal accepts with y" {
         tui.wait_for("file written", 60.0);
         assert sb.read("t.txt") == "tui";
     } finally {
-        if tui is not None { tui.close(); }
+        if tui is not None {
+            tui.close();
+        }
         sb.cleanup();
     }
 }
-
 
 test "tui approval modal rejects with n" {
     sb = make_sandbox();
     tui: TuiSession | None = None;
     try {
         sb.script([
-            {"text": "", "tool_calls": [{"name": "write_file", "args": {"path": "no.txt", "content": "x"}}]},
+            {
+                "text": "",
+                "tool_calls": [{"name": "write_file", "args": {"path": "no.txt", "content": "x"}}],
+            },
             {"text": "not written"},
         ]);
         tui = spawn_tui(sb);
@@ -66,11 +72,12 @@ test "tui approval modal rejects with n" {
         assert not sb.exists("no.txt");
         assert "denied" in sb.calls()[1]["last"]["content"];
     } finally {
-        if tui is not None { tui.close(); }
+        if tui is not None {
+            tui.close();
+        }
         sb.cleanup();
     }
 }
-
 
 test "tui slash commands and mode cycling" {
     sb = make_sandbox();
@@ -87,7 +94,9 @@ test "tui slash commands and mode cycling" {
         tui.wait_for("[plan]", 10.0);
         assert sb.calls() == [];
     } finally {
-        if tui is not None { tui.close(); }
+        if tui is not None {
+            tui.close();
+        }
         sb.cleanup();
     }
 }
@@ -109,7 +118,9 @@ test "tui streams a 20 KB answer without stalling" {
         code = tui.wait_exit(30.0);
         assert code == 0, "exit " + str(code) + "\n" + tui.screen_text();
     } finally {
-        if tui is not None { tui.close(); }
+        if tui is not None {
+            tui.close();
+        }
         sb.cleanup();
     }
 }
@@ -145,7 +156,9 @@ test "tui previews long tool results at six lines with a more-lines footer" {
         code = tui.wait_exit(30.0);
         assert code == 0, "exit " + str(code) + "\n" + tui.screen_text();
     } finally {
-        if tui is not None { tui.close(); }
+        if tui is not None {
+            tui.close();
+        }
         sb.cleanup();
     }
 }
@@ -172,7 +185,9 @@ test "tui mcp window opens, closes, and restart feedback flows" {
         code = tui.wait_exit(30.0);
         assert code == 0, "exit " + str(code) + "\n" + tui.screen_text();
     } finally {
-        if tui is not None { tui.close(); }
+        if tui is not None {
+            tui.close();
+        }
         sb.cleanup();
     }
 }
@@ -206,7 +221,9 @@ test "tui login api-key input accepts a bracketed paste" {
         fh.close();
         assert key in stored, stored;
     } finally {
-        if tui is not None { tui.close(); }
+        if tui is not None {
+            tui.close();
+        }
         sb.cleanup();
     }
 }
@@ -227,7 +244,9 @@ test "tui picker is owned by the window stack and closes cleanly" {
         tui.press("enter");
         tui.wait_for("/compact", 20.0);
     } finally {
-        if tui is not None { tui.close(); }
+        if tui is not None {
+            tui.close();
+        }
         sb.cleanup();
     }
 }

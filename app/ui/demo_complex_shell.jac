@@ -16,21 +16,12 @@ Test:
 
 import from time { perf_counter }
 
-import from ui.model {
-    node_id,
-}
+import from ui.model { node_id }
 
-import from ui.runtime {
-    create_session,
-    dispose_session,
-}
-import from ui.runtime_jids {
-    ui_jids_reachable_from_persistent_root,
-}
+import from ui.runtime { create_session, dispose_session }
+import from ui.runtime_jids { ui_jids_reachable_from_persistent_root }
 
-import from ui.bindings {
-    is_empty,
-}
+import from ui.bindings { is_empty }
 
 import from ui.screen {
     build_main_shell,
@@ -51,17 +42,9 @@ import from ui.transcript {
     set_follow_tail,
 }
 
-import from ui.layout_types {
-    LayoutSpec,
-    fill_axis,
-    fixed_axis,
-    grow_axis,
-}
+import from ui.layout_types { LayoutSpec, fill_axis, fixed_axis, grow_axis }
 
-import from ui.demo_complex_shell_render {
-    _install_shell_layout,
-    _paint_shell,
-}
+import from ui.demo_complex_shell_render { _install_shell_layout, _paint_shell }
 
 import from ui.renderer {
     create_renderer,
@@ -74,22 +57,11 @@ import from ui.renderer {
     frame_used_full_clear,
 }
 
-import from ui.virtual_terminal {
-    VirtualTerminal,
-}
+import from ui.virtual_terminal { VirtualTerminal }
 
-import from ui.progress_bar {
-    ProgressBar,
-    SetProgress,
-    render_progress,
-}
+import from ui.progress_bar { ProgressBar, SetProgress, render_progress }
 
-import from ui.inspect {
-    validate_invariants,
-    dump_graph,
-    dump_bindings,
-    dump_lifetimes,
-}
+import from ui.inspect { validate_invariants, dump_graph, dump_bindings, dump_lifetimes }
 
 import from agent.protocol {
     create_adapter,
@@ -101,13 +73,11 @@ import from agent.protocol {
     queue_stats,
 }
 
-
 obj DemoStep {
     has name: str,
         ok: bool,
         detail: str = "";
 }
-
 
 obj DemoReport {
     has passed: bool = False,
@@ -124,14 +94,12 @@ obj DemoReport {
         binding_dump: str = "";
 }
 
-
 def _step(demo: DemoReport, name: str, ok: bool, detail: str = "") {
     demo.steps.append(DemoStep(name=name, ok=ok, detail=detail));
     if not ok {
         demo.passed = False;
     }
 }
-
 
 def _frame_text(rows: list[str]) -> str {
     border = "+" + ("-" * 78) + "+";
@@ -148,13 +116,8 @@ def _frame_text(rows: list[str]) -> str {
     return "\n".join(lines);
 }
 
-
 """Run the full complex demo and return a structured result."""
-def run_complex_shell_demo(
-    columns: int = 80,
-    rows: int = 24,
-    verbose: bool = False,
-) -> DemoReport {
+def run_complex_shell_demo(columns: int = 80, rows: int = 24, verbose: bool = False) -> DemoReport {
     demo = DemoReport(passed=True);
     t0 = perf_counter();
 
@@ -178,18 +141,13 @@ def run_complex_shell_demo(
     );
 
     proj = bind_transcript(
-        shell.transcript,
-        "demo.transcript",
-        width=columns - 2,
-        height=max(6, rows - 6),
+        shell.transcript, "demo.transcript", width=columns - 2, height=max(6, rows - 6)
     );
     set_follow_tail(proj, True);
 
     seed: list[TranscriptMessage] = [
         TranscriptMessage(
-            message_id="m0",
-            content="system: Jackal OSP UI complex demo online.",
-            content_rev=1,
+            message_id="m0", content="system: Jackal OSP UI complex demo online.", content_rev=1
         ),
         TranscriptMessage(
             message_id="m1",
@@ -201,8 +159,7 @@ def run_complex_shell_demo(
     _step(
         demo,
         "transcript_bind",
-        shell.transcript.source_id == "demo.transcript"
-        and shell.transcript.observed_revision == 1,
+        shell.transcript.source_id == "demo.transcript" and shell.transcript.observed_revision == 1,
         "messages=" + str(len(proj.messages)),
     );
 
@@ -245,12 +202,7 @@ def run_complex_shell_demo(
         }
         drive_screen(adapter, shell, env);
     }
-    _step(
-        demo,
-        "drive_status",
-        shell.status.phase == "streaming",
-        "phase=" + shell.status.phase,
-    );
+    _step(demo, "drive_status", shell.status.phase == "streaming", "phase=" + shell.status.phase);
 
     shell_insert_text(session, shell, "also watch resize mid-stream");
     effects = shell_submit(session, shell);
@@ -269,25 +221,17 @@ def run_complex_shell_demo(
             TranscriptMessage(
                 message_id="old_" + str(i),
                 content=(
-                    "archive note "
-                    + str(i)
-                    + ": prior turn context that should stay off-screen"
+                    "archive note " + str(i) + ": prior turn context that should stay off-screen"
                 ),
                 content_rev=1,
-            )
+            ),
         );
     }
     assistant = (
         "assistant: tracing Child ranks → measure → damage union. "
         + "Unicode check: 日本語 wide glyphs + combining e\u0301."
     );
-    streamed.append(
-        TranscriptMessage(
-            message_id="m2",
-            content=assistant,
-            content_rev=1,
-        )
-    );
+    streamed.append(TranscriptMessage(message_id="m2", content=assistant, content_rev=1));
     apply_transcript_revision(proj, 2, streamed);
     win = materialize_visible(proj);
     _step(
@@ -300,17 +244,10 @@ def run_complex_shell_demo(
     # Mutate an early archive message that sits above the follow-tail window.
     offscreen = list(streamed);
     offscreen[2] = TranscriptMessage(
-        message_id="old_0",
-        content="archive note 0: mutated off-screen",
-        content_rev=2,
+        message_id="old_0", content="archive note 0: mutated off-screen", content_rev=2
     );
     apply_transcript_revision(proj, 3, offscreen);
-    _step(
-        demo,
-        "offscreen_no_damage",
-        proj.last_damage == False,
-        "follow_tail viewport unchanged",
-    );
+    _step(demo, "offscreen_no_damage", proj.last_damage == False, "follow_tail viewport unchanged");
 
     term = VirtualTerminal(columns=columns, rows=rows);
     term.start();
@@ -322,13 +259,7 @@ def run_complex_shell_demo(
     bar_line = render_progress(progress.value, 24);
 
     header = "Jackal │ OSP complex demo │ rev=" + str(session.graph_revision);
-    status = (
-        "phase="
-        + shell.status.phase
-        + " │ "
-        + bar_line
-        + " │ tool:jac_check"
-    );
+    status = ("phase=" + shell.status.phase + " │ " + bar_line + " │ tool:jac_check");
     prompt_lines = ["> ", "(draft empty after submit)"];
     _paint_shell(
         renderer,
@@ -354,8 +285,7 @@ def run_complex_shell_demo(
     _step(
         demo,
         "no_full_clear_boot",
-        frame1.used_full_clear == False
-        and frame_used_full_clear(term.writes) == False,
+        frame1.used_full_clear == False and frame_used_full_clear(term.writes) == False,
         "retained damage path",
     );
 
@@ -372,7 +302,7 @@ def run_complex_shell_demo(
             message_id="m3",
             content="assistant: resize preserved shell node ids; rewrapping…",
             content_rev=1,
-        )
+        ),
     );
     apply_transcript_revision(proj, 4, streamed2);
     win2 = materialize_visible(proj);
@@ -459,12 +389,7 @@ def run_complex_shell_demo(
     if findings {
         detail_findings = findings[0].kind + ": " + findings[0].detail;
     }
-    _step(
-        demo,
-        "invariants",
-        findings == [],
-        detail_findings if detail_findings else "clean",
-    );
+    _step(demo, "invariants", findings == [], detail_findings if detail_findings else "clean");
 
     demo.graph_dump = dump_graph(session);
     demo.binding_dump = dump_bindings(session);
@@ -483,12 +408,7 @@ def run_complex_shell_demo(
     );
 
     leaked = ui_jids_reachable_from_persistent_root(set(session.tracked_node_ids));
-    _step(
-        demo,
-        "detached_from_root",
-        leaked == [],
-        "leaked=" + str(len(leaked)),
-    );
+    _step(demo, "detached_from_root", leaked == [], "leaked=" + str(len(leaked)));
 
     term.stop();
     dispose_session(session);
@@ -509,26 +429,30 @@ def run_complex_shell_demo(
     return demo;
 }
 
-
 """Pretty-print a demo result for `jac run`."""
 def format_demo_report(demo: DemoReport) -> str {
     lines: list[str] = [];
     lines.append("=== OSP UI complex shell demo ===");
     lines.append(
         "result: "
-        + ("PASS" if demo.passed else "FAIL")
-        + "  frames="
-        + str(demo.frames_rendered)
-        + "  cells_written="
-        + str(demo.cells_written_total)
-        + "  coalesced="
-        + str(demo.coalesced_deltas)
-        + "  latency_ms="
-        + str(round(demo.latency_ms, 2))
+            + ("PASS" if demo.passed else "FAIL")
+            + "  frames="
+            + str(demo.frames_rendered)
+            + "  cells_written="
+            + str(demo.cells_written_total)
+            + "  coalesced="
+            + str(demo.coalesced_deltas)
+            + "  latency_ms="
+            + str(round(demo.latency_ms, 2)),
     );
-    lines.append("stable_ids=" + str(demo.stable_ids)
-        + "  disposed_clean=" + str(demo.disposed_clean)
-        + "  invariant_findings=" + str(demo.invariant_findings));
+    lines.append(
+        "stable_ids="
+            + str(demo.stable_ids)
+            + "  disposed_clean="
+            + str(demo.disposed_clean)
+            + "  invariant_findings="
+            + str(demo.invariant_findings),
+    );
     lines.append("");
     lines.append("-- steps --");
     for step in demo.steps {
@@ -548,7 +472,6 @@ def format_demo_report(demo: DemoReport) -> str {
     }
     return "\n".join(lines);
 }
-
 
 with entry {
     demo = run_complex_shell_demo(verbose=False);

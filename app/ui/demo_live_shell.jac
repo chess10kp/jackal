@@ -332,7 +332,7 @@ def _handle_host_events(app: LiveShell, events: list[HostEvent]) {
 }
 
 
-def create_live_shell() -> LiveShell {
+def create_live_shell -> LiveShell {
     (cols, rows) = read_terminal_size(80, 24);
     handle = create_session();
     session = handle.session;
@@ -373,7 +373,7 @@ def create_live_shell() -> LiveShell {
 }
 
 
-def run_live_shell_demo() {
+def run_live_shell_demo  {
     app = create_live_shell();
     app.term.start();
     app.term.set_title("Jackal");

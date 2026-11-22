@@ -15,7 +15,7 @@ import shutil;
 obj _Weird {
     has label: str = "weird";
 
-    def __repr__() -> str {
+    def __repr__ -> str {
         return "<weird object>";
     }
 }
@@ -43,7 +43,7 @@ def _with_env(env: dict[str, str], body: any) -> any {
 
 
 test "logging is off by default and writes nothing" {
-    def body() -> bool {
+    def body -> bool {
         return log_event("error", "test", "should not appear");
     }
     wrote = _with_env({"JACKAL_LOG": "", "JACKAL_LOG_LEVEL": "debug"}, body);
@@ -57,7 +57,7 @@ test "explicit sink path writes one JSON object per event" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-test-");
     try {
         sink = os.path.join(tmp, "nested", "debug.jsonl");
-        def body() -> bool {
+        def body -> bool {
             log_info("agent.tools", "read_file ok", {"path": "a.txt", "bytes": 3});
             return log_info("agent.tools", "second", None);
         }
@@ -86,7 +86,7 @@ test "JACKAL_LOG=1 uses the per-process .jackal/logs file" {
     cwd = os.getcwd();
     try {
         os.chdir(tmp);
-        def body() -> str {
+        def body -> str {
             log_warn("bridge", "extension timed out");
             return log_sink();
         }
@@ -108,7 +108,7 @@ test "level threshold filters lower-severity records" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-level-");
     try {
         sink = os.path.join(tmp, "l.jsonl");
-        def body() -> None {
+        def body -> None {
             log_debug("x", "debug line");
             log_info("x", "info line");
             log_warn("x", "warn line");
@@ -127,7 +127,7 @@ test "unknown level names do not disable or crash logging" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-badlevel-");
     try {
         sink = os.path.join(tmp, "l.jsonl");
-        def body() -> bool {
+        def body -> bool {
             # Unknown threshold falls back to info; unknown record level -> info.
             return log_event("nonsense", "x", "kept");
         }
@@ -160,7 +160,7 @@ test "unserializable payloads are projected, not raised" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-weird-");
     try {
         sink = os.path.join(tmp, "w.jsonl");
-        def body() -> bool {
+        def body -> bool {
             return log_info("x", "weird payload", fields);
         }
         assert _with_env({"JACKAL_LOG": sink, "JACKAL_LOG_LEVEL": "info"}, body);
@@ -180,7 +180,7 @@ test "an unusable sink path is a no-op, not an exception" {
         fh.close();
         # Parent "directory" is a regular file -> makedirs must fail.
         sink = os.path.join(blocker, "sub", "x.jsonl");
-        def body() -> bool {
+        def body -> bool {
             return log_event("error", "x", "boom");
         }
         wrote = _with_env({"JACKAL_LOG": sink, "JACKAL_LOG_LEVEL": "debug"}, body);
@@ -195,7 +195,7 @@ test "log_exception records type, message and traceback, and never raises" {
     tmp = tempfile.mkdtemp(prefix="jackal-log-exc-");
     try {
         sink = os.path.join(tmp, "e.jsonl");
-        def body() -> bool {
+        def body -> bool {
             try {
                 raise ValueError("disk on fire");
             } except Exception as exc {

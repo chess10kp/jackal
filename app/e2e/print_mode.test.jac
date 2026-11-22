@@ -1,8 +1,6 @@
 """E2E: one-shot print mode (`jackal -p`) against the scripted mock model."""
 
-
 import json;
-
 
 test "print mode answers and exits 0" {
     sb = make_sandbox();
@@ -20,7 +18,6 @@ test "print mode answers and exits 0" {
     }
 }
 
-
 test "print mode reads the prompt from stdin" {
     sb = make_sandbox();
     try {
@@ -33,13 +30,20 @@ test "print mode reads the prompt from stdin" {
     }
 }
 
-
 test "tool loop edits a file in yolo mode" {
     sb = make_sandbox({"notes.txt": "alpha\n"});
     try {
         sb.script([
             {"text": "", "tool_calls": [{"name": "read_file", "args": {"path": "notes.txt"}}]},
-            {"text": "", "tool_calls": [{"name": "edit_file", "args": {"path": "notes.txt", "old_text": "alpha", "new_text": "beta"}}]},
+            {
+                "text": "",
+                "tool_calls": [
+                    {
+                        "name": "edit_file",
+                        "args": {"path": "notes.txt", "old_text": "alpha", "new_text": "beta"},
+                    },
+                ],
+            },
             {"text": "done"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "rename alpha"]);
@@ -55,12 +59,16 @@ test "tool loop edits a file in yolo mode" {
     }
 }
 
-
 test "normal mode refuses confirm-gated tools without a prompt" {
     sb = make_sandbox({"keep.txt": "original\n"});
     try {
         sb.script([
-            {"text": "", "tool_calls": [{"name": "write_file", "args": {"path": "keep.txt", "content": "clobbered"}}]},
+            {
+                "text": "",
+                "tool_calls": [
+                    {"name": "write_file", "args": {"path": "keep.txt", "content": "clobbered"}},
+                ],
+            },
             {"text": "could not write"},
         ]);
         r = run_jackal(sb, ["-p", "overwrite it"]);
@@ -73,12 +81,14 @@ test "normal mode refuses confirm-gated tools without a prompt" {
     }
 }
 
-
 test "plan mode blocks writes" {
     sb = make_sandbox();
     try {
         sb.script([
-            {"text": "", "tool_calls": [{"name": "write_file", "args": {"path": "new.txt", "content": "x"}}]},
+            {
+                "text": "",
+                "tool_calls": [{"name": "write_file", "args": {"path": "new.txt", "content": "x"}}],
+            },
             {"text": "planned"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "plan", "make a file"]);
@@ -88,7 +98,6 @@ test "plan mode blocks writes" {
         sb.cleanup();
     }
 }
-
 
 test "json output reports result metadata" {
     sb = make_sandbox();
@@ -109,7 +118,6 @@ test "json output reports result metadata" {
     }
 }
 
-
 test "stream-json emits chunks then a result" {
     sb = make_sandbox();
     try {
@@ -123,7 +131,6 @@ test "stream-json emits chunks then a result" {
         sb.cleanup();
     }
 }
-
 
 test "provider error exits 1" {
     sb = make_sandbox();
@@ -139,7 +146,6 @@ test "provider error exits 1" {
     }
 }
 
-
 test "bad flags exit 2 with usage" {
     sb = make_sandbox();
     try {
@@ -151,7 +157,6 @@ test "bad flags exit 2 with usage" {
         sb.cleanup();
     }
 }
-
 
 test "continue resumes the previous session transcript" {
     sb = make_sandbox();

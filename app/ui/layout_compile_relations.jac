@@ -1,13 +1,9 @@
 """Registered spatial relation emission for layout compilation."""
 
 import from constraints.algebra { Relation, Term }
-import from ui.layout_types {
-    LayoutRelation,
-    LayoutRelationKind,
-}
+import from ui.layout_types { LayoutRelation, LayoutRelationKind }
 import from ui.layout_compile_model { CompileResult, NodeEdges, _wants }
 import from ui.layout_compile_emit { _emit, _expr, _t }
-
 
 def _emit_relation(
     result: CompileResult,
@@ -22,10 +18,7 @@ def _emit_relation(
     gap = rel.gap;
     horizontal_axis = rel.axis.value == "horizontal";
     axis_label = "h" if horizontal_axis else "v";
-    prov = (
-        "template=relation rel=" + str(rid)
-        + " src=" + rel.provenance + " axis=" + axis_label
-    );
+    prov = ("template=relation rel=" + str(rid) + " src=" + rel.provenance + " axis=" + axis_label);
 
     if not _wants(phase, rel.axis.value == "horizontal") {
         return True;  # Other phase owns this relation's axis.
@@ -60,34 +53,18 @@ def _emit_relation(
         }
     } elif k == LayoutRelationKind.ALIGN_CENTER {
         if horizontal_axis {
-            terms = [
-                _t(s.left), _t(s.right),
-                _t(tgt.left, -1.0), _t(tgt.right, -1.0),
-            ];
+            terms = [_t(s.left), _t(s.right), _t(tgt.left, -1.0), _t(tgt.right, -1.0)];
         } else {
-            terms = [
-                _t(s.top), _t(s.bottom),
-                _t(tgt.top, -1.0), _t(tgt.bottom, -1.0),
-            ];
+            terms = [_t(s.top), _t(s.bottom), _t(tgt.top, -1.0), _t(tgt.bottom, -1.0)];
         }
     } else {
         # SAME_SIZE
         if horizontal_axis {
-            terms = [
-                _t(s.right), _t(s.left, -1.0),
-                _t(tgt.right, -1.0), _t(tgt.left, 1.0),
-            ];
+            terms = [_t(s.right), _t(s.left, -1.0), _t(tgt.right, -1.0), _t(tgt.left, 1.0)];
         } else {
-            terms = [
-                _t(s.bottom), _t(s.top, -1.0),
-                _t(tgt.bottom, -1.0), _t(tgt.top, 1.0),
-            ];
+            terms = [_t(s.bottom), _t(s.top, -1.0), _t(tgt.bottom, -1.0), _t(tgt.top, 1.0)];
         }
     }
 
-    return _emit(
-        result, _expr(terms, constant), Relation.EQ, rel.strength, prov
-    );
+    return _emit(result, _expr(terms, constant), Relation.EQ, rel.strength, prov);
 }
-
-

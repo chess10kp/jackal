@@ -1,9 +1,6 @@
 """Continuous flow allocation and recursive partition emission."""
 
-import from constraints.algebra {
-    Relation,
-    StrengthTier,
-}
+import from constraints.algebra { Relation, StrengthTier }
 import from ui.layout_types {
     AxisSize,
     LayoutDiagnostic,
@@ -34,7 +31,6 @@ import from ui.layout_compile_emit {
     _t,
 }
 
-
 def _flow_weight(size: AxisSize) -> float {
     if size.mode == SizeMode.GROW {
         return size.grow_weight;
@@ -44,7 +40,6 @@ def _flow_weight(size: AxisSize) -> float {
     }
     return 0.0;
 }
-
 
 """Hard partition claim: only REQUIRED-exact sizes count. FIXED is a
 required equality so its claim is load-bearing; every other non-flex
@@ -60,7 +55,6 @@ def _flow_hard_claim(size: AxisSize) -> float {
     }
     return 0.0;
 }
-
 
 """Soft best-estimate claim (plan §6.2 step 2 as written): used for the
 OVERFLOW warning and for recursion spans of inflexible children — never
@@ -80,7 +74,6 @@ def _flow_soft_claim(size: AxisSize, natural: float | None) -> float {
     }
     return 0.0;
 }
-
 
 """Bounded proportional allocation with freeze-at-bound iteration
 (plan §6.2 steps 2–5, with the §4.1-review hard/soft claim split).
@@ -115,9 +108,7 @@ def _allocate_span(children: list[_FlowChild], span: float) -> _Allocation {
         } else {
             # Best-estimate target for inflexible children: drives the
             # recursion span for containers, never a hard equality.
-            alloc.targets[i] = max(0.0, _flow_soft_claim(
-                children[i].size, children[i].natural
-            ));
+            alloc.targets[i] = max(0.0, _flow_soft_claim(children[i].size, children[i].natural));
         }
     }
     while len(active) {
@@ -147,9 +138,7 @@ def _allocate_span(children: list[_FlowChild], span: float) -> _Allocation {
         }
         if not frozen {
             for i in active {
-                alloc.targets[i] = max(
-                    0.0, remaining * (_flow_weight(children[i].size) / wsum)
-                );
+                alloc.targets[i] = max(0.0, remaining * (_flow_weight(children[i].size) / wsum));
             }
             break;
         }
@@ -174,7 +163,6 @@ def _allocate_span(children: list[_FlowChild], span: float) -> _Allocation {
     }
     return alloc;
 }
-
 
 # ----------------------------------------------------------------------
 # Flow partition + subtree emission.
@@ -221,9 +209,7 @@ def _emit_partition(
     alloc = _allocate_span(flow_kids, span_flow);
     if _wants(phase, horizontal_flow) {
         info = PartitionInfo(
-            parent_id=parent_edges.id_str,
-            horizontal=horizontal_flow,
-            span=span_flow,
+            parent_id=parent_edges.id_str, horizontal=horizontal_flow, span=span_flow
         );
         for i in range(len(flow_kids)) {
             kid_size = flow_kids[i].size;
@@ -244,13 +230,14 @@ def _emit_partition(
         # ui.layout_quantize.quantize_partition (no honest integer
         # closure exists); the publisher quantizes their children
         # clip-aware per the contract in the quantizer module docstring.
-        result.diagnostics.append(LayoutDiagnostic(
-            code=LayoutError.OVERFLOW,
-            severity=LayoutSeverity.WARNING,
-            message="flow partition exceeds parent span; "
-                    "non-flexible claims kept",
-            node_ids=[parent_edges.id_str],
-        ));
+        result.diagnostics.append(
+            LayoutDiagnostic(
+                code=LayoutError.OVERFLOW,
+                severity=LayoutSeverity.WARNING,
+                message="flow partition exceeds parent span; " "non-flexible claims kept",
+                node_ids=[parent_edges.id_str],
+            ),
+        );
     }
 
     # Adjacency chain: first start pinned to parent start; siblings chain.
@@ -296,20 +283,27 @@ def _emit_partition(
             has_flexible = True;
             if not _emit(
                 result,
-                _expr([
-                    _t(_axis_end(kid_edges, horizontal_flow)),
-                    _t(_axis_start(kid_edges, horizontal_flow), -1.0),
-                ], -alloc.targets[i]),
+                _expr(
+                    [
+                        _t(_axis_end(kid_edges, horizontal_flow)),
+                        _t(_axis_start(kid_edges, horizontal_flow), -1.0),
+                    ],
+                    -alloc.targets[i],
+                ),
                 Relation.EQ,
                 StrengthTier.REQUIRED,
                 _prov(
-                    "grow", kid_edges.id_str, flow_label,
+                    "grow",
+                    kid_edges.id_str,
+                    flow_label,
                     key=kid_edges.key,
                     parent=parent_edges.id_str,
                     rank=kid_scoped.rank,
                     src="spec",
-                    extra="weight=" + repr(_flow_weight(kid.size))
-                          + " target=" + repr(alloc.targets[i]),
+                    extra="weight="
+                        + repr(_flow_weight(kid.size))
+                        + " target="
+                        + repr(alloc.targets[i]),
                 ),
             ) {
                 return False;
@@ -323,8 +317,7 @@ def _emit_partition(
                 horizontal_flow,
                 kid_edges.id_str,
                 kid.natural,
-                "src=spec parent=" + parent_edges.id_str
-                + "#" + str(kid_scoped.rank),
+                "src=spec parent=" + parent_edges.id_str + "#" + str(kid_scoped.rank),
             ) {
                 return False;
             }
@@ -333,10 +326,7 @@ def _emit_partition(
         # Cross-axis resolution against the parent content box. The
         # cross axis is the opposite of THIS container's flow axis.
         if _wants(phase, not horizontal_flow) {
-            if not _emit_cross_axis(
-                result, kid.ent, owner, natural_sizes,
-                not horizontal_flow,
-            ) {
+            if not _emit_cross_axis(result, kid.ent, owner, natural_sizes, not horizontal_flow) {
                 return False;
             }
         }
@@ -347,8 +337,7 @@ def _emit_partition(
         child_span_h = span_h if horizontal_flow else alloc.targets[i];
         if isinstance(kid.ent.scoped.target, UiContainer) {
             if not _emit_partition(
-                result, kid.ent, entries_by_id, natural_sizes,
-                child_span_w, child_span_h, phase,
+                result, kid.ent, entries_by_id, natural_sizes, child_span_w, child_span_h, phase
             ) {
                 return False;
             }
@@ -379,12 +368,8 @@ def _emit_partition(
     return True;
 }
 
-
 """Ordered non-overlay Child entries of a container entry."""
-def _ordered_flow_children(
-    owner: _Entry,
-    entries_by_id: dict[str, _Entry],
-) -> list[_Entry] {
+def _ordered_flow_children(owner: _Entry, entries_by_id: dict[str, _Entry]) -> list[_Entry] {
     out: list[_Entry] = [];
     if not isinstance(owner.scoped.target, UiContainer) {
         return out;
@@ -397,5 +382,3 @@ def _ordered_flow_children(
     }
     return out;
 }
-
-

@@ -20,7 +20,7 @@ obj SessionPlugins {
         t_interactive: float = 0.0,
         t_ext_ready: float = 0.0,
         prompt_queue: list[str] = [],
-        warm_future: any = None,
+        warm_future: Task[None] | None = None,
         wait_budget_s: float = 5.0,
         commands: dict[str, any] = {},
         interactive_ui: bool = False,
@@ -57,7 +57,7 @@ def set_mode_state(next_mode: str) -> None {
     mode = next_mode;
 }
 
-def get_mode_state() -> str {
+def get_mode_state -> str {
     return mode;
 }
 
@@ -65,7 +65,7 @@ def set_model_state(name: str) -> None {
     model = name;
 }
 
-def get_model_state() -> str {
+def get_model_state -> str {
     return model;
 }
 
@@ -73,7 +73,7 @@ def set_thinking_level_state(level: str) -> None {
     thinking_level = level;
 }
 
-def get_thinking_level_state() -> str {
+def get_thinking_level_state -> str {
     return thinking_level;
 }
 
@@ -82,7 +82,7 @@ def reset_turn_stats(t0: float) -> None {
     _n_tools = 0;
 }
 
-def bump_tool_count() -> None {
+def bump_tool_count -> None {
     _n_tools += 1;
 }
 

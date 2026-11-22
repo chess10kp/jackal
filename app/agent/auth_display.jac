@@ -4,7 +4,6 @@ import from .auth_credentials { KNOWN_AUTH_TYPES }
 
 # ── Redaction / display helpers ─────────────────────────────────────────
 
-
 """Mask a secret for display: keep only the last `visible` chars behind a
 fixed mask prefix. Empty/unset -> "(unset)". Secrets shorter than
 visible+4 render fully masked so length probing stays useless. The output
@@ -18,7 +17,6 @@ def redact_secret(secret: any, visible: int = 4) -> str {
     }
     return "*" * 8 + secret[-visible:];
 }
-
 
 """Deep-copy a credential with every secret-bearing field redacted.
 Unknown extra keys whose values are strings are masked too -- an unknown
@@ -40,9 +38,7 @@ def redact_credential(cred: any) -> dict[str, any] | None {
     return out;
 }
 
-
 # ── Flow item validation + filtering (from _auth_flow_toolchain.py) ────
-
 
 """Validate/normalise a provider picker entry; None on failure."""
 def validate_provider_entry(item: any) -> dict[str, any] | None {
@@ -70,7 +66,6 @@ def validate_provider_entry(item: any) -> dict[str, any] | None {
     };
 }
 
-
 """Which login channel a provider item demands: oauth providers need the
 browser/network seam, api_key providers need a text prompt, env providers
 need nothing. Unknown types degrade to "" (unloginnable)."""
@@ -81,12 +76,10 @@ def login_kind(auth_type: any) -> str {
     return "";
 }
 
-
 """True when the provider's login must go through the network seam."""
 def needs_oauth(auth_type: any) -> bool {
     return login_kind(auth_type) == "oauth";
 }
-
 
 """Validate/normalise a model picker entry; None on failure."""
 def validate_model_entry(item: any) -> dict[str, any] | None {
@@ -108,7 +101,6 @@ def validate_model_entry(item: any) -> dict[str, any] | None {
     return {"provider": provider, "modelId": model_id, "displayName": display};
 }
 
-
 """Case-insensitive substring filter over provider id/displayName."""
 def filter_providers_by_query(providers: list[dict[str, any]], query: str) -> list[dict[str, any]] {
     if not query {
@@ -124,10 +116,11 @@ def filter_providers_by_query(providers: list[dict[str, any]], query: str) -> li
     return found;
 }
 
-
 """Filter models by optional exact provider and case-insensitive query
 matched against modelId/displayName/provider."""
-def filter_models_by_query(models: list[dict[str, any]], query: str, provider_filter: str = "") -> list[dict[str, any]] {
+def filter_models_by_query(
+    models: list[dict[str, any]], query: str, provider_filter: str = ""
+) -> list[dict[str, any]] {
     result = models;
     if provider_filter {
         result = [m for m in result if m.get("provider") == provider_filter];
@@ -135,15 +128,15 @@ def filter_models_by_query(models: list[dict[str, any]], query: str, provider_fi
     if query {
         q = query.lower();
         result = [
-            m for m in result
+            m
+            for m in result
             if q in str(m.get("modelId", "")).lower()
-            or q in str(m.get("displayName", "")).lower()
-            or q in str(m.get("provider", "")).lower()
+                or q in str(m.get("displayName", "")).lower()
+                or q in str(m.get("provider", "")).lower()
         ];
     }
     return result;
 }
-
 
 """Human-readable picker row, e.g. "[✓] Anthropic (OAuth, 12 models)"."""
 def format_provider_label(item: dict[str, any]) -> str {
@@ -153,9 +146,16 @@ def format_provider_label(item: dict[str, any]) -> str {
     model_count = item.get("modelCount", 0);
     labels = {"oauth": "OAuth", "api_key": "API Key", "env": "Env"};
     auth_label = labels.get(str(auth_type), str(auth_type));
-    return "[" + configured + "] " + str(name) + " (" + auth_label + ", " + str(model_count) + " models)";
+    return "["
+        + configured
+        + "] "
+        + str(name)
+        + " ("
+        + auth_label
+        + ", "
+        + str(model_count)
+        + " models)";
 }
-
 
 """Human-readable model row, e.g. "Claude Sonnet (anthropic/claude-5)"."""
 def format_model_label(item: dict[str, any]) -> str {

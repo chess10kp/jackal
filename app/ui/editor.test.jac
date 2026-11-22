@@ -1,28 +1,12 @@
 """Editor runtime tests: caret, selection, history, display width."""
 
-import from ui.model {
-    Prompt,
-    MainScreen,
-}
+import from ui.model { Prompt, MainScreen }
 
-import from ui.width {
-    display_width,
-}
+import from ui.width { display_width }
 
-import from ui.runtime {
-    create_session,
-    dispose_session,
-    append_child_session,
-    set_current_screen,
-}
+import from ui.runtime { create_session, dispose_session, append_child_session, set_current_screen }
 
-import from ui.events {
-    InsertText,
-    Submit,
-    Cancel,
-    dispatch_event,
-}
-
+import from ui.events { InsertText, Submit, Cancel, dispatch_event }
 
 test "editor_insert advances caret" {
     p = Prompt(key="p");
@@ -34,7 +18,6 @@ test "editor_insert advances caret" {
     assert p.caret == 3;
 }
 
-
 test "editor_backspace and selection replace" {
     p = Prompt(key="p");
     editor_insert(p, "hello");
@@ -43,7 +26,6 @@ test "editor_backspace and selection replace" {
     assert p.draft == "hio";
     assert p.caret == 2;
 }
-
 
 test "editor_move_up_down across lines" {
     p = Prompt(key="p");
@@ -55,7 +37,6 @@ test "editor_move_up_down across lines" {
     # Same visual column as end of "aa" (col 2) lands at index 5 in "bbb".
     assert p.caret == 5;
 }
-
 
 test "editor_history_prev_next" {
     p = Prompt(key="p");
@@ -71,14 +52,12 @@ test "editor_history_prev_next" {
     assert p.draft == "two";
 }
 
-
 test "caret display col respects wide glyph width" {
     p = Prompt(key="p");
     editor_insert(p, "あ");
     assert display_width(p.draft) >= 1;
     assert editor_caret_display_col(p) == display_width(p.draft);
 }
-
 
 test "AblePrompt abilities handle insert submit cancel" {
     handle = create_session();

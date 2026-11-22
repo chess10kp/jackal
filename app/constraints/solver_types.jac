@@ -72,7 +72,7 @@ obj Row {
         }
     }
 
-    def reverse_sign() -> None {
+    def reverse_sign -> None {
         self.constant = -self.constant;
         for symbol in sorted(self.cells.keys()) {
             self.cells[symbol] = -self.cells[symbol];
@@ -108,7 +108,7 @@ obj Row {
     }
 
     # Deep copy used by the rollback journal.
-    def clone() -> Row {
+    def clone -> Row {
         r = Row(constant=self.constant);
         r.cells = dict(self.cells);
         return r;
@@ -160,7 +160,7 @@ obj CostRow {
         }
     }
 
-    def clone() -> CostRow {
+    def clone -> CostRow {
         copy = CostRow(constant=LexWeight(tiers=[
             self.constant.tiers[0],
             self.constant.tiers[1],

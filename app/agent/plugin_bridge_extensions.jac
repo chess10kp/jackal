@@ -6,18 +6,9 @@ import from .protocol { Envelope, make_envelope, is_plugin_kind }
 import from .registry { ToolRegistry, register_js, unregister_extension }
 import from .fake_host { FakeUi, ensure_host, touch_bridge }
 import from .plugin_bridge_support { _path_abspath }
-import from .plugin_bridge_core {
-    PluginBridge,
-    _alloc_corr,
-    _node_alive,
-    _emit_host_status,
-}
+import from .plugin_bridge_core { PluginBridge, _alloc_corr, _node_alive, _emit_host_status }
 import from .plugin_bridge_host { ensure_node_host, maybe_restart_host, host_status }
-import from .plugin_bridge_io {
-    _write_node,
-    _prepare_corr,
-    _read_node_until,
-}
+import from .plugin_bridge_io { _write_node, _prepare_corr, _read_node_until }
 import from .plugin_bridge_traffic { _absorb_payload, _absorb_pending_fake }
 
 def load_extension(
@@ -75,12 +66,11 @@ def load_extension(
             session_id=bridge.session_id,
             correlation_id=corr,
             payload={"id": extension_id, "tools": schemas},
-        )
+        ),
     );
     touch_bridge(bridge);
     return names;
 }
-
 
 """Return (ok, missing) for required capabilities vs host_caps (P4)."""
 def caps_satisfied(bridge: PluginBridge, requires: list[str]) -> list[any] {
@@ -94,7 +84,6 @@ def caps_satisfied(bridge: PluginBridge, requires: list[str]) -> list[any] {
     return [len(missing) == 0, missing];
 }
 
-
 """Composite capability gate (P12 slice 5): interactive_ui means the Node
 host can round-trip AND this frontend installed a UI adapter. Line/JSON
 frontends fail loud at ext_load instead of at first ui.select call."""
@@ -104,7 +93,6 @@ def ui_cap_satisfied(bridge: PluginBridge, requires: list[str], has_ui: bool) ->
     }
     return has_ui;
 }
-
 
 """Load a real JS module into the Node host and register its tools.
 
@@ -136,10 +124,8 @@ def load_extension_path(
         raise RuntimeError(detail);
     }
     if not ui_cap_satisfied(bridge, requires, has_ui) {
-        detail = (
-            f"requires interactive_ui but this frontend has no UI adapter "
-            f"(line/JSON mode); extension {extension_id} refused"
-        );
+        detail = (f"requires interactive_ui but this frontend has no UI adapter "
+            f"(line/JSON mode); extension {extension_id} refused");
         _emit_host_status(bridge, "degraded", detail);
         raise RuntimeError(detail);
     }
@@ -227,10 +213,7 @@ def load_extension_path(
     return names;
 }
 
-
-def unload_extension(
-    bridge: PluginBridge, reg: ToolRegistry, extension_id: str
-) -> int {
+def unload_extension(bridge: PluginBridge, reg: ToolRegistry, extension_id: str) -> int {
     removed = unregister_extension(reg, extension_id);
     dead: list[str] = [];
     for n in list(bridge.commands.keys()) {
@@ -242,7 +225,8 @@ def unload_extension(
         bridge.commands.pop(n, None);
     }
     bridge.md_transformers = [
-        t for t in bridge.md_transformers
+        t
+        for t in bridge.md_transformers
         if t.get("extension_id") != extension_id
     ];
     # No tuple unpacking in comprehensions: the Jac parser rejects
@@ -264,14 +248,11 @@ def unload_extension(
     }
     if bridge.host_kind == "node" and _node_alive(bridge) {
         req = make_envelope(
-            kind="ext_unload",
-            session_id=bridge.session_id,
-            payload={"id": extension_id},
+            kind="ext_unload", session_id=bridge.session_id, payload={"id": extension_id}
         );
         try {
             _write_node(bridge, req);
-        } except Exception {
-        }
+        } except Exception {}
         return removed;
     }
     ensure_host(bridge);
@@ -284,16 +265,14 @@ def unload_extension(
             }
         }
         dead_cmds = [
-            n for n in list(h.command_handlers.keys())
+            n
+            for n in list(h.command_handlers.keys())
             if h.command_handlers[n].get("owner") == extension_id
         ];
         for n in dead_cmds {
             del h.command_handlers[n];
         }
-        h.md_transformers = [
-            t for t in h.md_transformers
-            if t.get("extension_id") != extension_id
-        ];
+        h.md_transformers = [t for t in h.md_transformers if t.get("extension_id") != extension_id];
         # Jac parser rejects tuple unpacking in comprehensions.
         for pn in list(h.providers.keys()) {
             if h.providers[pn].get("owner") == extension_id {
@@ -311,7 +290,6 @@ def unload_extension(
     }
     return removed;
 }
-
 
 def invoke_shortcut(bridge: PluginBridge, key: str, timeout: float = 10.0) -> dict[str, any] {
     if bridge.host_kind == "node" {
@@ -384,7 +362,6 @@ def invoke_shortcut(bridge: PluginBridge, key: str, timeout: float = 10.0) -> di
     }
 }
 
-
 def cancel_tool(bridge: PluginBridge, correlation_id: str) {
     if bridge.host_kind == "node" and _node_alive(bridge) {
         req = make_envelope(
@@ -395,8 +372,7 @@ def cancel_tool(bridge: PluginBridge, correlation_id: str) {
         );
         try {
             _write_node(bridge, req);
-        } except Exception {
-        }
+        } except Exception {}
         return;
     }
     ensure_host(bridge);
@@ -405,7 +381,6 @@ def cancel_tool(bridge: PluginBridge, correlation_id: str) {
         h.cancelled.add(correlation_id);
     }
 }
-
 
 """Drain inbox plugin envelopes; return kinds seen (tests / status)."""
 def drain_inbox(bridge: PluginBridge) -> list[str] {
@@ -418,7 +393,6 @@ def drain_inbox(bridge: PluginBridge) -> list[str] {
     }
     return kinds;
 }
-
 
 # ======================= T2-partial: commands + hooks =======================
 
@@ -445,9 +419,7 @@ def invoke_command(
         );
         try {
             _write_node(bridge, req);
-            reply = _read_node_until(
-                bridge, "cmd_result", correlation_id=corr, timeout=timeout
-            );
+            reply = _read_node_until(bridge, "cmd_result", correlation_id=corr, timeout=timeout);
         } except Exception as e {
             return {"ok": False, "error": str(e)};
         }

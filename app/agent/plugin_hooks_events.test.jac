@@ -6,7 +6,6 @@ dispatch, real Node sidecar round-trip via
 plugin_host/fixtures/pi_lifecycle_probe.mjs, and the name-pinned helpers.
 """
 
-
 test "fire_user_bash reaches fake-host listeners" {
     bridge = create_bridge("s-ub-fake");
     seen: dict[str, str] = {};
@@ -23,7 +22,6 @@ test "fire_user_bash reaches fake-host listeners" {
     dispose_bridge(bridge);
 }
 
-
 test "fire_project_trust reaches fake-host listeners" {
     bridge = create_bridge("s-pt-fake");
     seen2: dict[str, str] = {};
@@ -39,7 +37,6 @@ test "fire_project_trust reaches fake-host listeners" {
     dispose_bridge(bridge);
 }
 
-
 test "lifecycle events round-trip through the real node host" {
     bridge3 = create_bridge("s-lifecycle-node");
     reg = create_registry();
@@ -51,9 +48,7 @@ test "lifecycle events round-trip through the real node host" {
     if not os.path.isdir(os.path.join(app_root, "plugin_host")) {
         app_root = os.path.join(app_root, "app");
     }
-    fixture = os.path.join(
-        app_root, "plugin_host", "fixtures", "pi_lifecycle_probe.mjs"
-    );
+    fixture = os.path.join(app_root, "plugin_host", "fixtures", "pi_lifecycle_probe.mjs");
     names = load_extension_path(bridge3, reg, "pi.probe", fixture);
     assert len(names) == 0;
 
@@ -76,7 +71,6 @@ test "lifecycle events round-trip through the real node host" {
 
     dispose_bridge(bridge3);
 }
-
 
 test "unknown lifecycle event names return empty results, never raise" {
     bridge4 = create_bridge("s-unknown-fake");

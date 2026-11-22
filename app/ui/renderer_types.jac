@@ -1,24 +1,15 @@
 """Retained renderer state and frame-result value objects."""
 
-import from ui.model {
-    UiNode,
-}
+import from ui.model { UiNode }
 
-import from ui.layout_types {
-    LayoutState,
-    Rect,
-}
+import from ui.layout_types { LayoutState, Rect }
 
-import from ui.cells {
-    CellBuffer,
-}
-
+import from ui.cells { CellBuffer }
 
 obj DamageRect {
     has rect: Rect = Rect(),
         reason: str = "";
 }
-
 
 obj FrameResult {
     has damage: list[DamageRect] = [],
@@ -31,12 +22,10 @@ obj FrameResult {
         sync_wrapped: bool = False;
 }
 
-
 obj AnsiDiff {
     has text: str = "",
         cells_written: int = 0;
 }
-
 
 obj _OverlayHit {
     has nd: UiNode,
@@ -44,12 +33,10 @@ obj _OverlayHit {
         id_str: str = "";
 }
 
-
 obj CursorPos {
     has row: int = -1,
         col: int = -1;
 }
-
 
 obj Renderer {
     has layout: LayoutState,

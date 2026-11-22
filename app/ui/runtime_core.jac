@@ -95,7 +95,7 @@ obj UiSessionHandle {
 }
 
 
-def create_session() -> UiSessionHandle {
+def create_session -> UiSessionHandle {
     ui_root = UiSessionRoot(key="session");
     session = UiSession(
         ui_root=ui_root,

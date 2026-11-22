@@ -7,7 +7,6 @@ used directly, no import from .compaction.
 import tempfile;
 import shutil;
 
-
 test "config defaults and override resolution" {
     # Defaults with no .jackal keys.
     d = resolve_auto_compact_config(None);
@@ -36,7 +35,6 @@ test "config defaults and override resolution" {
     assert bogus["strategy"] == "llm";
 }
 
-
 test "should_auto_compact thresholds" {
     cfg_on = {"enabled": True, "thresholdPercent": 80};
     cfg_off = {"enabled": False, "thresholdPercent": 0};
@@ -51,7 +49,6 @@ test "should_auto_compact thresholds" {
     assert should_auto_compact({"percent": 100}, cfg_off) is False;
 }
 
-
 test "usage estimation is char/4 with per-message overhead" {
     assert estimate_tokens("") == 0;
     # 8 chars -> ceil(8/4) = 2 tokens.
@@ -65,11 +62,13 @@ test "usage estimation is char/4 with per-message overhead" {
     assert usage["percent"] == round((6 / DEFAULT_CONTEXT_MAX) * 100);
 }
 
-
 test "mechanical summary shape: wrapper, role prefixes, truncation" {
     msgs = [
         {"role": "user", "content": "hello"},
-        {"role": "assistant", "content": [{"type": "text", "text": "hi"}, {"type": "toolCall", "name": "read"}]},
+        {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "hi"}, {"type": "toolCall", "name": "read"}],
+        },
         {"content": "no role here"},
         {"role": "tool", "content": "x" * 400},
     ];
@@ -97,7 +96,6 @@ test "mechanical summary shape: wrapper, role prefixes, truncation" {
     assert body.endswith("...");
 }
 
-
 test "llm summary prompt previews truncate at 200 and wrap summary guards empty" {
     msgs = [{"role": "user", "content": "y" * 500}];
     p = build_llm_summary_prompt(msgs);
@@ -114,7 +112,6 @@ test "llm summary prompt previews truncate at 200 and wrap summary guards empty"
     w = wrap_compaction_summary("brief facts");
     assert w.startswith("<conversation-summary>\nbrief facts\n</conversation-summary>");
 }
-
 
 test "project config also loads from .jackal/config.json" {
     tmp_dir = tempfile.mkdtemp(prefix="jackal-cfg-");

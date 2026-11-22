@@ -103,7 +103,7 @@ def load_auth_file(path: str) -> dict[str, any] {
     if not os.path.isfile(path) {
         return {};
     }
-    fh = None;
+    fh: any = None;
     try {
         fh = open(path, "r");
         raw = json.load(fh);
@@ -226,7 +226,7 @@ def has_credential(data: dict[str, any], provider: str) -> bool {
 
 
 """Epoch milliseconds (pi-ai stores OAuth expiry in ms, not seconds)."""
-def now_ms() -> int {
+def now_ms -> int {
     return int(time.time() * 1000);
 }
 

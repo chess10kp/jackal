@@ -28,7 +28,7 @@ obj ToolRegistry {
 }
 
 
-def create_registry() -> ToolRegistry {
+def create_registry -> ToolRegistry {
     return ToolRegistry();
 }
 

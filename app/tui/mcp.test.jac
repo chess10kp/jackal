@@ -3,8 +3,6 @@ Guards the MCP status window contract: honest per-state rows over
 (specs, status), name-sorted, ids aligned with rows for the restart action,
 and the empty state naming the config convention."""
 
-
-
 test "connected server shows tools and command" {
     out = mcp_window_rows(
         {"zeta": ["jac", "mcp"]},
@@ -13,7 +11,6 @@ test "connected server shows tools and command" {
     assert out["rows"] == ["zeta — connected · 3 tools · jac mcp"], str(out["rows"]);
     assert out["ids"] == ["zeta"];
 }
-
 
 test "connecting and failed states surface their live status" {
     out = mcp_window_rows(
@@ -29,7 +26,6 @@ test "connecting and failed states surface their live status" {
     assert out["ids"] == ["a", "b"];
 }
 
-
 test "config-only server reports not connected; status-only reports attached shape" {
     out = mcp_window_rows(
         {"alpha": ["toolserv"]},
@@ -43,17 +39,12 @@ test "config-only server reports not connected; status-only reports attached sha
     assert "ghost — connected · 1 tools · g" in rows, str(rows);
 }
 
-
 test "rows are name-sorted regardless of insertion order" {
-    out = mcp_window_rows(
-        {"zeta": ["z"], "alpha": ["a"]},
-        {},
-    );
+    out = mcp_window_rows({"zeta": ["z"], "alpha": ["a"]}, {});
     assert out["ids"] == ["alpha", "zeta"], str(out["ids"]);
     assert out["rows"][0].startswith("alpha —"), out["rows"][0];
     assert out["rows"][1].startswith("zeta —"), out["rows"][1];
 }
-
 
 test "empty state names the config convention and carries a furniture id" {
     out = mcp_window_rows({}, {});
@@ -61,7 +52,6 @@ test "empty state names the config convention and carries a furniture id" {
     assert "no mcp servers configured" in out["rows"][0], out["rows"][0];
     assert out["ids"] == [""];
 }
-
 
 test "window state wires the restart key and a cursor only over real rows" {
     live = _mcp_window_state(
@@ -83,17 +73,32 @@ test "window state wires the restart key and a cursor only over real rows" {
 test "connected row shows denied count when tools were filtered" {
     out = mcp_window_rows(
         {"zeta": ["jac", "mcp"]},
-        {"zeta": {"state": "connected", "error": "", "tools": 2, "denied": 4, "cmd": ["jac", "mcp"]}},
+        {
+            "zeta": {
+                "state": "connected",
+                "error": "",
+                "tools": 2,
+                "denied": 4,
+                "cmd": ["jac", "mcp"],
+            },
+        },
     );
     assert out["rows"] == ["zeta — connected · 2 tools · 4 denied · jac mcp"], str(out["rows"]);
     # zero denied stays out of the row
     out2 = mcp_window_rows(
         {"zeta": ["jac", "mcp"]},
-        {"zeta": {"state": "connected", "error": "", "tools": 2, "denied": 0, "cmd": ["jac", "mcp"]}},
+        {
+            "zeta": {
+                "state": "connected",
+                "error": "",
+                "tools": 2,
+                "denied": 0,
+                "cmd": ["jac", "mcp"],
+            },
+        },
     );
     assert out2["rows"] == ["zeta — connected · 2 tools · jac mcp"], str(out2["rows"]);
 }
-
 
 test "disabled servers surface their config state" {
     out = mcp_window_rows(

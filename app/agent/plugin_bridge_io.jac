@@ -7,6 +7,7 @@ import time;
 import from .protocol { Envelope, make_envelope, is_plugin_kind }
 import from .interactions { new_ui_queue, UiInteractionQueue }
 import from .plugin_bridge_support { envelope_to_dict, envelope_from_dict }
+
 def _node_alive(bridge: any) -> bool {
     if bridge.host_kind != "node" or bridge.proc is None {
         return False;
@@ -33,7 +34,6 @@ def _write_node(bridge: any, env: Envelope) {
         bridge.proc.stdin.flush();
     }
 }
-
 
 """Route an inbound envelope to a pending waiter; always keep a copy in inbox.
 
@@ -72,7 +72,6 @@ def _dispatch_inbound(bridge: any, env: Envelope) {
     }
 }
 
-
 """Background stdout reader — multiplexes replies by correlation_id (P3)."""
 def _reader_loop(bridge: any) {
     stop = bridge.reader_stop;
@@ -102,7 +101,7 @@ def _reader_loop(bridge: any) {
                     kind="host_status",
                     session_id=bridge.session_id,
                     payload={"phase": "degraded", "detail": "bad json from host"},
-                )
+                ),
             );
             continue;
         }
@@ -113,7 +112,6 @@ def _reader_loop(bridge: any) {
         _dispatch_inbound(bridge, env);
     }
 }
-
 
 def _ensure_io(bridge: any) {
     if bridge.reply_q is None {
@@ -130,7 +128,6 @@ def _ensure_io(bridge: any) {
     }
 }
 
-
 def _start_reader(bridge: any) {
     _ensure_io(bridge);
     if bridge.reader_thread is not None and bridge.reader_thread.is_alive() {
@@ -144,7 +141,6 @@ def _start_reader(bridge: any) {
     t.start();
 }
 
-
 def _stop_reader(bridge: any) {
     if bridge.reader_stop is not None {
         bridge.reader_stop.set();
@@ -152,16 +148,13 @@ def _stop_reader(bridge: any) {
     bridge.reader_thread = None;
 }
 
-
 """Wait for a correlated reply (or any matching kind if corr empty).
 
 Callers that write a request MUST register `correlation_id` in
 `bridge.pending` *before* `_write_node` (or call `_prepare_corr`) so the
 reader cannot win the race.
 """
-def _prepare_corr(
-    bridge: any, correlation_id: str, expect_kind: str = ""
-) {
+def _prepare_corr(bridge: any, correlation_id: str, expect_kind: str = "") {
     _ensure_io(bridge);
     if correlation_id and correlation_id not in bridge.pending {
         # expect_kind: only an envelope of this kind may complete the waiter.
@@ -175,13 +168,7 @@ def _prepare_corr(
     }
 }
 
-
-def _wait_corr(
-    bridge: any,
-    kind: str,
-    correlation_id: str = "",
-    timeout: float = 5.0,
-) -> Envelope {
+def _wait_corr(bridge: any, kind: str, correlation_id: str = "", timeout: float = 5.0) -> Envelope {
     deadline = time.monotonic() + timeout;
     if correlation_id {
         _prepare_corr(bridge, correlation_id, expect_kind=kind);
@@ -244,11 +231,9 @@ def _wait_corr(
     raise TimeoutError(f"timed out waiting for {kind}");
 }
 
-
 def _read_node(bridge: any, timeout: float = 5.0) -> Envelope {
     return _wait_corr(bridge, "", "", timeout=timeout);
 }
-
 
 """Read until an envelope with kind matches (or timeout)."""
 def _read_node_until(
@@ -277,7 +262,6 @@ def _read_node_until(
     raise TimeoutError(f"timed out waiting for {kind}");
 }
 
-
 """Spawn the Node plugin host. Emits host_hello from the child."""
 def _ui_queue(bridge: any) -> UiInteractionQueue {
     if bridge.ui_q is None {
@@ -285,7 +269,6 @@ def _ui_queue(bridge: any) -> UiInteractionQueue {
     }
     return bridge.ui_q as UiInteractionQueue;
 }
-
 
 def _ui_enqueue_from_env(bridge: any, env: Envelope) {
     p = env.payload if env.payload is not None else {};
@@ -310,10 +293,7 @@ def _ui_enqueue_from_env(bridge: any, env: Envelope) {
     }
 }
 
-
-def _ui_send_response(
-    bridge: any, corr: str, status: str, value: any, reason: str = ""
-) -> bool {
+def _ui_send_response(bridge: any, corr: str, status: str, value: any, reason: str = "") -> bool {
     payload: dict[str, any] = {"status": status};
     if value is not None {
         payload["value"] = value;
@@ -323,12 +303,15 @@ def _ui_send_response(
     }
     if bridge.host_kind == "node" and _node_alive(bridge) {
         try {
-            _write_node(bridge, make_envelope(
-                kind="ui_response",
-                session_id=bridge.session_id,
-                correlation_id=corr,
-                payload=payload,
-            ));
+            _write_node(
+                bridge,
+                make_envelope(
+                    kind="ui_response",
+                    session_id=bridge.session_id,
+                    correlation_id=corr,
+                    payload=payload,
+                ),
+            );
             return True;
         } except Exception {
             return False;

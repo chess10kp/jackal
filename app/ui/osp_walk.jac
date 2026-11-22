@@ -13,7 +13,6 @@ raw node references in as `list[any]`.
 
 node OspAny {}
 
-
 """Bidirectional BFS over the OSP graph from seed node handles; return
 the subset of `ui_jids` that is reachable."""
 def ui_jids_reachable_from_nodes(seeds: list[any], ui_jids: set[str]) -> list[str] {

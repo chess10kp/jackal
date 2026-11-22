@@ -5,11 +5,20 @@ import sys;
 import json;
 import subprocess;
 
-
 def _mcp_cfg(env_fail: bool = False) -> dict[str, any] {
-    return {"mcp": {"servers": {"fake": {"command": [sys.executable if not env_fail else "false", fixture_path("fake_mcp.py")]}}}};
+    return {
+        "mcp": {
+            "servers": {
+                "fake": {
+                    "command": [
+                        sys.executable if not env_fail else "false",
+                        fixture_path("fake_mcp.py"),
+                    ],
+                },
+            },
+        },
+    };
 }
-
 
 test "mcp tools are offered on the first request and callable" {
     sb = make_sandbox();
@@ -31,7 +40,6 @@ test "mcp tools are offered on the first request and callable" {
     }
 }
 
-
 test "a failing mcp server degrades without breaking the turn" {
     sb = make_sandbox();
     try {
@@ -48,7 +56,6 @@ test "a failing mcp server degrades without breaking the turn" {
     }
 }
 
-
 test "repl /mcp reports server status" {
     sb = make_sandbox();
     try {
@@ -63,17 +70,25 @@ test "repl /mcp reports server status" {
     }
 }
 
-
 test "mcp env and cwd reach the server subprocess" {
     sb = make_sandbox();
     try {
         sub = os.path.join(sb.project, "sub");
         os.makedirs(sub);
-        write_project_config(sb, {"mcp": {"servers": {"fake": {
-            "command": [sys.executable, fixture_path("fake_mcp.py")],
-            "env": {"FAKE_MCP_TOKEN": "xyz42"},
-            "cwd": "sub",
-        }}}});
+        write_project_config(
+            sb,
+            {
+                "mcp": {
+                    "servers": {
+                        "fake": {
+                            "command": [sys.executable, fixture_path("fake_mcp.py")],
+                            "env": {"FAKE_MCP_TOKEN": "xyz42"},
+                            "cwd": "sub",
+                        },
+                    },
+                },
+            },
+        );
         sb.script([
             {"text": "", "tool_calls": [{"name": "mcp_fake_envpeek", "args": {}}]},
             {"text": "", "tool_calls": [{"name": "mcp_fake_where", "args": {}}]},
@@ -89,14 +104,22 @@ test "mcp env and cwd reach the server subprocess" {
     }
 }
 
-
 test "an enabled:false mcp server never attaches" {
     sb = make_sandbox();
     try {
-        write_project_config(sb, {"mcp": {"servers": {"off": {
-            "command": [sys.executable, fixture_path("fake_mcp.py")],
-            "enabled": False,
-        }}}});
+        write_project_config(
+            sb,
+            {
+                "mcp": {
+                    "servers": {
+                        "off": {
+                            "command": [sys.executable, fixture_path("fake_mcp.py")],
+                            "enabled": False,
+                        },
+                    },
+                },
+            },
+        );
         sb.script([{"text": "warm"}]);
         r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
         assert r.code == 0, sb.explain(r);
@@ -109,7 +132,6 @@ test "an enabled:false mcp server never attaches" {
     }
 }
 
-
 test "legacy mcp.json import attaches imported servers with a notice" {
     sb = make_sandbox();
     try {
@@ -118,14 +140,19 @@ test "legacy mcp.json import attaches imported servers with a notice" {
         os.makedirs(home);
         legacy = os.path.join(sb.agent_dir, "mcp.json");
         with open(legacy, "w") as f {
-            f.write(json.dumps({"mcpServers": {
-                "leg": {"command": sys.executable,
-                        "args": [fixture_path("fake_mcp.py")]},
-            }}));
+            f.write(
+                json.dumps({
+                    "mcpServers": {
+                        "leg": {"command": sys.executable, "args": [fixture_path("fake_mcp.py")]},
+                    },
+                }),
+            );
         }
         sb.script([{"text": "warm"}]);
         r = run_jackal(
-            sb, [], stdin_text="hi\n/mcp\n/exit\n",
+            sb,
+            [],
+            stdin_text="hi\n/mcp\n/exit\n",
             env_extra={"JACKAL_MCP_NO_IMPORT": "", "HOME": home},
         );
         assert r.code == 0, sb.explain(r);
@@ -135,8 +162,7 @@ test "legacy mcp.json import attaches imported servers with a notice" {
         assert "imported 1 server(s) from legacy" in r.stdout, sb.explain(r);
         # the marker makes it one-time: a second run imports nothing new
         r2 = run_jackal(
-            sb, [], stdin_text="hi\n/exit\n",
-            env_extra={"JACKAL_MCP_NO_IMPORT": "", "HOME": home},
+            sb, [], stdin_text="hi\n/exit\n", env_extra={"JACKAL_MCP_NO_IMPORT": "", "HOME": home}
         );
         assert r2.code == 0, sb.explain(r2);
         assert "imported" not in r2.stdout, sb.explain(r2);
@@ -144,7 +170,6 @@ test "legacy mcp.json import attaches imported servers with a notice" {
         sb.cleanup();
     }
 }
-
 
 test "a dead mcp server degrades, then recovers on the next call" {
     sb = make_sandbox();
@@ -165,7 +190,6 @@ test "a dead mcp server degrades, then recovers on the next call" {
     }
 }
 
-
 test "repl /mcp SERVER PROMPT expands the server prompt" {
     sb = make_sandbox();
     try {
@@ -179,7 +203,6 @@ test "repl /mcp SERVER PROMPT expands the server prompt" {
     }
 }
 
-
 test "an http mcp server attaches and its tools are callable" {
     sb = make_sandbox();
     proc: any = None;
@@ -187,17 +210,25 @@ test "an http mcp server attaches and its tools are callable" {
         # ephemeral fake streamable-HTTP server on loopback
         proc = subprocess.Popen(
             [sys.executable, fixture_path("fake_mcp_http.py")],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, bufsize=1,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
         );
         out_pipe: any = proc.stdout;
         ready: str = out_pipe.readline().strip();
         assert ready.startswith("READY "), ready;
         port: str = ready.split(" ")[1];
-        write_project_config(sb, {"mcp": {"servers": {"rem": {
-            "type": "http",
-            "url": "http://127.0.0.1:" + port + "/mcp",
-        }}}});
+        write_project_config(
+            sb,
+            {
+                "mcp": {
+                    "servers": {
+                        "rem": {"type": "http", "url": "http://127.0.0.1:" + port + "/mcp"},
+                    },
+                },
+            },
+        );
         sb.script([
             {"text": "", "tool_calls": [{"name": "mcp_rem_echo", "args": {"text": "hi"}}]},
             {"text": "remote done"},
@@ -211,12 +242,15 @@ test "an http mcp server attaches and its tools are callable" {
     } finally {
         if proc is not None {
             proc.terminate();
-            try { proc.wait(timeout=5.0); } except Exception { proc.kill(); }
+            try {
+                proc.wait(timeout=5.0);
+            } except Exception {
+                proc.kill();
+            }
         }
         sb.cleanup();
     }
 }
-
 
 test "repl /mcp reports an http server as connected" {
     sb = make_sandbox();
@@ -224,17 +258,25 @@ test "repl /mcp reports an http server as connected" {
     try {
         proc = subprocess.Popen(
             [sys.executable, fixture_path("fake_mcp_http.py")],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, bufsize=1,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
         );
         out_pipe: any = proc.stdout;
         ready: str = out_pipe.readline().strip();
         assert ready.startswith("READY "), ready;
         port: str = ready.split(" ")[1];
-        write_project_config(sb, {"mcp": {"servers": {"rem": {
-            "type": "http",
-            "url": "http://127.0.0.1:" + port + "/mcp",
-        }}}});
+        write_project_config(
+            sb,
+            {
+                "mcp": {
+                    "servers": {
+                        "rem": {"type": "http", "url": "http://127.0.0.1:" + port + "/mcp"},
+                    },
+                },
+            },
+        );
         sb.script([{"text": "warm"}]);
         r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
         assert r.code == 0, sb.explain(r);
@@ -242,19 +284,25 @@ test "repl /mcp reports an http server as connected" {
     } finally {
         if proc is not None {
             proc.terminate();
-            try { proc.wait(timeout=5.0); } except Exception { proc.kill(); }
+            try {
+                proc.wait(timeout=5.0);
+            } except Exception {
+                proc.kill();
+            }
         }
         sb.cleanup();
     }
 }
-
 
 test "mcp resources surface as a generated read-only tool" {
     sb = make_sandbox();
     try {
         write_project_config(sb, _mcp_cfg());
         sb.script([
-            {"text": "", "tool_calls": [{"name": "mcp_fake_read_resource", "args": {"uri": "memo://1"}}]},
+            {
+                "text": "",
+                "tool_calls": [{"name": "mcp_fake_read_resource", "args": {"uri": "memo://1"}}],
+            },
             {"text": "read the memo"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "yolo", "read the resource"]);
@@ -267,13 +315,14 @@ test "mcp resources surface as a generated read-only tool" {
     }
 }
 
-
 test "repl /mcp resources lists and reads" {
     sb = make_sandbox();
     try {
         write_project_config(sb, _mcp_cfg());
         sb.script([{"text": "warm"}]);
-        r = run_jackal(sb, [], stdin_text="hi\n/mcp resources\n/mcp resources fake memo://1\n/exit\n");
+        r = run_jackal(
+            sb, [], stdin_text="hi\n/mcp resources\n/mcp resources fake memo://1\n/exit\n"
+        );
         assert r.code == 0, sb.explain(r);
         assert "memo://1 — memo (text/plain)" in r.stdout, sb.explain(r);
         assert "the memo body" in r.stdout, sb.explain(r);
@@ -282,12 +331,16 @@ test "repl /mcp resources lists and reads" {
     }
 }
 
-
 test "subagent runs a nested loop and returns its report" {
     sb = make_sandbox({"README.md": "secret word: kumquat\n"});
     try {
         sb.script([
-            {"text": "", "tool_calls": [{"name": "subagent", "args": {"task": "find the secret word in README.md"}}]},
+            {
+                "text": "",
+                "tool_calls": [
+                    {"name": "subagent", "args": {"task": "find the secret word in README.md"}},
+                ],
+            },
             # nested subagent loop
             {"text": "", "tool_calls": [{"name": "read_file", "args": {"path": "README.md"}}]},
             {"text": "the word is kumquat"},
@@ -310,7 +363,6 @@ test "subagent runs a nested loop and returns its report" {
         sb.cleanup();
     }
 }
-
 
 test "task tools persist the board across processes" {
     sb = make_sandbox();

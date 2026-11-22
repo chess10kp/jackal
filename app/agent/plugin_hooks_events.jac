@@ -21,8 +21,6 @@ import from .plugin_bridge {
     fire_project_trust,
     PluginBridge,
 }
-import from .fake_host {
-    register_fake_listener,
-}
+import from .fake_host { register_fake_listener }
 import from .registry { create_registry }
 import os;

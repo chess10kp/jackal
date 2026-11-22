@@ -4,12 +4,9 @@ Kept separate from llm.jac so registry/tools can import ToolSpec without
 pulling httpx (llm transport).
 """
 
-
-
 # Shared safety caps used by both tool execution and the ReAct history.
 glob MAX_TOOL_RESULT: int = 50_000,
      MAX_SEARCH_RESULTS: int = 100;
-
 
 obj ToolSpec {
     has name: str,
@@ -19,7 +16,6 @@ obj ToolSpec {
         # dictionary instead of dynamically unpacked keyword arguments.
         handler: Callable[[dict[str, any]], str] | None = None;
 }
-
 
 """Factory for ToolSpec, callable from server-codespace consumers.
 
@@ -35,10 +31,5 @@ def make_tool_spec(
     parameters: dict[str, any] = {},
     handler: Callable[[dict[str, any]], str] | None = None,
 ) -> ToolSpec {
-    return ToolSpec(
-        name=name,
-        description=description,
-        parameters=parameters,
-        handler=handler,
-    );
+    return ToolSpec(name=name, description=description, parameters=parameters, handler=handler);
 }

@@ -23,11 +23,7 @@ wrapped line list. `wrap_text` is intentionally NOT imported here —
 calling it directly would hit E5093 (list[str] return crosses boundary).
 """
 
-import from ui.width {
-    display_width,
-    wrap_text_joined,
-}
-
+import from ui.width { display_width, wrap_text_joined }
 
 """Natural (unwrapped) display width of registered content lines.
 
@@ -44,7 +40,6 @@ def natural_width(lines: list[str]) -> int {
     return best;
 }
 
-
 # Native-friendly cache representation: parallel primitive dicts keyed
 # by node id. Replaces the previous MeasureEntry obj, which failed to
 # lower natively (E5092) because the signature type 'MeasureEntry'
@@ -53,7 +48,6 @@ glob _CACHE_WIDTH: dict[str, int] = {};
 glob _CACHE_CONTENT_REV: dict[str, int] = {};
 glob _CACHE_STYLE_REV: dict[str, int] = {};
 glob _CACHE_LINES: dict[str, list[str]] = {};
-
 
 def _cache_valid(
     cached_width: int,
@@ -70,7 +64,6 @@ def _cache_valid(
     );
 }
 
-
 """Wrap content to exactly `width` columns, cached per node.
 
 Returns the wrapped lines for the CURRENT content at this width,
@@ -82,11 +75,7 @@ and `style_revision` from LayoutState.content (server->native reads are
 free; this module's signature deliberately avoids LayoutState because the
 obj's measurement_cache field type can't be lowered natively)."""
 def wrapped_lines_at(
-    content_lines: list[str],
-    content_revision: int,
-    style_revision: int,
-    id_str: str,
-    width: int,
+    content_lines: list[str], content_revision: int, style_revision: int, id_str: str, width: int
 ) -> list[str] {
     if width < 1 {
         width = 1;
@@ -97,10 +86,10 @@ def wrapped_lines_at(
     if cached_width is not None {
         cached_lines = _CACHE_LINES.get(id_str);
         if cached_lines is not None
-        and _cache_valid(
-            cached_width, cached_cr, cached_sr,
-            width, content_revision, style_revision
-        ) {
+            and _cache_valid(
+                cached_width, cached_cr, cached_sr, width, content_revision, style_revision
+            )
+        {
             return cached_lines;
         }
     }
@@ -117,25 +106,15 @@ def wrapped_lines_at(
     return wrapped;
 }
 
-
 """Wrapped height in rows for one node at one integer width."""
 def wrapped_height(
-    content_lines: list[str],
-    content_revision: int,
-    style_revision: int,
-    id_str: str,
-    width: int,
+    content_lines: list[str], content_revision: int, style_revision: int, id_str: str, width: int
 ) -> int {
     if width < 1 {
         width = 1;
     }
-    return len(
-        wrapped_lines_at(
-            content_lines, content_revision, style_revision, id_str, width
-        )
-    );
+    return len(wrapped_lines_at(content_lines, content_revision, style_revision, id_str, width));
 }
-
 
 """Drop every cached entry whose node id is `id_str`.
 

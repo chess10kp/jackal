@@ -22,9 +22,7 @@ credential errors even for users logged into deepseek/openrouter via
 auth.json.
 """
 
-import from agent.llm {
-    PROVIDER_ROUTES, provider_for, credential_error, routed_model_id
-}
+import from agent.llm { PROVIDER_ROUTES, provider_for, credential_error, routed_model_id }
 
 # the real symbols must resolve: the replica's invariant is only
 # meaningful against the live routing table
@@ -32,7 +30,6 @@ test "routing seam is the real agent.llm table" {
     assert provider_for("deepseek/deepseek-chat") == "deepseek";
     assert provider_for("deepseek-chat") == "openai_compat";
 }
-
 
 """Replica of tui.overlay._model_completion_candidates minus the live
 catalog fetches (network) and model_preferences/active-model pool entries
@@ -79,7 +76,6 @@ def _model_completion_candidates(prefix: str) -> list[list[str]] {
     return out;
 }
 
-
 test "every advertised id routes to its advertising provider" {
     for prov in PROVIDER_ROUTES {
         route: any = PROVIDER_ROUTES[prov];
@@ -99,7 +95,6 @@ test "every advertised id routes to its advertising provider" {
     }
 }
 
-
 test "candidate labels are complete /model commands" {
     cands: list[list[str]] = _model_completion_candidates("");
     assert len(cands) > 0;
@@ -116,7 +111,6 @@ test "candidate labels are complete /model commands" {
     }
 }
 
-
 test "deepseek rows carry the provider prefix (the reported misroute)" {
     cands: list[list[str]] = _model_completion_candidates("deepseek");
     found = False;
@@ -129,7 +123,6 @@ test "deepseek rows carry the provider prefix (the reported misroute)" {
     }
     assert found;
 }
-
 
 test "openrouter rows keep their nested catalog id intact" {
     cands: list[list[str]] = _model_completion_candidates("claude-sonnet");
@@ -145,7 +138,6 @@ test "openrouter rows keep their nested catalog id intact" {
     }
     assert found;
 }
-
 
 test "bare ids that already route correctly stay bare" {
     # targeted prefixes: the unfiltered pool is capped at 8 and both bare
@@ -168,7 +160,6 @@ test "bare ids that already route correctly stay bare" {
     }
     assert gpt_found;
 }
-
 
 test "prefix filters by substring and caps at 8" {
     cands: list[list[str]] = _model_completion_candidates("zzz-no-such-model");

@@ -8,7 +8,6 @@ and brackets break onto their own lines, empty containers stay flat,
 string contents pass through untouched (escapes included).
 """
 
-
 def:pub json_pretty(raw: str) -> str {
     out: list[str] = [];
     depth: int = 0;
@@ -35,7 +34,9 @@ def:pub json_pretty(raw: str) -> str {
             depth += 1;
             out.append(ch);
             out.append("\n");
-            for i in range(depth) { out.append("  "); }
+            for i in range(depth) {
+                out.append("  ");
+            }
         } elif ch == "}" or ch == "]" {
             depth -= 1;
             if prev == "{" or prev == "[" {
@@ -46,13 +47,17 @@ def:pub json_pretty(raw: str) -> str {
                 out.append(ch);
             } else {
                 out.append("\n");
-                for i in range(depth) { out.append("  "); }
+                for i in range(depth) {
+                    out.append("  ");
+                }
                 out.append(ch);
             }
         } elif ch == "," {
             out.append(ch);
             out.append("\n");
-            for i in range(depth) { out.append("  "); }
+            for i in range(depth) {
+                out.append("  ");
+            }
         } else {
             out.append(ch);
         }

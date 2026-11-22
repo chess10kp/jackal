@@ -224,7 +224,7 @@ def _iter_attrs(text: str, end: int) -> list[_MarkupMatch] {
 
 
 
-def create_tag_registry() -> TagRegistry {
+def create_tag_registry -> TagRegistry {
     return TagRegistry();
 }
 
@@ -238,7 +238,7 @@ def register_tag(registry: TagRegistry, tag: str, archetype: any) {
 }
 
 
-def default_shell_registry() -> TagRegistry {
+def default_shell_registry -> TagRegistry {
     reg = create_tag_registry();
     register_tag(reg, "MainScreen", MainScreen);
     register_tag(reg, "Header", Header);

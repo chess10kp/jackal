@@ -25,13 +25,7 @@ import from ui.layout_types {
     Viewport,
 }
 import from ui.model { UiNode }
-import from ui.layout_compile_model {
-    CompileResult,
-    NodeEdges,
-    _Entry,
-    _wants,
-}
-
+import from ui.layout_compile_model { CompileResult, NodeEdges, _Entry, _wants }
 
 """Unwrap a semantically required size value."""
 def _req(v: float | None) -> float {
@@ -41,16 +35,13 @@ def _req(v: float | None) -> float {
     return v;
 }
 
-
 def _t(v: Variable, coefficient: float = 1.0) -> Term {
     return Term(variable=v, coefficient=coefficient);
 }
 
-
 def _expr(terms: list[Term], constant: float = 0.0) -> Expression {
     return normalize_expression(Expression(terms=terms, constant=constant));
 }
-
 
 """Provenance string per plan §6: template name, node jid (+ semantic
 key when known), axis, parent jid + rank when relevant, the declaring
@@ -84,7 +75,6 @@ def _prov(
     return out;
 }
 
-
 """Emit one constraint; on rejection attach a diagnostic with provenance
 and flip the result to failed. Returns True only on success."""
 def _emit(
@@ -109,18 +99,16 @@ def _emit(
         for w in res.witness_provenance {
             witnesses.append(w);
         }
-        result.diagnostics.append(LayoutDiagnostic(
-            code=code,
-            severity=LayoutSeverity.ERROR,
-            message=res.message,
-            provenance=witnesses,
-        ));
+        result.diagnostics.append(
+            LayoutDiagnostic(
+                code=code, severity=LayoutSeverity.ERROR, message=res.message, provenance=witnesses
+            ),
+        );
         result.ok = False;
         return False;
     }
     return True;
 }
-
 
 # ----------------------------------------------------------------------
 # Templates.
@@ -130,18 +118,12 @@ def _axis_start(edges: NodeEdges, horizontal: bool) -> Variable {
     return edges.left if horizontal else edges.top;
 }
 
-
 def _axis_end(edges: NodeEdges, horizontal: bool) -> Variable {
     return edges.right if horizontal else edges.bottom;
 }
 
-
 def _emit_pin_edge(
-    result: CompileResult,
-    v: Variable,
-    target: float,
-    id_str: str,
-    axis_label: str,
+    result: CompileResult, v: Variable, target: float, id_str: str, axis_label: str
 ) -> bool {
     return _emit(
         result,
@@ -152,22 +134,14 @@ def _emit_pin_edge(
     );
 }
 
-
 """Required viewport pinning of the root's four edges (plan §6.1)."""
-def _emit_root(
-    result: CompileResult,
-    edges: NodeEdges,
-    viewport: Viewport,
-    phase: str,
-) -> bool {
+def _emit_root(result: CompileResult, edges: NodeEdges, viewport: Viewport, phase: str) -> bool {
     id_str = edges.id_str;
     if _wants(phase, True) {
         if not _emit_pin_edge(result, edges.left, 0.0, id_str, "h") {
             return False;
         }
-        if not _emit_pin_edge(
-            result, edges.right, float(viewport.columns), id_str, "h"
-        ) {
+        if not _emit_pin_edge(result, edges.right, float(viewport.columns), id_str, "h") {
             return False;
         }
     }
@@ -175,21 +149,14 @@ def _emit_root(
         if not _emit_pin_edge(result, edges.top, 0.0, id_str, "v") {
             return False;
         }
-        if not _emit_pin_edge(
-            result, edges.bottom, float(viewport.rows), id_str, "v"
-        ) {
+        if not _emit_pin_edge(result, edges.bottom, float(viewport.rows), id_str, "v") {
             return False;
         }
     }
     return True;
 }
 
-
-def _emit_invariants(
-    result: CompileResult,
-    edges: NodeEdges,
-    phase: str,
-) -> bool {
+def _emit_invariants(result: CompileResult, edges: NodeEdges, phase: str) -> bool {
     id_str = edges.id_str;
     if _wants(phase, True) {
         if not _emit(
@@ -213,7 +180,6 @@ def _emit_invariants(
     }
     return True;
 }
-
 
 """FIXED / INTRINSIC / BOUNDED sizing on one axis (plan §6.1)."""
 def _emit_sized_axis(
@@ -287,7 +253,6 @@ def _emit_sized_axis(
     return True;
 }
 
-
 """Pin both edges of a child to the parent content box on one axis."""
 def _emit_pin(
     result: CompileResult,
@@ -318,14 +283,9 @@ def _emit_pin(
     );
 }
 
-
 """Position a sized child on the cross axis per cross_align."""
 def _emit_cross_align(
-    result: CompileResult,
-    child: NodeEdges,
-    parent: NodeEdges,
-    spec: LayoutSpec,
-    horizontal: bool,
+    result: CompileResult, child: NodeEdges, parent: NodeEdges, spec: LayoutSpec, horizontal: bool
 ) -> bool {
     label = "h" if horizontal else "v";
     start_c = _axis_start(child, horizontal);
@@ -361,9 +321,6 @@ def _emit_cross_align(
     }
     return True;  # STRETCH never reaches here (handled as pins).
 }
-
-
-
 
 def _emit_cross_axis(
     result: CompileResult,
@@ -432,5 +389,3 @@ def _emit_cross_axis(
     }
     return _emit_cross_align(result, kid_edges, parent_edges, kid_spec, horizontal);
 }
-
-

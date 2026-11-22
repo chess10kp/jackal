@@ -69,7 +69,7 @@ obj VirtualTerminal(Terminal) {
         self._reset_cells();
     }
 
-    def _reset_cells() {
+    def _reset_cells  {
         grid: list[list[Cell]] = [];
         for _r in range(self.rows) {
             row: list[Cell] = [];
@@ -99,7 +99,7 @@ obj VirtualTerminal(Terminal) {
         self.write(f"\x1b[{row};{col}H");
     }
 
-    def start() -> None {
+    def start -> None {
         if self.started {
             return;
         }
@@ -110,7 +110,7 @@ obj VirtualTerminal(Terminal) {
         self.restored = False;
     }
 
-    def stop() -> None {
+    def stop -> None {
         if self.restored and not self.started {
             return;
         }
@@ -151,7 +151,7 @@ obj VirtualTerminal(Terminal) {
     }
 
     """Simulate SIGINT: restore then invoke interrupt callback."""
-    def inject_sigint() {
+    def inject_sigint  {
         self.interrupt_count += 1;
         self.restore();
         if self.on_interrupt is not None {
@@ -174,7 +174,7 @@ obj VirtualTerminal(Terminal) {
     }
 
     """Drain queued stdin chunks (non-destructive copy)."""
-    def pending_input() -> list[str] {
+    def pending_input -> list[str] {
         return list(self.input_queue);
     }
 
@@ -188,23 +188,23 @@ obj VirtualTerminal(Terminal) {
         return data;
     }
 
-    def take_input() -> list[str] {
+    def take_input -> list[str] {
         queued = self.input_queue;
         self.input_queue = [];
         return queued;
     }
 
     """Return all bytes written since start/reset."""
-    def written_text() -> str {
+    def written_text -> str {
         return "".join(self.writes);
     }
 
-    def clear_writes() {
+    def clear_writes  {
         self.writes = [];
     }
 
     """Snapshot the cell grid as a list of row strings (no styles)."""
-    def capture_cells() -> list[str] {
+    def capture_cells -> list[str] {
         rows: list[str] = [];
         for row in self.cells {
             chars = "";

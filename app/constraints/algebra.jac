@@ -37,7 +37,7 @@ def require_finite(x: float) -> None {
 enum Relation {
     LEQ = "leq",
     EQ = "eq",
-    GEQ = "geq"
+    GEQ = "geq",
 }
 
 
@@ -45,7 +45,7 @@ enum StrengthTier {
     REQUIRED = "required",
     STRONG = "strong",
     MEDIUM = "medium",
-    WEAK = "weak"
+    WEAK = "weak",
 }
 
 
@@ -58,7 +58,7 @@ obj LexWeight {
 }
 
 
-def lex_zero() -> LexWeight {
+def lex_zero -> LexWeight {
     return LexWeight(tiers=[0.0, 0.0, 0.0]);
 }
 

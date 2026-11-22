@@ -16,7 +16,7 @@ import tempfile;
 import shutil;
 
 
-def _make_tmp() -> str {
+def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-context-input-test-");
 }
 

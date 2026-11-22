@@ -1,12 +1,10 @@
 """Behavior tests for Terminal helpers (no TTY required)."""
 
-
 test "read_terminal_size returns positive dimensions" {
     (cols, rows) = read_terminal_size();
     assert cols > 0;
     assert rows > 0;
 }
-
 
 test "control sequence constants are non-empty escapes" {
     assert ENTER_ALT_SCREEN.startswith("\x1b");
@@ -19,13 +17,11 @@ test "control sequence constants are non-empty escapes" {
     assert SHOW_CURSOR.startswith("\x1b");
 }
 
-
 test "utf8 stream decoder emits complete characters" {
     dec = Utf8StreamDecoder();
     out = dec.feed("你\n".encode());
     assert out == "你\n";
 }
-
 
 test "utf8 stream decoder holds split multibyte until complete" {
     enc = "你好".encode();
@@ -38,13 +34,11 @@ test "utf8 stream decoder holds split multibyte until complete" {
     assert third == "好";
 }
 
-
 test "utf8 stream decoder replaces invalid bytes without losing the tail" {
     dec = Utf8StreamDecoder();
     out = dec.feed(b"\xffok");
     assert "ok" in out;
 }
-
 
 test "utf8 stream decoder survives ascii between split multibyte" {
     enc = ("a" + "é" + "b").encode();

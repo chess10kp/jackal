@@ -23,7 +23,6 @@ glob FAKE_HOST_CAPS: list[str] = [
      ],
      FAKE_COMPAT_TIER: str = "T2-partial";
 
-
 obj FakePluginHost {
     has handlers: dict[str, any] = {},
         command_handlers: dict[str, any] = {},
@@ -44,7 +43,6 @@ obj FakePluginHost {
         caps: list[str] = list(FAKE_HOST_CAPS),
         compat_tier: str = FAKE_COMPAT_TIER;
 }
-
 
 def create_fake_host(node_version: str = "fake") -> FakePluginHost {
     return FakePluginHost(node_version=node_version);

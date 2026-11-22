@@ -54,7 +54,7 @@ def set_thinking_level(level: str) -> str {
     return result;
 }
 
-def get_model() -> str {
+def get_model -> str {
     return get_model_state();
 }
 
@@ -66,7 +66,7 @@ def restore_model(name: str) -> str {
     return name;
 }
 
-def get_thinking_level() -> str {
+def get_thinking_level -> str {
     return get_thinking_level_state();
 }
 import from .session_lifecycle {

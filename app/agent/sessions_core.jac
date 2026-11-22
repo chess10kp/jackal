@@ -83,7 +83,7 @@ def is_valid_session_id(session_id: str) -> bool {
 
 
 """Monotonic epoch milliseconds: same-millisecond callers get ms + 1."""
-def _next_epoch_ms() -> int {
+def _next_epoch_ms -> int {
     ms = int(time.time() * 1000);
     if ms <= _last_id_ms {
         ms = _last_id_ms + 1;
@@ -94,7 +94,7 @@ def _next_epoch_ms() -> int {
 
 
 """Fresh legacy-format id: sess_<epoch_milliseconds>, digits only."""
-def new_session_id() -> str {
+def new_session_id -> str {
     return "sess_" + str(_next_epoch_ms());
 }
 
@@ -127,7 +127,7 @@ def _iso_from_ms(ms: int) -> str {
 }
 
 
-def _now_iso() -> str {
+def _now_iso -> str {
     return _iso_from_ms(_next_epoch_ms());
 }
 

@@ -47,7 +47,7 @@ obj CellDiff {
 }
 
 
-def blank_cell() -> StyledCell {
+def blank_cell -> StyledCell {
     return StyledCell(ch=" ", attrs=StyleAttrs());
 }
 
@@ -98,7 +98,7 @@ def copy_cell(c: StyledCell) -> StyledCell {
 }
 
 
-def sgr_reset() -> str {
+def sgr_reset -> str {
     return "\x1b[0m";
 }
 

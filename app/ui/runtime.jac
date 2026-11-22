@@ -66,7 +66,7 @@ obj OverlayBounds {
         width: int = 0,
         height: int = 0;
 
-    def is_empty() -> bool {
+    def is_empty -> bool {
         return self.width <= 0 or self.height <= 0;
     }
 }

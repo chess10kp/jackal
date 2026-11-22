@@ -581,7 +581,7 @@ test "fake host enforces active tools" {
     bridge = create_bridge("s-b1-active");
     reg = create_registry();
 
-    def _noop() -> str {
+    def _noop -> str {
         return "ok";
     }
 

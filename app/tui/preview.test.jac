@@ -4,14 +4,11 @@ TOOL_RESULT_PREVIEW_LINES lines verbatim, per-line char cap, and the exact
 '…  +N lines' footer when the result is longer. Display-only: nothing
 here may assume the full result is unavailable elsewhere."""
 
-
-
 test "short result shows verbatim with no footer" {
     out = tool_result_preview("alpha\nbeta\ngamma");
     assert out == "alpha\nbeta\ngamma", out;
     assert "(more lines)" not in out, out;
 }
-
 
 test "long result shows six lines plus an exact-count footer" {
     lines: list[str] = [];
@@ -22,19 +19,16 @@ test "long result shows six lines plus an exact-count footer" {
     assert out == "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\n…  +4 lines", out;
 }
 
-
 test "trailing newline does not invent an extra hidden line" {
     out = tool_result_preview("a\nb\nc\nd\ne\nf\ng\n");
     # Seven logical lines: six shown, exactly one more.
     assert out.endswith("\n…  +1 lines"), out;
 }
 
-
 test "empty and whitespace-only results collapse to a placeholder" {
     assert tool_result_preview("") == "(no output)";
     assert tool_result_preview("\n\n") == "(no output)";
 }
-
 
 test "a single overlong line is char-capped with an ellipsis" {
     long_line = "x" * 500;
@@ -43,11 +37,12 @@ test "a single overlong line is char-capped with an ellipsis" {
     assert out.endswith("x..."), out;
 }
 
-
 test "overlong lines inside a long result are capped, footer still counts lines" {
     a = "y" * 300;
     b = "z" * 250;
-    out = tool_result_preview(a + "\n" + b + "\n" + "tail1\ntail2\ntail3\ntail4\ntail5\ntail6\ntail7");
+    out = tool_result_preview(
+        a + "\n" + b + "\n" + "tail1\ntail2\ntail3\ntail4\ntail5\ntail6\ntail7"
+    );
     parts: list[str] = out.split("\n");
     assert len(parts) == 7, out;  # 6 shown + footer
     assert parts[0].endswith("y..."), out;
@@ -55,7 +50,6 @@ test "overlong lines inside a long result are capped, footer still counts lines"
     assert parts[5] == "tail4", out;
     assert parts[6] == "…  +3 lines", out;
 }
-
 
 test "custom max_lines is honored" {
     out = tool_result_preview("one\ntwo\nthree", max_lines=2);

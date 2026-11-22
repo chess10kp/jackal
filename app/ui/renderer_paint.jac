@@ -1,46 +1,19 @@
 """Cell-buffer painting for the retained renderer."""
 
-import from ui.model {
-    UiNode,
-    UiContainer,
-    Screen,
-    Overlay,
-    Layer,
-    ordered_children,
-    node_id,
-}
+import from ui.model { UiNode, UiContainer, Screen, Overlay, Layer, ordered_children, node_id }
 
-import from ui.layout_types {
-    FrameEntry,
-    LayoutState,
-}
+import from ui.layout_types { FrameEntry, LayoutState }
 
-import from ui.cells {
-    CellBuffer,
-    StyleAttrs,
-    create_buffer,
-    buffer_clear_rect,
-    buffer_blit_text,
-}
+import from ui.cells { CellBuffer, StyleAttrs, create_buffer, buffer_clear_rect, buffer_blit_text }
 
-import from ui.renderer_types {
-    Renderer,
-    _OverlayHit,
-}
-
+import from ui.renderer_types { Renderer, _OverlayHit }
 
 def _blank_buffer(columns: int, rows: int) -> CellBuffer {
     return create_buffer(columns, rows);
 }
 
-
 def _paint_text_into(
-    buf: CellBuffer,
-    text: str,
-    row: int,
-    col: int,
-    max_width: int,
-    attrs: StyleAttrs | None = None,
+    buf: CellBuffer, text: str, row: int, col: int, max_width: int, attrs: StyleAttrs | None = None
 ) {
     if max_width <= 0 {
         return;
@@ -48,12 +21,7 @@ def _paint_text_into(
     buffer_blit_text(buf, row, col, text, attrs, max_width);
 }
 
-
-def _paint_entry_lines(
-    buf: CellBuffer,
-    layout_entry: FrameEntry,
-    scrolls: bool,
-) {
+def _paint_entry_lines(buf: CellBuffer, layout_entry: FrameEntry, scrolls: bool) {
     rect = layout_entry.rect;
     clip = layout_entry.clip if not layout_entry.clip.is_empty() else rect;
     if clip.is_empty() or rect.is_empty() {
@@ -74,17 +42,9 @@ def _paint_entry_lines(
         if src_i < 0 or src_i >= len(lines) {
             continue;
         }
-        _paint_text_into(
-            buf,
-            lines[src_i],
-            term_row,
-            clip.x,
-            clip.width,
-            None,
-        );
+        _paint_text_into(buf, lines[src_i], term_row, clip.x, clip.width, None);
     }
 }
-
 
 # Layer-reached overlays of one Screen, ordered by (z_index, jid) —
 # same ordering the compiler's scope walk uses (plan §6.3).
@@ -92,11 +52,9 @@ def _overlay_z_key(hit: _OverlayHit) -> int {
     return hit.z;
 }
 
-
 def _overlay_jid_key(hit: _OverlayHit) -> str {
     return hit.id_str;
 }
-
 
 def _layered_overlays(layout_root: UiNode) -> list[UiNode] {
     found: list[_OverlayHit] = [];
@@ -117,7 +75,6 @@ def _layered_overlays(layout_root: UiNode) -> list[UiNode] {
     return [hit.nd for hit in found];
 }
 
-
 def _paint_node(state: LayoutState, n: UiNode, buf: CellBuffer) {
     frame = state.last_frame;
     if frame is None {
@@ -135,7 +92,6 @@ def _paint_node(state: LayoutState, n: UiNode, buf: CellBuffer) {
     }
 }
 
-
 def _paint_tree(state: LayoutState, n: UiNode, buf: CellBuffer) {
     _paint_node(state, n, buf);
     if isinstance(n, UiContainer) {
@@ -149,7 +105,6 @@ def _paint_tree(state: LayoutState, n: UiNode, buf: CellBuffer) {
         }
     }
 }
-
 
 def _paint_frame_buffer(renderer: Renderer, layout_root: UiNode) -> CellBuffer {
     state = renderer.layout;
