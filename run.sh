@@ -6,8 +6,12 @@
 # cache makes a rebuild of unchanged sources near-instant, so this builds on
 # every launch and then execs the binary.
 #
-#   ./run.sh               build + run the TUI
+#   ./run.sh               run the TUI (build only if binary missing)
 #   JACKAL_ENTRY=main ./run.sh [--json|...]   the line REPL / JSONL frontend
+#   JACKAL_FORCE_BUILD=1 ./run.sh            rebuild before run
+#
+# Pre-built binaries live in app/.jac/bin/ — run them directly:
+#   ./bin/jackal-tui    ./bin/jackal
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,5 +40,8 @@ esac
 
 cd "$REPO_ROOT/app"
 mkdir -p .jac/bin
-"$NEOJAC" build "$src" -o ".jac/bin/$out" ${JACKAL_RELEASE:+--release}
-exec ".jac/bin/$out" "$@"
+bin=".jac/bin/$out"
+if [[ "${JACKAL_FORCE_BUILD:-0}" == "1" ]] || [[ ! -x "$bin" ]]; then
+  "$NEOJAC" build "$src" -o "$bin" ${JACKAL_RELEASE:+--release}
+fi
+exec "$bin" "$@"

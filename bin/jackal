@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Run the pre-built CLI binary (no neojac).
+set -euo pipefail
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export JACKAL_ROOT="$REPO_ROOT"
+export JACKAL_AGENT_DIR="${JACKAL_AGENT_DIR:-$REPO_ROOT/pi}"
+BIN="$REPO_ROOT/app/.jac/bin/jackal"
+if [[ ! -x "$BIN" ]]; then
+  echo "missing $BIN — build once: cd $REPO_ROOT/app && neojac build main.jac -o .jac/bin/jackal --release" >&2
+  exit 127
+fi
+exec "$BIN" "$@"
