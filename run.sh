@@ -17,7 +17,12 @@ export JACKAL_ROOT="$REPO_ROOT"
 export JACKAL_AGENT_DIR="${JACKAL_AGENT_DIR:-$REPO_ROOT/pi}"
 unset JAC_HANDOFF
 
-NEOJAC="${NEOJAC:-$(command -v neojac || true)}"
+if [[ -z "${NEOJAC:-}" ]]; then
+  NEOJAC="$(command -v neojac 2>/dev/null || true)"
+  if [[ -z "$NEOJAC" && -x "${HOME}/.local/bin/neojac" ]]; then
+    NEOJAC="${HOME}/.local/bin/neojac"
+  fi
+fi
 if [[ -z "$NEOJAC" ]]; then
   echo "neojac not found; install: curl -fsSL https://github.com/jaseci-labs/neojac-releases/releases/latest/download/install.sh | bash" >&2
   exit 127
