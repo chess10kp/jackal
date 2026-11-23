@@ -65,12 +65,9 @@ installs it as `./jac`, then runs `jac install` in `app/` for the `[dependencies
 entries. The binary is self-contained (bundled runtime, no Python/pip) and
 `macos-x86_64` is not shipped by upstream (#8805), so the script refuses Intel Macs.
 
-Startup: `run.sh` launches with `jac run -b python`, which is an upstream flag, so
-the dev fast path works with a released binary. The `JAC_IGNORE_PLACEMENT_PINS`
-hook that `run.sh` also exports exists **only** in this checkout's `vendor/jac`
-(commit `6e7e4986c`); it is not on upstream `main` and not in any release, so it is
-inert with a downloaded binary. Do not make anything depend on it — an upstream
-sync (`setup-vendor-jac.sh` checks out `origin/main`) drops the local commit.
+Startup: `./run.sh` builds with **neojac** and execs the native binary under
+`app/.jac/bin/`. The workspace `./jac` from setup is for `jac build` / per-module
+tests, not for launching the agent UI.
 
 ## Editing rules
 

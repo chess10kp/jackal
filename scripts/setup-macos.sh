@@ -17,11 +17,8 @@
 #
 # Run it from anywhere; it installs into the repository root.
 #
-# On the fast path: `run.sh` launches with `jac run -b python`, which is an
-# upstream flag and works with the released binary. The additional
-# JAC_IGNORE_PLACEMENT_PINS hook that run.sh also exports is local to the
-# vendor checkout (not on upstream main, absent from the v0.38.3 release), so
-# on a downloaded binary it is simply inert -- harmless, not required.
+# Running Jackal: `./run.sh` builds with neojac and execs `app/.jac/bin/jackal-tui`.
+# The `./jac` binary from this script is for `cd app && ../jac build` / tests, not for launch.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -155,9 +152,7 @@ EOF
 
 if [[ "$LANE" == "download" ]]; then
   cat <<EOF
-Note: run.sh launches with 'jac run -b python' (upstream flag, works with this
-binary), so the dev fast path is intact. The extra JAC_IGNORE_PLACEMENT_PINS
-hook is local to the vendor checkout and is inert here -- it costs nothing.
+Note: Jackal launches via neojac (`./run.sh`); this `./jac` is for build/tests only.
 
 EOF
 fi

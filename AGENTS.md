@@ -14,6 +14,20 @@ Jac-native terminal coding agent.
 4. **Framework/plugin gaps** → stop, document symptom + owning repo + minimal recommended fix for the **human** (see [Human handoff](#human-handoff)).
 5. **Forward product work:** `app/`, its tests, and docs.
 6. **Jac compiler bugs:** file an upstream issue at jaseci-labs/jac without waiting for the user, make the fix in the `vendor/jac` checkout so work can continue, and put the implementation details in that issue.
+7. **Dev host (instabox):** Use the **box-7a0637** box for compiling and hands-on work on this repo (neojac builds, `jac build`, heavy tests) unless the user directs otherwise — not a compute-constrained local machine.
+
+---
+
+## Dev environment (instabox)
+
+Canonical workspace for Jackal compile and dev work:
+
+```bash
+npx instabox@latest ssh box-7a0637
+cd ~/repos/jackal
+```
+
+Repo path on the box: **`~/repos/jackal`**. Run `./run.sh`, `neojac build` / `neojac test`, and `cd app && ../jac build` there by default.
 
 ---
 

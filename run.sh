@@ -8,7 +8,6 @@
 #
 #   ./run.sh               build + run the TUI
 #   JACKAL_ENTRY=main ./run.sh [--json|...]   the line REPL / JSONL frontend
-#   JACKAL_LEGACY_JAC=1 ./run.sh             old path: workspace ./jac run (Python codespace)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,16 +16,6 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export JACKAL_ROOT="$REPO_ROOT"
 export JACKAL_AGENT_DIR="${JACKAL_AGENT_DIR:-$REPO_ROOT/pi}"
 unset JAC_HANDOFF
-
-if [[ "${JACKAL_LEGACY_JAC:-0}" == "1" ]]; then
-  if [[ ! -x "$REPO_ROOT/jac" ]]; then
-    echo "workspace Jac binary missing; run ./scripts/setup-vendor-jac.sh with Zig 0.16.0" >&2
-    exit 127
-  fi
-  export JAC_IGNORE_PLACEMENT_PINS=1
-  cd "$REPO_ROOT/app"
-  exec "$REPO_ROOT/jac" run -b python tui/shell.jac "$@"
-fi
 
 NEOJAC="${NEOJAC:-$(command -v neojac || true)}"
 if [[ -z "$NEOJAC" ]]; then
