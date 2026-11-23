@@ -51,21 +51,16 @@ containers are invariant (annotate `list[dict[str, any]]` literals);
 `sys.executable` is the program itself (never spawn it for Python fixtures —
 it fork-bombs the test runner); `bytes.decode(enc, errors)` is positional.
 
-**Legacy jac (vendored jaclang):**
+**Vendored `./jac` (toolchain only, not launch):**
 
 ```bash
-# Native harness (the product)
-cd app && ../jac run main.jac       # term REPL frontend (--json for JSONL protocol)
-../jac run tui/shell.jac            # native TUI (TTY required)
-
-# Build / check
-cd app && ../jac build               # native compile check over app/
-./jac test app/<file>.test.jac       # per-file Jac tests
+cd app && ../jac build               # placement seal / compile check over app/
+../jac test app/<file>.test.jac       # per-file Jac tests (repo root)
 ```
 
-**Running:** `./run.sh` launches Jackal through the workspace-built `./jac` (one process, from `app/`, with `JACKAL_ROOT`/`JACKAL_AGENT_DIR` set). Direct commands from `app/` use `../jac run tui/shell.jac` (TTY required) or `../jac run main.jac` (line REPL, add `-- --json` for JSONL protocol). Set `JACKAL_AGENT_DIR=<repo>/pi` and `JACKAL_ROOT=<repo>` so auth/catalogs resolve.
+Optional: `export JAC_IGNORE_PLACEMENT_PINS=1` only for a faster *exploratory* `jac run` during harness development — never for `jac build` or seal reads.
 
-**Dev fast path (dogfooding).** A dev `jac run` inside `app/` always prepares the whole application first, and the `[placement.pins]` there pull the native JIT into that prepare: cold ~6 min, and a *warm* restore hangs (>5 min in `MCJIT`, inside `_restore_sections` → `_load_native_from_cache`). `run.sh` therefore exports `JAC_IGNORE_PLACEMENT_PINS=1` (the vendored compiler honors it and treats every module as server/plain Python): ~3 s warm, ~2 min cold on the bytecode floor. `JACKAL_NATIVE=1 ./run.sh` keeps the pins. Never set `JAC_IGNORE_PLACEMENT_PINS` for `jac build` or a seal read — it would silently drop the pins the seal exists to enforce.
+**Running:** `./run.sh` builds with neojac and execs `app/.jac/bin/jackal-tui` (or `jackal` when `JACKAL_ENTRY=main`). `JACKAL_ROOT` and `JACKAL_AGENT_DIR` (default `<repo>/pi`) are set automatically.
 
 **Requirements:** build Jac with `./scripts/setup-vendor-jac.sh` (Zig 0.16.0 required); a TTY for the TUI; provider API keys via env or auth.json (see below).
 
@@ -146,8 +141,7 @@ These paths are frozen. A deletion commit is upcoming — do not extend them:
 | `JACKAL_LOG` | `agent/logging.jac` | Structured JSONL debug log. `1` → `<cwd>/.jackal/logs/<date>-<pid>.jsonl`; any other value is a sink path. Unset/`0` = off |
 | `JACKAL_LOG_LEVEL` | `agent/logging.jac` | `debug`/`info`/`warn`/`error` threshold (default `info`) |
 | `JACKAL_SANDBOX_ROOT` | `agent/tools.jac` | When set, file tools reject paths outside this root (lexical `..` containment; off by default) |
-| `JAC_IGNORE_PLACEMENT_PINS` | vendored jac (`project/`, `compiler/placement/`) | Mutes `[placement.pins]` for this run — the dev fast path `run.sh` sets it. Never for `jac build`. |
-| `JACKAL_NATIVE` | `run.sh` | `1` keeps the native placement pins instead of the fast path |
+| `JAC_IGNORE_PLACEMENT_PINS` | vendored jac (`project/`, `compiler/placement/`) | Mutes `[placement.pins]` for an exploratory `jac run` only. Never for `jac build` or seal reads. |
 | `JACKAL_ALLOW_PRIVATE_HOSTS` | `agent/web_tools.jac` | Offline-test escape hatch: lets `web_fetch` reach loopback/private hosts that the SSRF guard blocks. Never set in a normal session |
 
 Legacy vars (`JACKAL_HEAP_MB`, `JACKAL_TUI_OUT`, `JACKAL_SKIP_TUI_COMPILE`) belong to the old launcher path and die with the launcher cleanup. Provider keys come from env (e.g. `OPENROUTER_API_KEY`) or `auth.json` (byte-compatible with the legacy pi-ai shape; see `app/agent/auth.jac`).
