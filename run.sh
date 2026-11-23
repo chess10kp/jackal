@@ -7,6 +7,7 @@
 #   ./run.sh               run the TUI (build only if binary missing)
 #   JACKAL_ENTRY=main ./run.sh [--json|...]   the line REPL / JSONL frontend
 #   JACKAL_FORCE_BUILD=1 ./run.sh            rebuild before run
+#   JACKAL_RELEASE=0 JACKAL_FORCE_BUILD=1 ./run.sh   build without release optimizations
 #
 # Pre-built binaries live in app/.jac/bin/ — run them directly:
 #   ./bin/jackal-tui    ./bin/jackal
@@ -39,6 +40,10 @@ if [[ "${JACKAL_FORCE_BUILD:-0}" == "1" ]] || [[ ! -x "$bin" ]]; then
     exit 127
   fi
   mkdir -p .jac/bin
-  "$NEOJAC" build "$src" -o "$bin" ${JACKAL_RELEASE:+--release}
+  build_flags=()
+  if [[ "${JACKAL_RELEASE:-1}" != "0" ]]; then
+    build_flags+=(--release)
+  fi
+  "$NEOJAC" build "$src" -o "$bin" "${build_flags[@]}"
 fi
 exec "$bin" "$@"
