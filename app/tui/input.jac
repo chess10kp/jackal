@@ -152,7 +152,6 @@ def _handle_picker_key(app: LiveShell, key: str) {
         if title == "DEV MODE" {
             _close_picker(app);
             app.mode = set_mode(chosen_id);
-            _push_turn(app, "system", "mode → " + app.mode);
             app.dirty = True;
             return;
         }
@@ -306,11 +305,6 @@ def _handle_key(app: LiveShell, key: str) {
     if key == "shift+tab" {
         app.mode = cycle_mode(app.mode);
         set_mode(app.mode);
-        note: str = "mode → " + app.mode;
-        if is_read_only_mode(app.mode) {
-            note += "  (write tools blocked)";
-        }
-        _push_turn(app, "system", note);
         app.dirty = True;
         return;
     }

@@ -141,7 +141,7 @@ def _run_slash(app: LiveShell, line: str) -> str {
         }
         app.mode = set_mode(want);
         app.dirty = True;
-        return "mode -> " + app.mode;
+        return "";
     }
     if line == "/logout" or line.startswith("/logout ") {
         prov = line[len("/logout"):].strip();
