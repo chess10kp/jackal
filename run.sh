@@ -13,7 +13,11 @@
 #   ./bin/jackal-tui    ./bin/jackal
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_path="${BASH_SOURCE[0]}"
+if [[ "$script_path" == */* ]]; then
+  CDPATH= cd -- "${script_path%/*}/"
+fi
+REPO_ROOT="$PWD"
 
 # Auth/skills/chains catalogs live in the repo, not in app/.
 export JACKAL_ROOT="$REPO_ROOT"

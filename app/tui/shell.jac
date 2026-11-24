@@ -80,17 +80,17 @@ def boot_tui(term: Terminal | None = None) -> LiveShell {
         session_boot(interactive_ui=True);
     } except Exception {}
     _hydrate_auth_environment();
-    # fx-style catalog preload: /models endpoints refresh in background
-    # flows so the picker serves live lists without blocking first paint.
-    try {
-        warm_model_catalog();
-    } except Exception {}
     app = create_live_shell(term);
     app.cmd_q = queue.Queue();
     app.term.start();
     app.term.set_title("Jackal — " + get_model());
     app.dirty = True;
     _render(app);
+    # Start catalog refresh after the first frame so its workers cannot
+    # delay the initial paint.
+    try {
+        warm_model_catalog();
+    } except Exception {}
     return app;
 }
 

@@ -136,6 +136,12 @@ def grapheme_width(seg: str) -> int {
     if not seg {
         return 0;
     }
+    if len(seg) == 1 {
+        cp: int = ord(seg);
+        if (cp >= 32 and cp <= 126) or (cp >= 0x2500 and cp <= 0x259F) {
+            return 1;
+        }
+    }
     if seg == "\t" {
         return 3;
     }

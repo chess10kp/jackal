@@ -299,6 +299,7 @@ def diff_buffers_ansi(
     cur_attrs = StyleAttrs();
     sgr_on = False;
     need_attrs = True;
+    blank = blank_cell();
 
     for rect in rects {
         (x0, y0, x1, y1) = _rect_bounds(rect, columns, rows_n);
@@ -307,10 +308,9 @@ def diff_buffers_ansi(
             run_chars: list[str] = [];
             run_attrs = StyleAttrs();
             for x in range(x0, x1) {
-                want = blank_cell();
-                if y < len(desired.cells) and x < len(desired.cells[y]) {
-                    want = desired.cells[y][x];
-                }
+                want = desired.cells[y][x]
+                    if y < len(desired.cells) and x < len(desired.cells[y])
+                    else blank;
                 if want.wide_cont {
                     if run_start >= 0 {
                         if need_attrs or not attrs_eq(cur_attrs, run_attrs) {
@@ -326,11 +326,11 @@ def diff_buffers_ansi(
                     }
                     continue;
                 }
-                had = blank_cell();
+                had = blank;
                 if (previous is not None and y < previous.rows and x < previous.columns) {
                     had = previous.cells[y][x];
                 }
-                if cell_eq(want, had) and not force {
+                if not force and cell_eq(want, had) {
                     if run_start >= 0 {
                         if need_attrs or not attrs_eq(cur_attrs, run_attrs) {
                             parts.append(sgr_for(run_attrs));
