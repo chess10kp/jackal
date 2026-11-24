@@ -52,18 +52,19 @@ import from ui.layout_types {
     rect_of,
     _copy_rect,
 }
-import from ui.layout_compile { CompileResult, PartitionInfo, compile_layout }
+import from ui.layout_compile {
+    CompileResult, PartitionInfo, collect_scope_for_engine, compile_scoped_layout
+}
+import from ui.layout_compile_model { _ScopedNode }
 import from ui.layout_measure { natural_width, wrapped_lines_at, invalidate_measurement_cache }
 import from ui.layout_quantize { PartitionRequest, quantize_partition, snap_edge }
 import from ui.model { UiNode, UiContainer, Screen, Overlay, node_id, ordered_children }
 import from ui.width { wrap_text_joined }
-import from ui.layout_scope { _ScopedNode, _Scope, _collect_scope }
 
 # ----------------------------------------------------------------------
 # Compute pipeline (plan §7.1).
 #
-# Scope collection is isolated in ui.layout_scope; this module retains
-# the public pipeline and frame publication seam.
+# Both constraint passes use the same validated topology.
 # ----------------------------------------------------------------------
 
 def _fail(diagnostics: list[LayoutDiagnostic]) -> LayoutResult {
@@ -272,7 +273,7 @@ def _structural_naturals(
 
 """Full pipeline: registry + topology -> published LayoutFrame."""
 def compute_layout(state: LayoutState, layout_root: UiNode, viewport: Viewport) -> LayoutResult {
-    scope = _collect_scope(layout_root);
+    scope = collect_scope_for_engine(layout_root);
     if scope.error is not None {
         return _fail([scope.error]);
     }
@@ -288,7 +289,7 @@ def compute_layout(state: LayoutState, layout_root: UiNode, viewport: Viewport) 
     }
     naturals_w = _structural_naturals(order, state, hint_all);
 
-    ch = compile_layout(state, layout_root, viewport, naturals_w, "h");
+    ch = compile_scoped_layout(state, scope, root_id, viewport, naturals_w, "h");
     if not ch.ok or ch.solver is None {
         return _fail(ch.diagnostics);
     }
@@ -352,7 +353,7 @@ def compute_layout(state: LayoutState, layout_root: UiNode, viewport: Viewport) 
     # structural sum/max over those measured children.
     naturals_h = _structural_naturals(order, state, widths);
 
-    cv = compile_layout(state, layout_root, viewport, naturals_h, "v");
+    cv = compile_scoped_layout(state, scope, root_id, viewport, naturals_h, "v");
     if not cv.ok or cv.solver is None {
         return _fail(cv.diagnostics);
     }

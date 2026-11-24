@@ -31,7 +31,19 @@ def compile_layout(
     natural_sizes: dict[str, Size] = {},
     phase: str = "full",
 ) -> CompileResult {
-    scope = _collect_scope(layout_root);
+    return compile_scoped_layout(
+        state, _collect_scope(layout_root), node_id(layout_root), viewport, natural_sizes, phase
+    );
+}
+
+def compile_scoped_layout(
+    state: LayoutState,
+    scope: _Scope,
+    root_id: str,
+    viewport: Viewport,
+    natural_sizes: dict[str, Size],
+    phase: str,
+) -> CompileResult {
     if scope.error is not None {
         r = CompileResult(ok=False);
         r.diagnostics.append(scope.error);
@@ -115,7 +127,7 @@ def compile_layout(
         ent = _Entry(scoped=scoped, edges=edges, spec=state.specs[scoped.id_str]);
         entries_by_id[scoped.id_str] = ent;
     }
-    root_entry = entries_by_id[node_id(layout_root)];
+    root_entry = entries_by_id[root_id];
 
     # Root pins + per-node geometric invariants.
     if not _emit_root(result, root_entry.edges, viewport, phase) {
