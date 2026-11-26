@@ -41,15 +41,20 @@ Its native C-library interface supports statically linked OpenSSL crypto.
 OpenSSL EVP, RSA JWKS conversion, and issuer/audience/expiry/nonce/subject
 checks. It compiled in isolation on the VM. Synthetic signed-token fixtures
 and security tests are beside it; the private fixture key was discarded.
-Those tests have **not run**: Instabox began returning
-`no sandbox with ID or name "box-7a0637"` during test transfer.
+The three native security tests now pass on replacement dev box
+`jackal-extra-1` with neojac 0.5.3 (14.7 seconds). They cover a valid
+signature, tampering, invalid issuer/audience/nonce/timestamps, unsupported
+algorithm, unknown signing key, malformed tokens, and account substitution.
+The previous box became unavailable during test transfer.
 
 The full application build with 0.5.3 also reports E2231 (requires
 `archwire.jac`), E3058 (redundant lint selection), and E3059 (old lint ignore
 configuration). Owner: Jackal toolchain migration. Minimal recommended fix:
 migrate the project manifest and import wiring to the new compiler format,
 preserving the existing native placement policy, then build both entries.
-This is separate from implementing OAuth and requires a working dev box.
+This is separate from implementing OAuth. The replacement dev box is now
+reachable using `instabox ssh jackal-extra-1`; neojac is installed there at
+`/data/workspace/neojac` (also linked from `~/.local/bin/neojac`).
 
 Account login is still unimplemented and disabled. The native verifier is
 preparatory code, not a verified authentication feature or deliverable binary.
