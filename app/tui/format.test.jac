@@ -1,6 +1,6 @@
-test "format_turn is compact for conversation roles" {
+test "format_turn omits speaker labels" {
     out = format_turn("user", "hello\nworld");
-    assert out == "◆ You\n  hello\n  world", str(out);
+    assert out == "hello\nworld", str(out);
 }
 
 test "format_turn passes tool blocks through without a header" {

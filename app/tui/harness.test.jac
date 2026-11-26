@@ -38,8 +38,8 @@ test "submit streams the reply into the transcript" {
         h.wait_for("streamed reply from mock");
         h.wait_idle();
         txt = h.screen();
-        assert "◆ You" in txt and "hi jackal" in txt, str(h.dump());
-        assert "◇ Jackal" in txt, str(h.dump());
+        assert "◆ You" not in txt and "◇ Jackal" not in txt, str(h.dump());
+        assert "hi jackal" in txt, str(h.dump());
         calls = h.calls();
         assert len(calls) == 1 and calls[0]["last"]["content"] == "hi jackal", str(h.dump());
     } finally {

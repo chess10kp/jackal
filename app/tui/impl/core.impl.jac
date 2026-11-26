@@ -38,8 +38,12 @@ impl _commit_messages(app: LiveShell) {
 
 impl _push_turn(app: LiveShell, role: str, body: str) -> str {
     mid = _next_id(app);
+    content = format_turn(role, body);
+    if app.messages and role != "tool" {
+        content = "\n" + content;
+    }
     app.messages = app.messages + [
-        TranscriptMessage(message_id=mid, content=format_turn(role, body), content_rev=1),
+        TranscriptMessage(message_id=mid, content=content, content_rev=1),
     ];
     _commit_messages(app);
     return mid;

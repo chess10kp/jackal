@@ -10,17 +10,10 @@ impl format_turn(role: str, body: str) -> str {
         }
         return "\n".join(lines);
     }
-    if role == "user" {
-        mark = "◆ You";
-    } elif role == "assistant" {
-        mark = "◇ Jackal";
-    } else {
-        mark = "· System";
-    }
-    lines: list[str] = [mark];
+    lines: list[str] = [];
     for line in text.split("\n") {
         if line {
-            lines.append("  " + line);
+            lines.append(line);
         } else {
             lines.append("");
         }
