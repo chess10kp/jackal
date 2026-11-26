@@ -1,13 +1,3 @@
-"""Unit 8 acceptance: durable Jackal shell topology and editor lifecycle.
-
-Companion scope provides screen APIs. runtime imported for session helpers.
-The last case also checks markup lowering against this shell, which is why it
-lives here rather than in `ui/markup.test.jac`: `ui.markup` is pinned native,
-its annex is folded into the native unit, and calling this server-placed
-builder from there fails the seal (E5093). See docs/TESTING.md and
-jaseci-labs/jac#10490.
-"""
-
 import from ui.model { MainScreen, UiContainer, node_id, ordered_child_keys }
 
 import from ui.layout_types { SizeMode, create_layout_state }
@@ -123,9 +113,6 @@ test "configure_main_shell_layout installs legacy-parity specs" {
     state = create_layout_state(80, 24);
     failures = configure_main_shell_layout(state, shell);
     assert failures == [];
-
-    # Screen fills; header/status/prompt keep legacy fixed heights;
-    # transcript grows with scroll enabled (mirrors gates.jac).
     sid = node_id(shell.screen);
     tid = node_id(shell.transcript);
     hid = node_id(shell.header);

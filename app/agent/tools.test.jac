@@ -1,8 +1,3 @@
-"""Tests for agent/tools.jac (same-stem annex, merged with the base module
-at test time - no import of the own stem). Covers glob and grep search
-behavior including generated-directory skips and result caps.
-"""
-
 import from .modes { is_tool_blocked }
 
 test "glob finds files and skips generated directories" {
@@ -46,7 +41,6 @@ test "jac_check and jac_format register with correct read-only blocking" {
     names = [spec.name for spec in tool_specs()];
     assert "jac_check" in names;
     assert "jac_format" in names;
-    # jac_format mutates files -> blocked in plan/ask; jac_check stays allowed.
     assert is_tool_blocked("plan", "jac_format") is True;
     assert is_tool_blocked("ask", "jac_format") is True;
     assert is_tool_blocked("normal", "jac_format") is False;
@@ -54,8 +48,6 @@ test "jac_check and jac_format register with correct read-only blocking" {
 }
 
 test "jac_check happy path formats real CLI output" {
-    # Happy-path coverage for _run_jac_cli formatting via the public handler.
-    # Runs the REAL jac CLI once (~seconds); skipped when it is not installed.
     if shutil.which("jac") is None {
         return;
     }
@@ -66,9 +58,6 @@ test "jac_check happy path formats real CLI output" {
             f.write("");
         }
         out = jac_check(target);
-        # Assert the _run_jac_cli output FORMAT only - toolchain verdicts
-        # belong to the Jac toolchain, not to this adapter layer.
-        # Contract: "jac check <path> -> ok|failed (exit N)\n<body>"
         assert out.startswith("jac check "), str(out);
         assert " -> " in out;
         first_line = out.split("\n")[0];
@@ -96,7 +85,6 @@ test "JACKAL_SANDBOX_ROOT contains tools inside the root" {
         os.environ["JACKAL_SANDBOX_ROOT"] = sandbox;
         assert resolve_path("a.txt") == f"{sandbox}/a.txt";
         assert resolve_path(f"{sandbox}/c.txt") == f"{sandbox}/c.txt";
-        # `..` is collapsed before the check, so an in-root normalization passes.
         assert resolve_path("sub/../b.txt") == f"{sandbox}/sub/../b.txt";
         for bad in ["..", "../escape.txt", "../../etc/passwd", "/etc/passwd", "/tmp"] {
             try {
@@ -148,7 +136,6 @@ test "child jac processes never inherit JAC_HANDOFF" {
         os.environ["JAC_HANDOFF"] = "tcp://127.0.0.1:1";
         env = _jac_child_env();
         assert "JAC_HANDOFF" not in env, str(env.get("JAC_HANDOFF"));
-        # Unrelated env still passes through.
         os.environ["JACKAL_PROBE_KEEP"] = "yes";
         env2 = _jac_child_env();
         assert env2.get("JACKAL_PROBE_KEEP") == "yes", str(env2.get("JACKAL_PROBE_KEEP"));

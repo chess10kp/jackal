@@ -1,16 +1,3 @@
-"""Context input expansion tests for app/agent/context_input.jac.
-
-Covers: @mention extraction (multiple, none, malformed, invalid paths),
-line-range parsing edge cases (reversed, zero, multi-dash, non-numeric),
-mention-token resolution including colons in paths, cursor autocomplete
-scanning, and end-to-end expansion — plain passthrough, full-file blocks,
-line slices with clamping past EOF, missing-file error tolerance with
-mixed results, duplicate dedup, large-file truncation, token warning
-header, and !command output wrapping (echo-only plus exit-code probing).
-Uses Python tempfile dirs (cleaned up per test) so no repo state is
-touched -- never real project files.
-"""
-
 import os;
 import tempfile;
 import shutil;
@@ -42,8 +29,6 @@ def _read_text(path: str) -> str {
     }
 }
 
-# ============================== path validation ==============================
-
 test "is_valid_file_path rejects traversal, absolute, drive, NUL, blank" {
     assert is_valid_file_path("src/app.py");
     assert is_valid_file_path("a/b/c.txt");
@@ -59,8 +44,6 @@ test "is_valid_file_path rejects traversal, absolute, drive, NUL, blank" {
     assert not is_valid_file_path("bad\0name");
 }
 
-# ============================== line range parsing ==============================
-
 test "parse_line_range accepts single lines and ranges" {
     assert parse_line_range("10") == {"start": 10};
     assert parse_line_range("10-20") == {"start": 10, "end": 20};
@@ -71,13 +54,11 @@ test "parse_line_range rejects malformed, zero, and reversed ranges" {
     assert parse_line_range("") is None;
     assert parse_line_range("abc") is None;
     assert parse_line_range("0") is None;
-    assert parse_line_range("5-3") is None;  # reversed
-    assert parse_line_range("0-4") is None;  # zero start
-    assert parse_line_range("-3") is None;  # empty first part
-    assert parse_line_range("1-2-3") is None;  # three parts
+    assert parse_line_range("5-3") is None;
+    assert parse_line_range("0-4") is None;
+    assert parse_line_range("-3") is None;
+    assert parse_line_range("1-2-3") is None;
 }
-
-# ============================== mention extraction ==============================
 
 test "parse_file_mentions extracts multiple mentions in order" {
     text = "look at @src/app.py then @README.md:10-20 and @lib/main.jac:3";
@@ -99,7 +80,6 @@ test "parse_file_mentions extracts multiple mentions in order" {
 test "parse_file_mentions returns empty for no mentions" {
     assert parse_file_mentions("just plain words") == [];
     assert parse_file_mentions("") == [];
-    # Lone @ with nothing after it matches nothing.
     assert parse_file_mentions("email me @ ok") == [];
 }
 
@@ -107,17 +87,10 @@ test "parse_file_mentions skips invalid paths and bad ranges" {
     mentions = parse_file_mentions("@../escape and @/abs/path but keep @good.txt:9-2");
     assert len(mentions) == 1;
     assert mentions[0]["file_path"] == "good.txt";
-    # Rejected range leaves the mention whole-file.
     assert mentions[0]["raw_text"] == "@good.txt:9-2";
     assert mentions[0]["line_range"] is None;
-
-    # Note: "@C:\win" tokenizes as bare path "C" (colon ends the token), so
-    # drive-letter rejection only fires on whole paths, matching the legacy
-    # parser exactly. NUL names are rejected here.
     assert [str(m["file_path"]) for m in parse_file_mentions("@x\0y @ok.jac")] == ["ok.jac"];
 }
-
-# ============================== token + cursor parsing ==============================
 
 test "parse_mention_token splits path from range suffix" {
     assert parse_mention_token("app.py") == {"path": "app.py"};
@@ -127,9 +100,7 @@ test "parse_mention_token splits path from range suffix" {
         "startLine": 12,
         "endLine": 30,
     };
-    # Last colon wins; earlier colons stay part of the path.
     assert parse_mention_token("a:b:7") == {"path": "a:b", "startLine": 7, "endLine": 7};
-    # No leading colon content or non-numeric range: raw passthrough.
     assert parse_mention_token(":10") == {"path": ":10"};
     assert parse_mention_token("file:x") == {"path": "file:x"};
     assert parse_mention_token("f:5-3") == {"path": "f:5-3"};
@@ -137,31 +108,23 @@ test "parse_mention_token splits path from range suffix" {
 
 test "get_current_file_mention scans around the cursor for autocomplete" {
     text = "see @src/ma and more";
-    # Cursor right after "ma".
     found = get_current_file_mention(text, 11);
     assert found is not None;
     assert found["mention"] == "src/ma";
     assert found["start"] == 4;
     assert found["end"] == 11;
     assert found["rangeSuffix"] == "";
-
-    # Cursor inside a range suffix keeps it separate.
     ranged = get_current_file_mention("use @f.py:10-20 ok", 15);
     assert ranged is not None;
     assert ranged["mention"] == "f.py";
     assert ranged["end"] == 15;
     assert ranged["rangeSuffix"] == ":10-20";
-
-    # Whitespace before the cursor ends scanning backwards.
     assert get_current_file_mention("no at sign here", 15) is None;
-    # Default cursor position is end of input.
     tail = get_current_file_mention("hello @notes.md");
     assert tail is not None;
     assert tail["mention"] == "notes.md";
     assert tail["end"] == len("hello @notes.md");
 }
-
-# ============================== expansion: passthrough ==============================
 
 test "expand_context_input passes through text without mentions or commands" {
     tmp = _make_tmp();
@@ -170,15 +133,12 @@ test "expand_context_input passes through text without mentions or commands" {
         assert expand_context_input(tmp, "   ") == "   ";
         assert expand_context_input(tmp, "plain question about jac?")
             == "plain question about jac?";
-        # A bare ! with no command also passes through.
         assert expand_context_input(tmp, "!") == "!";
         assert expand_context_input(tmp, "!   ") == "!   ";
     } finally {
         _cleanup(tmp);
     }
 }
-
-# ============================== expansion: file blocks ==============================
 
 test "expand_context_input wraps a whole file in a fenced file block" {
     tmp = _make_tmp();
@@ -216,13 +176,10 @@ test "expand_context_input clamps out-of-bounds ranges like the legacy runtime" 
     tmp = _make_tmp();
     try {
         _write_file(os.path.join(tmp, "short.txt"), "one\ntwo\nthree");
-        # End far past EOF clamps to the last line.
         clamped = expand_context_input(tmp, "@short.txt:2-999");
         assert '<file path="short.txt:2-999">' in clamped;
         body = clamped.split("```")[1];
         assert body.strip() == "two\nthree";
-
-        # Start beyond EOF yields an empty slice, not an error.
         past = expand_context_input(tmp, "@short.txt:50");
         assert '<file path="short.txt:50">' in past;
         assert past.split("```")[1].strip() == "";
@@ -240,7 +197,6 @@ test "expand_context_input tolerates missing files as inline error blocks" {
         assert '<file path="ghost.txt"' in out;
         assert '<file path="real.txt">' in out;
         assert "content here" in out;
-        # The turn still completes with an Attached context header.
         assert out.startswith("@ghost.txt and @real.txt\n\nAttached context:");
     } finally {
         _cleanup(tmp);
@@ -281,8 +237,6 @@ test "expand_context_input prepends a token warning above 40k chars" {
         out = expand_context_input(tmp, prompt);
         assert out.startswith("[Warning: attached files ~10000 tokens]\n");
         assert prompt in out;
-
-        # Under the threshold there is no warning header.
         small = "z" * 1000;
         _write_file(os.path.join(tmp, "small.txt"), small);
         plain = expand_context_input(tmp, "check @small.txt");
@@ -306,8 +260,6 @@ test "expand_context_input handles several files end-to-end in one prompt" {
         _cleanup(tmp);
     }
 }
-
-# ============================== expansion: !commands ==============================
 
 test "expand_context_input runs echo-only commands into command_output blocks" {
     tmp = _make_tmp();

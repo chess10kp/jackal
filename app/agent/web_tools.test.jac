@@ -1,13 +1,3 @@
-"""Tests for agent/web_tools.jac — same-stem annex (plugin_hooks_events
-pattern; the base module carries the shared imports).
-
-Offline-first: URL validation, truncation, and HTML stripping are pure.
-The HTTP round-trip test serves canned HTML from a raw-socket server bound
-to 127.0.0.1:0 in a daemon thread. The live DuckDuckGo test skips when
-JACKAL_SKIP_NET_TESTS=1 or a 3s TCP probe to the search host fails, so CI
-never depends on egress.
-"""
-
 def _canned_page -> str {
     parts: list[str] = [];
     parts.append("<html><head><title>Canned Page</title>");
@@ -21,8 +11,6 @@ def _canned_page -> str {
 }
 
 def _start_server(body_text: str) -> int {
-    # Raw-socket HTTP server on 127.0.0.1:0 serving one canned body;
-    # answers up to 8 requests then closes.
     srv = socket.socket();
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
     srv.bind(("127.0.0.1", 0));
@@ -156,7 +144,6 @@ test "validate_web_url blocks loopback private and metadata targets" {
         assert len(str(res[1])) > 0, str(target);
         assert "lock" in str(res[1]) or "Invalid" in str(res[1]), str((target, res[1]));
     }
-    # A public literal is still allowed without any DNS lookup.
     ok = validate_web_url("https://93.184.216.34/page");
     assert str(ok[1]) == "", str(ok);
 }
@@ -202,7 +189,6 @@ test "resolved-address guard rejects loopback names and unresolvable hosts" {
     } except ValueError as exc {
         assert "resolve" in str(exc).lower(), str(exc);
     }
-    # Public names only when egress/DNS is available (CI may be offline).
     if _egress_available() {
         assert_host_resolves_public("example.com");
     }
@@ -229,8 +215,6 @@ test "duckduckgo search returns formatted results when egress available" {
         if out.startswith("1.") {
             assert "URL:" in out;
         }
-        # Either formatted results or a graceful {"ok": false} JSON error -
-        # never an exception across the seam.
         assert out.startswith("1.")
             or out == "No results found."
             or json.loads(out).get("ok") is False;

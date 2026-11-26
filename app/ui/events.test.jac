@@ -1,5 +1,3 @@
-"""Behavior tests for semantic event dispatch, bubbling, and effects."""
-
 import from ui.model { MainScreen, Overlay, UiContainer, UiRegion, node_id }
 
 import from ui.runtime {
@@ -288,14 +286,10 @@ test "handled default_prevented and propagation_stopped are independent flags" {
     append_child_session(session, ui_root, screen);
     append_child_session(session, screen, region);
     set_current_screen(session, screen);
-
-    # Cancel sets propagation_stopped only (EchoRegion.on_stop).
     cancel = dispatch_event(session, Cancel(), region);
     assert cancel.propagation_stopped;
     assert not cancel.handled;
     assert not cancel.default_prevented;
-
-    # Submit sets handled + default_prevented, not propagation_stopped.
     submit = dispatch_event(session, Submit(), region);
     assert submit.handled;
     assert submit.default_prevented;
@@ -310,7 +304,6 @@ test "Resize walker carries terminal dimensions" {
     screen = MainScreen(key="main");
     append_child_session(session, ui_root, screen);
     set_current_screen(session, screen);
-    # OSPUI.md: walker Resize(UiEvent) { has width: int; has height: int; }
     event = Resize(width=120, height=40);
     dispatch_event(session, event, screen);
     assert event.width == 120;

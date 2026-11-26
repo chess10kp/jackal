@@ -1,5 +1,3 @@
-"""Behavior tests for the OSP-native semantic UI graph model."""
-
 test "Child edges order siblings by sparse rank" {
     screen = MainScreen(key="main");
     header = Header(key="header", title="Jackal");

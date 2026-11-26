@@ -1,5 +1,3 @@
-"""E2E: MCP servers and subagents through the real entry and mock model."""
-
 import shutil;
 import os;
 import sys;
@@ -62,7 +60,6 @@ test "repl /mcp reports server status" {
     try {
         write_project_config(sb, _mcp_cfg());
         sb.script([{"text": "warm"}]);
-        # One turn first so the attach flow has settled before /mcp.
         r = run_jackal(sb, [], stdin_text="hi\n/mcp\n/exit\n");
         assert r.code == 0, str(sb.explain(r));
         assert "fake — connected · 6 tools" in r.stdout, str(sb.explain(r));
@@ -136,7 +133,6 @@ test "an enabled:false mcp server never attaches" {
 test "legacy mcp.json import attaches imported servers with a notice" {
     sb = make_sandbox();
     try {
-        # sandbox HOME + opt back in; legacy source in the sandbox agent dir
         home = os.path.join(sb.base_dir, "home");
         os.makedirs(home);
         legacy = os.path.join(sb.agent_dir, "mcp.json");
@@ -160,11 +156,8 @@ test "legacy mcp.json import attaches imported servers with a notice" {
             env_extra={"JACKAL_MCP_NO_IMPORT": "", "HOME": home},
         );
         assert r.code == 0, str(sb.explain(r));
-        # imported server attached from the legacy source...
         assert "leg — connected · 6 tools" in r.stdout, str(sb.explain(r));
-        # ...and the onboarding notice surfaced
         assert "imported 1 server(s) from legacy" in r.stdout, str(sb.explain(r));
-        # the marker makes it one-time: a second run imports nothing new
         r2 = run_jackal(
             sb, [], stdin_text="hi\n/exit\n", env_extra={"JACKAL_MCP_NO_IMPORT": "", "HOME": home}
         );
@@ -211,7 +204,6 @@ test "an http mcp server attaches and its tools are callable" {
     sb = make_sandbox();
     proc: any = None;
     try {
-        # ephemeral fake streamable-HTTP server on loopback
         proc = subprocess.Popen(
             [_fixture_python(), fixture_path("fake_mcp_http.py")],
             stdout=subprocess.PIPE,
@@ -345,10 +337,8 @@ test "subagent runs a nested loop and returns its report" {
                     {"name": "subagent", "args": {"task": "find the secret word in README.md"}},
                 ],
             },
-            # nested subagent loop
             {"text": "", "tool_calls": [{"name": "read_file", "args": {"path": "README.md"}}]},
             {"text": "the word is kumquat"},
-            # back in the main loop
             {"text": "subagent found kumquat"},
         ]);
         r = run_jackal(sb, ["-p", "--mode", "auto-accept", "delegate it"]);
@@ -356,11 +346,9 @@ test "subagent runs a nested loop and returns its report" {
         assert r.stdout.strip() == "subagent found kumquat", str(sb.explain(r));
         calls = sb.calls();
         assert len(calls) == 4, str(sb.explain(r));
-        # Nested call 1 starts fresh: system + task only, and no recursion tool.
         assert calls[1]["messages"] == 2, str(sb.explain(r));
         assert calls[1]["last"]["content"] == "find the secret word in README.md";
         assert "subagent" not in calls[1]["tools"];
-        # The main loop got only the report back.
         assert calls[3]["last"]["role"] == "tool";
         assert calls[3]["last"]["content"] == "the word is kumquat";
     } finally {
@@ -383,9 +371,6 @@ test "task tools persist the board across processes" {
     }
 }
 
-"""Interpreter for the Python fixture servers. Never `sys.executable`: in a
-native test runner that is the runner itself, so spawning it re-runs the
-suite recursively (a fork bomb)."""
 def _fixture_python -> str {
     found: str | None = shutil.which("python3");
     return found if found is not None else "python3";

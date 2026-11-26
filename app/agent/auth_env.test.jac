@@ -1,5 +1,3 @@
-"""Stored-credential env hydration and logout (merged with auth_env.jac)."""
-
 import os;
 import json;
 import tempfile;
@@ -29,7 +27,6 @@ test "hydrate exports stored keys and logout clears only those" {
         assert stored_providers() == [];
         assert logout_provider("openrouter").startswith("no stored credential");
         assert logout_provider("not-a-provider").startswith("unknown provider");
-        # A shell-exported key is never cleared by logout.
         os.environ[key_env] = "from-shell";
         assert "still set" in logout_provider("openrouter");
         assert os.environ.get(key_env) == "from-shell";

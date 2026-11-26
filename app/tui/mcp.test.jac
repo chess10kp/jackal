@@ -1,8 +1,3 @@
-"""Unit tests for tui/mcp.jac (same-stem annex; imports live in the stem).
-Guards the MCP status window contract: honest per-state rows over
-(specs, status), name-sorted, ids aligned with rows for the restart action,
-and the empty state naming the config convention."""
-
 test "connected server shows tools and command" {
     out = mcp_window_rows(
         {"zeta": ["jac", "mcp"]},
@@ -32,10 +27,7 @@ test "config-only server reports not connected; status-only reports attached sha
         {"ghost": {"state": "connected", "error": "", "tools": 1, "cmd": ["g"]}},
     );
     rows: list[str] = [str(r) for r in out["rows"]];
-    # alpha: configured, never attached (no status entry, state "").
     assert "alpha — configured · not connected · toolserv" in rows, str(rows);
-    # ghost: live but absent from config — status-only falls back to the
-    # bare state label with its own cmd.
     assert "ghost — connected · 1 tools · g" in rows, str(rows);
 }
 
@@ -84,7 +76,6 @@ test "connected row shows denied count when tools were filtered" {
         },
     );
     assert out["rows"] == ["zeta — connected · 2 tools · 4 denied · jac mcp"], str(out["rows"]);
-    # zero denied stays out of the row
     out2 = mcp_window_rows(
         {"zeta": ["jac", "mcp"]},
         {

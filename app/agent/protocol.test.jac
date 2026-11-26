@@ -1,9 +1,3 @@
-"""Unit 9 acceptance: typed agent/UI envelopes, queues, coalescing, cancel.
-
-Core enqueue/dequeue/coalesce/cancel/drive_screen are stubbed until Unit 9
-implementation (OSPUI-P0-PLAN Unit 9). Companion scope provides protocol APIs.
-"""
-
 import from ui.runtime { create_session, dispose_session }
 
 import from ui.screen { build_main_shell }

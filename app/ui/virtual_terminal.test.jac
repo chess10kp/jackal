@@ -1,5 +1,3 @@
-"""Virtual terminal restoration, injection, and cell-capture tests."""
-
 import from ui.terminal { synchronized_write }
 
 test "start enables paste and alternate screen; stop restores" {

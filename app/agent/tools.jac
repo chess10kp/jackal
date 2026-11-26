@@ -1,313 +1,67 @@
-"""Jackal agent tools - file and shell operations for the ReAct loop.
-
-Server codespace (subprocess/os are server anchors). Pure logic is delegated
-to core/ modules which place native by inference.
-"""
-
 import os;
 import subprocess;
-# NOTE: shutil/tempfile are unused by this module's runtime code but REQUIRED
-# here: the same-stem test annex (tools.test.jac) resolves names against the
-# base module's namespace at merge time. Do not remove.
 import tempfile;
 import shutil;
 import fnmatch;
 import re;
-import from core.edit { apply_edit }
-import from .tool_spec { ToolSpec, make_tool_spec, MAX_TOOL_RESULT, MAX_SEARCH_RESULTS }
-import from .web_tools { _web_search_tool, _web_fetch_tool }
 
 glob MAX_TOOL_OUTPUT: int = MAX_TOOL_RESULT,
      READ_LINE_CAP: int = 2_000,
      SANDBOX_ROOT_ENV: str = "JACKAL_SANDBOX_ROOT",
-     # Kept for compatibility with older session wiring; current boot wraps
-     # run_command at the registry boundary instead of using this callback.
      user_bash_fire: Callable[[str, str], None] | None = None;
-
-# os.path.dirname/relpath and fnmatch.fnmatch demand PathLike/LiteralString
-# params under native checking; any-typed aliases keep call sites str-based.
-
-"""Lexically normalize a path: collapse '.', '..', and duplicate separators.
-Purely textual — symlinks are NOT resolved (see `resolve_path`)."""
-def _normalize_abs(path: str) -> str {
-    parts: list[str] = [];
-    for seg in str(path).replace("\\", "/").split("/") {
-        if not seg or seg == "." {
-            continue;
-        }
-        if seg == ".." {
-            if parts {
-                parts.pop();
-            }
-            continue;
-        }
-        parts.append(seg);
-    }
-    return "/" + "/".join(parts);
-}
-
-"""Absolute sandbox root from JACKAL_SANDBOX_ROOT, or "" when unset."""
-def _sandbox_root -> str {
-    raw: str = str(os.environ.get(SANDBOX_ROOT_ENV, "")).strip();
-    if not raw {
-        return "";
-    }
-    expanded: str = os.path.expanduser(raw);
-    if not os.path.isabs(expanded) {
-        expanded = os.path.join(os.getcwd(), expanded);
-    }
-    return _normalize_abs(expanded);
-}
-
-"""Resolve a path against the process cwd; reject empty paths.
-
-When JACKAL_SANDBOX_ROOT is set, the resolved path must stay inside that
-root (lexical containment: `..` segments are collapsed before the check, so
-`root/../etc/passwd` is rejected). Containment is lexical, not physical —
-a symlink inside the root can still point outside it. Off by default."""
-def resolve_path(path: str) -> str {
-    if not path {
-        raise ValueError("path must not be empty");
-    }
-    full: str = path if os.path.isabs(path) else os.path.join(os.getcwd(), path);
-    sandbox: str = _sandbox_root();
-    if not sandbox {
-        return full;
-    }
-    target: str = _normalize_abs(full);
-    prefix: str = f"{sandbox.rstrip('/')}/";
-    if target != sandbox and not target.startswith(prefix) {
-        raise ValueError(f"path escapes {SANDBOX_ROOT_ENV} ({sandbox}): {path}");
-    }
-    return full;
-}
+def _normalize_abs(path: str) -> str;
+def _sandbox_root -> str;
+def resolve_path(path: str) -> str;
 
 sem resolve_path = "Resolve a possibly-relative path to an absolute one. Internal helper.";
 sem resolve_path.path = "Filesystem path, relative or absolute.";
 
-def read_file(path: str) -> str {
-    full = resolve_path(path);
-    with open(full, "r", errors="replace") as f {
-        text = f.read();
-    }
-    lines = text.split("\n");
-    if len(lines) > READ_LINE_CAP {
-        lines = lines[:READ_LINE_CAP];
-        lines.append("... [truncated at " + str(READ_LINE_CAP) + " lines]");
-    }
-    if len(text) > MAX_TOOL_OUTPUT {
-        return text[:MAX_TOOL_OUTPUT];
-    }
-    return "\n".join(lines);
-}
+def read_file(path: str) -> str;
 
 sem read_file = "Read a text file and return its contents. Use this before editing a file you have not seen this session.";
 sem read_file.path = "Filesystem path to read, relative to the project root.";
 
-def write_file(path: str, content: str) -> str {
-    full: str = resolve_path(path);
-    d: str = os.path.dirname(full);
-    if d {
-        os.makedirs(d, exist_ok=True);
-    }
-    with open(full, "w") as f {
-        f.write(content);
-    }
-    return f"Wrote {len(content)} bytes to {path}";
-}
+def write_file(path: str, content: str) -> str;
 
 sem write_file = "Create or completely overwrite a file with the given content. Prefer edit_file for small changes to existing files.";
 sem write_file.path = "Filesystem path to write.";
 sem write_file.content = "Full file content to write.";
 
-def edit_file(path: str, old_text: str, new_text: str) -> str {
-    full = resolve_path(path);
-    with open(full, "r", errors="replace") as f {
-        text = f.read();
-    }
-    result = apply_edit(text, old_text, new_text);
-    if result.startswith("ERROR:") {
-        return result;
-    }
-    with open(full, "w") as f {
-        f.write(result);
-    }
-    return f"Edited {path} ({len(old_text)} -> {len(new_text)} chars)";
-}
+def edit_file(path: str, old_text: str, new_text: str) -> str;
 
 sem edit_file = "Replace an exact, unique snippet in a file. old_text must match the file byte-for-byte and appear exactly once; on failure read the file again and retry with a wider or corrected snippet.";
 sem edit_file.path = "Filesystem path of the file to edit.";
 sem edit_file.old_text = "Exact existing text to replace, including indentation.";
 sem edit_file.new_text = "Replacement text.";
 
-def list_dir(path: str) -> str {
-    full = resolve_path(path);
-    names = sorted(os.listdir(full));
-    out: list[str] = [];
-    for n in names {
-        if n.startswith(".") {
-            continue;
-        }
-        label = n + "/" if os.path.isdir(os.path.join(full, n)) else n;
-        out.append(label);
-    }
-    return "\n".join(out[:500]);
-}
+def list_dir(path: str) -> str;
 
 sem list_dir = "List immediate entries of a directory (dotfiles hidden, directories suffixed with /). Use for exploration before reading files.";
 sem list_dir.path = "Directory path to list.";
 
-def run_command(cmd: str, timeout_secs: int = 120) -> str {
-    try {
-        r = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=timeout_secs if timeout_secs > 0 else 120,
-            env=_jac_child_env(),
-        );
-    } except subprocess.TimeoutExpired {
-        return f"ERROR: command timed out after {timeout_secs}s";
-    }
-    out = (r.stdout or "") + (r.stderr or "");
-    # The session-level run_command adapter fires user_bash after this
-    # function returns. Keeping the hook outside this low-level helper avoids
-    # storing a dynamically shaped callback in the native tool registry.
-    if len(out) > MAX_TOOL_OUTPUT {
-        out = out[:MAX_TOOL_OUTPUT] + "\n... [truncated]";
-    }
-    return f"exit={r.returncode}\n{out.strip()}";
-}
+def run_command(cmd: str, timeout_secs: int = 120) -> str;
 
 sem run_command = "Run a shell command in the project root and return exit code plus combined stdout/stderr. Use for builds, tests, git, and inspection commands.";
 sem run_command.cmd = "The shell command line to execute.";
 sem run_command.timeout_secs = "Seconds before the command is killed (default 120).";
 
-"""Env vars the harness's own jac process exposes that must NOT reach a
-child process. `JAC_HANDOFF` names the parent's handoff endpoint: a child
-that sees it waits for that endpoint instead of running, which deadlocks
-every `jac check`/`jac format` tool call — and any `jac build`/`jac test`
-the agent runs through run_command — until the timeout (found 2026-11-01;
-the tui/agent suites all went red on the `jac_check` test for this)."""
 glob JAC_CHILD_ENV_DROP: list[str] = ["JAC_HANDOFF"];
-
-"""Environment for a child `jac` process: the harness's coordination vars
-removed, so the child is a plain CLI invocation."""
-def _jac_child_env -> dict[str, str] {
-    env: dict[str, str] = {};
-    for pair in os.environ.items() {
-        env[str(pair[0])] = str(pair[1]);
-    }
-    for key in JAC_CHILD_ENV_DROP {
-        env.pop(key, None);
-    }
-    return env;
-}
-
-"""Run the jac CLI with args and format exit status plus output for the LLM.
-Spawns with a sanitized environment (see JAC_CHILD_ENV_DROP) and no stdin:
-a CLI that prompts must fail fast, never hang the agent turn."""
-def _run_jac_cli(args: list[str], timeout_secs: int = 120) -> str {
-    effective = timeout_secs if timeout_secs > 0 else 120;
-    argv: list[str] = ["jac"] + args;
-    if shutil.which("jac") is None and shutil.which("neojac") is not None {
-        # neojac-only machine: same verbs, but `format` is `fmt`.
-        argv = ["neojac"] + [("fmt" if a == "format" else a) for a in args];
-    }
-    try {
-        r = subprocess.run(
-            argv,
-            capture_output=True,
-            text=True,
-            timeout=effective,
-            env=_jac_child_env(),
-            stdin=subprocess.DEVNULL,
-        );
-    } except FileNotFoundError {
-        return "ERROR: jac CLI not found on PATH";
-    } except subprocess.TimeoutExpired {
-        return f"ERROR: jac {' '.join(args)} timed out after {effective}s";
-    }
-    out = (r.stdout or "") + (r.stderr or "");
-    if len(out) > MAX_TOOL_OUTPUT {
-        out = out[:MAX_TOOL_OUTPUT] + "\n... [truncated]";
-    }
-    status = "ok" if r.returncode == 0 else f"failed (exit {r.returncode})";
-    body = out.strip() if out.strip() else "(no output)";
-    return f"jac {' '.join(args)} -> {status}\n{body}";
-}
-
-"""Type-check / compile-check Jac files or a whole project via `jac check`."""
-def jac_check(path: str = ".") -> str {
-    full = resolve_path(path);
-    if not os.path.exists(full) {
-        return f"ERROR: no such file or directory: {path}";
-    }
-    return _run_jac_cli(["check", full]);
-}
+def _jac_child_env -> dict[str, str];
+def _run_jac_cli(args: list[str], timeout_secs: int = 120) -> str;
+def jac_check(path: str = ".") -> str;
 
 sem jac_check = "Check Jac files for syntax/type errors with the Jac toolchain. Read-only; run this after editing .jac files.";
 sem jac_check.path = "File or directory to check (default: project root).";
-
-"""Format Jac files in place via `jac format`. Blocked in plan/ask modes."""
-def jac_format(path: str = ".") -> str {
-    full = resolve_path(path);
-    if not os.path.exists(full) {
-        return f"ERROR: no such file or directory: {path}";
-    }
-    return _run_jac_cli(["format", full]);
-}
+def jac_format(path: str = ".") -> str;
 
 sem jac_format = "Format Jac files in place with the Jac formatter. Modifies files on disk.";
 sem jac_format.path = "File or directory to format (default: project root).";
 
-def _skip_walk_dir(name: str) -> bool {
-    return name.startswith(".") or name in ["node_modules", ".jac", "__pycache__"];
-}
+def _skip_walk_dir(name: str) -> bool;
 
-def _search_limit(limit: int) -> int {
-    if limit <= 0 {
-        return MAX_SEARCH_RESULTS;
-    }
-    return min(limit, MAX_SEARCH_RESULTS);
-}
+def _search_limit(limit: int) -> int;
 
-def file_glob(pattern: str, base_dir: str = ".", max_results: int = MAX_SEARCH_RESULTS) -> str {
-    if not pattern {
-        return "ERROR: pattern must not be empty";
-    }
-    base_path = resolve_path(base_dir);
-    if not os.path.isdir(base_path) {
-        return f"ERROR: directory not found: {base_dir}";
-    }
-    cap = _search_limit(max_results);
-    matches: list[str] = [];
-    for walk_item in os.walk(base_path) {
-        current = walk_item[0];
-        dirs = walk_item[1];
-        files = walk_item[2];
-        dirs[:] = [d for d in dirs if not _skip_walk_dir(d)];
-        for name in files {
-            if name.startswith(".") {
-                continue;
-            }
-            full = os.path.join(current, name);
-            rel: str = str(os.path.relpath(str(full), str(base_path))).replace(os.sep, "/");
-            if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(name, pattern) {
-                matches.append(rel);
-            }
-        }
-    }
-    matches.sort();
-    truncated = len(matches) > cap;
-    visible = matches[:cap];
-    out: str = "\n".join(visible);
-    if truncated {
-        out += ("\n" if out else "") + f"... [truncated at {cap} results]";
-    }
-    return out;
-}
+def file_glob(pattern: str, base_dir: str = ".", max_results: int = MAX_SEARCH_RESULTS) -> str;
 
 sem file_glob = "Find files matching a pattern under the project root. Hidden directories, node_modules, .jac, and __pycache__ are skipped.";
 sem file_glob.pattern = "Shell-style file pattern such as **/*.jac or *.md.";
@@ -316,62 +70,7 @@ sem file_glob.max_results = "Maximum results to return, capped at 100.";
 
 def content_grep(
     pattern: str, base_dir: str = ".", regex: bool = False, max_results: int = MAX_SEARCH_RESULTS
-) -> str {
-    if not pattern {
-        return "ERROR: pattern must not be empty";
-    }
-    base_path = resolve_path(base_dir);
-    if not os.path.isdir(base_path) {
-        return f"ERROR: directory not found: {base_dir}";
-    }
-    cap = _search_limit(max_results);
-    matcher: any = None;
-    if regex {
-        try {
-            matcher = re.compile(pattern);
-        } except re.error as e {
-            return f"ERROR: invalid regex: {e}";
-        }
-    }
-    matches: list[str] = [];
-    for walk_item in os.walk(base_path) {
-        current = walk_item[0];
-        dirs = walk_item[1];
-        files = walk_item[2];
-        dirs[:] = [d for d in dirs if not _skip_walk_dir(d)];
-        for name in files {
-            if name.startswith(".") {
-                continue;
-            }
-            full = os.path.join(current, name);
-            rel: str = str(os.path.relpath(str(full), str(base_path))).replace(os.sep, "/");
-            try {
-                with open(full, "r", errors="replace") as f {
-                    lines = f.readlines();
-                }
-            } except (OSError, UnicodeError) {
-                continue;
-            }
-            for line_item in enumerate(lines, 1) {
-                line_no = line_item[0];
-                line = line_item[1];
-                text = line.rstrip("\n");
-                found = matcher.search(text) if regex else pattern in text;
-                if found {
-                    matches.append(f"{rel}:{line_no}:{text[:500]}");
-                }
-            }
-        }
-    }
-    matches.sort();
-    truncated = len(matches) > cap;
-    visible = matches[:cap];
-    out: str = "\n".join(visible);
-    if truncated {
-        out += ("\n" if out else "") + f"... [truncated at {cap} matches]";
-    }
-    return out;
-}
+) -> str;
 
 sem content_grep = "Search file contents for a literal or regular-expression pattern under the project root. Hidden directories, node_modules, .jac, and __pycache__ are skipped.";
 sem content_grep.pattern = "Text or regular expression to search for.";
@@ -379,251 +78,22 @@ sem content_grep.base_dir = "Directory to search, relative to the project root (
 sem content_grep.regex = "Use regular-expression matching instead of literal matching (default false).";
 sem content_grep.max_results = "Maximum matches to return, capped at 100.";
 
-import from .registry { ToolRegistry, create_registry, register_native_spec }
+def _read_file_tool(args: dict[str, any]) -> str;
 
-"""Native-safe adapters for the dictionary-based tool ABI."""
-def _read_file_tool(args: dict[str, any]) -> str {
-    return read_file(str(args.get("path", "")));
-}
+def _write_file_tool(args: dict[str, any]) -> str;
 
-def _write_file_tool(args: dict[str, any]) -> str {
-    return write_file(str(args.get("path", "")), str(args.get("content", "")));
-}
+def _edit_file_tool(args: dict[str, any]) -> str;
 
-def _edit_file_tool(args: dict[str, any]) -> str {
-    return edit_file(
-        str(args.get("path", "")), str(args.get("old_text", "")), str(args.get("new_text", ""))
-    );
-}
+def _list_dir_tool(args: dict[str, any]) -> str;
 
-def _list_dir_tool(args: dict[str, any]) -> str {
-    return list_dir(str(args.get("path", "")));
-}
+def _run_command_tool(args: dict[str, any]) -> str;
 
-def _run_command_tool(args: dict[str, any]) -> str {
-    timeout_raw: any = args.get("timeout_secs", 120);
-    timeout_secs = int(timeout_raw) if timeout_raw is not None else 120;
-    return run_command(str(args.get("cmd", "")), timeout_secs);
-}
+def _jac_check_tool(args: dict[str, any]) -> str;
 
-def _jac_check_tool(args: dict[str, any]) -> str {
-    return jac_check(str(args.get("path", ".")));
-}
+def _jac_format_tool(args: dict[str, any]) -> str;
 
-def _jac_format_tool(args: dict[str, any]) -> str {
-    return jac_format(str(args.get("path", ".")));
-}
+def _glob_tool(args: dict[str, any]) -> str;
 
-def _glob_tool(args: dict[str, any]) -> str {
-    max_raw: any = args.get("max_results", MAX_SEARCH_RESULTS);
-    max_results = int(max_raw) if max_raw is not None else MAX_SEARCH_RESULTS;
-    return file_glob(str(args.get("pattern", "")), str(args.get("base_dir", ".")), max_results);
-}
-
-def _grep_tool(args: dict[str, any]) -> str {
-    max_raw: any = args.get("max_results", MAX_SEARCH_RESULTS);
-    max_results = int(max_raw) if max_raw is not None else MAX_SEARCH_RESULTS;
-    return content_grep(
-        str(args.get("pattern", "")),
-        str(args.get("base_dir", ".")),
-        bool(args.get("regex", False)),
-        max_results,
-    );
-}
-
-"""Explicit tool specs for the owned loop (replaces byllm sem-string schema
-derivation). When tools become Cordis fibers, live providers of "tools.*"
-keys build this list dynamically."""
-def tool_specs -> list[ToolSpec] {
-    return [
-        make_tool_spec(
-            name="read_file",
-            description="Read a text file and return its contents. Use this before editing a file you have not seen this session.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Filesystem path to read, relative to the project root.",
-                    },
-                },
-                "required": ["path"],
-            },
-            handler=_read_file_tool,
-        ),
-        make_tool_spec(
-            name="write_file",
-            description="Create or completely overwrite a file with the given content. Prefer edit_file for small changes to existing files.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Filesystem path to write."},
-                    "content": {"type": "string", "description": "Full file content to write."},
-                },
-                "required": ["path", "content"],
-            },
-            handler=_write_file_tool,
-        ),
-        make_tool_spec(
-            name="edit_file",
-            description="Replace an exact, unique snippet in a file. old_text must match the file byte-for-byte and appear exactly once.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Filesystem path of the file to edit.",
-                    },
-                    "old_text": {
-                        "type": "string",
-                        "description": "Exact existing text to replace, including indentation.",
-                    },
-                    "new_text": {"type": "string", "description": "Replacement text."},
-                },
-                "required": ["path", "old_text", "new_text"],
-            },
-            handler=_edit_file_tool,
-        ),
-        make_tool_spec(
-            name="list_dir",
-            description="List immediate entries of a directory (dotfiles hidden, directories suffixed with /).",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Directory path to list."},
-                },
-                "required": ["path"],
-            },
-            handler=_list_dir_tool,
-        ),
-        make_tool_spec(
-            name="run_command",
-            description="Run a shell command in the project root and return exit code plus combined stdout/stderr.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "cmd": {"type": "string", "description": "The shell command line to execute."},
-                    "timeout_secs": {
-                        "type": "integer",
-                        "description": "Seconds before the command is killed (default 120).",
-                    },
-                },
-                "required": ["cmd"],
-            },
-            handler=_run_command_tool,
-        ),
-        make_tool_spec(
-            name="jac_check",
-            description="Check Jac files for syntax and type errors using the Jac toolchain (jac check). Prefer this over run_command for validating .jac edits.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "File or directory to check (default: project root).",
-                    },
-                },
-                "required": [],
-            },
-            handler=_jac_check_tool,
-        ),
-        make_tool_spec(
-            name="jac_format",
-            description="Format Jac files in place with the Jac formatter (jac format). Modifies files; blocked in plan/ask modes.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "File or directory to format (default: project root).",
-                    },
-                },
-                "required": [],
-            },
-            handler=_jac_format_tool,
-        ),
-        make_tool_spec(
-            name="glob",
-            description="Find files matching a pattern under the project root, skipping hidden and generated directories.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "pattern": {
-                        "type": "string",
-                        "description": "Shell-style file pattern such as **/*.jac.",
-                    },
-                    "base_dir": {
-                        "type": "string",
-                        "description": "Directory to search (default .).",
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "description": "Maximum results, capped at 100.",
-                    },
-                },
-                "required": ["pattern"],
-            },
-            handler=_glob_tool,
-        ),
-        make_tool_spec(
-            name="grep",
-            description="Search file contents for a literal or regular-expression pattern under the project root.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "pattern": {
-                        "type": "string",
-                        "description": "Text or regular expression to search for.",
-                    },
-                    "base_dir": {
-                        "type": "string",
-                        "description": "Directory to search (default .).",
-                    },
-                    "regex": {
-                        "type": "boolean",
-                        "description": "Use regex matching instead of literal matching.",
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "description": "Maximum matches, capped at 100.",
-                    },
-                },
-                "required": ["pattern"],
-            },
-            handler=_grep_tool,
-        ),
-    ] + [
-        make_tool_spec(
-            name="web_search",
-            description="Search the web and return result titles, URLs, and snippets.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Search query."},
-                    "num_results": {"type": "integer", "description": "Maximum results."},
-                },
-                "required": ["query"],
-            },
-            handler=_web_search_tool,
-        ),
-        make_tool_spec(
-            name="web_fetch",
-            description="Fetch an http(s) URL and return readable text.",
-            parameters={
-                "type": "object",
-                "properties": {"url": {"type": "string", "description": "http(s) URL to fetch."}},
-                "required": ["url"],
-            },
-            handler=_web_fetch_tool,
-        ),
-    ];
-}
-
-"""Fresh registry seeded with native tool_specs(). Js tools join via plugin_bridge."""
-def default_registry -> ToolRegistry {
-    reg = create_registry();
-    for spec in tool_specs() {
-        register_native_spec(reg, spec);
-    }
-    return reg;
-}
+def _grep_tool(args: dict[str, any]) -> str;
+def tool_specs -> list[ToolSpec];
+def default_registry -> ToolRegistry;

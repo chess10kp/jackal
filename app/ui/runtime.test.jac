@@ -1,5 +1,3 @@
-"""Behavior tests for UiSession runtime ownership and Gate 1 lifecycle."""
-
 import from ui.model { MainScreen, Prompt, TranscriptView, node_id }
 
 import from ui.bindings { is_empty, subscribe }
@@ -11,8 +9,6 @@ test "create_session builds detached ui_root not connected to persistent root" {
     assert session.ui_root.key == "session";
     assert handle.ui_root_id == node_id(session.ui_root);
     assert node_id(session.ui_root) in session.tracked_node_ids;
-    # reachability coverage lives in runtime_jids.test.jac — importing the
-    # OSP module here would poison this unit's native dep scan (PERSIST).
     assert not session.disposed;
 }
 
@@ -77,7 +73,7 @@ test "Gate 1 lifecycle dispose releases bindings renderer and capabilities" {
     dispose_session(session);
     assert session.disposed;
     assert is_empty(session.bindings);
-    assert len(session.renderer.layout) == 0;  # == {} dict-compare pending native dict deep-eq
+    assert len(session.renderer.layout) == 0;
     assert len(session.capabilities.by_node) == 0;
     assert validate_session(session) == [];
 }
@@ -124,7 +120,7 @@ test "dispose clears renderer layout keys" {
     session.renderer.layout["00000000000000000000000000000000"] = {"x": 0};
     assert len(session.renderer.layout) != 0;
     dispose_session(session);
-    assert len(session.renderer.layout) == 0;  # == {} dict-compare pending native dict deep-eq
+    assert len(session.renderer.layout) == 0;
 }
 
 test "failed mutation under session does not bump graph_revision" {

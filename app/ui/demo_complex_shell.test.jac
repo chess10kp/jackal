@@ -1,5 +1,3 @@
-"""Acceptance tests for the complex OSP UI shell demo."""
-
 test "complex shell demo passes all validation steps" {
     demo = run_complex_shell_demo(columns=80, rows=24, verbose=False);
     assert demo.passed == True;

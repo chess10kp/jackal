@@ -1,17 +1,3 @@
-"""Auth store + flow state machine tests for agent/auth.jac.
-
-Covers: load/save round trips in the legacy auth.json format (both
-credential types plus unknown extra keys), a hand-written fixture built
-from the TS AuthStorageData shape, missing/corrupt file tolerance,
-restricted file permissions, expiry math (live/expired/boundary/garbage),
-stored_api_key routing, redaction never leaking secrets, provider/model
-entry validation + filtering + labels, the full login flow transition
-table including cancel mid-flow and pending-step detection, the network
-seam envelopes, and path resolution. Uses Python tempfile dirs with fake
-auth.json files (cleaned up per test) -- NEVER touches the real
-~/.pi/agent/auth.json, pi/auth.json, or ~/.jackal/auth.json.
-"""
-
 import os;
 import json;
 import stat;
@@ -61,8 +47,6 @@ def _oauth_cred(access: str, refresh: str, expires: int) -> dict[str, any] {
     return {"type": "oauth", "access": access, "refresh": refresh, "expires": expires};
 }
 
-# ============================== store ==============================
-
 test "load/save round trip preserves both credential types and unknown keys" {
     tmp = _make_tmp();
     try {
@@ -82,8 +66,6 @@ test "load/save round trip preserves both credential types and unknown keys" {
         assert loaded["anthropic"]["key"] == "sk-ant-live-1234";
         assert loaded["openai-codex"]["account_id"] == "acct-42";
         assert loaded["openai-codex"]["lastRefresh"] == "2026-01-01";
-
-        # Save of the loaded copy is byte-equivalent content again.
         assert save_auth_file(_auth_path(tmp), loaded);
         reloaded = load_auth_file(_auth_path(tmp));
         assert reloaded == data;
@@ -95,9 +77,6 @@ test "load/save round trip preserves both credential types and unknown keys" {
 test "hand-written legacy-format fixture parses exactly like the TS shape" {
     tmp = _make_tmp();
     try {
-        # Built from src/auth/auth.ts: Record<string, ApiKeyCredential |
-        # OAuthCredential> where OAuthCredential = {type:"oauth"} &
-        # OAuthCredentials {refresh, access, expires(ms), ...unknown}.
         fixture = '''{
   "anthropic": {
     "type": "api_key",
@@ -137,8 +116,6 @@ test "missing file and non-object roots default to empty store" {
         assert load_auth_file(_auth_path(tmp)) == {};
         _write_text(_auth_path(tmp), "");
         assert load_auth_file(_auth_path(tmp)) == {};
-
-        # Missing dir for save is created; nested too.
         deep = os.path.join(tmp, "a", "b", "auth.json");
         assert save_auth_file(deep, {});
         assert load_auth_file(deep) == {};
@@ -174,8 +151,7 @@ test "save writes 0600 perms, indent=2, trailing newline" {
             fh.close();
         }
         assert raw.endswith("\n");
-        assert "\n  \"p\": {" in raw;  # indent=2 pretty print
-        # Parent dir created with restricted mode as well.
+        assert "\n  \"p\": {" in raw;
         dmode = stat.S_IMODE(os.stat(tmp).st_mode);
         assert dmode & 0o077 == 0;
     } finally {
@@ -189,21 +165,18 @@ test "credential set/remove are immutable snapshots and persist to disk" {
         path = _auth_path(tmp);
         original: dict[str, any] = {"a": _api_cred("ka")};
         updated = credential_set(original, "b", _oauth_cred("t", "r", 5_000_000_000_000));
-        assert original == {"a": _api_cred("ka")};  # input untouched
+        assert original == {"a": _api_cred("ka")};
         assert has_credential(updated, "b");
         assert not has_credential(original, "b");
 
         trimmed = credential_remove(updated, "a");
         assert "a" not in trimmed and "b" in trimmed;
-        assert "a" in updated;  # remove did not mutate either
+        assert "a" in updated;
 
         assert save_auth_file(path, trimmed);
         disk = load_auth_file(path);
         assert set(disk.keys()) == {"b"};
-        # Removing an absent provider is a no-op snapshot.
         assert credential_remove(trimmed, "nope") == trimmed;
-
-        # Malformed entries are skipped by the validated accessors...
         broken = {"bad": {"type": "api_key"}, "ok": _api_cred("fine")};
         assert credential_get(broken, "bad") is None;
         assert credential_get(broken, "ok") is not None;
@@ -242,20 +215,15 @@ test "validate_credential rejects junk but preserves unknown extra keys" {
     assert oa["project_id"] == "pj" and oa["expires"] == 123;
 }
 
-# ============================== expiry ==============================
-
 test "expiry math: live, expired, boundary-inclusive, garbage expires" {
     now = 1_000_000_000_000;
     assert not is_expired(_oauth_cred("a", "r", now + 1), at_ms=now);
     assert is_expired(_oauth_cred("a", "r", now - 1), at_ms=now);
-    # Boundary: exactly equal counts as expired (Date.now() >= expires).
     assert is_expired(_oauth_cred("a", "r", now), at_ms=now);
-    # Garbage / missing expires fail safe toward expired.
     assert is_expired({"type": "oauth", "access": "a", "refresh": "r"}, at_ms=now);
     assert is_expired({"type": "oauth", "access": "a", "refresh": "r", "expires": None}, at_ms=now);
     assert is_expired(None, at_ms=now);
     assert is_expired({"type": "junk"}, at_ms=now);
-    # API keys never expire.
     assert not is_expired(_api_cred("k"), at_ms=now - 100_000_000);
 }
 
@@ -269,8 +237,6 @@ test "stored_api_key routes api keys live oauth and expired-oauth-to-seam" {
     };
     assert stored_api_key(data, "plain", at_ms=now) == "the-key";
     assert stored_api_key(data, "live", at_ms=now) == "live-access";
-    # Expired or malformed OAuth must NOT hand out tokens here: refreshing
-    # is the runtime loop's job via the network seam.
     assert stored_api_key(data, "dead", at_ms=now) is None;
     assert stored_api_key(data, "broken", at_ms=now) is None;
     assert stored_api_key(data, "unknown-provider", at_ms=now) is None;
@@ -299,7 +265,6 @@ test "resolve_auth_path honours explicit dir then env then home fallback" {
         assert resolve_auth_path(tmp) == os.path.join(tmp, "auth.json");
         os.environ["JACKAL_AGENT_DIR"] = tmp;
         assert resolve_auth_path() == _auth_path(tmp);
-        # Explicit arg still wins over the env var.
         other = os.path.join(tmp, "other");
         assert resolve_auth_path(other) == os.path.join(other, "auth.json");
     } finally {
@@ -311,8 +276,6 @@ test "resolve_auth_path honours explicit dir then env then home fallback" {
         _cleanup(tmp);
     }
 }
-
-# ============================== redaction ==============================
 
 test "redaction never leaks secrets in any display form" {
     secret = "sk-super-secret-value-ZX9Q";
@@ -328,16 +291,12 @@ test "redaction never leaks secrets in any display form" {
     blob = json.dumps(masked);
     assert secret not in blob;
     assert "rt-short" not in blob;
-    # Type stays visible; non-secret scalars pass through.
     assert masked["type"] == "oauth";
     assert masked["expires"] == 123;
-    # Only the tail is shown for long secrets.
     assert masked["access"].endswith(secret[-4:]);
     assert "*" * 8 in str(masked["access"]);
     assert redact_credential(None) is None;
     assert redact_credential([]) is None;
-
-    # Short secrets render fully masked (nothing recoverable).
     short = redact_secret("abc");
     assert short == "*" * 8;
     assert redact_secret("") == "(unset)";
@@ -346,8 +305,6 @@ test "redaction never leaks secrets in any display form" {
     assert long_masked.endswith("ZX9Q");
     assert secret not in long_masked;
 }
-
-# ============================== flow machine ==============================
 
 def _provider(pid: str, auth_type: str, configured: bool = False) -> dict[str, any] {
     return {
@@ -467,10 +424,8 @@ test "cancel mid-flow returns to idle from any pending state" {
         cancelled = transition_auth_flow(st, "cancel");
         assert cancelled["step"]["kind"] == "idle";
         assert not step_is_pending(cancelled);
-        # Original state object was not mutated by the cancel.
         assert st["step"]["kind"] != "idle";
     }
-    # reset lands on the same idle shape as a fresh machine.
     st = transition_auth_flow(initial_auth_flow_state(), "set_error", {"message": "boom"});
     assert transition_auth_flow(st, "reset") == initial_auth_flow_state();
 }
@@ -482,7 +437,7 @@ test "query updates only affect picker steps and stay immutable" {
     before = json.dumps(st);
     qd = transition_auth_flow(st, "update_query", {"query": "an"});
     assert qd["step"]["query"] == "an";
-    assert json.dumps(st) == before;  # no mutation
+    assert json.dumps(st) == before;
 
     ms = transition_auth_flow(
         qd,
@@ -493,8 +448,6 @@ test "query updates only affect picker steps and stay immutable" {
     assert ms["step"]["query"] == "m1";
     ms = transition_auth_flow(ms, "update_provider_filter", {"providerFilter": "a"});
     assert ms["step"]["providerFilter"] == "a";
-
-    # Non-picker steps ignore query/filter updates entirely.
     err = transition_auth_flow(initial_auth_flow_state(), "set_error", {"message": "x"});
     same = transition_auth_flow(err, "update_query", {"query": "zzz"});
     assert same == err and same["step"]["kind"] == "error";
@@ -511,7 +464,7 @@ test "error steps carry message and optional provider id; unknown actions noop" 
         initial_auth_flow_state(), "set_logging_in", {"providerId": "p", "status": "s"}
     );
     weird = transition_auth_flow(base, "teleport_to_mars", {"anything": True});
-    assert weird == base;  # unknown action returns unchanged copy
+    assert weird == base;
 }
 
 test "filters and labels match the picker rendering contract" {
@@ -522,7 +475,6 @@ test "filters and labels match the picker rendering contract" {
     ];
     hits = filter_providers_by_query(providers, "copilot");
     assert len(hits) == 1 and hits[0]["id"] == "github-copilot";
-    # Case-insensitive across id and displayName.
     assert len(filter_providers_by_query(providers, "ANTHROPIC")) == 1;
     assert len(filter_providers_by_query(providers, "OpenAI")) == 1;
     assert filter_providers_by_query(providers, "") == providers;
@@ -553,8 +505,6 @@ test "login_kind classifies which providers need oauth vs prompt vs nothing" {
     assert login_kind("telepathy") == "";
     assert not needs_oauth(None);
 }
-
-# ============================== network seam ==============================
 
 test "network seams return explicit not-supported envelopes" {
     for result in [

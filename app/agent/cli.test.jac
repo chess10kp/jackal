@@ -1,5 +1,3 @@
-"""CLI argument parsing tests (merged with agent/cli.jac by stem)."""
-
 test "no args yields defaults" {
     opts = parse_cli([]);
     assert opts["error"] == "";

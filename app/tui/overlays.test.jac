@@ -1,15 +1,3 @@
-"""Tasks/checkpoints/explorer/skills overlay row builders for tui/shell.jac.
-
-tui/shell.jac cannot be imported headless (its `with entry` TTY guard raises
-SystemExit(1) under `jac test` — same constraint as keybinding_probe), so
-this file REPLICATES the pure picker-entry builders verbatim:
-_task_picker_entries, _checkpoint_picker_entries, plus the newer
-_explorer_file_entries / _skills_picker_entries / _format_mentions wiring.
-Everything BEHIND them is real: agent.tasks / agent.checkpoints /
-agent.skills loaders (load_skills_from_dir) run against a temp project dir.
-Keep the replicas in sync with app/tui/shell.jac.
-"""
-
 import os;
 import re;
 import tempfile;
@@ -27,8 +15,6 @@ import from agent.context_input {
     _load_file_slice,
 }
 
-# --- verbatim replica of tui/shell.jac _meter ---------------------------------
-
 def _meter(value: float, width: int) -> str {
     if width < 3 {
         return "▪" * max(0, width);
@@ -40,8 +26,6 @@ def _meter(value: float, width: int) -> str {
     }
     return "▐" + ("█" * filled) + ("░" * (inner - filled)) + "▌";
 }
-
-# --- verbatim replicas of tui/shell.jac picker entry builders ------------------
 
 def _task_picker_entries(cwd: str) -> dict[str, list[str]] {
     tasks: list[dict[str, any]] = load_tasks(cwd);
@@ -65,8 +49,6 @@ def _task_picker_entries(cwd: str) -> dict[str, list[str]] {
     idx = 0;
     for ln in format_tasks_list(tasks).split("\n") {
         rows.append(ln);
-        # First two board lines are the counts header and divider rule;
-        # everything after maps back onto its task index for enter.
         if idx >= 2 {
             ids.append(str(idx - 2));
         } else {
@@ -87,8 +69,6 @@ def _checkpoint_picker_entries(cwd: str) -> dict[str, list[str]] {
     }
     return {"rows": rows, "ids": ids};
 }
-
-# --- verbatim replica of tui/shell.jac explorer/skills builders -----------------
 
 glob _EXPLORER_SKIP_DIRS: list[str] = [
          "node_modules",
@@ -124,8 +104,6 @@ def _explorer_walk(dir_path: str, base_root: str, depth: int, out: list[str]) {
         full = os.path.join(dir_path, name);
         is_dir = os.path.isdir(full);
         rel = str(os.path.relpath(full, base_root)).replace(os.sep, "/");
-        # Ignore patterns match dirs with a trailing slash (skills.jac
-        # convention), files bare.
         rel_cmp = rel + "/" if is_dir else rel;
         try {
             if _match_ignore_pattern(rel_cmp, rules) {
@@ -195,10 +173,6 @@ def _format_mentions(paths: list[str]) -> str {
     return " ".join(parts) + " ";
 }
 
-# --- verbatim replicas of tui/shell.jac mode/filter/quote helpers -------------
-
-# Quoted mention: @"path" / @"path:N[-M]" / @"path":N[-M] — an optional
-# line range is accepted inside OR after the closing quote.
 glob _QUOTED_MENTION_PATTERN: str = r'@"([^"]+)"(?::(\d+)(?:-(\d+))?)?';
 
 def _multi_filtered(p: dict[str, any]) -> tuple[list[str], list[str]] {
@@ -229,14 +203,11 @@ def _take_quoted_mentions(text: str) -> tuple[str, list[dict[str, any]]] {
         outer_start: any = m.group(2);
         outer_end: any = m.group(3);
         if outer_start {
-            # Range AFTER the closing quote: @"path":10-20.
             outer_range: str = str(outer_start) + ("-" + str(outer_end) if outer_end else "");
             parsed_outer: dict[str, any] | None = parse_line_range(outer_range);
             if parsed_outer is not None {
                 rng = parsed_outer;
             }
-            # A malformed outer range keeps the quoted content as the path;
-            # the bad suffix disappears with the token span.
         } else {
             cm = re.search(r":(\d+)(?:-(\d+))?$", inner);
             if cm is not None {
@@ -307,8 +278,6 @@ def _expand_quoted_context(cwd: str, text: str) -> str {
     return head + "Attached context:\n" + "\n".join(blocks);
 }
 
-# --- fixtures ------------------------------------------------------------
-
 def _make_project -> str {
     return tempfile.mkdtemp(prefix="jackal-tui-overlays-");
 }
@@ -319,8 +288,6 @@ def _seed_task_file(cwd: str, tasks: list[dict[str, any]]) {
     json.dump(tasks, fh);
     fh.close();
 }
-
-# --- tests ----------------------------------------------------------------
 
 test "empty project yields single non-selectable header row" {
     cwd = _make_project();
@@ -339,8 +306,6 @@ test "task board maps selectable ids onto task indices" {
     try {
         add_task(cwd, "first thing");
         add_task(cwd, "second thing", "with a blurb");
-        # Mark the first completed via a raw rewrite (update_tasks not
-        # imported to keep this fixture minimal).
         seeded: list[dict[str, any]] = [];
         for i in range(len(load_tasks(cwd))) {
             t = dict(load_tasks(cwd)[i]);
@@ -353,17 +318,14 @@ test "task board maps selectable ids onto task indices" {
         _seed_task_file(cwd, seeded);
 
         entries = _task_picker_entries(cwd);
-        # summary + counts header + divider + one row per task
         assert len(entries["rows"]) == 3 + len(seeded);
         assert entries["ids"][0] == "__header__";
         assert entries["ids"][1] == "__header__";
         assert entries["ids"][2] == "__header__";
         assert entries["ids"][3] == "0";
         assert entries["ids"][4] == "1";
-        # Meter summary reflects the one completed task.
         assert "█" in entries["rows"][0];
         assert "1/2 done" in entries["rows"][0];
-        # Task rows carry the store's own formatting (icon, id, title).
         assert "✓" in entries["rows"][3];
         assert "second thing" in entries["rows"][4];
         assert "— with a blurb" in entries["rows"][4];
@@ -389,7 +351,6 @@ test "checkpoint entries expose newest-first names with overlay rows" {
 
         entries = _checkpoint_picker_entries(cwd);
         assert len(entries["rows"]) == 2;
-        # Newest timestamp first; ids map 1:1 onto picker actions.
         assert entries["ids"] == ["cp-new", "cp-old"];
         assert "cp-new" in entries["rows"][0];
         assert "0 msgs" in entries["rows"][0];
@@ -423,8 +384,6 @@ def _seed_skill(cwd: str, dir_name: str, name: str, description: str, hidden: bo
     fh.close();
 }
 
-# --- explorer / skills / mention tests ------------------------------------
-
 test "explorer walk skips junk dirs and honors gitignore" {
     cwd = _make_project();
     try {
@@ -443,8 +402,6 @@ test "explorer walk skips junk dirs and honors gitignore" {
         gh.close();
 
         entries = _explorer_file_entries(cwd);
-        # Dot-FILES stay selectable; dot-dirs and skip-listed dirs do not;
-        # gitignore'd files are excluded. ids map 1:1 onto rows.
         assert entries["rows"] == [".gitignore", ".hidden-file", "a.txt", "sub/b.py"];
         assert entries["ids"] == entries["rows"];
     } finally {
@@ -464,8 +421,6 @@ test "explorer walk enforces depth and file caps" {
             _touch(cwd, "f" + str(j) + ".txt");
         }
         entries = _explorer_file_entries(cwd);
-        # Depth cap (6): leaves under d0..d4 survive the walk (root=1,
-        # d0=2 ... d4=6), d5+ branches are cut. Plus the 5 root files.
         assert len(entries["rows"]) == 10;
         rows: list[str] = entries["rows"];
         for r in rows {
@@ -485,16 +440,12 @@ test "skills picker lists project skills with hidden tagging" {
 
         _seed_skill(cwd, "my-skill", "my-skill", "does things well");
         _seed_skill(cwd, "quiet-skill", "quiet-skill", "hidden helper", hidden=True);
-
-        # Real loader: parse the seeded project skills dir, then format.
         loaded: dict[str, list[dict[str, any]]] = load_skills_from_dir(
             os.path.join(cwd, ".jackal", "skills"), "project"
         );
         assert len(loaded["skills"]) == 2;
 
         entries = _skills_picker_entries(loaded["skills"]);
-        # Name-sorted by the loader; ids are skill names so enter can
-        # insert /skill:name.
         assert entries["ids"] == ["my-skill", "quiet-skill"];
         assert entries["rows"][0] == "my-skill — does things well";
         assert "quiet-skill — hidden helper" in entries["rows"][1];
@@ -510,8 +461,6 @@ test "mention formatting dedupes and trails a space" {
     assert got == "@a.py @sub/b.py ";
 }
 
-# --- explorer filter / quoted mention / mcp status tests ------
-
 test "multi filter narrows rows case-insensitively with aligned ids" {
     p: dict[str, any] = {
         "options": ["src/main.py", "README.md", "src/SUB/Deep.txt"],
@@ -525,8 +474,6 @@ test "multi filter narrows rows case-insensitively with aligned ids" {
     got: tuple[list[str], list[str]] = _multi_filtered(p);
     assert got[0] == ["src/main.py"];
     assert got[1] == ["src/main.py"];
-
-    # Substring anywhere in the path, not just the basename.
     p["filter"] = "deep";
     got2: tuple[list[str], list[str]] = _multi_filtered(p);
     assert got2[0] == ["src/SUB/Deep.txt"];
@@ -538,37 +485,26 @@ test "multi filter narrows rows case-insensitively with aligned ids" {
 }
 
 test "quoted mentions extract paths with spaces and line ranges" {
-    # Plain quoted path.
     r1: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('see @"my file.md" now');
     assert len(r1[1]) == 1;
     assert r1[1][0]["path"] == "my file.md";
     assert r1[1][0]["line_range"] is None;
     assert r1[0] == "see  now";
-
-    # Range inside the quotes.
     r2: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('@"notes big.txt:10-20"');
     assert len(r2[1]) == 1;
     assert r2[1][0]["path"] == "notes big.txt";
     assert r2[1][0]["line_range"] == {"start": 10, "end": 20};
-
-    # Range after the closing quote works too.
     r2b: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('see @"other file.md":3');
     assert len(r2b[1]) == 1;
     assert r2b[1][0]["path"] == "other file.md";
     assert r2b[1][0]["line_range"] == {"start": 3};
     assert r2b[0] == "see ";
-
-    # Malformed range inside the quotes stays part of the path.
     r3: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('@"weird:name.txt:abc"');
     assert len(r3[1]) == 1;
     assert r3[1][0]["path"] == "weird:name.txt:abc";
-
-    # Invalid (traversal) paths are left untouched in the text.
     r4: tuple[str, list[dict[str, any]]] = _take_quoted_mentions('@"../escape.md"');
     assert r4[1] == [];
     assert r4[0] == '@"../escape.md"';
-
-    # No quoted mentions -> verbatim passthrough.
     r5: tuple[str, list[dict[str, any]]] = _take_quoted_mentions("plain @a.py text");
     assert r5[0] == "plain @a.py text";
     assert r5[1] == [];
@@ -588,13 +524,9 @@ test "quoted context expansion attaches real file slices" {
         assert "gamma line" not in out;
         assert 'review  please' in out;
         assert "Attached context:" in out;
-
-        # Missing quoted file degrades to an error block, not a crash.
         out2: str = _expand_quoted_context(cwd, '@"nope missing.txt"');
         assert 'error=' in out2;
         assert 'Attached context:' in out2;
-
-        # No quotes at all -> plain expansion passthrough.
         out3: str = _expand_quoted_context(cwd, "just words");
         assert out3 == "just words";
     } finally {

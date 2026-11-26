@@ -1,10 +1,3 @@
-"""MCP config breadth tests — spec parsing (env/cwd/enabled/timeout) and
-the user-level + project-level merge.
-
-Same-stem annex of session_config.jac (merged automatically): local names
-are used directly, no import from .session_config.
-"""
-
 import os;
 import sys;
 import json;
@@ -51,7 +44,6 @@ test "mcp server specs parse env, cwd, enabled, and timeout" {
     assert minimal["cwd"] == "";
     assert minimal["enabled"] is True;
     assert minimal["timeout"] == -1.0;
-    # public alias keeps the {name: argv} shape the status window renders
     argv = mcp_server_specs(cfg);
     assert argv["full"] == ["uvx", "some-server"];
     assert "off" in argv;
@@ -64,7 +56,6 @@ test "user-level config merges beneath the project config" {
     old_env = os.environ.get("JACKAL_AGENT_DIR", "");
     os.environ["JACKAL_AGENT_DIR"] = agent_dir;
     try {
-        # User level: a user-only server and a shared server (user flavor).
         fh: any = open(os.path.join(agent_dir, "config.json"), "w");
         fh.write(
             json.dumps({
@@ -77,7 +68,6 @@ test "user-level config merges beneath the project config" {
             }),
         );
         fh.close();
-        # Project level: shared overrides wholesale; project-only added.
         proj = os.path.join(tmp_dir, "proj");
         _write_project_cfg(
             proj,
@@ -94,12 +84,10 @@ test "user-level config merges beneath the project config" {
         servers: any = eff["mcp"]["servers"];
         snames = sorted(list(servers.keys()));
         assert snames == ["projonly", "shared", "useronly"];
-        # project entry replaces the user entry wholesale (same name wins)
         assert servers["shared"]["command"] == "proj-shared";
         assert servers["shared"].get("cwd") == "/w";
         assert servers["useronly"]["command"] == "user-cmd";
         assert servers["projonly"]["command"] == "proj-cmd";
-        # and the parsed specs reflect the merge
         specs = _mcp_server_specs(eff);
         assert specs["shared"]["cwd"] == "/w";
         assert "useronly" in specs;
@@ -234,8 +222,6 @@ test "tools/list_changed refresh diffs the registry without a respawn" {
         assert int(stats["registered"]) == 1;
         assert get_tool(reg, "mcp_t_alpha") is not None;
         assert plugins.mcp_owned.get("mcp_t_alpha", "") == "t";
-
-        # Server now serves "beta"; a buffered list_changed must diff.
         client.notifications.append({
             "jsonrpc": "2.0",
             "method": "notifications/tools/list_changed",
@@ -281,7 +267,6 @@ test "cross-server tool name collisions rename deterministically" {
         );
         assert int(s1["registered"]) == 1 and int(s1["lost"]) == 0;
         assert get_tool(reg, "mcp_a_b_x") is not None;
-        # "a-b" sanitizes to the same chunk: second registration must rename
         s2 = _register_server_tools(
             reg,
             "a-b",
@@ -301,7 +286,6 @@ test "cross-server tool name collisions rename deterministically" {
         assert plugins.mcp_owned.get("mcp_a_b_x_2", "") == "a-b";
         joined = " ".join(plugins.mcp_notices);
         assert "collision" in joined;
-        # same-server re-registration replaces silently (no _3)
         s3 = _register_server_tools(
             reg,
             "a-b",
@@ -338,7 +322,6 @@ test "health check flips dead servers to failed with a notice" {
         plugins.mcp_clients["t"] = client;
         plugins.mcp_specs["t"] = _spec_for(cmd);
         plugins.mcp_status["t"] = {"state": "connected", "error": "", "tools": 1, "cmd": cmd};
-        # Kill the process out from under the healthy status.
         client.proc.kill();
         client.proc.wait(timeout=5);
         mcp_health_check();
@@ -369,7 +352,6 @@ test "a tool call against a dead server revives once and succeeds" {
         plugins.mcp_specs["t"] = _spec_for(cmd);
         plugins.mcp_status["t"] = {"state": "connected", "error": "", "tools": 1, "cmd": cmd};
         handler = _make_mcp_handler(client, "t", "ping");
-        # Kill the server, then call: transparent restart + retry must land.
         client.proc.kill();
         client.proc.wait(timeout=5);
         res: str = handler({});
@@ -377,7 +359,6 @@ test "a tool call against a dead server revives once and succeeds" {
         assert str(plugins.mcp_status["t"]["state"]) == "connected";
         joined = " ".join(plugins.mcp_notices);
         assert "restarted after unexpected death" in joined;
-        # A healthy client is reused, not restarted again.
         notices_before = len(plugins.mcp_notices);
         assert handler({}) == "pong";
         assert len(plugins.mcp_notices) == notices_before;
@@ -433,15 +414,10 @@ test "mcp_restart_failed restarts only failed servers" {
             "dead": {"state": "failed", "error": "boom", "tools": 0, "cmd": ["true"]},
             "alive": {"state": "connected", "error": "", "tools": 1, "cmd": ["true"]},
         };
-        # Give the failed server a resolvable spec so restart can proceed.
         plugins.mcp_specs["dead"] = _spec_for(["true"]);
         out: str = mcp_restart_failed();
         assert out.startswith("restarting mcp servers: dead"), str(out);
-        # The alive server is untouched (still its old status object state).
         assert str(plugins.mcp_status["alive"]["state"]) == "connected";
-        # (The failed server's re-attach runs in a background flow; its state
-        # moves connecting -> connected/failed on its own schedule.)
-        # Nothing failed now -> honest no-op.
         plugins.mcp_status["dead"]["state"] = "connected";
         assert mcp_restart_failed() == "no failed mcp servers";
     } finally {
@@ -456,7 +432,6 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
     try {
         home_dir = os.path.join(tmp, "home");
         os.makedirs(home_dir);
-        # hermetic: agent dir without config.json, import not disabled
         os.environ["JACKAL_AGENT_DIR"] = os.path.join(tmp, "agent");
         os.makedirs(os.environ["JACKAL_AGENT_DIR"], exist_ok=True);
         os.environ.pop("JACKAL_MCP_NO_IMPORT", None);
@@ -478,7 +453,6 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
             f.write(
                 json.dumps({
                     "mcpServers": {
-                        # duplicate name loses to the first source
                         "leg_one": {"command": "other"},
                         "leg_two": {"command": "npx", "args": ["srv-two"], "env": {"K": "V"}},
                     },
@@ -487,17 +461,14 @@ test "legacy mcp.json import is one-time, shape-mapped, and collision-safe" {
         }
         imported = mcp_import_legacy(home_dir=home_dir, sources=[src1, src2]);
         assert sorted(imported) == ["leg_off", "leg_one", "leg_two"], str(imported);
-        # user config written with mapped entries
         user_cfg: any = json.load(open(os.path.join(home_dir, ".jackal", "config.json")));
         servers: any = user_cfg["mcp"]["servers"];
         assert servers["leg_one"]["command"] == "uvx";
         assert servers["leg_one"]["args"] == ["srv-one"];
         assert servers["leg_off"]["enabled"] is False;
         assert servers["leg_two"]["env"] == {"K": "V"};
-        # http-shaped and malformed entries never import
         assert "leg_web" not in servers;
         assert "leg_bare" not in servers;
-        # one-time marker: a second call is a no-op
         again = mcp_import_legacy(home_dir=home_dir, sources=[src1, src2]);
         assert again == [];
         user_cfg2: any = json.load(open(os.path.join(home_dir, ".jackal", "config.json")));
@@ -527,7 +498,6 @@ test "legacy import respects JACKAL_MCP_NO_IMPORT and existing names" {
         os.environ["JACKAL_AGENT_DIR"] = os.path.join(tmp, "agent");
         os.makedirs(os.environ["JACKAL_AGENT_DIR"], exist_ok=True);
         os.environ.pop("JACKAL_MCP_NO_IMPORT", None);
-        # pre-existing user config: its names are not re-imported/overwritten
         target = os.path.join(home_dir, ".jackal", "config.json");
         os.makedirs(os.path.dirname(target), exist_ok=True);
         with open(target, "w") as f {
@@ -545,7 +515,6 @@ test "legacy import respects JACKAL_MCP_NO_IMPORT and existing names" {
         assert imported == ["leg_two"], str(imported);
         user_cfg: any = json.load(open(target));
         assert user_cfg["mcp"]["servers"]["leg_one"]["command"] == "already-here";
-        # opt-out env var: nothing imports, no marker written
         home2 = os.path.join(tmp, "home2");
         os.makedirs(home2);
         os.environ["JACKAL_MCP_NO_IMPORT"] = "1";
@@ -567,9 +536,6 @@ test "legacy import respects JACKAL_MCP_NO_IMPORT and existing names" {
     }
 }
 
-"""Interpreter for the Python fixture servers. Never `sys.executable`: in a
-native test runner that is the runner itself, so spawning it re-runs the
-suite recursively (a fork bomb)."""
 def _fixture_python -> str {
     found: str | None = shutil.which("python3");
     return found if found is not None else "python3";

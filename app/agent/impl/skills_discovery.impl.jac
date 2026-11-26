@@ -1,0 +1,270 @@
+impl _load_skills_from_dir(
+    dir_path: str,
+    source: str,
+    include_root_files: bool = True,
+    ignore_rules: list[str] | None = None,
+    root_dir: str = "",
+) -> dict[str, list[dict[str, any]]] {
+    skills: list[dict[str, any]] = [];
+    diagnostics: list[dict[str, any]] = [];
+    empty: dict[str, list[dict[str, any]]] = {"skills": skills, "diagnostics": diagnostics};
+    if not os.path.isdir(dir_path) {
+        return empty;
+    }
+    base = root_dir or dir_path;
+    rules: list[str] = list(ignore_rules) if ignore_rules else [];
+    rules.extend(_load_ignore_rules(base, dir_path));
+
+    try {
+        entries = sorted(os.listdir(dir_path));
+    } except OSError {
+        return empty;
+    }
+    for name in entries {
+        if name != "SKILL.md" {
+            continue;
+        }
+        full = os.path.join(dir_path, name);
+        if not os.path.isfile(full) {
+            continue;
+        }
+        rel = _rel_path(full, base).replace(os.sep, "/");
+        if _match_ignore_pattern(rel, rules) {
+            continue;
+        }
+        (skill, diag) = _load_skill_from_file(full, source);
+        if skill is not None {
+            skills.append(skill);
+        }
+        diagnostics.extend(diag);
+        return {"skills": skills, "diagnostics": diagnostics};
+    }
+    for name in entries {
+        if name.startswith(".") or name == "node_modules" {
+            continue;
+        }
+        full = os.path.join(dir_path, name);
+        if os.path.isdir(full) {
+            rel = _rel_path(full, base).replace(os.sep, "/") + "/";
+            if _match_ignore_pattern(rel, rules) {
+                continue;
+            }
+            sub = _load_skills_from_dir(full, source, False, rules, base);
+            sub_skills: list[dict[str, any]] = sub["skills"];
+            sub_diags: list[dict[str, any]] = sub["diagnostics"];
+            skills.extend(sub_skills);
+            diagnostics.extend(sub_diags);
+        } elif include_root_files and name.endswith(".md") and os.path.isfile(full) {
+            rel = _rel_path(full, base).replace(os.sep, "/");
+            if _match_ignore_pattern(rel, rules) {
+                continue;
+            }
+            (skill, diag) = _load_skill_from_file(full, source);
+            if skill is not None {
+                skills.append(skill);
+            }
+            diagnostics.extend(diag);
+        }
+    }
+    return {"skills": skills, "diagnostics": diagnostics};
+}
+
+impl load_skills_from_dir(dir_path: str, source: str) -> dict[str, list[dict[str, any]]] {
+    return _load_skills_from_dir(dir_path, source, True);
+}
+
+impl _find_project_skills_dir(cwd: str) -> str {
+    cur = _abs_path(cwd);
+    for _hop in range(256) {
+        candidate = os.path.join(cur, ".jackal", "skills");
+        if os.path.isdir(candidate) {
+            return candidate;
+        }
+        parent = _dir_name(cur);
+        if parent == cur {
+            return "";
+        }
+        cur = parent;
+    }
+    return "";
+}
+
+impl _normalize_path(p: str) -> str {
+    trimmed = p.strip();
+    home = _user_home();
+    if trimmed == "~" {
+        return home;
+    }
+    if trimmed.startswith("~/") {
+        return os.path.join(home, trimmed[2:]);
+    }
+    if trimmed.startswith("~") {
+        return os.path.join(home, trimmed[1:]);
+    }
+    return trimmed;
+}
+
+impl _resolve_skill_path(p: str, cwd: str) -> str {
+    normalized = _normalize_path(p);
+    if _is_abs(normalized) {
+        return normalized;
+    }
+    return _abs_path(os.path.join(cwd, normalized));
+}
+
+impl _path_under(target: str, base_root: str) -> bool {
+    if not base_root {
+        return False;
+    }
+    nr = _abs_path(base_root);
+    if target == nr {
+        return True;
+    }
+    return target.startswith(nr + os.sep);
+}
+
+impl _get_source(rp: str, user_dir: str, proj_dir: str) -> str {
+    if _path_under(rp, user_dir) {
+        return "user";
+    }
+    if _path_under(rp, proj_dir) {
+        return "project";
+    }
+    return "path";
+}
+
+impl _add_loaded(
+    result: dict[str, list[dict[str, any]]],
+    skill_map: dict[str, dict[str, any]],
+    real_paths: set[str],
+    all_diags: list[dict[str, any]],
+    collision_diags: list[dict[str, any]],
+) {
+    res_diags: list[dict[str, any]] = result["diagnostics"];
+    all_diags.extend(res_diags);
+    res_skills: list[dict[str, any]] = result["skills"];
+    for skill in res_skills {
+        rp = _canonical(str(skill["filePath"]));
+        if rp in real_paths {
+            continue;
+        }
+        real_paths.add(rp);
+        existing: dict[str, any] | None = skill_map.get(str(skill["name"]));
+        if existing is not None {
+            collision_diags.append({
+                "type": "collision",
+                "message": 'name "' + str(skill["name"]) + '" collision',
+                "path": str(skill["filePath"]),
+                "collision": {
+                    "name": str(skill["name"]),
+                    "winnerPath": str(skill["filePath"]),
+                    "loserPath": str(existing["filePath"]),
+                },
+            });
+        }
+        skill_map[str(skill["name"])] = skill;
+    }
+}
+
+impl _resolve_package_root -> str {
+    env = os.environ.get("JACKAL_AGENT_DIR");
+    if env and os.path.isdir(os.path.join(env, "pi", "skills")) {
+        return _abs_path(env);
+    }
+    root_env = os.environ.get("JACKAL_ROOT");
+    if root_env and os.path.isdir(os.path.join(root_env, "pi", "skills")) {
+        return _abs_path(root_env);
+    }
+    return os.getcwd();
+}
+
+impl _skill_sort_key(skill: dict[str, any]) -> str {
+    return str(skill.get("name", ""));
+}
+
+impl load_jackal_skills(
+    cwd: str = "",
+    package_root: str = "",
+    agent_dir: str = "",
+    skill_paths: list[str] | None = None,
+    include_defaults: bool = True,
+) -> dict[str, list[dict[str, any]]] {
+    base_cwd = cwd or os.getcwd();
+    pkg_root = package_root or _resolve_package_root();
+    home_dir = agent_dir or os.path.join(_user_home(), ".jackal");
+    paths: list[str] = skill_paths if skill_paths is not None else [];
+
+    skill_map: dict[str, dict[str, any]] = {};
+    real_paths: set[str] = set();
+    all_diags: list[dict[str, any]] = [];
+    collision_diags: list[dict[str, any]] = [];
+
+    user_skills_dir = os.path.join(home_dir, "skills");
+    project_skills_dir = _find_project_skills_dir(base_cwd);
+
+    if include_defaults {
+        _add_loaded(
+            _load_skills_from_dir(os.path.join(pkg_root, "pi", "skills"), "builtin"),
+            skill_map,
+            real_paths,
+            all_diags,
+            collision_diags,
+        );
+        _add_loaded(
+            _load_skills_from_dir(user_skills_dir, "user"),
+            skill_map,
+            real_paths,
+            all_diags,
+            collision_diags,
+        );
+        if project_skills_dir {
+            _add_loaded(
+                _load_skills_from_dir(project_skills_dir, "project"),
+                skill_map,
+                real_paths,
+                all_diags,
+                collision_diags,
+            );
+        }
+    }
+
+    for raw in paths {
+        rp = _resolve_skill_path(str(raw), base_cwd);
+        try {
+            if not os.path.exists(rp) {
+                all_diags.append(_warning("skill path does not exist", rp));
+                continue;
+            }
+            source = _get_source(rp, user_skills_dir, project_skills_dir);
+            if os.path.isdir(rp) {
+                _add_loaded(
+                    _load_skills_from_dir(rp, source),
+                    skill_map,
+                    real_paths,
+                    all_diags,
+                    collision_diags,
+                );
+            } elif os.path.isfile(rp) and rp.endswith(".md") {
+                (skill, diag) = _load_skill_from_file(rp, source);
+                if skill is not None {
+                    _add_loaded(
+                        {"skills": [skill], "diagnostics": diag},
+                        skill_map,
+                        real_paths,
+                        all_diags,
+                        collision_diags,
+                    );
+                } else {
+                    all_diags.extend(diag);
+                }
+            } else {
+                all_diags.append(_warning("skill path is not a markdown file", rp));
+            }
+        } except Exception as exc {
+            all_diags.append(_warning(str(exc), rp));
+        }
+    }
+
+    ordered = sorted(list(skill_map.values()), key=_skill_sort_key);
+    return {"skills": ordered, "diagnostics": all_diags + collision_diags};
+}

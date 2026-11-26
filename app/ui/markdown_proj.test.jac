@@ -1,5 +1,3 @@
-"""Tests for markdown → projection spans (not a component tree)."""
-
 test "project_inline_spans marks strong em code strike" {
     spans = project_inline_spans("a **b** c *d* `e` ~~f~~");
     ids = [s.style_id for s in spans];

@@ -1,5 +1,3 @@
-"""Task-board and subagent tool tests (merged with agent/agent_tools.jac)."""
-
 import tempfile;
 import shutil;
 import from .registry { create_registry, register_native }
@@ -38,7 +36,6 @@ test "subagent tool names map legacy aliases and exclude recursion" {
     assert subagent_tool_names(reg, None) == ["grep", "read_file", "run_command"];
     assert subagent_tool_names(reg, ["read", "bash"]) == ["read_file", "run_command"];
     assert subagent_tool_names(reg, ["grep"]) == ["grep"];
-    # Nothing matches -> fall back to every usable tool.
     assert subagent_tool_names(reg, ["nonexistent"]) == ["grep", "read_file", "run_command"];
 }
 

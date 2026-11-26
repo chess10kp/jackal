@@ -1,10 +1,5 @@
-"""Shared mutable state for the agent session compatibility facade."""
-
 import os;
-import from .plugin_bridge { PluginBridge }
-import from .mcp { McpClient }
 
-"""Mutable plugin/session control-plane state."""
 obj SessionPlugins {
     has session_id: str = "session",
         cwd: str = "",
@@ -25,17 +20,11 @@ obj SessionPlugins {
         interactive_ui: bool = False,
         active_cancel: any = None,
         mcp_clients: dict[str, McpClient] = {},
-        # name -> full attach spec {cmd, env, cwd, enabled, timeout} as
-        # parsed from config; restart reuses it instead of the bare argv.
         mcp_specs: dict[str, dict[str, any]] = {},
-        # server -> sanitized tool names currently marked plan/ask-safe
         mcp_read_only: dict[str, list[str]] = {},
-        # registered tool name -> owning server (collision arbitration)
         mcp_owned: dict[str, str] = {},
         mcp_tools: int = 0,
-        # name -> {"state": connecting|connected|failed, "error", "tools", "cmd"}
         mcp_status: dict[str, dict[str, any]] = {},
-        # Human-readable MCP events queued for the active frontend to show.
         mcp_notices: list[str] = [];
 }
 
@@ -50,41 +39,19 @@ glob history: list[dict[str, any]] = [],
      _model_prefs: dict[str, any] = {},
      _model_prefs_loaded: bool = False;
 
-def set_mode_state(next_mode: str) {
-    mode = next_mode;
-}
+def set_mode_state(next_mode: str);
 
-def get_mode_state -> str {
-    return mode;
-}
+def get_mode_state -> str;
 
-def set_model_state(name: str) {
-    model = name;
-}
+def set_model_state(name: str);
 
-def get_model_state -> str {
-    return model;
-}
+def get_model_state -> str;
 
-def set_thinking_level_state(level: str) {
-    thinking_level = level;
-}
+def set_thinking_level_state(level: str);
 
-def get_thinking_level_state -> str {
-    return thinking_level;
-}
+def get_thinking_level_state -> str;
 
-def reset_turn_stats(t0: float) {
-    _t0 = t0;
-    _n_tools = 0;
-}
+def reset_turn_stats(t0: float);
 
-def bump_tool_count {
-    _n_tools += 1;
-}
-
-"""Adopt a successfully loaded model_prefs dict and latch the one-shot."""
-def adopt_model_prefs(raw: dict[str, any]) {
-    _model_prefs = raw;
-    _model_prefs_loaded = True;
-}
+def bump_tool_count;
+def adopt_model_prefs(raw: dict[str, any]);

@@ -1,5 +1,3 @@
-"""Reachability tests for ui_jids_reachable_from_persistent_root."""
-
 import from ui.model { Prompt, TranscriptView, node_id }
 import from ui.runtime { create_session, register_capability, dispose_session }
 import from ui.bindings { subscribe }

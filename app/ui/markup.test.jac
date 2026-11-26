@@ -1,10 +1,3 @@
-"""Unit 12 acceptance: markup lowering, errors, and print-generated mode.
-
-Companion scope provides markup APIs. This annex stays inside `ui.markup`'s
-native unit (hard pin), so it must not import the server-placed screen/runtime
-modules — the cross-context cases live in `ui/screen.test.jac` instead.
-"""
-
 import from ui.model { MainScreen, UiContainer, ordered_child_keys }
 
 test "default_shell_registry has Jackal shell tags" {

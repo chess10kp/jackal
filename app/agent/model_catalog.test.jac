@@ -1,22 +1,10 @@
-"""Tests for agent/model_catalog.jac (same-stem annex, merged with the
-base module at test time - no import of the own stem).
-
-Covers the pure catalog pipeline: payload parsing, freshness window,
-merge/fallback semantics, static hints, local-route detection, and the
-provider-facing catalog_models dispatch. Network I/O (_fetch_route_models,
-refresh_model_catalog, warm_model_catalog) is deliberately NOT exercised —
-the pure seams around it are.
-"""
-
-# ── _parse_models_payload ────────────────────────────────────────────────────
-
 test "parse extracts string ids in order and dedupes" {
     payload = {
         "object": "list",
         "data": [
             {"id": "openai/gpt-5", "created": 1},
             {"id": "anthropic/claude-sonnet-5", "created": 2},
-            {"id": "openai/gpt-5"},  # duplicate, dropped
+            {"id": "openai/gpt-5"},
             {"id": "zai/glm-5"},
         ],
     };
@@ -46,17 +34,13 @@ test "parse caps at MAX_CATALOG_MODELS" {
     assert out[0] == "m0";
 }
 
-# ── _entry_is_fresh ──────────────────────────────────────────────────────────
-
 test "freshness needs a nonempty entry inside the window" {
     assert not _entry_is_fresh(None, 1_000_000, 60_000);
     assert not _entry_is_fresh({"models": ["a"], "fetched_ms": 0}, 1_000_000, 60_000);
     assert not _entry_is_fresh({"models": [], "fetched_ms": 999_000}, 1_000_000, 60_000);
-    assert not _entry_is_fresh({"models": ["a"], "fetched_ms": 999_000}, 1_060_000, 60_000);  # exactly at the boundary is stale
+    assert not _entry_is_fresh({"models": ["a"], "fetched_ms": 999_000}, 1_060_000, 60_000);
     assert _entry_is_fresh({"models": ["a"], "fetched_ms": 999_000}, 1_058_999, 60_000);
 }
-
-# ── _merge_catalog_result ────────────────────────────────────────────────────
 
 test "successful fetch is cached and served" {
     _CATALOG_CACHE.clear();
@@ -73,7 +57,6 @@ test "failed fetch serves last-good cache over static hints" {
     _CATALOG_CACHE["prov_b"] = {"models": ["old"], "fetched_ms": 1_000};
     shown = _merge_catalog_result("prov_b", [], ["hint"], 999_999);
     assert shown == ["old"];
-    # Failure does not overwrite the last-good entry.
     assert _CATALOG_CACHE["prov_b"]["fetched_ms"] == 1_000;
 }
 
@@ -83,8 +66,6 @@ test "failed fetch with no cache serves static hints" {
     assert shown == ["hint1", "hint2"];
     assert "prov_c" not in _CATALOG_CACHE;
 }
-
-# ── static hints + local routes ──────────────────────────────────────────────
 
 test "static models filter non-strings and handle missing routes" {
     assert _static_models(None) == [];
@@ -100,8 +81,6 @@ test "local route detection covers local:// empty and missing routes" {
     assert not _is_local_route({"base_url": "https://api.example.com/v1"});
 }
 
-# ── catalog_models dispatch (no network: local/unknown providers only) ──────
-
 test "mock provider serves static hints without fetching" {
     _CATALOG_CACHE.clear();
     assert catalog_models("mock") == ["mock"];
@@ -112,8 +91,6 @@ test "unknown provider serves empty without fetching" {
     _CATALOG_CACHE.clear();
     assert catalog_models("not-a-provider") == [];
 }
-
-# ── TTL env override ────────────────────────────────────────────────────────
 
 test "ttl env override validates input" {
     old = os.environ.get("JACKAL_CATALOG_TTL_MS", None);

@@ -1,15 +1,3 @@
-"""Session persistence tests for the legacy-compatible agent/sessions.jac.
-
-Covers: save/load round trips in the legacy six-key transcript format,
-interop with a fixture byte-identical to the verified legacy sample,
-index+scan merge with newest-first ordering and messageCount, rename
-touching both transcript and index, delete of both artifacts, corrupt or
-unreadable transcripts being skipped, missing/corrupt index fallback and
-rebuild, id format, same-millisecond id uniqueness, and latest-session
-resolution. Uses Python tempfile dirs (cleaned up per test) so no repo
-state is touched -- never the real .jackal/sessions data.
-"""
-
 import os;
 import json;
 import re;
@@ -44,7 +32,6 @@ def _read_raw(path: str) -> any {
 }
 
 def _write_text(path: str, text: str) {
-    # any-typed alias: native checker binds os.path.dirname to PathLike.
     os.makedirs(str(os.path.dirname(path)), exist_ok=True);
     fh = open(path, "w");
     try {
@@ -88,9 +75,6 @@ test "save then load round-trips the legacy six-key record" {
 
         loaded = load_session(tmp, str(meta["id"]));
         assert loaded == hist;
-
-        # Re-saving under the same id preserves identity, created stamp,
-        # and prior name when no new name is given.
         again = save_session(tmp, _hist("more"), session_id=str(meta["id"]));
         assert again["id"] == meta["id"];
         assert again["created"] == meta["created"];
@@ -127,9 +111,6 @@ test "legacy fixture file loads and lists exactly like the real runtime wrote it
         assert item["updatedAt"] == "2026-05-23T13:45:44.126Z";
         assert item["messageCount"] == 2;
         assert latest_session_id(tmp) == "sess_1779521512249";
-
-        # Our own save must emit all six keys too, so the legacy runtime
-        # can read our files back.
         hist: list[dict[str, any]] = [{"role": "user", "content": "ours"}];
         meta = save_session(tmp, hist, name="renamed by us");
         ours = _read_raw(meta["path"]);
@@ -153,7 +134,6 @@ test "list_sessions merges index and directory scan newest first with counts" {
     try {
         m1 = save_session(tmp, _hist("first"), name="oldest chat");
         m2 = save_session(tmp, _hist("second"), name="newest chat");
-        # Orphan transcript absent from the index, stamped oldest.
         orphan = '{"sessionId": "sess_111111111111", "sessionName": "orphan scan", "cwd": "'
             + tmp
             + '", "createdAt": "2026-01-01T00:00:00.000Z", "updatedAt": "2026-01-01T00:00:00.000Z", "messages": [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}, {"role": "user", "content": "c"}]}';
@@ -203,8 +183,6 @@ test "rename updates BOTH transcript sessionName and index name" {
         assert str(entries[0]["name"]) == "after";
         assert str(entries[0]["id"]) == meta["id"];
         assert load_session(tmp, str(meta["id"])) == hist;
-
-        # Unknown ids, blank names, and traversal attempts fail cleanly.
         assert not rename_session(tmp, "sess_999999999999", "nope");
         assert not rename_session(tmp, str(meta["id"]), "   ");
         assert not rename_session(tmp, "../escape", "nope");
@@ -230,8 +208,6 @@ test "delete removes transcript and index entry" {
         assert gone["id"] not in listed;
         assert keep["id"] in listed;
         assert load_session(tmp, str(gone["id"])) == [];
-
-        # Second delete is a no-op returning False; unknown/invalid ids too.
         assert not delete_session(tmp, str(gone["id"]));
         assert not delete_session(tmp, "sess_424242424242");
         assert not delete_session(tmp, "../escape");
@@ -307,8 +283,6 @@ test "ids are sess_<epoch_ms> digits-only and never collide within a millisecond
         assert re.match(r"^sess_[0-9]+$", str(m1["id"])) is not None;
         assert re.match(r"^sess_[0-9]+$", str(m2["id"])) is not None;
         assert m1["id"] != m2["id"];
-
-        # Explicitly passing an invalid id raises rather than corrupting disk.
         failed = False;
         try {
             save_session(tmp, [], name="bad", session_id="../escape");
@@ -330,7 +304,6 @@ test "latest_session_id resolves the most recently saved session" {
         m2 = save_session(tmp, _hist("two"), name="two");
         m3 = save_session(tmp, _hist("three"), name="three");
         assert latest_session_id(tmp) == m3["id"];
-        # Renaming bumps updatedAt, making the renamed session latest.
         assert rename_session(tmp, str(m1["id"]), "touched");
         assert latest_session_id(tmp) == m1["id"];
         assert delete_session(tmp, str(m1["id"]));
@@ -345,7 +318,6 @@ test "latest_session_id resolves the most recently saved session" {
 test "model ref persists as optional seventh key and stays byte-compatible without one" {
     tmp = _make_tmp();
     try {
-        # No model -> exactly the legacy six keys.
         meta = save_session(tmp, _hist("a"), name="plain");
         raw = _read_raw(meta["path"]);
         assert set(raw.keys()) == {
@@ -357,8 +329,6 @@ test "model ref persists as optional seventh key and stays byte-compatible witho
             "messages",
         };
         assert meta["model"] == "";
-
-        # With model -> seventh key present; re-save without arg keeps it.
         m2 = save_session(
             tmp,
             _hist("b"),
@@ -370,8 +340,6 @@ test "model ref persists as optional seventh key and stays byte-compatible witho
         rec = get_session_record(tmp, str(m2["id"]));
         assert rec is not None;
         assert rec["model"] == "openrouter/anthropic/claude-sonnet-5";
-
-        # Re-save with no model argument preserves the prior model ref.
         m3 = save_session(tmp, _hist("c"), session_id=str(m2["id"]));
         assert m3["model"] == "openrouter/anthropic/claude-sonnet-5";
     } finally {
@@ -433,10 +401,7 @@ test "export_session writes readable markdown from a transcript" {
         assert "```json" in body and "{\"path\": \".\"}" in body;
         assert "### tool result" in body and "src/" in body;
         assert "here they are" in body;
-        # System prompt must not leak into the export.
         assert "hidden system prompt" not in body;
-
-        # Unknown id and unwritable target both fail cleanly.
         assert not export_session(tmp, "sess_987654321", out_path);
         assert not export_session(tmp, str(meta["id"]), "/proc/nope/out.md");
     } finally {
@@ -444,10 +409,7 @@ test "export_session writes readable markdown from a transcript" {
     }
 }
 
-# ============================== retention prune ==============================
-
 def _backdate_transcript(tmp: str, session_id: str, updated_iso: str) {
-    # Rewrite a saved transcript's updatedAt to an arbitrary ISO stamp.
     path = os.path.join(tmp, ".jackal", "sessions", session_id + ".json");
     raw: any = _read_raw(path);
     raw["updatedAt"] = updated_iso;
@@ -495,13 +457,12 @@ test "prune_sessions keeps newest N and rewrites the index" {
         for text in ["one", "two", "three"] {
             meta = save_session(tmp, _hist(text));
             ids.append(str(meta["id"]));
-            time.sleep(0.01);  # distinct millisecond stamps
+            time.sleep(0.01);
         }
         pruned = prune_sessions(tmp, max_count=1);
         assert pruned == 2;
         remaining = list_sessions(tmp);
         assert [str(e["id"]) for e in remaining] == [ids[2]];
-        # Index must agree with the surviving transcripts.
         idx = _read_raw(os.path.join(_sessions_dir(tmp), "index.json"));
         assert [str(e["id"]) for e in idx] == [ids[2]];
         for sid in ids[:2] {
@@ -539,7 +500,6 @@ test "prune_sessions combines age and count limits safely on junk timestamps" {
         b = save_session(tmp, _hist("b"));
         c = save_session(tmp, _hist("c"));
         time.sleep(0.01);
-        # Corrupt one timestamp; pruning must still work (count rule applies).
         path = os.path.join(_sessions_dir(tmp), str(a["id"]) + ".json");
         raw: any = _read_raw(path);
         raw["updatedAt"] = "";

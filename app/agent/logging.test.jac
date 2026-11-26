@@ -1,11 +1,3 @@
-"""Tests for agent/logging.jac — same-stem annex (merged with the base
-module at test time).
-
-The contract under test is total-ness: logging must never raise, never write
-when disabled, and never let a bad payload or a bad sink escape into the
-caller of a swallowed `except` block.
-"""
-
 import os;
 import json;
 import tempfile;
@@ -19,7 +11,6 @@ obj _Weird {
     }
 }
 
-"""Run `body` with the given env vars applied, restoring the old values."""
 def _with_env(env: dict[str, str], body: any) -> any {
     old: dict[str, any] = {};
     for pair in env.items() {
@@ -121,7 +112,6 @@ test "unknown level names do not disable or crash logging" {
     try {
         sink = os.path.join(tmp, "l.jsonl");
         def body -> bool {
-            # Unknown threshold falls back to info; unknown record level -> info.
             return log_event("nonsense", "x", "kept");
         }
         wrote = _with_env({"JACKAL_LOG": sink, "JACKAL_LOG_LEVEL": "chatty"}, body);
@@ -148,7 +138,6 @@ test "unserializable payloads are projected, not raised" {
     assert proj["huge"].endswith("..."), str(proj["huge"]);
     assert len(proj["huge"]) <= MAX_STRING_LEN + 3, str(len(proj["huge"]));
     assert proj["many"][-1] == "...", str(proj["many"]);
-    # The whole write path must also survive it.
     tmp = tempfile.mkdtemp(prefix="jackal-log-weird-");
     try {
         sink = os.path.join(tmp, "w.jsonl");
@@ -169,7 +158,6 @@ test "an unusable sink path is a no-op, not an exception" {
         fh: any = open(blocker, "w");
         fh.write("not a directory");
         fh.close();
-        # Parent "directory" is a regular file -> makedirs must fail.
         sink = os.path.join(blocker, "sub", "x.jsonl");
         def body -> bool {
             return log_event("error", "x", "boom");
@@ -191,7 +179,6 @@ test "log_exception records type, message and traceback, and never raises" {
             } except Exception as exc {
                 log_exception("agent.checkpoints", exc, {"phase": "capture"});
             }
-            # Outside an except block: no traceback field, still no raise.
             return log_exception("x", None);
         }
         wrote = _with_env({"JACKAL_LOG": sink, "JACKAL_LOG_LEVEL": "debug"}, body);
@@ -204,7 +191,6 @@ test "log_exception records type, message and traceback, and never raises" {
         assert rec["fields"]["detail"] == "disk on fire", str(rec);
         assert rec["fields"]["phase"] == "capture", str(rec);
         assert "ValueError: disk on fire" in rec["fields"]["traceback"], str(rec);
-        # The no-exception call still logs, without a traceback field.
         second_rec = recs[1];
         assert second_rec["level"] == "error", str(second_rec);
         assert not ("traceback" in second_rec["fields"]), str(second_rec);

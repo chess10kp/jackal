@@ -1,8 +1,3 @@
-"""Tool registry tests (merged with agent/registry.jac via same-stem annex).
-
-Covers native/js registration, invoke routing, schema export, and extension teardown.
-"""
-
 import os;
 import json;
 import tempfile;

@@ -1,12 +1,3 @@
-"""Tests for agent/llm.jac (same-stem annex, merged with the base module
-at test time - no import of the own stem). Covers the ReAct loop: tool runs,
-transient retries, cooperative cancel, loop limits, approval hooks, request
-body shape, provider transport binding, registry/js tools, and plugin-bridge
-tool_call block verdicts.
-
-Test-only transports and helpers live here, not in llm.jac.
-"""
-
 obj RetryTransport(Transport) {
     has calls: int = 0;
 
@@ -55,9 +46,6 @@ obj TwoCallTransport(Transport) {
     }
 }
 
-# Test doubles are duck-typed transports; call sites cast with
-# `as Transport` so react_loop's typed parameter accepts them under native
-# checking (the same-stem annex cannot reference Transport at class-def time).
 obj ScriptedTransport(Transport) {
     has tool_call_id: str = "call_1",
         tool_name: str = "echo",
@@ -191,9 +179,6 @@ test "cancel before tool calls fills cancelled tool results" {
     _events.clear();
     cancel = TurnCancel();
     transport = TwoCallTransport();
-
-    # Cooperative semantics: the in-flight call finishes; the NEXT pending
-    # call is skipped and filled with a terminal cancelled result.
     def _cancelling_event(kind: str, data: dict[str, any]) {
         _events.append([kind, dict(data)]);
         if kind == "tool_result" {
@@ -205,7 +190,6 @@ test "cancel before tool calls fills cancelled tool results" {
     assert answer == "done" or answer == "working";
     roles = [m["role"] for m in messages];
     assert roles == ["user", "assistant", "tool", "tool"];
-    # First call ran; second was filled with the cancelled marker.
     assert messages[2]["content"] == "ECHO:one";
     assert messages[3]["content"] == "ERROR: cancelled by user";
     assert _events[-1][0] == "cancelled";
@@ -234,13 +218,10 @@ test "approve hook denial yields error tool result without executing" {
     answer = react_loop(
         messages, specs, ScriptedTransport() as Transport, _noop_event, approve=_deny_all
     );
-    # The loop continues past a denial — the model sees the ERROR result
-    # and produces a final answer.
     roles = [m["role"] for m in messages];
     assert roles == ["user", "assistant", "tool", "assistant"];
     assert messages[2]["content"].startswith("ERROR:");
     assert "denied by test policy" in messages[2]["content"];
-    # No echo ran; the request + denial pair is on the event stream.
     kinds = [e[0] for e in _events];
     assert "approval_request" in kinds and "approval_decision" in kinds;
     idx_req = kinds.index("approval_request");
@@ -338,8 +319,6 @@ test "make_transport binds explicit model and thinking per provider" {
     plain = make_transport("gpt-4o-mini", thinking="minimal");
     assert plain.model == "gpt-4o-mini";
     assert plain.thinking == "minimal";
-
-    # Backward-compat shapes: no thinking arg, default model arg.
     legacy = make_transport("legacy-model");
     assert legacy.thinking == "";
     assert "reasoning" not in legacy._build_body([], []);
@@ -351,7 +330,6 @@ test "routed_model_id prefixes bare ids and passes routed ids through" {
     assert routed_model_id("deepseek", "deepseek-chat") == "deepseek/deepseek-chat";
     assert routed_model_id("openrouter", "anthropic/claude-sonnet-5")
         == "openrouter/anthropic/claude-sonnet-5";
-    # Already routes to its advertising provider: stays bare.
     assert routed_model_id("openai_compat", "gpt-4o") == "gpt-4o";
     assert routed_model_id("mock", "mock") == "mock";
 }
@@ -415,7 +393,6 @@ test "react loop honors tool_call block verdicts from a plugin bridge" {
     transport.tool_name = "echo";
     _events.clear();
     answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge);
-    # Blocked call becomes an error tool-result; the run continues normally.
     assert answer == "done";
     assert messages[2]["role"] == "tool";
     assert messages[2]["content"] == "ERROR: blocked by extension: policy";
@@ -454,8 +431,6 @@ test "make_ext_transport wires provider config without network" {
     assert t.base_url == "https://acme.example/v1";
     assert t.model == "sonnet-x";
     assert t.ext_cfg["provider"] == "acme";
-
-    # Unknown / non-ext ids fall back to None (native routing).
     assert make_ext_transport(bridge as PluginBridge, "gpt-4o") is None;
     assert make_ext_transport(bridge as PluginBridge, "ext/ghost/m") is None;
     assert make_ext_transport(None, "ext/a/b") is None;
@@ -464,7 +439,6 @@ test "make_ext_transport wires provider config without network" {
 
 test "react loop applies tool_result rewrites from a plugin bridge" {
     def _rewrite(data: dict[str, any], ctx: any) -> dict[str, any] | None {
-        # Sees the latest content; appends a marker (middleware chain).
         if data.get("toolName") == "echo" {
             return {"content": str(data.get("content", "")) + "+REWRITTEN"};
         }
@@ -472,7 +446,6 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
     }
 
     def _confirm_latest(data: dict[str, any], ctx: any) -> dict[str, any] | None {
-        # Second handler must see the first handler's patch applied.
         assert str(data.get("content", "")).endswith("+REWRITTEN");
         return None;
     }
@@ -502,17 +475,14 @@ test "react loop applies tool_result rewrites from a plugin bridge" {
     _events.clear();
     answer = react_loop(messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge);
     assert answer == "done";
-    # Module-level _echo prefixes ECHO:; the middleware appends +REWRITTEN.
     assert messages[2]["content"] == "ECHO:hi+REWRITTEN";
     dispose_bridge(bridge);
 }
 
 test "react loop skips tool execution when cancelled during the gate" {
-    # TurnCancel is module-level in this file.
     cancel = TurnCancel();
 
     def _slow_gate(data: dict[str, any], ctx: any) -> any {
-        # User hits esc while the gate dialog is open.
         cancel.cancelled = True;
         return None;
     }
@@ -541,16 +511,11 @@ test "react loop skips tool execution when cancelled during the gate" {
     answer = react_loop(
         messages, [], transport as Transport, _noop_event, reg=reg, bridge=bridge, cancel=cancel
     );
-    # The gate fired; the tool itself must NOT have executed. Cancelled
-    # calls get a terminal tool MESSAGE but no tool_result event (matching
-    # the pre-existing cancel-before-invoke semantics).
     assert messages[2]["role"] == "tool";
     assert messages[2]["content"] == "ERROR: cancelled by user";
-    assert len(messages) == 3;  # no assistant reply after abort
+    assert len(messages) == 3;
     dispose_bridge(bridge);
 }
-
-# ===================== after_provider_response (Pi parity) =====================
 
 test "make_transport wires hook_bridge through every provider branch" {
     bridge = create_bridge("apr-native");
@@ -560,8 +525,6 @@ test "make_transport wires hook_bridge through every provider branch" {
         assert tr.hook_bridge is bridge;
         assert tr.hook_timeout == 2.0;
     }
-
-    # Default stays None so bare transports never touch hooks.
     assert make_transport("gpt-4o-mini").hook_bridge is None;
     dispose_bridge(bridge);
 }
@@ -591,13 +554,9 @@ test "_notify_response fires after_provider_response with status and headers" {
     assert len(seen) == 1;
     assert seen[0]["status"] == 200;
     assert seen[0]["headers"]["content-type"] == "text/event-stream";
-
-    # Non-200 statuses also flow through (informational event).
     t._notify_response(429, {});
     assert len(seen) == 2;
     assert seen[1]["status"] == 429;
-
-    # No bridge -> silent no-op.
     bare = Transport(model="m");
     bare._notify_response(200, {});
     dispose_bridge(bridge);
@@ -627,7 +586,6 @@ test "_open_stream fires hook before the first delta from a live SSE server" {
             }
         }
         assert chunks == ["hello"];
-        # Hook strictly precedes the first content delta downstream.
         assert order == ["hook:200", "chunk"];
     } finally {
         server.shutdown();
@@ -694,8 +652,6 @@ test "after_provider_response refires per retry attempt through react_loop" {
         _events.clear();
         answer = react_loop([{"role": "user", "content": "hi"}], [], t, _noop_event, bridge=bridge);
         assert answer == "hello";
-        # Pi onResponse parity: one hook fire PER PROVIDER ATTEMPT — the
-        # 503 attempt and the successful retry each reported.
         assert statuses == [503, 200];
         retries: list[any] = [];
         for e in _events {
@@ -710,23 +666,16 @@ test "after_provider_response refires per retry attempt through react_loop" {
     }
 }
 
-# ===================== provider-first routing (fx-style) =====================
-
 test "provider_for dispatches by case-sensitive prefix" {
-    # Case-sensitivity is deliberate: prefix matching preserves the exact
-    # startswith semantics make_transport had before PROVIDER_ROUTES existed.
     assert provider_for("openrouter/vendor/x") == "openrouter";
     assert provider_for("deepseek/deepseek-chat") == "deepseek";
     assert provider_for("mock") == "mock";
     assert provider_for("mockllm") == "mock";
     assert provider_for("mock/echo") == "mock";
     assert provider_for("ext/acme/sonnet-x") == "ext";
-    # Bare names, unknown prefixes, and wrong-case spellings all fall through
-    # to the OpenAI-compatible default — exactly as before the table.
     assert provider_for("gpt-4o-mini") == "openai_compat";
     assert provider_for("OpenRouter/vendor/x") == "openai_compat";
     assert provider_for("") == "openai_compat";
-    # Pure: no env reads, same input -> same output.
     assert provider_for("openrouter/a") == provider_for("openrouter/a");
 }
 
@@ -768,8 +717,6 @@ test "credential_error names provider, key, and /model escape hatch" {
             os.environ["OPENROUTER_API_KEY"] = saved;
         }
     }
-
-    # openai_compat failures also mention OPENAI_COMPAT_BASE.
     saved2 = os.environ.pop("OPENAI_API_KEY", None);
     try {
         msg = credential_error("gpt-4o-mini");
@@ -785,11 +732,9 @@ test "credential_error names provider, key, and /model escape hatch" {
 }
 
 test "credential_error never fires for keyless or ext providers" {
-    # mock needs no credential; ext ids are validated by their own extension.
     for m in ["mock", "mockllm", "mock/echo", "ext/acme/sonnet-x"] {
         assert credential_error(m) == "";
     }
-    # Never raises even on nonsense input.
     assert isinstance(credential_error(""), str);
 }
 
@@ -802,12 +747,11 @@ test "every provider route declares usable metadata" {
         assert isinstance(base_url, str) and base_url != "";
         key_env = route.get("key_env", "");
         assert isinstance(key_env, str);
-        if pid != "mock" {  # mock is the one declared-keyless route
+        if pid != "mock" {
             assert key_env != "";
         }
         assert isinstance(route.get("models", []), list);
     }
-    # Each keyed route's key_env is exactly what credential_error checks.
     for pid in ["openrouter", "deepseek", "openai_compat"] {
         env_name = str(PROVIDER_ROUTES[pid]["key_env"]);
         saved = os.environ.get(env_name);
@@ -827,24 +771,16 @@ test "every provider route declares usable metadata" {
 test "make_transport keeps historical wiring via the table" {
     saved = os.environ.pop("OPENAI_COMPAT_BASE", None);
     try {
-        # Prefix stripping still happens for prefixed providers.
         or_t = make_transport("openrouter/vendor/model-x");
         assert or_t.model == "vendor/model-x";
         assert or_t.base_url == PROVIDER_ROUTES["openrouter"]["base_url"];
         ds_t = make_transport("deepseek/deepseek-chat");
         assert ds_t.model == "deepseek-chat";
-
-        # Unresolved ext ids keep falling back to openai_compat verbatim
-        # (session resolves ext ids through make_ext_transport first).
         ext_t = make_transport("ext/acme/sonnet-x");
         assert ext_t.model == "ext/acme/sonnet-x";
         assert ext_t.base_url == "https://api.openai.com/v1";
-
-        # OPENAI_COMPAT_BASE override still wins for the fallback route.
         os.environ["OPENAI_COMPAT_BASE"] = "http://127.0.0.1:9/v1";
         assert make_transport("gpt-4o").base_url == "http://127.0.0.1:9/v1";
-
-        # mock gets its local marker endpoint and never a credential.
         mk = make_transport("mockllm");
         assert mk.base_url == PROVIDER_ROUTES["mock"]["base_url"];
         assert mk.api_key == "";

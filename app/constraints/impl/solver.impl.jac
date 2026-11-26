@@ -1,19 +1,3 @@
-"""Solver module annex: tableau journal, primal simplex, dual simplex.
-
-These bodies were previously separate modules (solver_journal.jac,
-solver_simplex.jac, solver_dual.jac). They are folded into the
-constraints.solver module so the mutable state type (`Solver`) can be named
-directly: every former `s: any` parameter is now `s: Solver`, which is what
-lets the whole module lower natively with no per-function demotions. Under
-jac test a mixed native/Python graph segfaults at the seam (upstream jaclang
-bug), so full-native lowering of this chain is a correctness requirement, not
-just a performance one.
-"""
-
-# ---------------------------------------------------------------------------
-# Tableau bookkeeping and exact rollback journal operations.
-# ---------------------------------------------------------------------------
-
 def _journal_expression_is_finite(s: Solver, e: Expression) -> bool {
     if not is_finite(e.constant) {
         return False;
@@ -108,45 +92,30 @@ def _journal_pop_row(s: Solver, symbol: int, jnl: MutationJournal) -> Row {
 
 def _journal_rollback(s: Solver, jnl: MutationJournal) {
     rows: dict[int, Row] = s.rows;
-    # 1. Drop rows created during the operation.
     for symbol in reversed(jnl.inserted_rows) {
         if symbol in rows {
             rows.pop(symbol);
         }
     }
-    # 2. Restore pre-existing rows to pre-mutation state; re-inserts
-    #    rows optimize() may have moved or removed.
     for symbol in sorted(jnl.row_snapshots.keys()) {
         rows[symbol] = jnl.row_snapshots[symbol].clone();
     }
-    # 3. Restore the objective row.
     if jnl.objective_snapshot is not None {
         s.objective = jnl.objective_snapshot.clone();
     }
-    # 4. Unregister external variables introduced here.
     for vid in reversed(jnl.new_var_ids) {
         s.var_symbols.pop(vid);
     }
-    # 5. Release symbols and rewind the id counter.
     for symbol in reversed(jnl.allocated_symbols) {
         s.kinds.pop(symbol);
     }
     s.id_tick = jnl.id_tick_start;
-    # 6. Drop worklist entries recorded during the failed operation.
     del s.infeasible_rows[jnl.infeasible_start:];
 }
-
-# ---------------------------------------------------------------------------
-# Constraint insertion and primal simplex algorithm.
-# ---------------------------------------------------------------------------
 
 def _solver_add_core(s: Solver, c: Constraint, tag: Tag, jnl: MutationJournal) -> SolveResult {
     row = _solver_create_row(s, c, tag, jnl);
     subject = _solver_choose_subject(s, row, tag);
-
-    # No valid entering subject: an all-dummy row is redundant when its
-    # constant is zero (the dummy marker may enter the basis) and
-    # unsatisfiable otherwise (kiwi addConstraint).
     if (_journal_kind_of(s, subject) == SymbolKind.INVALID and _solver_all_dummies(s, row)) {
         if not near_zero(row.constant) {
             return SolveResult(
@@ -169,15 +138,11 @@ def _solver_add_core(s: Solver, c: Constraint, tag: Tag, jnl: MutationJournal) -
         _solver_substitute(s, subject, row, jnl);
         _journal_insert_row(s, subject, row, jnl);
     }
-
-    # Optimize after every mutation. The target is lexicographic, so
-    # higher tiers are exhausted before lower tiers are considered.
     return _solver_optimize_cost(s, jnl);
 }
 
 def _solver_create_row(s: Solver, c: Constraint, tag: Tag, jnl: MutationJournal) -> Row {
     row = Row(constant=c.expression.constant);
-    # Substitute already-basic variables from the current tableau.
     for t in c.expression.terms {
         if not near_zero(t.coefficient) {
             symbol = _journal_get_var_symbol(s, t.variable, jnl);
@@ -195,27 +160,18 @@ def _solver_create_row(s: Solver, c: Constraint, tag: Tag, jnl: MutationJournal)
         tag.marker = slack;
         row.insert_symbol(slack, coeff);
         if c.strength == StrengthTier.REQUIRED {
-            # A required inequality has only its non-negative slack.
             tag.other = 0;
         } else {
-            # LEQ violation is positive expression, hence -error; GEQ
-            # violation is negative expression, hence +error.
             error = _journal_new_symbol_journaled(s, SymbolKind.ERROR, jnl);
             tag.other = error;
             row.insert_symbol(error, -coeff);
             _solver_add_objective(s, error, strength_weight(c.strength), jnl);
         }
     } elif c.strength == StrengthTier.REQUIRED {
-        # Required equality: a dummy marker keeps the basis restricted.
         dummy = _journal_new_symbol_journaled(s, SymbolKind.DUMMY, jnl);
         tag.marker = dummy;
         row.insert_symbol(dummy);
     } else {
-        # A soft equality needs two non-negative error
-        # directions: v == eplus - eminus, i.e. v - eplus +
-        # eminus = 0 (kiwi OP_EQ soft case). The marker keeps a
-        # NEGATIVE coefficient so chooseSubject can pick it as
-        # pivot subject when no external symbol is available.
         plus = _journal_new_symbol_journaled(s, SymbolKind.ERROR, jnl);
         minus = _journal_new_symbol_journaled(s, SymbolKind.ERROR, jnl);
         tag.marker = plus;
@@ -274,9 +230,6 @@ def _solver_add_with_artificial_variable(s: Solver, row: Row, jnl: MutationJourn
     art_row = Row(constant=row.constant);
     art_row.cells = dict(row.cells);
     _journal_insert_row(s, art, art_row, jnl);
-
-    # Artificial cost row; kept in sync by every pivot below
-    # (kiwi m_artificial, substituted inside substitute()).
     artificial = Row(constant=row.constant);
     artificial.cells = dict(row.cells);
     _solver_optimize_toward(s, artificial, jnl, artificial);
@@ -313,18 +266,12 @@ def _solver_substitute(
         _journal_touch_row(s, row_symbol, jnl);
         r = s.rows[row_symbol];
         r.substitute(symbol, row);
-        # Negative non-external constants would be tracked for
-        # dualOptimize from M3 onward (kiwi m_infeasible_rows).
     }
     _journal_touch_objective(s, jnl);
     s.objective.substitute(symbol, row);
-    # The artificial cost row participates in its own pivots
-    # (kiwi substitutes into m_artificial when present).
     if extra is not None {
         extra.substitute(symbol, row);
     }
-    # Track rows driven out of feasibility so a later suggestion's
-    # dualOptimize can repair them (kiwi m_infeasible_rows).
     for row_symbol in sorted(s.rows.keys()) {
         if (
             _journal_kind_of(s, row_symbol) != SymbolKind.EXTERNAL
@@ -389,8 +336,6 @@ def _solver_terms_reversed(s: Solver, st: StoredConstraint) -> StoredConstraint 
 }
 
 def _solver_replay_all(s: Solver, order: list[StoredConstraint]) -> Solver | None {
-    # Replay on a scratch tableau so `self` stays untouched unless the
-    # caller adopts the result.
     scratch = _new_solver();
     tags: dict[str, Tag] = {};
     for st in order {
@@ -405,8 +350,6 @@ def _solver_replay_all(s: Solver, order: list[StoredConstraint]) -> Solver | Non
         tags[key] = tag;
     }
     scratch.cns = tags;
-    # Preserve the complete accepted set so a future rebuild after this
-    # adoption does not silently forget constraints.
     scratch.history = list(order);
     return scratch;
 }
@@ -503,20 +446,13 @@ def _solver_get_leaving_row(s: Solver, entering: int) -> int {
     return found;
 }
 
-# ---------------------------------------------------------------------------
-# Constraint removal and dual simplex algorithm.
-# ---------------------------------------------------------------------------
-
 def _solver_remove_core(
     s: Solver, tag: Tag, strength: StrengthTier, jnl: MutationJournal
 ) -> SolveResult {
-    # Remove the error effects from the objective BEFORE pivoting, or
-    # substitutions into the objective would double-count them.
     _solver_remove_constraint_effects(s, tag, strength, jnl);
     marker = tag.marker;
     rows: dict[int, Row] = s.rows;
     if marker in rows {
-        # Marker is basic: simply drop the row.
         _journal_pop_row(s, marker, jnl);
     } else {
         leaving = _solver_get_marker_leaving_row(s, marker);
@@ -527,7 +463,6 @@ def _solver_remove_core(
         }
         _solver_pivot(s, marker, leaving, jnl, reinsert=False);
     }
-    # Optimize so the solver stays consistent after removal.
     return _solver_optimize_cost(s, jnl);
 }
 
@@ -683,7 +618,221 @@ def _solver_adopt(s: Solver, bundle: Solver) {
     s.objective = bundle.objective;
     s.id_tick = bundle.id_tick;
     s.cns = bundle.cns;
-    # Stale worklist entries would reference old-symbol ids that now
-    # denote different rows in the adopted tableau.
     s.infeasible_rows = bundle.infeasible_rows;
+}
+
+impl _new_solver -> Solver {
+    return Solver();
+}
+
+impl Solver.new_variable -> Variable {
+    v = Variable(id=self.next_var_id);
+    self.next_var_id += 1;
+    return v;
+}
+
+impl Solver.add_constraint(c_raw: Constraint, provenance: str = "") -> SolveResult {
+    if not _journal_expression_is_finite(self, c_raw.expression) {
+        return SolveResult(ok=False, error=SolveError.NON_FINITE_VALUE);
+    }
+    c = Constraint(
+        expression=normalize_expression(c_raw.expression),
+        relation=c_raw.relation,
+        strength=c_raw.strength,
+    );
+    key = constraint_key(c);
+    if key in self.cns {
+        return SolveResult(
+            ok=False,
+            error=SolveError.DUPLICATE_CONSTRAINT,
+            witness_provenance=_journal_witness_for_key(self, key),
+        );
+    }
+    jnl = _journal_begin(self);
+    tag = Tag();
+    res = _solver_add_core(self, c, tag, jnl);
+    if not res.ok {
+        _journal_rollback(self, jnl);
+        if res.error != SolveError.UNSATISFIABLE {
+            res.witness_provenance = _journal_witness_extra(self, provenance);
+            return res;
+        }
+        rebuilt = _solver_rebuild_admitting(self, c);
+        if rebuilt is None {
+            return SolveResult(
+                ok=False,
+                error=SolveError.UNSATISFIABLE,
+                message="required system inconsistent under all " + "elimination orders",
+                witness_provenance=_journal_witness_extra(self, provenance),
+            );
+        }
+        _solver_adopt(self, rebuilt);
+    }
+    handle = ConstraintHandle(id=self.next_handle_id);
+    self.next_handle_id += 1;
+    if key not in self.cns {
+        self.cns[key] = tag;
+    }
+    self.handle_keys[handle.id] = key;
+    self.provenance[handle.id] = provenance;
+    self.history.append(
+        StoredConstraint(
+            expression=c.expression,
+            relation=c.relation,
+            strength=c.strength,
+            provenance=provenance,
+            content_key=key,
+        ),
+    );
+    self.generation += 1;
+    return SolveResult(ok=True, handle=handle);
+}
+
+impl Solver.has_constraint(handle: ConstraintHandle) -> bool {
+    return handle.id in self.handle_keys;
+}
+
+impl Solver.provenance_of(handle: ConstraintHandle) -> str {
+    return self.provenance.get(handle.id, "");
+}
+
+impl Solver._replay_all(order: list[StoredConstraint]) -> Solver | None {
+    return _solver_replay_all(self, order);
+}
+
+impl Solver._adopt(bundle: Solver) {
+    _solver_adopt(self, bundle);
+}
+
+impl Solver.remove_constraint(handle: ConstraintHandle) -> SolveResult {
+    if handle.id not in self.handle_keys {
+        return SolveResult(ok=False, error=SolveError.UNKNOWN_CONSTRAINT);
+    }
+    key = self.handle_keys[handle.id];
+    if key not in self.cns {
+        return SolveResult(ok=False, error=SolveError.UNKNOWN_CONSTRAINT);
+    }
+    tag = Tag(marker=self.cns[key].marker, other=self.cns[key].other);
+    strength = solver_strength_for_key(self, key);
+    jnl = _journal_begin(self);
+    res = _solver_remove_core(self, tag, strength, jnl);
+    if not res.ok {
+        _journal_rollback(self, jnl);
+        return res;
+    }
+    self.cns.pop(key);
+    self.handle_keys.pop(handle.id);
+    self.provenance.pop(handle.id);
+    self.history = [st for st in self.history if st.content_key != key];
+    for vid in sorted(self.edits.keys()) {
+        if self.edits[vid].key == key {
+            self.edits.pop(vid);
+        }
+    }
+    self.generation += 1;
+    return res;
+}
+
+impl Solver.add_edit_variable(v: Variable, strength: StrengthTier) -> SolveResult {
+    if v.id in self.edits {
+        return SolveResult(ok=False, error=SolveError.DUPLICATE_EDIT_VARIABLE);
+    }
+    if strength == StrengthTier.REQUIRED {
+        return SolveResult(
+            ok=False,
+            error=SolveError.REQUIRED_EDIT_VARIABLE,
+            message="edit variables cannot be required",
+        );
+    }
+    c = Constraint(
+        expression=normalize_expression(term(v)), relation=Relation.EQ, strength=strength
+    );
+    res = self.add_constraint(c);
+    if not res.ok {
+        return res;
+    }
+    handle = res.handle;
+    if handle is None {
+        return SolveResult(
+            ok=False, error=SolveError.INTERNAL_INVARIANT, message="accepted add returned no handle"
+        );
+    }
+    self.edits[v.id] = EditInfo(var_id=v.id, key=self.handle_keys[handle.id], handle=handle);
+    return res;
+}
+
+impl Solver.remove_edit_variable(v: Variable) -> SolveResult {
+    if v.id not in self.edits {
+        return SolveResult(ok=False, error=SolveError.UNKNOWN_EDIT_VARIABLE);
+    }
+    info = self.edits[v.id];
+    res = self.remove_constraint(info.handle);
+    return res;
+}
+
+impl Solver.has_edit_variable(v: Variable) -> bool {
+    return v.id in self.edits;
+}
+
+impl Solver.suggest_value(v: Variable, value: float) -> SolveResult {
+    if not is_finite(value) {
+        return SolveResult(ok=False, error=SolveError.NON_FINITE_VALUE);
+    }
+    if v.id not in self.edits {
+        return SolveResult(ok=False, error=SolveError.UNKNOWN_EDIT_VARIABLE);
+    }
+    info = self.edits[v.id];
+    if info.key not in self.cns {
+        return SolveResult(ok=False, error=SolveError.UNKNOWN_EDIT_VARIABLE);
+    }
+    delta = value - info.constant;
+    jnl = _journal_begin(self);
+    _solver_apply_suggestion(self, info, delta, jnl);
+    res = _solver_dual_optimize(self, jnl);
+    if not res.ok {
+        _journal_rollback(self, jnl);
+        return res;
+    }
+    info.constant = value;
+    self.generation += 1;
+    return SolveResult(ok=True);
+}
+
+impl Solver.snapshot -> SolverSnapshot {
+    vals: dict[int, float] = {};
+    for vid in sorted(self.var_symbols.keys()) {
+        symbol = self.var_symbols[vid];
+        if symbol in self.rows {
+            vals[vid] = self.rows[symbol].constant;
+        } else {
+            vals[vid] = 0.0;
+        }
+    }
+    return SolverSnapshot(generation=self.generation, values=vals);
+}
+
+impl Solver.reset {
+    self.rows = {};
+    self.kinds = {};
+    self.var_symbols = {};
+    self.cns = {};
+    self.handle_keys = {};
+    self.provenance = {};
+    self.next_handle_id = 1;
+    self.objective = CostRow();
+    self.id_tick = 1;
+    self.next_var_id = 1;
+    self.history = [];
+    self.edits = {};
+    self.infeasible_rows = [];
+    self.generation = 0;
+}
+
+impl solver_strength_for_key(s: Solver, key: str) -> StrengthTier {
+    for st in s.history {
+        if st.content_key == key {
+            return st.strength;
+        }
+    }
+    return StrengthTier.REQUIRED;
 }

@@ -1,5 +1,3 @@
-"""Slash-command routing through builtins and extension commands."""
-
 import from agent.session { plugins, session_boot, session_dispose }
 import from agent.plugin_bridge { PluginBridge, create_bridge, dispose_bridge }
 import from agent.fake_host { ensure_host, register_fake_command }
@@ -27,7 +25,6 @@ test "handle_command builtins" {
     assert handle_command("/model ") == "usage: /model NAME";
     assert handle_command("/help") == "";
     assert handle_command("/exit") is None;
-    # No turn in flight -> abort is a no-op with a clear reply.
     assert handle_command("/abort") == "no active turn";
 }
 
@@ -43,14 +40,10 @@ test "handle_command routes slash args into extension commands" {
         assert listing is not None;
         assert "extension commands:" in listing;
         assert "/upper  Uppercase args" in listing;
-
-        # Unknown names still fail loud, now with the /commands hint.
         miss = handle_command("/nope");
         assert miss is not None;
         assert miss.startswith("unknown command:");
         assert "/commands" in miss;
-
-        # Non-slash text is not a command.
         assert handle_command("plain text") == "";
     } finally {
         plugins.bridge = None;
@@ -59,7 +52,6 @@ test "handle_command routes slash args into extension commands" {
 }
 
 test "session_boot dispose round trip (no extensions)" {
-    # Empty cwd -> no .jackal/extensions.json -> idle phase, bridge is None.
     tmp = tempfile.mkdtemp(prefix="jackal-main-boot-");
     old_cwd = os.getcwd();
     os.chdir(tmp);

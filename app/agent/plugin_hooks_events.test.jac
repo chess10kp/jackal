@@ -1,11 +1,3 @@
-"""Tests for cheap lifecycle events (user_bash, project_trust) — annex of
-agent/plugin_hooks_events.jac.
-
-Proves the arbitrary-name hook_fire pass-through end-to-end: fake-host
-dispatch, real Node sidecar round-trip via
-plugin_host/fixtures/pi_lifecycle_probe.mjs, and the name-pinned helpers.
-"""
-
 test "fire_user_bash reaches fake-host listeners" {
     bridge = create_bridge("s-ub-fake");
     seen: dict[str, str] = {};
@@ -43,7 +35,6 @@ test "lifecycle events round-trip through the real node host" {
     phase = ensure_node_host(bridge3);
     assert phase == "ready";
     assert bridge3.host_kind == "node";
-    # Runs from the repo root (scripts/test.sh, CI) or from app/.
     app_root: str = os.getcwd();
     if not os.path.isdir(os.path.join(app_root, "plugin_host")) {
         app_root = os.path.join(app_root, "app");
@@ -62,8 +53,6 @@ test "lifecycle events round-trip through the real node host" {
     pt = fire_hook(bridge3, "project_trust", {"path": "/tmp/demo"});
     assert len(pt) == 1;
     assert "project_trust:" in str(pt[0].get("result", ""));
-
-    # Name-pinned helpers ride the same wire.
     via_helper = fire_user_bash(bridge3, "jac test", "ok 42");
     assert len(via_helper) == 1;
     res_h = str(via_helper[0].get("result", ""));

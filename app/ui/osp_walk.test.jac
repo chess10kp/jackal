@@ -1,5 +1,3 @@
-"""Tests for native OSP graph traversal helpers."""
-
 test "overlapping seeds are processed once" {
     first = OspAny();
     second = OspAny();

@@ -1,5 +1,3 @@
-"""Behavior tests for ANSI-aware display width, wrap, and truncate."""
-
 test "ascii display_width matches string length" {
     assert display_width("") == 0;
     assert display_width("hello") == 5;
@@ -19,7 +17,6 @@ test "wide cjk characters count as two columns" {
 }
 
 test "combining marks do not add width" {
-    # Latin 'e' + combining acute
     composed = "e\u0301";
     assert display_width(composed) == 1;
 }
@@ -29,8 +26,6 @@ test "emoji grapheme clusters count as two columns" {
 }
 
 test "text-presentation symbols stay one column" {
-    # Terminals render these one cell wide; counting them as two shifted
-    # every span after them (stale cells in the prompt footer).
     assert display_width("↑") == 1;
     assert display_width("↑↓") == 2;
     assert display_width("❯ ") == 2;

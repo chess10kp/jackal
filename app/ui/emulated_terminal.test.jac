@@ -1,5 +1,3 @@
-"""EmulatedTerminal (pyte-backed) fidelity tests (merged with emulated_terminal.jac)."""
-
 test "cursor addressing, erase, and trailing trim" {
     t = EmulatedTerminal(20, 4);
     t.write("hello world");

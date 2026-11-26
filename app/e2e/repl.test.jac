@@ -1,5 +1,3 @@
-"""E2E: the line REPL frontend driven over piped stdin."""
-
 test "repl runs a turn and slash commands then exits" {
     sb = make_sandbox();
     try {

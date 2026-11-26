@@ -1,8 +1,3 @@
-"""Unit tests for tui/window.jac (same-stem annex; imports live in the
-stem). Guards the general windowing contract: uniform chrome, per-width
-truncation, the selection-stable sliding viewport with more-markers, and
-cursor/no-cursor modes."""
-
 test "frame draws title, body and an exact box" {
     spec = WindowSpec(title="T", width=10, hint="esc close");
     lines = window_frame(spec, ["alpha", "beta"]);
@@ -48,21 +43,17 @@ test "long list scrolls only when the cursor leaves the viewport" {
     for i in range(1, 11) {
         rows.append("row " + str(i));
     }
-    # Cursor at top: first max_rows rows, only a below-marker.
     (vis, off) = window_view(rows, 0, 8);
     assert len(vis) == 9, str(vis);
     assert vis[0] == "> row 1", str(vis[0]);
     assert vis[7] == "  row 8", str(vis[7]);
     assert vis[8] == "… 2 more", str(vis[8]);
     assert off == 0;
-    # Cursor at bottom: last max_rows rows, only an above-marker.
     (vis2, off2) = window_view(rows, 9, 8);
     assert vis2[0] == "… 2 more", str(vis2[0]);
     assert vis2[1] == "  row 3", str(vis2[1]);
     assert vis2[8] == "> row 10", str(vis2[8]);
     assert off2 == 2;
-    # Cursor in the middle stays put while visible; no markers at offset 0
-    # until it passes the bottom edge.
     (vis3, off3) = window_view(rows, 6, 8);
     assert vis3[0] == "  row 1" or vis3[0] == "> row 7", str(vis3[0]);
     assert off3 == 0;

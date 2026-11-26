@@ -1,12 +1,3 @@
-"""Behavior tests for constraint compilation (LAYOUT-ENGINE-PLAN §6, M4).
-
-Same-stem test module: ui/layout_compile.jac symbols are ambient.
-Covers: root pinning, grow partition solve, provenance presence,
-topology/scope rejection, UNSAT via conflicting relations, overflow
-warning without frame failure, overlay centering, determinism, and the
-D23 contract (intrinsic drift never turns a frame unsatisfiable).
-"""
-
 import from constraints.algebra { StrengthTier }
 import from constraints.solver { Solver }
 import from ui.layout_types {
@@ -27,8 +18,6 @@ import from ui.layout_types {
 }
 import from ui.model { Child, Header, MainScreen, Prompt, Status, TranscriptView, UiNode, node_id }
 
-"""Narrow CompileResult.solver for the type checker (fails loudly on
-an unsuccessful compile instead of returning a None solver)."""
 def _solver_of(r: CompileResult) -> Solver {
     s = r.solver;
     if s is None {
@@ -62,8 +51,6 @@ obj _ShellFixture {
         prompt: Prompt;
 }
 
-"""Build the legacy-parity shell: header(1) / transcript(grow) /
-status(1) / prompt(2) under a MainScreen, specs registered in state."""
 def _shell_state(columns: int = 80, rows: int = 24) -> _ShellFixture {
     screen = MainScreen(key="main");
     header = Header(key="header");
@@ -103,8 +90,6 @@ test "root pins to viewport and grow child absorbs the remainder" {
     edges = r.nodes[node_id(m.transcript)];
     top = snap.values[edges.top.id];
     bottom = snap.values[edges.bottom.id];
-    # 24 viewport rows minus header(1) + status(1) + prompt(2) fixed:
-    # transcript grows into exactly 20 rows starting below the header.
     assert top == 1.0;
     assert bottom == 21.0;
     assert bottom - top == 20.0;
@@ -114,8 +99,6 @@ test "root pins to viewport and grow child absorbs the remainder" {
     assert snap.values[root_edges.top.id] == 0.0;
     assert snap.values[root_edges.right.id] == 80.0;
     assert snap.values[root_edges.bottom.id] == 24.0;
-
-    # Cross-axis FILL: transcript spans full width.
     assert snap.values[edges.left.id] == 0.0;
     assert snap.values[edges.right.id] == 80.0;
 }
@@ -175,8 +158,6 @@ test "relation endpoint outside scope is rejected as OUT_OF_SCOPE" {
 
 test "relation owner that is not the direct parent is INVALID_TOPOLOGY" {
     m = _shell_state();
-    # header and prompt share the screen parent; declaring status as the
-    # owning parent violates the direct-parent rule.
     rel = LayoutRelation(
         owner_id=node_id(m.status),
         source_id=node_id(m.header),
@@ -195,13 +176,11 @@ test "relation owner that is not the direct parent is INVALID_TOPOLOGY" {
             return;
         }
     }
-    assert False;  # INVALID_TOPOLOGY diagnostic missing
+    assert False;
 }
 
 test "conflicting REQUIRED relation makes compilation unsatisfiable" {
     m = _shell_state();
-    # Distinct fixed widths plus a REQUIRED same-width relation is a
-    # direct contradiction.
     set_spec(m.state, m.header, LayoutSpec(width=_fixed(30.0), height=_fixed(1.0)));
     set_spec(m.state, m.status, LayoutSpec(width=_fixed(45.0), height=_fixed(1.0)));
     rel = LayoutRelation(
@@ -223,12 +202,12 @@ test "conflicting REQUIRED relation makes compilation unsatisfiable" {
 }
 
 test "overflow keeps the frame satisfiable and attaches a WARNING" {
-    m = _shell_state(rows=3);  # 3 rows cannot hold 1+1+2 fixed rows.
+    m = _shell_state(rows=3);
     r = compile_layout(m.state, m.screen, Viewport(columns=80, rows=3));
     overflow = [d for d in r.diagnostics if d.code == LayoutError.OVERFLOW];
     assert len(overflow) == 1;
     assert overflow[0].severity == LayoutSeverity.WARNING;
-    assert r.ok;  # Warned clipped frame, not an error (plan §6.2 step 3).
+    assert r.ok;
 }
 
 test "intrinsic natural drift never turns the frame unsatisfiable (D23)" {
@@ -242,10 +221,6 @@ test "intrinsic natural drift never turns the frame unsatisfiable (D23)" {
     set_spec(state, screen, LayoutSpec(width=_fill(), height=_fill()));
     set_spec(state, text, LayoutSpec(width=_fill(), height=_intrinsic()));
     set_spec(state, filler, LayoutSpec(width=_fill(), height=_grow(1.0)));
-
-    # Natural HEIGHT wildly exceeds the viewport: the WEAK preference
-    # must lose to the REQUIRED chain + grow equality; the frame stays
-    # solvable (hard-claim-only split, decision D23).
     naturals: dict[str, Size] = {};
     naturals[node_id(text)] = Size(width=40, height=500);
     r = compile_layout(state, screen, Viewport(columns=40, rows=10), natural_sizes=naturals);
@@ -256,7 +231,6 @@ test "intrinsic natural drift never turns the frame unsatisfiable (D23)" {
     snap = _solver_of(r).snapshot();
     tedges = r.nodes[node_id(text)];
     fedges = r.nodes[node_id(filler)];
-    # Text collapsed to zero rows; filler took the whole column.
     assert (snap.values[tedges.bottom.id] - snap.values[tedges.top.id]) < 1e-6;
     assert (snap.values[fedges.bottom.id] - snap.values[fedges.top.id]) == 10.0;
 }

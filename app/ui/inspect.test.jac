@@ -1,8 +1,3 @@
-"""Unit 11 acceptance: inspection dumps and invariant validation.
-
-Companion scope provides inspect APIs.
-"""
-
 import from ui.model { MainScreen, Prompt, TranscriptView, node_id }
 
 import from ui.runtime {

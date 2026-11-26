@@ -1,13 +1,3 @@
-"""Dev-mode safety tests (ported from lib/jac/tests/test_phase2_leaf_modules.py).
-
-Covers: mode cycling, read-only blocking across every mode, destructive
-bash detection variants, approval policy resolution per mode, --mode flag
-parsing, and system-prompt appendix behavior.
-
-This file is tested merged with agent/modes.jac (same-stem convention), so
-all symbols under test are referenced directly without imports.
-"""
-
 test "read-only modes are exactly plan and ask" {
     assert is_read_only_mode("plan");
     assert is_read_only_mode("ask");
@@ -73,7 +63,6 @@ test "parse_mode_flag rejects invalid values with an error payload" {
 
 test "destructive bash variants are detected" {
     assert is_destructive_bash("rm -rf /");
-    # Original-pattern semantics: lookahead excludes "/usr" (path-anchored).
     assert not is_destructive_bash("rm -rf /usr");
     assert is_destructive_bash("rm -rf ~");
     assert is_destructive_bash("rm -rf $HOME");
@@ -196,12 +185,10 @@ test "registered read-only mcp tools stay usable in plan/ask" {
     try {
         assert requires_approval("plan", "mcp_docs_search", "") == "auto";
         assert requires_approval("ask", "mcp_db_query", "") == "auto";
-        # unmarked siblings stay blocked
         assert requires_approval("plan", "mcp_db_write", "") == "blocked";
     } finally {
         unregister_mcp_read_only_tools(["mcp_docs_search", "mcp_db_query"]);
     }
-    # dropped from the registry -> blocked again
     assert requires_approval("plan", "mcp_docs_search", "") == "blocked";
     assert requires_approval("ask", "mcp_db_query", "") == "blocked";
 }
@@ -209,6 +196,5 @@ test "registered read-only mcp tools stay usable in plan/ask" {
 test "native tools never trip the mcp namespace check" {
     assert is_mcp_tool("write_file") is False;
     assert is_mcp_tool("mcp_srv_tool") is True;
-    # and the native blocked set is unaffected by the mcp registry
     assert requires_approval("plan", "write_file", "") == "blocked";
 }

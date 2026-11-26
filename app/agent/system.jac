@@ -1,5 +1,3 @@
-"""System prompt for the Jackal agent session."""
-
 import os;
 
 glob SYSTEM_PROMPT: str = (

@@ -1,5 +1,3 @@
-"""Interaction queue tests (P12 slice 2) — pure queue semantics."""
-
 import time;
 
 def _req(method: str = "select", parent: str = "corr-1", **extra: any) -> dict[str, any] {
@@ -41,7 +39,6 @@ test "caller-supplied child correlations are honored; duplicates rejected" {
     assert r2[0] is False;
     r3 = q.enqueue(_req(method="confirm", parent="p", corr="child-8"));
     assert r3[1] == "child-8";
-    # Mixed: generated id must not collide with caller-supplied ones.
     r4 = q.enqueue(_req(parent="p"));
     assert r4[1] == "ui-1" or r4[1] != "child-7";
 }
@@ -52,7 +49,6 @@ test "poll peeks FIFO head without detaching" {
     q.enqueue(_req(method="confirm", parent="p2"));
     first = q.poll(time.monotonic());
     assert first[0] is not None and first[0].parent_corr == "p1";
-    # Peek semantics: still queued until taken.
     again = q.poll(time.monotonic() + 1.0);
     assert again[0] is not None and again[0].parent_corr == "p1";
     peeked: any = first[0];

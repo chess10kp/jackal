@@ -1,16 +1,3 @@
-"""FakePluginHost type + factory — native unit.
-
-Split from agent/fake_host.jac so the host obj registers a native layout:
-the bridge-touching helpers stay in fake_host.jac (server; `bridge: any`
-receivers and the make_envelope boundary cannot lower). Pinned native in
-jac.toml; server callers construct through create_fake_host because a
-native-pinned obj class cannot be constructed by server code directly
-(class-boundary wall, see agent.tool_spec / make_tool_spec).
-"""
-
-# Mirror of plugin_host/pi_shim.mjs HOST_CAPS / COMPAT_TIER: the fake host
-# advertises the same surfaces in its host_hello as the real shim so the
-# bridge derives identical capability state from either hello.
 glob FAKE_HOST_CAPS: list[str] = [
          "tools",
          "cancel",
@@ -44,6 +31,4 @@ obj FakePluginHost {
         compat_tier: str = FAKE_COMPAT_TIER;
 }
 
-def create_fake_host(node_version: str = "fake") -> FakePluginHost {
-    return FakePluginHost(node_version=node_version);
-}
+def create_fake_host(node_version: str = "fake") -> FakePluginHost;

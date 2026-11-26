@@ -1,5 +1,3 @@
-"""Extension declaration helpers (native control plane)."""
-
 test "decl_from_dict defaults activation from runtime" {
     d = decl_from_dict({"id": "a", "path": "./x.js", "runtime": "node"});
     assert d.activation == "sidecar";

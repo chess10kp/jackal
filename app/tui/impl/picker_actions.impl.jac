@@ -1,0 +1,350 @@
+impl _login_provider_entries -> dict[str, any] {
+    stored = load_auth_file(resolve_auth_path());
+    rows: list[str] = [];
+    ids: list[str] = [];
+    for prov in PROVIDER_ROUTES {
+        provider_id = str(prov);
+        route: any = PROVIDER_ROUTES[prov];
+        meta: dict[str, any] = route if isinstance(route, dict) else {};
+        key_env = str(meta.get("key_env", "") or "");
+        auth_type = str(meta.get("authType", "api_key" if key_env else "env"));
+        if auth_type == "env" {
+            continue;
+        }
+        status = get_auth_status(
+            provider_id, stored, env_api_key=os.environ.get(key_env, "") if key_env else ""
+        );
+        item = {
+            "id": provider_id,
+            "displayName": provider_id,
+            "authType": auth_type,
+            "configured": bool(status.get("configured", False)),
+            "modelCount": len(meta.get("models", []) or []),
+        };
+        rows.append(format_provider_label(item));
+        ids.append(provider_id);
+    }
+    return {"rows": rows, "ids": ids, "stored": stored};
+}
+
+impl _hydrate_auth_environment {
+    hydrate_auth_environment();
+}
+
+impl _login_error(app: LiveShell, message: str) {
+    app.auth_flow = transition_auth_flow(
+        app.auth_flow,
+        "set_error",
+        {
+            "message": message,
+            "providerId": _picker_state(app).get("providerId", "")
+                if _picker_state(app) is not None
+                else "",
+        },
+    );
+    if _picker_state(app) is not None {
+        _close_picker(app);
+    }
+    _push_turn(app, "tool", "login error: " + message);
+    app.dirty = True;
+}
+
+impl _cancel_login(app: LiveShell) {
+    app.auth_flow = transition_auth_flow(app.auth_flow, "cancel");
+    if _picker_state(app) is not None {
+        _close_picker(app);
+    }
+    _push_turn(app, "tool", "login cancelled");
+    app.dirty = True;
+}
+
+impl _start_login_provider(app: LiveShell, provider_id: str) {
+    entries = _login_provider_entries();
+    stored: dict[str, any] = entries.get("stored", {});
+    found: dict[str, any] | None = None;
+    for item in PROVIDER_ROUTES {
+        if str(item) == provider_id {
+            route: any = PROVIDER_ROUTES[item];
+            found = route if isinstance(route, dict) else {};
+            break;
+        }
+    }
+    if found is None {
+        _login_error(app, "unknown provider: " + provider_id);
+        return;
+    }
+    key_env = str(found.get("key_env", "") or "");
+    auth_type = str(found.get("authType", "api_key" if key_env else "env"));
+    app.auth_data = stored;
+    app.auth_flow = transition_auth_flow(
+        app.auth_flow, "set_logging_in", {"providerId": provider_id, "status": "starting"}
+    );
+    if auth_type == "oauth" {
+        result = oauth_start_login(provider_id);
+        detail = str(result.get("detail", "") or "") if isinstance(result, dict) else "";
+        _login_error(
+            app,
+            "OAuth login is unavailable in the native runtime" + (": " + detail if detail else ""),
+        );
+        return;
+    }
+    if not key_env {
+        _login_error(app, "provider " + provider_id + " has no interactive login");
+        return;
+    }
+    if _picker_state(app) is None {
+        _login_error(app, "login overlay unavailable");
+        return;
+    }
+    _picker_state(app)["mode"] = "input";
+    _picker_state(app)["providerId"] = provider_id;
+    _picker_state(app)["authType"] = auth_type;
+    _picker_state(app)["keyEnv"] = key_env;
+    _picker_state(app)["draft"] = "";
+    app.auth_flow = transition_auth_flow(
+        app.auth_flow, "set_api_key_input", {"providerId": provider_id}
+    );
+    app.dirty = True;
+}
+
+impl _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
+    if not key {
+        _login_error(app, "API key cannot be empty");
+        return;
+    }
+    next_data = credential_set(app.auth_data, provider_id, {"type": "api_key", "key": key});
+    path = resolve_auth_path();
+    if not save_auth_file(path, next_data) {
+        _login_error(app, "could not save credentials to " + path);
+        return;
+    }
+    app.auth_data = next_data;
+    route: any = PROVIDER_ROUTES.get(provider_id, {});
+    key_env = str(route.get("key_env", "") or "") if isinstance(route, dict) else "";
+    if key_env {
+        os.environ[key_env] = key;
+        note_hydrated(key_env);
+    }
+    app.auth_flow = transition_auth_flow(
+        app.auth_flow, "set_logged_in", {"providerId": provider_id, "nextStep": "done"}
+    );
+    if _picker_state(app) is not None {
+        _close_picker(app);
+    }
+    _push_turn(app, "tool", "logged in to " + provider_id + "; credentials saved to " + path);
+    app.dirty = True;
+}
+
+impl _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
+    entries = _login_provider_entries();
+    rows: list[str] = list(entries.get("rows", []));
+    ids: list[str] = list(entries.get("ids", []));
+    if provider_arg {
+        if provider_arg not in ids {
+            return "unknown login provider: " + provider_arg;
+        }
+        app.auth_flow = initial_auth_flow_state();
+        if not _open_picker(app, "LOGIN", [], []) {
+            return "login unavailable (overlay busy)";
+        }
+        _picker_state(app)["providerId"] = provider_arg;
+        app.auth_data = entries.get("stored", {});
+        _start_login_provider(app, provider_arg);
+        return "";
+    }
+    if not rows {
+        return "no interactive providers available";
+    }
+    if not _open_picker(app, "LOGIN", rows, ids) {
+        return "login unavailable (overlay busy)";
+    }
+    app.auth_data = entries.get("stored", {});
+    app.auth_flow = transition_auth_flow(
+        initial_auth_flow_state(),
+        "open_provider_picker",
+        {
+            "providers": [
+                {
+                    "id": ids[i],
+                    "displayName": ids[i],
+                    "authType": "api_key",
+                    "configured": False,
+                    "modelCount": 0,
+                }
+                for i in range(len(ids))
+            ],
+        },
+    );
+    app.dirty = True;
+    return "";
+}
+
+impl _open_resume_picker(app: LiveShell) -> str {
+    rows = list_sessions(os.getcwd());
+    if not rows {
+        return "no saved sessions";
+    }
+    labels: list[str] = [];
+    ids: list[str] = [];
+    for row in rows[:20] {
+        sid = str(row.get("id", ""));
+        sname = str(row.get("name", ""));
+        labels.append(sid[:18] + "  " + sname[:38]);
+        ids.append(sid);
+    }
+    opened = _open_picker(app, "RESUME SESSION", labels, ids);
+    if not opened {
+        return "picker unavailable (overlay busy)";
+    }
+    return "";
+}
+
+impl _task_picker_entries(cwd: str) -> dict[str, any] {
+    tasks = load_tasks(cwd);
+    if not tasks {
+        return {"rows": ["No tasks yet."], "ids": ["__header__"]};
+    }
+    counts = task_counts(tasks);
+    total: int = int(counts["pending"]) + int(counts["in_progress"]) + int(counts["completed"]);
+    ratio: float = float(counts["completed"]) / float(total) if total else 0.0;
+    rows: list[str] = [
+        str(total)
+            + " tasks  "
+            + _meter(ratio, 14)
+            + "  "
+            + str(counts["completed"])
+            + "/"
+            + str(total)
+            + " done",
+    ];
+    ids: list[str] = ["__header__"];
+    idx = 0;
+    for ln in format_tasks_list(tasks).split("\n") {
+        rows.append(ln);
+        if idx >= 2 {
+            ids.append(str(idx - 2));
+        } else {
+            ids.append("__header__");
+        }
+        idx += 1;
+    }
+    return {"rows": rows, "ids": ids};
+}
+
+impl _checkpoint_picker_entries(cwd: str) -> dict[str, any] {
+    items = list_checkpoints(cwd);
+    rows: list[str] = [];
+    ids: list[str] = [];
+    for item in items[:20] {
+        rows.append(format_checkpoint_overlay_row(item));
+        ids.append(str(item.get("name", "")));
+    }
+    return {"rows": rows, "ids": ids};
+}
+
+impl _open_skills_picker(app: LiveShell) -> str {
+    skills: list[dict[str, any]] = [];
+    try {
+        catalog: dict[str, list[dict[str, any]]] = load_jackal_skills();
+        skills = list(catalog.get("skills", []));
+    } except Exception as e {
+        return "ERROR: failed to load skills: " + str(e)[:80];
+    }
+    entries = _skills_picker_entries(skills);
+    ids: list[str] = list(entries["ids"]);
+    selectable = False;
+    for rid in ids {
+        if str(rid) != "__header__" {
+            selectable = True;
+            break;
+        }
+    }
+    if not selectable {
+        return str(entries["rows"][0]) if entries["rows"] else "no skills found";
+    }
+    rows: list[str] = list(entries["rows"]);
+    opened = _open_picker(app, "SKILLS", rows, ids);
+    if not opened {
+        return "picker unavailable (overlay busy)";
+    }
+    return "";
+}
+
+impl _open_tasks_picker(app: LiveShell) -> str {
+    entries = _task_picker_entries(os.getcwd());
+    opened = _open_picker(app, "TASKS", entries["rows"], entries["ids"]);
+    if not opened {
+        return "picker unavailable (overlay busy)";
+    }
+    return "";
+}
+
+impl _open_checkpoints_picker(app: LiveShell) -> str {
+    entries = _checkpoint_picker_entries(os.getcwd());
+    if not entries["rows"] {
+        return "no checkpoints yet (/checkpoint NAME to create one)";
+    }
+    opened = _open_picker(app, "CHECKPOINTS", entries["rows"], entries["ids"]);
+    if not opened {
+        return "picker unavailable (overlay busy)";
+    }
+    return "";
+}
+
+impl _create_checkpoint_now(app: LiveShell, name: str) -> str {
+    cwd = os.getcwd();
+    hist = get_history();
+    try {
+        active_model = get_model();
+        meta = create_checkpoint(cwd, hist, provider_for(active_model), active_model, name=name);
+    } except Exception as e {
+        return "ERROR: checkpoint failed: " + str(e);
+    }
+    files_changed: any = meta.get("filesChanged", []);
+    n_files = len(files_changed) if isinstance(files_changed, list) else 0;
+    app.dirty = True;
+    return (
+        "checkpoint '"
+        + str(meta.get("name", name))
+        + "' saved ("
+        + str(len(hist))
+        + " msgs, "
+        + str(n_files)
+        + " files)"
+    );
+}
+
+impl _restore_checkpoint(app: LiveShell, name: str) -> str {
+    cwd = os.getcwd();
+    try {
+        payload: any = load_checkpoint(cwd, name);
+    } except Exception as e {
+        return "ERROR: cannot load checkpoint '" + name + "': " + str(e);
+    }
+    conv: any = payload.get("conversation") if isinstance(payload, dict) else None;
+    msgs: any = conv.get("messages", []) if isinstance(conv, dict) else [];
+    if not isinstance(msgs, list) {
+        msgs = [];
+    }
+    note = "";
+    files: any = payload.get("fileSnapshots", {}) if isinstance(payload, dict) else {};
+    if isinstance(files, dict) and files {
+        try {
+            restore_checkpoint_files(cwd, files);
+            note = ", " + str(len(files)) + " files restored";
+        } except Exception as e {
+            note = ", FILE RESTORE FAILED: " + str(e).split("\n")[0][:80];
+        }
+    }
+    restore_history(msgs as list[dict[str, any]]);
+    app.messages = [];
+    app.rev = 0;
+    apply_transcript_revision(app.proj, 0, app.messages);
+    for m in msgs as list[dict[str, any]] {
+        if isinstance(m, dict) and str(m.get("role", "")) != "system" {
+            _push_turn(app, str(m.get("role", "")), str(m.get("content", "")));
+        }
+    }
+    app.dirty = True;
+    return "checkpoint '" + name + "' restored (" + str(len(msgs)) + " msgs" + note + ")";
+}

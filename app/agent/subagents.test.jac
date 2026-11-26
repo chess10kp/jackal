@@ -1,23 +1,3 @@
-"""Subagent catalog tests for agent/subagents.jac (same-stem annex).
-
-Covers: recursive .md discovery across nested dirs with *.chain.md
-exclusion, frontmatter field extraction (name/description/tools inline +
-dash lists/model/systemPrompt), invalid or unreadable agent files being
-tolerated (None / skipped, never raised), package+project merge with
-project-wins precedence, sorted listing and name lookup including
-whitespace tolerance and unknown names, tool normalization (aliases,
-mcp: passthrough, empty -> None), subagent tool filtering (excluded set,
-bash re-pin, empty fallback), settings.json and `.jackal` project model
-overrides (including corrupt/absent files), catalog formatting, and one
-smoke test over the REAL repo catalog under pi/.pi/agents (read-only).
-Every fixture lives in a Python tempfile tree removed per test -- the
-real pi/.pi/agents data is never modified.
-
-Typing note: values pulled out of untyped dicts/lists arrive as
-<Unknown> to the Jac checker, so this file funnels them through explicit
-locals or str()/dict() casts before use.
-"""
-
 import os;
 import json;
 import tempfile;
@@ -31,7 +11,6 @@ def _cleanup(tmp: str) {
     shutil.rmtree(tmp, ignore_errors=True);
 }
 
-"""str-typed shim over os.path.dirname, which demands PathLike here."""
 def _parent_dir(p: any) -> str {
     return str(os.path.dirname(p));
 }
@@ -86,8 +65,6 @@ test "discovery finds agents in nested dirs but skips chain files and non-md" {
             rec2: dict[str, any] = a;
             assert str(rec2["source"]) == "package";
         }
-
-        # Missing directory yields nothing, not an error.
         assert load_agents_from_dir(os.path.join(tmp, "nope"), "package") == [];
     } finally {
         _cleanup(tmp);
@@ -97,7 +74,6 @@ test "discovery finds agents in nested dirs but skips chain files and non-md" {
 test "load_agent_file extracts name description tools model systemPrompt" {
     tmp = _make_tmp();
     try {
-        # Inline tools list.
         p1 = _write_agent(
             tmp,
             "inline.md",
@@ -115,8 +91,6 @@ test "load_agent_file extracts name description tools model systemPrompt" {
         assert str(agent1["systemPrompt"]) == "You are a scout.\nBe quick.";
         assert str(agent1["source"]) == "package";
         assert str(agent1["filePath"]) == p1;
-
-        # Dash-block tools list, no model -> None.
         p2 = _write_agent(
             tmp,
             "dash.md",
@@ -129,8 +103,6 @@ test "load_agent_file extracts name description tools model systemPrompt" {
         assert isinstance(tools2, list);
         assert [str(t) for t in tools2] == ["read", "write"];
         assert agent2["model"] is None;
-
-        # No tools key at all -> None (meaning all allowed).
         p3 = _write_agent(tmp, "bare.md", "name: bare\ndescription: Bare agent", "Body.");
         agent3 = load_agent_file(p3, "project");
         assert agent3 is not None;
@@ -144,21 +116,16 @@ test "load_agent_file extracts name description tools model systemPrompt" {
 test "invalid or unreadable agent files are tolerated without raising" {
     tmp = _make_tmp();
     try {
-        # Missing name / missing description / no frontmatter at all.
         assert load_agent_file(_write_agent(tmp, "a.md", "description: only desc", "x"), "p")
             is None;
         assert load_agent_file(_write_agent(tmp, "b.md", "name: only-name", "x"), "p") is None;
         plain = os.path.join(tmp, "c.md");
         _write_text(plain, "just body text, no frontmatter");
         assert load_agent_file(plain, "p") is None;
-        # Unterminated frontmatter keeps everything as body -> no name.
         unterminated = os.path.join(tmp, "d.md");
         _write_text(unterminated, "---\nname: ghost\ndescription: never closed");
         assert load_agent_file(unterminated, "p") is None;
-        # Unreadable path.
         assert load_agent_file(os.path.join(tmp, "missing.md"), "p") is None;
-
-        # Directory loader silently skips the bad ones.
         good = _write_agent(tmp, "good.md", "name: good\ndescription: fine", "ok");
         loaded = load_agents_from_dir(tmp, "project");
         assert _agent_names(loaded) == ["good"];
@@ -191,7 +158,7 @@ test "merge puts project overrides above package by name" {
         assert str(loser["source"]) == "package";
 
         listed = list_subagents(os.path.join(tmp, "proj"), os.path.join(tmp, "pkg"));
-        assert _agent_names(listed) == ["planner", "scout"];  # sorted by name
+        assert _agent_names(listed) == ["planner", "scout"];
 
         picked: dict[str, any] | None = get_subagent(
             os.path.join(tmp, "proj"), " scout ", os.path.join(tmp, "pkg")
@@ -207,8 +174,6 @@ test "merge puts project overrides above package by name" {
 test "normalize_allowed_tool_names applies aliases mcp prefix and empty rule" {
     assert normalize_allowed_tool_names(None) is None;
     assert normalize_allowed_tool_names([]) is None;
-    # Blank-only lists normalize to an empty (falsy) set -- callers treat
-    # that as "all allowed", matching the toolchain's behavior.
     assert normalize_allowed_tool_names(["   ", ""]) == set();
 
     got = normalize_allowed_tool_names(["read_file", "grep", "mcp:jac_docs", "custom_tool"]);
@@ -218,28 +183,18 @@ test "normalize_allowed_tool_names applies aliases mcp prefix and empty rule" {
 
 test "filter_tools_for_subagent excludes pins bash and falls back safely" {
     all_tools = ["read", "write", "bash", "agent", "subagent", "compact_context", "mermaid"];
-
-    # No allowlist -> everything except excluded.
     assert filter_tools_for_subagent(all_tools, None) == ["read", "write", "bash", "mermaid"];
-
-    # Allowlist intersection.
     got = filter_tools_for_subagent(all_tools, {"read", "bash"});
     assert got == ["read", "bash"];
-
-    # bash allowed but filtered away gets re-pinned when present upstream.
     repinned = filter_tools_for_subagent(all_tools, {"bash", "nonexistent"});
     assert "bash" in repinned;
     assert "nonexistent" not in repinned;
-
-    # Nothing survives -> fallback to all non-excluded.
     assert filter_tools_for_subagent(all_tools, {"only_ghost"}) == [
         "read",
         "write",
         "bash",
         "mermaid",
     ];
-
-    # Excluded names never pass even when explicitly allowed.
     assert filter_tools_for_subagent(all_tools, {"agent", "read"}) == ["read"];
 
     assert filter_tools_for_subagent([], None) == [];
@@ -250,7 +205,6 @@ test "settings.json model overrides parse or degrade to empty" {
     try {
         base = os.path.join(tmp, "root");
         os.makedirs(base, exist_ok=True);
-        # No settings.json yet.
         assert load_settings_model_overrides(base) == {};
 
         _write_text(
@@ -291,7 +245,6 @@ test "project model overrides come from walked-up .jackal config" {
                 "broken": 7,
             },
         };
-        # Config lives two levels ABOVE the cwd -- walk-up must find it.
         _write_text(os.path.join(tmp, ".jackal"), json.dumps(cfg));
 
         got = load_project_model_overrides(deep);
@@ -300,8 +253,6 @@ test "project model overrides come from walked-up .jackal config" {
             "scout": "fast-model",
             "architect": "reasoner-model",
         };
-
-        # No subagents section anywhere up the tree -> {}.
         empty = _make_tmp();
         try {
             assert load_project_model_overrides(empty) == {};
@@ -339,7 +290,6 @@ test "format_subagent_catalog renders entries and the empty message" {
         assert "tools: 2  model: inherit" in text;
         assert "- zeta (package) — Last one" in text;
         assert "tools: all  model: big-model" in text;
-        # Sorted output: alpha line before zeta line.
         assert text.index("alpha") < text.index("zeta");
     } finally {
         _cleanup(tmp);
@@ -347,7 +297,6 @@ test "format_subagent_catalog renders entries and the empty message" {
 }
 
 test "real repo builtin catalog smoke-parses read-only" {
-    # Local-only catalog: pi/.pi is gitignored, so CI checkouts lack it.
     repo_pi = os.path.join(os.environ.get("JACKAL_ROOT", os.getcwd()), "pi");
     if not os.path.isdir(os.path.join(repo_pi, ".pi")) {
         return;

@@ -1,5 +1,3 @@
-"""E2E: the native TUI driven through a real pseudo-terminal."""
-
 test "tui boots, streams a reply, and quits cleanly on esc" {
     sb = make_sandbox();
     tui: TuiSession | None = None;
@@ -14,7 +12,6 @@ test "tui boots, streams a reply, and quits cleanly on esc" {
         tui.press("esc");
         code = tui.wait_exit(30.0);
         assert code == 0, "exit " + str(code) + "\n" + tui.screen_text();
-        # Terminal restored: left the alternate screen and re-showed the cursor.
         raw = tui.raw_output();
         assert "\x1b[?1049l" in raw;
         assert "\x1b[?25h" in raw;
@@ -111,8 +108,6 @@ test "tui streams a 20 KB answer without stalling" {
         tui = spawn_tui(sb);
         tui.type_text("long answer please");
         tui.press("enter");
-        # 200 deltas arrive through the real PTY; the UI must keep draining
-        # (batched rewrites) and end with the reply tail on screen.
         tui.wait_for(tail, 90.0);
         tui.press("esc");
         code = tui.wait_exit(30.0);
@@ -140,15 +135,11 @@ test "tui previews long tool results at six lines with a more-lines footer" {
         tui = spawn_tui(sb);
         tui.type_text("read big.txt");
         tui.press("enter");
-        # read_file is read-only: auto-approved in normal mode (no modal).
         tui.wait_for("…  +4 lines", 60.0);
         tui.wait_for("done reading", 60.0);
         tui.wait_for("fixture line 1", 10.0);
         screen = tui.screen_text();
-        # Display truncates: the seventh line never renders.
         assert "fixture line 7" not in screen, str(screen);
-        # Display-only: the full result still reached the model (request 2's
-        # last message is the untruncated tool result).
         calls = sb.calls();
         assert len(calls) >= 2, str(calls)[:2000];
         assert "fixture line 7" in calls[1]["last"]["content"], str(calls[1])[:2000];
@@ -168,16 +159,13 @@ test "tui mcp window opens, closes, and restart feedback flows" {
     tui: TuiSession | None = None;
     try {
         tui = spawn_tui(sb);
-        # No .jackal config in the sandbox: the window shows the empty state.
         tui.type_text("/mcp");
         tui.press("enter");
         tui.wait_for("MCP STATUS", 20.0);
         tui.wait_for("no mcp servers configured", 10.0);
-        # esc closes the window (does not quit the app): both markers vanish.
         tui.press("esc");
         tui.wait_gone("MCP STATUS", 20.0);
         tui.wait_gone("no mcp servers configured", 10.0);
-        # /mcp restart NAME goes through mcp_restart without a window.
         tui.type_text("/mcp restart ghost");
         tui.press("enter");
         tui.wait_for("unknown mcp server: ghost", 20.0);
@@ -197,24 +185,17 @@ test "tui login api-key input accepts a bracketed paste" {
     tui: TuiSession | None = None;
     try {
         tui = spawn_tui(sb);
-        # /login -> searchable provider drop-up -> API-key input in that
-        # same prompt-anchored picker. DeepSeek is not the first route, so
-        # this also proves type-to-filter changes the selected options.
         tui.type_text("/login");
         tui.press("enter");
         tui.wait_for("LOGIN", 30.0);
         tui.type_text("deepseek");
         tui.press("enter");
         tui.wait_for("paste API key", 15.0);
-        # Exactly what a terminal sends on ctrl+shift+v. Regression: the
-        # PasteEvent branch previously missed the stack-owned login input window
-        # while the API-key input drop-up was open.
         key: str = "sk-e2e-paste-1234567890";
         tui.send("\x1b[200~" + key + "\x1b[201~");
         tui.wait_for("*" * len(key), 10.0);
         tui.press("enter");
         tui.wait_for("logged in to deepseek", 15.0);
-        # The decisive assertion: the pasted bytes landed in auth.json.
         auth_path: str = os.path.join(sb.agent_dir, "auth.json");
         fh: any = open(auth_path, "r", encoding="utf-8");
         stored: str = fh.read();
@@ -238,8 +219,6 @@ test "tui picker is owned by the window stack and closes cleanly" {
         tui.wait_for("LOGIN", 30.0);
         tui.press("esc");
         tui.wait_gone("LOGIN", 20.0);
-        # Closing a picker must release its stack entry and drop-up,
-        # not exit the application or leave stale choices active.
         tui.type_text("/help");
         tui.press("enter");
         tui.wait_for("/compact", 20.0);

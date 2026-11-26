@@ -1,19 +1,3 @@
-"""Checkpoint store tests for agent/checkpoints.jac (ported from
-lib/jac/workflow/_checkpoints_toolchain.py).
-
-Covers: create with the documented .jackal/checkpoints/<name>/ layout,
-auto-generated timestamped names and duplicate rejection, every name
-validation branch, description derivation and 80-char truncation, git
-modification detection in throwaway repos, load round trips, corrupt or
-missing store files surfacing as ValueError/OSError, list ordering with
-sizeBytes and junk skipping, delete semantics, restore write-backs
-including nested paths and aggregated failure, a full modify -> snapshot
--> modify -> restore git round trip, and the humanized formatting
-helpers. Uses Python tempfile dirs (cleaned up per test) and throwaway
-`git init` repos with local user config so no repo state is touched --
-never the real .jackal/checkpoints data.
-"""
-
 import os;
 import json;
 import re;
@@ -67,7 +51,6 @@ def _git(args: list[str], repo: str) {
     subprocess.run(["git"] + args, cwd=repo, capture_output=True, text=True, timeout=15);
 }
 
-"""Throwaway repo under tmp/repo with local identity and one commit."""
 def _init_git_repo(tmp: str) -> str {
     repo = os.path.join(tmp, "repo");
     os.makedirs(repo, exist_ok=True);
@@ -122,7 +105,6 @@ test "create writes the documented layout and exact metadata keys" {
         assert meta["messageCount"] == len(msgs);
         assert meta["filesChanged"] == ["src/a.txt", "lib/deep/b.txt"];
         assert meta["provider"] == {"name": "prov", "model": "model-x"};
-        # Non-git directory: no HEAD hash available.
         assert meta["gitCommitHash"] is None;
 
         cp = os.path.join(_cp_dir(tmp), "first");
@@ -131,7 +113,7 @@ test "create writes the documented layout and exact metadata keys" {
         assert os.path.exists(meta_path) and os.path.exists(conv_path);
         raw_meta = _read_file(meta_path);
         assert raw_meta.endswith("\n");
-        assert '"name": "first"' in raw_meta;  # indent=2 signature
+        assert '"name": "first"' in raw_meta;
 
         stored_meta = _read_raw(meta_path);
         assert stored_meta == meta;
@@ -152,12 +134,8 @@ test "create auto-generates timestamped names and rejects duplicates" {
         meta = create_checkpoint(tmp, [], "p", "m");
         assert re.match(r"^checkpoint-\d{4}-\d{2}-\d{2}-", str(meta["name"])) is not None;
         assert os.path.isdir(os.path.join(_cp_dir(tmp), str(meta["name"])));
-
-        # Blank/whitespace names fall through to auto-generation too.
         meta2 = create_checkpoint(tmp, [], "p", "m", name="   ");
         assert str(meta2["name"]).startswith("checkpoint-");
-
-        # An explicit name can only be used once.
         create_checkpoint(tmp, [], "p", "m", name="dupe");
         failed = False;
         try {
@@ -239,7 +217,6 @@ test "get_modified_files lists tracked edits and untracked files" {
         assert "base.txt" in files;
         assert "new.txt" in files;
         assert "nested/un.txt" in files;
-        # Clean repo has nothing to snapshot.
         assert get_modified_files(tmp) == [];
     } finally {
         _cleanup(tmp);
@@ -337,8 +314,6 @@ test "list orders newest first with sizes and skips junk entries" {
         m2 = create_checkpoint(tmp, [], "p", "m", name="middle");
         m3 = create_checkpoint(tmp, [], "p", "m", name="newest");
         assert len({m1["timestamp"], m2["timestamp"], m3["timestamp"]}) == 3;
-
-        # Junk: no metadata, corrupt metadata, and a plain file.
         os.makedirs(os.path.join(_cp_dir(tmp), "junk-empty"));
         junk_corrupt = os.path.join(_cp_dir(tmp), "junk-corrupt");
         os.makedirs(junk_corrupt);
@@ -403,8 +378,6 @@ test "restore writes snapshots back including nested directories" {
         );
         assert _read_file(os.path.join(tmp, "top.txt")) == "restored-top";
         assert _read_file(os.path.join(tmp, "deep", "nested", "f.txt")) == "restored-deep";
-
-        # Overwrites existing content wholesale.
         _write_file(tmp, "top.txt", "changed after snapshot");
         restore_checkpoint_files(tmp, {"top.txt": "snapshot-content"});
         assert _read_file(os.path.join(tmp, "top.txt")) == "snapshot-content";
@@ -416,7 +389,6 @@ test "restore writes snapshots back including nested directories" {
 test "restore aggregates per-file failures into one RuntimeError" {
     tmp = _make_tmp();
     try {
-        # "." resolves to cwd itself, which cannot be opened for writing.
         failed = False;
         try {
             restore_checkpoint_files(tmp, {".": "impossible"});
@@ -435,16 +407,14 @@ test "full git round trip: modify, snapshot, modify again, restore" {
     tmp = _make_tmp();
     try {
         repo = _init_git_repo(tmp);
-        _write_file(repo, "base.txt", "base v2\n");  # tracked edit
-        _write_file(repo, "extra.txt", "extra v1\n");  # untracked
+        _write_file(repo, "base.txt", "base v2\n");
+        _write_file(repo, "extra.txt", "extra v1\n");
 
         meta = create_checkpoint(repo, _msgs("save my work"), "prov", "model-z");
         assert "base.txt" in meta["filesChanged"];
         assert "extra.txt" in meta["filesChanged"];
         snap_dir = os.path.join(_cp_dir(repo), str(meta["name"]));
         assert _read_file(os.path.join(snap_dir, "files", "base.txt")) == "base v2\n";
-
-        # Diverge the tree further after the snapshot.
         _write_file(repo, "base.txt", "base v3\n");
         _write_file(repo, "extra.txt", "extra v2\n");
 
@@ -452,8 +422,6 @@ test "full git round trip: modify, snapshot, modify again, restore" {
         restore_checkpoint_files(repo, data["fileSnapshots"]);
         assert _read_file(os.path.join(repo, "base.txt")) == "base v2\n";
         assert _read_file(os.path.join(repo, "extra.txt")) == "extra v1\n";
-
-        # The restored checkpoint still loads and lists afterwards.
         assert [str(i["name"]) for i in list_checkpoints(repo)] == [str(meta["name"])];
         delete_checkpoint(repo, str(meta["name"]));
         assert list_checkpoints(repo) == [];
@@ -470,7 +438,7 @@ test "format_relative_time buckets deltas into humanized strings" {
     assert format_relative_time(_iso_ago(hours=3)) == "3 hrs ago";
     assert format_relative_time(_iso_ago(days=3)) == "3 days ago";
     stamp = _iso_ago(days=400);
-    assert format_relative_time(stamp)[:4] != "just";  # bare date fallback
+    assert format_relative_time(stamp)[:4] != "just";
     assert re.match(r"\d{4}-\d{2}-\d{2}$", format_relative_time(stamp)) is not None;
 }
 
@@ -511,9 +479,6 @@ test "format_checkpoint_list prints header lines or the empty-state hint" {
 }
 
 test "a swallowed capture failure is recorded in the debug log" {
-    # The toolchain skips unreadable files silently; checkpoints must still
-    # surface the skip when JACKAL_LOG is on, or a zero-file checkpoint looks
-    # like a clean capture.
     tmp = _make_tmp();
     old_log = os.environ.get("JACKAL_LOG");
     old_level = os.environ.get("JACKAL_LOG_LEVEL");

@@ -1,5 +1,3 @@
-"""E2E: one-shot print mode (`jackal -p`) against the scripted mock model."""
-
 import json;
 
 test "print mode answers and exits 0" {
@@ -23,7 +21,6 @@ test "print mode reads the prompt from stdin" {
     try {
         r = run_jackal(sb, ["-p", "summarize"], stdin_text="file body");
         assert r.code == 0, str(sb.explain(r));
-        # Unscripted mock echoes the last user message.
         assert "summarize" in r.stdout and "file body" in r.stdout, str(sb.explain(r));
     } finally {
         sb.cleanup();
@@ -51,7 +48,6 @@ test "tool loop edits a file in yolo mode" {
         assert sb.read("notes.txt") == "beta\n", str(sb.explain(r));
         calls = sb.calls();
         assert len(calls) == 3, str(sb.explain(r));
-        # The model saw the read_file result before editing.
         assert calls[1]["last"]["role"] == "tool";
         assert "alpha" in calls[1]["last"]["content"];
     } finally {
@@ -167,7 +163,6 @@ test "continue resumes the previous session transcript" {
         r2 = run_jackal(sb, ["-p", "-c", "what number?"]);
         assert r2.code == 0, str(sb.explain(r2));
         calls = sb.calls();
-        # Second process sent system + first exchange + new prompt.
         assert calls[-1]["messages"] >= 4, str(sb.explain(r2));
     } finally {
         sb.cleanup();

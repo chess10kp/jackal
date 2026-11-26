@@ -1,8 +1,3 @@
-"""Unit 10 acceptance: transcript virtualization and scroll anchoring.
-
-Companion scope provides transcript APIs.
-"""
-
 import from ui.model { TranscriptView }
 
 def _msgs(n: int, prefix: str = "m") -> list[TranscriptMessage] {

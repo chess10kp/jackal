@@ -1,20 +1,3 @@
-"""Behavior tests for the permanent layout seam (LAYOUT-ENGINE-PLAN §4/§7).
-
-Registry lifecycle (spec validation, relation lifecycle, content
-revisions, clearing) and the compute_layout pipeline (legacy-parity
-shell geometry, atomic publication, generation monotonicity, resize
-reclamping, scroll clamping, overlay centering, wrap-driven heights,
-degenerate viewports, measurement-cache invalidation).
-
-Both suites moved here at the M6 cutover: their functions live in
-ui/layout.jac and this module shares its stem.
-"""
-
-# Same-stem note: only functions DECLARED in ui.layout (compute_layout)
-# are ambient here; never import from ui.layout inside this module
-# (circular import at collection). Everything else — value types and the
-# registry lifecycle — comes from the leaf module ui.layout_types.
-
 import from constraints.algebra { StrengthTier }
 import from ui.layout_types {
     Axis,
@@ -55,10 +38,6 @@ import from ui.model {
     node_id,
 }
 
-# ----------------------------------------------------------------------
-# Shared helpers.
-# ----------------------------------------------------------------------
-
 def _fixed(n: float) -> AxisSize {
     return AxisSize(mode=SizeMode.FIXED, preferred=n);
 }
@@ -70,10 +49,6 @@ def _fill -> AxisSize {
 def _grow(weight: float) -> AxisSize {
     return AxisSize(mode=SizeMode.GROW, grow_weight=weight);
 }
-
-# ----------------------------------------------------------------------
-# Registry lifecycle tests.
-# ----------------------------------------------------------------------
 
 def _intrinsic -> AxisSize {
     return AxisSize(mode=SizeMode.INTRINSIC);
@@ -103,8 +78,6 @@ test "set_spec registers a validated spec by stable node id" {
     r = set_spec(state, prompt, _spec());
     assert r.ok;
     assert node_id(prompt) in state.specs;
-
-    # Replacing the spec is allowed; last write wins.
     r2 = set_spec(state, prompt, _spec(height=_fixed(5)));
     assert r2.ok;
     assert state.specs[node_id(prompt)].height.preferred == 5.0;
@@ -115,13 +88,9 @@ test "set_spec rejects malformed specs with INVALID_SPEC" {
     status = Status(key="s");
 
     cases: list[LayoutSpec] = [
-        # Negative minimum.
         _spec(width=AxisSize(mode=SizeMode.BOUNDED, minimum=-1.0)),
-        # minimum > maximum.
         _spec(width=AxisSize(mode=SizeMode.BOUNDED, minimum=10.0, maximum=5.0)),
-        # FIXED without preferred.
         _spec(width=AxisSize(mode=SizeMode.FIXED)),
-        # GROW with zero weight.
         _spec(width=AxisSize(mode=SizeMode.GROW, grow_weight=0.0)),
     ];
     for bad in cases {
@@ -146,8 +115,6 @@ test "add_relation validates liveness, shape, and gap rules" {
     transcript = TranscriptView(key="t");
     set_spec(state, header, _spec());
     set_spec(state, transcript, _spec());
-
-    # Unregistered endpoints are stale.
     ghost = _rel(
         node_id(header), node_id(transcript), "ghost", LayoutRelationKind.LEFT_OF, Axis.HORIZONTAL
     );
@@ -155,8 +122,6 @@ test "add_relation validates liveness, shape, and gap rules" {
     assert not r0.ok;
     assert r0.diagnostics[0].code == LayoutError.STALE_NODE;
     assert r0.diagnostics[0].node_ids == ["ghost"];
-
-    # Directional kind on the wrong axis.
     wrong_axis = _rel(
         node_id(header),
         node_id(header),
@@ -167,8 +132,6 @@ test "add_relation validates liveness, shape, and gap rules" {
     r1 = add_relation(state, wrong_axis);
     assert not r1.ok;
     assert r1.diagnostics[0].code == LayoutError.INVALID_RELATION;
-
-    # Negative gap.
     neg_gap = _rel(
         node_id(header),
         node_id(header),
@@ -180,8 +143,6 @@ test "add_relation validates liveness, shape, and gap rules" {
     r2 = add_relation(state, neg_gap);
     assert not r2.ok;
     assert r2.diagnostics[0].code == LayoutError.INVALID_RELATION;
-
-    # Alignment kind with nonzero gap.
     aligned = _rel(
         node_id(header),
         node_id(header),
@@ -193,8 +154,6 @@ test "add_relation validates liveness, shape, and gap rules" {
     r3 = add_relation(state, aligned);
     assert not r3.ok;
     assert r3.diagnostics[0].code == LayoutError.INVALID_RELATION;
-
-    # Happy path allocates deterministic ascending handles.
     good = _rel(
         node_id(header),
         node_id(header),
@@ -227,12 +186,9 @@ test "duplicate relations merge provenance or reject strength change" {
     second.provenance = "gate:duplicate";
     r2 = add_relation(state, second);
     assert r2.ok;
-    # Merged into one stored relation carrying both provenances.
     assert len(state.relations) == 1;
     merged = state.relations[_must_handle(r1).id];
     assert merged.provenance == "shell:header;gate:duplicate";
-
-    # Same expression, different strength -> rejected.
     third = _rel(node_id(a), node_id(a), node_id(b), LayoutRelationKind.SAME_SIZE, Axis.HORIZONTAL);
     third.strength = StrengthTier.STRONG;
     third.provenance = "gate:conflict";
@@ -270,10 +226,8 @@ test "set_content enforces monotonic revisions and liveness" {
     assert ghost.diagnostics[0].code == LayoutError.STALE_NODE;
 
     assert set_content(state, t, ["one"], 1).ok;
-    # Decreasing either revision is rejected.
     assert not set_content(state, t, ["two"], 0).ok;
     assert not set_content(state, t, ["two"], 1, style_revision=-1).ok;
-    # Equal-or-advancing revisions replace content.
     assert set_content(state, t, ["two"], 1).ok;
     assert set_content(state, t, ["three"], 2).ok;
     ent = state.content[node_id(t)];
@@ -290,8 +244,6 @@ test "clear_node removes spec, content, and incident relations atomically" {
     set_spec(state, left, _spec());
     set_spec(state, right, _spec());
     assert set_content(state, left, ["l"], 1).ok;
-
-    # left --ABOVE--> right (owned by root), and left --SAME_SIZE--> root.
     r1 = add_relation(
         state,
         _rel(
@@ -319,7 +271,6 @@ test "clear_node removes spec, content, and incident relations atomically" {
     assert node_id(left) not in state.specs;
     assert node_id(left) not in state.content;
     assert len(state.relations) == 0;
-    # Untouched nodes survive.
     assert node_id(owner_node) in state.specs;
     assert node_id(right) in state.specs;
 }
@@ -331,10 +282,6 @@ test "frame accessors are None before first publication" {
     assert frame_entry_of(state, p) is None;
     assert rect_of(state, p) is None;
 }
-
-# ----------------------------------------------------------------------
-# compute_layout pipeline tests.
-# ----------------------------------------------------------------------
 
 def _published(state: LayoutState) -> LayoutFrame {
     f = state.last_frame;
@@ -414,11 +361,7 @@ test "pipeline reproduces legacy-parity shell geometry at 80x24" {
     fp = r.frame.entries[pid];
     assert fp.rect.y == 22;
     assert fp.rect.height == 2;
-
-    # Partition closure: children exactly fill the column.
     assert (fh.rect.height + ft.rect.height + fs.rect.height + fp.rect.height) == 24;
-
-    # Clips nest inside the viewport.
     assert ft.clip.width <= 80;
     assert ft.clip.height <= 20;
 
@@ -437,8 +380,6 @@ test "publication replaces state.last_frame and generations advance" {
     assert r2.ok;
     assert _published(m.state).generation == 2;
     assert _published(m.state).viewport.columns == 100;
-
-    # Transcript reclamped into the resized column.
     tid = node_id(m.transcript);
     e = _published(m.state).entries[tid];
     assert e.rect.height == 26;
@@ -450,8 +391,6 @@ test "failed run leaves the prior published frame untouched" {
     r1 = compute_layout(m.state, m.screen, Viewport(columns=80, rows=24));
     assert r1.ok;
     published = m.state.last_frame;
-
-    # A scoped node without a spec aborts compilation.
     stranger = Prompt(key="stranger");
     m.screen +>:Child(rank=9999):+> stranger;
 
@@ -493,9 +432,7 @@ test "wrapped content drives wrapped lines while fixed height clips" {
     hid = node_id(m.header);
     e = _published(m.state).entries[hid];
     assert e.rect.width == 80;
-    # Content wraps at the quantized integer width...
     assert len(e.wrapped_lines) >= 2;
-    # ...but the FIXED height still wins: overflow is clipped, not sized.
     assert e.measured.height == 1;
     assert e.clip.height <= 1;
 }
@@ -513,8 +450,8 @@ test "centered fixed overlay lands at integer floor division" {
     assert r.ok;
     oid = node_id(overlay);
     e = _published(state).entries[oid];
-    assert e.rect.x == 30;  # (80 - 20) // 2
-    assert e.rect.y == 9;  # (24 - 6) // 2
+    assert e.rect.x == 30;
+    assert e.rect.y == 9;
     assert e.rect.width == 20;
     assert e.rect.height == 6;
     assert _published(state).overlay_ids == [oid];
@@ -534,7 +471,7 @@ test "oversized fixed overlay keeps size and clips to viewport" {
     e = _published(state).entries[node_id(overlay)];
     assert e.rect.width == 120;
     assert e.rect.height == 40;
-    assert e.rect.x == 0;  # origin clamped
+    assert e.rect.x == 0;
     assert e.rect.y == 0;
 }
 

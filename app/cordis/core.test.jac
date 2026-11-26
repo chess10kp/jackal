@@ -1,11 +1,3 @@
-"""Tests for the Cordis-style core: temporal + spatial composability.
-
-This file is a `.test.jac` annex of core.jac - it sees the module's
-declarations directly, with no import line.
-"""
-
-# --- component effect functions (plain functions, no closures needed) -----
-
 def model_apply(ctx: EffectContext, fiber: Fiber) {
     ctx.put("model", "claude-sonnet-5");
     ctx.put("model.health", "ok");

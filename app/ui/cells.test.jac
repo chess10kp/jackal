@@ -1,5 +1,3 @@
-"""Tests for styled cell buffer and SGR-aware diff."""
-
 test "create_buffer is blank spaces" {
     buf = create_buffer(4, 2);
     assert buf.columns == 4;
@@ -39,7 +37,6 @@ test "wide grapheme clips when only one column remains" {
     buffer_blit_text(buf, 0, 0, "xy你", None, 3);
     assert buffer_get(buf, 0, 0).ch == "x";
     assert buffer_get(buf, 0, 1).ch == "y";
-    # Wide char needs 2 cols but only 1 left — not painted.
     assert buffer_get(buf, 0, 2).ch == " ";
     assert not buffer_get(buf, 0, 2).wide_cont;
 }

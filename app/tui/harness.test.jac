@@ -1,6 +1,3 @@
-"""Real LiveShell driven in-process on an emulated terminal (merged with
-tui/harness.jac). Every assertion reads the emulated screen."""
-
 test "first frame: header hidden, prompt, terminal modes" {
     h = open_tui();
     try {

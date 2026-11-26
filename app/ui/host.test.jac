@@ -1,5 +1,3 @@
-"""Host loop tick tests (virtual terminal, no TTY)."""
-
 import from ui.virtual_terminal { VirtualTerminal }
 
 import from ui.input { TextEvent, KeyEvent }

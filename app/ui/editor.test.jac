@@ -1,5 +1,3 @@
-"""Editor runtime tests: caret, selection, history, display width."""
-
 import from ui.model { Prompt, MainScreen }
 
 import from ui.width { display_width }
@@ -34,7 +32,6 @@ test "editor_move_up_down across lines" {
     editor_move_up(p);
     assert p.caret == 2;
     editor_move_down(p);
-    # Same visual column as end of "aa" (col 2) lands at index 5 in "bbb".
     assert p.caret == 5;
 }
 

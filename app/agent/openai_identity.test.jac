@@ -46,7 +46,9 @@ test "account substitution unknown keys and malformed tokens fail closed" {
     for token in ["", "a.b", "a.b.c", str(fixture["valid"])] {
         rejected = False;
         try {
-            validate_identity(token, keys, "oaiapp_test", "test-nonce", subject="another-subject", at=1500);
+            validate_identity(
+                token, keys, "oaiapp_test", "test-nonce", subject="another-subject", at=1500
+            );
         } except ValueError {
             rejected = True;
         }
@@ -54,7 +56,9 @@ test "account substitution unknown keys and malformed tokens fail closed" {
     }
     rejected = False;
     try {
-        validate_identity(str(fixture["valid"]), {"keys": []}, "oaiapp_test", "test-nonce", at=1500);
+        validate_identity(
+            str(fixture["valid"]), {"keys": []}, "oaiapp_test", "test-nonce", at=1500
+        );
     } except ValueError {
         rejected = True;
     }

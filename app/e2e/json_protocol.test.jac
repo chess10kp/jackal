@@ -1,5 +1,3 @@
-"""E2E: the --json JSONL protocol used by UI clients."""
-
 test "jsonl session lifecycle and a turn" {
     sb = make_sandbox();
     try {

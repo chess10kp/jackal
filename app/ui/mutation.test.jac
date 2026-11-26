@@ -1,5 +1,3 @@
-"""Behavior tests for OSP UI graph structural mutations."""
-
 test "append_child maintains sparse rank ordering" {
     screen = MainScreen(key="main");
     header = Header(key="header", title="Jackal");
@@ -88,7 +86,6 @@ test "insert_before and insert_after place relative to a sibling" {
     c = Prompt(key="c");
     append_child(screen, a);
     append_child(screen, c);
-    # OSPUI.md: insert_before(parent, child, sibling)
     insert_before(screen, b, c);
     assert ordered_child_keys(screen) == ["a", "b", "c"];
     d = TranscriptView(key="d");
@@ -154,7 +151,6 @@ test "sparse ranks keep a positive gap after successive appends" {
     for i in range(1, len(ranks)) {
         assert ranks[i] - ranks[i - 1] >= 1;
     }
-    # Default gap is 1024 until exhaustion forces normalize.
     assert ranks[1] - ranks[0] >= 1024 or ranks[1] > ranks[0];
 }
 

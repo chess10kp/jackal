@@ -1,5 +1,3 @@
-"""Session plugin boot + dual clocks + bridge wiring (P1/P2)."""
-
 import os;
 import json;
 import time;
@@ -45,7 +43,6 @@ test "session_boot parallel sidecar loads fixture and run_turn uses bridge" {
         [{"id": "stub.echo", "path": stub, "runtime": "node"}],
         wait_budget_s=10.0,
     );
-    # First-frame clock is set immediately (parallel warm).
     assert st.t_interactive_s >= t0;
     assert st.total == 1;
     assert "loading" in st.label or st.ready or st.phase == "starting";
@@ -77,7 +74,6 @@ test "unsupported requires fail loud at load" {
         wait_budget_s=10.0,
     );
     ready = wait_extensions_ready(0.0);
-    # "events" is still a stubbed surface; renderers became real in P11.
     assert ready.phase == "degraded";
     assert "unsupported" in ready.detail or "events" in ready.detail;
     session_dispose();
@@ -113,8 +109,6 @@ test "enqueue_prompt queues while loading" {
     assert drained == ["hello"];
     assert drain_prompt_queue() == [];
 }
-
-# ===================== T2-partial: commands + hooks =====================
 
 import from .plugin_bridge { resolve_stub_commands }
 import from .fake_host { register_fake_command, register_fake_listener }
@@ -156,8 +150,6 @@ test "run_command without a bridge degrades gracefully" {
 
 test "turn_start and turn_end hooks fire around a turn" {
     session_dispose();
-    # No decls -> no Node -> no bridge -> hooks are skipped silently. Use the
-    # fake host path instead: attach listeners to a manual bridge.
     st = session_boot("t-t2-hooks", os.getcwd(), []);
     b = plugins.bridge;
     if b is None {
@@ -179,8 +171,6 @@ test "turn_start and turn_end hooks fire around a turn" {
 
     register_fake_listener(b, "turn_start", _on_start);
     register_fake_listener(b, "turn_end", _on_end);
-
-    # Drive the hook path directly (react_loop needs a live model endpoint).
     res = fire_hook(b, "turn_start", {"message": "hook-msg"});
     assert len(res) == 1 and res[0]["ok"] is True;
     res2 = fire_hook(b, "turn_end", {"secs": 0.4, "tools": 0});
@@ -190,8 +180,6 @@ test "turn_start and turn_end hooks fire around a turn" {
     dispose_bridge(b);
     session_dispose();
 }
-
-# ===================== full-compat Phase A: event coverage =====================
 
 test "relay_tool_hooks fires pi-named tool events and delegates" {
     session_dispose();
@@ -224,8 +212,6 @@ test "relay_tool_hooks fires pi-named tool events and delegates" {
     relay("tool_result", {"tool": "read", "result": "ok"});
     assert seen == ["start:read", "end:read"];
     assert inner_seen == ["chunk", "tool_call", "tool_result"];
-
-    # Identity without a bridge — native path keeps zero overhead.
     relay2 = relay_tool_hooks(None, _inner);
     assert relay2 is _inner;
     plugins.bridge = None;
@@ -273,8 +259,6 @@ test "extension traffic joins history and emits entry events" {
 
     assert history[-1] == {"role": "user", "content": "injected context"};
     assert "entry" in seen;
-
-    # Second application with empty buffers is a no-op.
     n = len(history);
     _apply_extension_traffic(b as PluginBridge, _collect);
     assert len(history) == n;
@@ -283,8 +267,6 @@ test "extension traffic joins history and emits entry events" {
     clear_history();
     session_dispose();
 }
-
-# ===================== batch-2: input gate + before_agent_start =====================
 
 test "run_turn short-circuits on handled input verdict" {
     session_dispose();
@@ -313,11 +295,7 @@ test "run_turn short-circuits on handled input verdict" {
 
     answer = run_turn("!ping", _collect);
     assert answer == "";
-    # Handled input never reaches LLM history.
     assert len(history) == n_before;
-
-    # Non-handled input continues (would need a live model past this point,
-    # so only the gate decision is exercised here).
     plugins.bridge = None;
     dispose_bridge(b as PluginBridge);
     clear_history();
@@ -341,7 +319,6 @@ test "agent_start_gate collects systemPrompt without touching history" {
     register_fake_listener(b as PluginBridge, "before_agent_start", _sys);
     a = agent_start_gate(b as PluginBridge, "hi");
     assert a["systemPrompt"] == "OVERRIDE";
-    # Gate alone never touches history — the swap lives inside run_turn.
     n_before = len(history);
     assert len(history) == n_before;
 
@@ -354,8 +331,6 @@ test "agent_start_gate collects systemPrompt without touching history" {
 test "set_model refuses when provider credential is missing" {
     session_dispose();
     st = session_boot("t-model-refusal", tempfile.mkdtemp(), []);
-    # Start from a keyless provider so the unchanged-model assert is meaningful
-    # (the boot default itself is an openrouter model).
     assert set_model("mock") == "mock";
     saved: any = os.environ.pop("OPENROUTER_API_KEY", None);
     try {
@@ -368,7 +343,6 @@ test "set_model refuses when provider credential is missing" {
             os.environ["OPENROUTER_API_KEY"] = str(saved);
         }
     }
-    # Keyless providers always pass validation.
     assert set_model("mock") == "mock";
     session_dispose();
 }

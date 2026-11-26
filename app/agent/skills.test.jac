@@ -1,23 +1,3 @@
-"""Skills discovery/indexing tests for agent/skills.jac (same-stem annex).
-
-Covers: the recursive discovery walk (SKILL.md branch claiming, nested
-dirs, dot-dir and node_modules skipping, gitignore rules, root-level *.md
-pickup), the hand-rolled frontmatter parser (scalars, quotes, inline +
-dash lists, absent/unterminated blocks), malformed-SKILL.md tolerance
-(warnings, no crashes, description-less exclusion), root merging in
-load_jackal_skills (builtin < user < project precedence, name-sorted
-output, collision diagnostics, realpath dedup), explicit skill_paths
-resolution and error cases, prompt catalog formatting with XML escaping
-and the disable flag, /skill:name expansion, load_skill_by_dir, the read
-allowlist, and one smoke test over the REAL repo catalog under pi/skills/
-(read-only). Every fixture lives in a Python tempfile tree removed per
-test -- the real pi/skills data is never modified.
-
-Typing note: values pulled out of untyped dicts/lists arrive as <Unknown>
-to the Jac checker, so this file funnels them through explicit locals or
-str()/dict() casts before use.
-"""
-
 def _make_tmp -> str {
     return tempfile.mkdtemp(prefix="jackal-skills-test-");
 }
@@ -37,7 +17,6 @@ def _write_text(path: str, text: str) {
 }
 
 def _write_bytes_as_latin1(path: str, text: str) {
-    # Produces bytes that are INVALID utf-8 without b"" literals.
     os.makedirs(_dir_name(path), exist_ok=True);
     fh = open(path, "w", encoding="latin-1");
     try {
@@ -86,12 +65,9 @@ test "discovery walk claims SKILL.md branches and skips hidden vendor dirs" {
     try {
         skills_root = os.path.join(tmp, "skills");
         _write_skill(os.path.join(skills_root, "alpha"), "alpha", "Alpha skill.");
-        # Nested two levels deep: beta/tools/SKILL.md is still discovered.
         _write_skill(os.path.join(skills_root, "beta", "tools"), "beta", "Beta tooling.");
-        # Hidden dirs, node_modules, and ignored patterns are skipped.
         _write_skill(os.path.join(skills_root, ".hidden"), "secret", "Should not load.");
         _write_skill(os.path.join(skills_root, "node_modules", "dep"), "dep", "Nope.");
-        # A .gitignore inside a subdir excludes its sibling SKILL.md.
         _write_text(os.path.join(skills_root, "gamma", ".gitignore"), "SKILL.md\n");
         _write_skill(os.path.join(skills_root, "gamma"), "gamma", "Ignored by rule.");
 
@@ -107,8 +83,6 @@ test "discovery walk claims SKILL.md branches and skips hidden vendor dirs" {
             assert str(s["source"]) == "project";
             assert s["disableModelInvocation"] is False;
         }
-
-        # Root-level *.md files are picked up at the top of the walk only.
         plain_root = os.path.join(tmp, "plain");
         os.makedirs(plain_root, exist_ok=True);
         _write_skill(os.path.join(plain_root, "nested"), "nested-skill", "Nested.");
@@ -121,8 +95,6 @@ test "discovery walk claims SKILL.md branches and skips hidden vendor dirs" {
         loose_items: list[dict[str, any]] = loose["skills"];
         first: dict[str, any] = loose_items[0];
         assert str(first["source"]) == "builtin";
-
-        # Missing directory yields an empty result, not an error.
         absent = load_skills_from_dir(os.path.join(tmp, "nope"), "user");
         assert absent["skills"] == [] and absent["diagnostics"] == [];
     } finally {
@@ -154,16 +126,10 @@ test "frontmatter parser handles scalars, quoting, lists, and absence" {
     steps: any = fm.get("steps");
     assert steps == ["first", "second"];
     assert body == "Body line one.\n\nBody line two.";
-
-    # No frontmatter: everything is body.
     parsed2 = parse_frontmatter("just prose, nothing else");
     assert parsed2[0] == {} and parsed2[1] == "just prose, nothing else";
-
-    # Unterminated block: whole text stays body.
     parsed3 = parse_frontmatter("---\nname: never-closed");
     assert parsed3[0] == {} and "never-closed" in parsed3[1];
-
-    # CRLF normalization.
     parsed4 = parse_frontmatter("---\r\nname: crlf\r\ndescription: d\r\n---\r\n\r\nB\r\n");
     fm4: dict[str, any] = parsed4[0];
     assert str(fm4.get("name")) == "crlf";
@@ -179,24 +145,17 @@ test "malformed SKILL.md files produce warnings without crashing" {
     try {
         tree_base = os.path.join(tmp, "skills");
         os.makedirs(tree_base, exist_ok=True);
-
-        # Missing description -> excluded with a warning diagnostic.
         _write_text(
             os.path.join(tree_base, "nodesc", "SKILL.md"),
             "---\nname: nodesc\n---\n\nNo description here.\n",
         );
-        # Invalid name characters -> warning but still loaded.
         _write_skill(os.path.join(tree_base, "badname"), "Bad Name!", "Still usable.");
-        # Name exceeding the length cap.
         long_name = "a" * 80;
         _write_skill(os.path.join(tree_base, "toolong"), long_name, "Too long name.");
-        # Empty file.
         _write_text(os.path.join(tree_base, "emptyf", "SKILL.md"), "");
-        # Undecodable bytes (latin-1 written 0xFF/0xFE are invalid UTF-8).
         _write_bytes_as_latin1(
             os.path.join(tree_base, "binary", "SKILL.md"), "\xff\xfe\x00not utf8"
         );
-        # Garbage frontmatter that never terminates.
         _write_text(
             os.path.join(tree_base, "garbled", "SKILL.md"),
             "---\nname [broken: ===\nno closing delimiter ever",
@@ -205,9 +164,6 @@ test "malformed SKILL.md files produce warnings without crashing" {
 
         result: dict[str, list[dict[str, any]]] = load_skills_from_dir(tree_base, "path");
         names = _names(result);
-        # nodesc/emptyf/binary/garbled excluded; badname+toolong warn but
-        # keep loading under their declared (invalid) names -- the dir-name
-        # fallback only applies when the frontmatter name is absent/empty.
         assert "nodesc" not in names;
         assert "emptyf" not in names;
         assert "Bad Name!" in names;
@@ -228,8 +184,6 @@ test "malformed SKILL.md files produce warnings without crashing" {
             wp: any = wd2["path"];
             assert str(wp).endswith(".md");
         }
-
-        # The same tree through load_jackal_skills stays crash-free.
         merged = load_jackal_skills(cwd=tmp, package_root=tmp, agent_dir=os.path.join(tmp, "home"));
         merged_skills: list[dict[str, any]] = merged["skills"];
         assert isinstance(merged_skills, list);
@@ -263,7 +217,6 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
         result: dict[str, list[dict[str, any]]] = load_jackal_skills(
             cwd=proj, package_root=pkg, agent_dir=home
         );
-        # Sorted by name across all roots.
         assert _names(result) == ["alpha", "beta", "dupe", "gamma", "zeta"];
 
         by_name: dict[str, dict[str, any]] = {};
@@ -278,12 +231,10 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
         assert str(winner_beta["source"]) == "user";
         winner_gamma: dict[str, any] = by_name["gamma"];
         assert str(winner_gamma["source"]) == "project";
-        # Later root (user) overrides builtin on name collision...
         winner_dupe: dict[str, any] = by_name["dupe"];
         assert str(winner_dupe["source"]) == "user";
         assert str(winner_dupe["description"]) == "User dupe wins.";
         assert winner_dupe["disableModelInvocation"] is True;
-        # ...and records a collision diagnostic pointing both ways.
         collisions = _diag_types(result, "collision");
         assert len(collisions) == 1;
         col0: dict[str, any] = collisions[0];
@@ -291,8 +242,6 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
         assert str(col["name"]) == "dupe";
         assert str(col["winnerPath"]) == dupe_user;
         assert str(col["loserPath"]) == dupe_builtin;
-
-        # include_defaults=False loads only explicit paths.
         only_paths: dict[str, list[dict[str, any]]] = load_jackal_skills(
             cwd=proj,
             package_root=pkg,
@@ -301,8 +250,6 @@ test "load_jackal_skills merges roots with precedence, sorting, collisions" {
             skill_paths=[os.path.join(pkg, "pi", "skills", "alpha")],
         );
         assert _names(only_paths) == ["alpha"];
-
-        # Project skills dir discovered via walk-up from a nested cwd.
         nested_cwd = os.path.join(proj, "deep", "deeper");
         os.makedirs(nested_cwd, exist_ok=True);
         walked_up: dict[str, list[dict[str, any]]] = load_jackal_skills(
@@ -324,8 +271,6 @@ test "explicit skill_paths resolve relative, home, and error cases" {
             "---\nname: standalone\ndescription: One file skill.\n---\n\nBody.\n",
         );
         _write_text(os.path.join(proj, "notmd.txt"), "plain text");
-
-        # Relative directory resolves against cwd.
         rel: dict[str, list[dict[str, any]]] = load_jackal_skills(
             cwd=proj, include_defaults=False, skill_paths=["local"]
         );
@@ -333,14 +278,10 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         rel_items: list[dict[str, any]] = rel["skills"];
         rel0: dict[str, any] = rel_items[0];
         assert str(rel0["filePath"]) == target;
-
-        # Single .md file loads directly; duplicate paths dedup by realpath.
         solo: dict[str, list[dict[str, any]]] = load_jackal_skills(
             cwd=proj, include_defaults=False, skill_paths=["standalone.md", str(single_md)]
         );
         assert _names(solo) == ["standalone"];
-
-        # Errors become diagnostics: missing path and non-markdown file.
         errs = load_jackal_skills(
             cwd=proj, include_defaults=False, skill_paths=["missing-dir", "notmd.txt"]
         );
@@ -353,8 +294,6 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         }
         assert any("does not exist" in m for m in msgs);
         assert any("not a markdown file" in m for m in msgs);
-
-        # Paths under the user roots get tagged accordingly.
         home = os.path.join(tmp, "home");
         _write_skill(os.path.join(home, "skills", "homed"), "homed", "From home.");
         tagged = load_jackal_skills(
@@ -367,8 +306,6 @@ test "explicit skill_paths resolve relative, home, and error cases" {
         tagged_items: list[dict[str, any]] = tagged["skills"];
         tag0: dict[str, any] = tagged_items[0];
         assert str(tag0["source"]) == "user";
-
-        # Tilde expansion maps into the fake home via HOME env override.
         old_home = os.environ.get("HOME");
         os.environ["HOME"] = home;
         try {
@@ -412,8 +349,6 @@ test "format_skills_for_prompt escapes xml and honors the disable flag" {
         assert "<name>escaper</name>" in block;
         assert "&lt;b &amp; c&gt;d &quot;quotes&quot; and &apos;apos&apos;" in block;
         assert "hidden-one" not in block;
-
-        # Catalog preamble wording matches the legacy contract.
         assert "Use the read tool to load a skill's file" in block;
         assert "resolve it against the skill directory" in block;
 
@@ -446,13 +381,8 @@ test "expand_skill_command inlines the referenced skill body" {
         assert "References are relative to " + dir_path + "." in expanded;
         assert "Step 1. Step 2." in expanded;
         assert "</skill>\n\nplease run it" in expanded;
-
-        # Without args there is no trailing blank-arg section.
         bare = expand_skill_command("/skill:demo", [skill]);
         assert bare.endswith("</skill>");
-
-        # Unknown skill, non-command input, and unreadable files all pass
-        # the original text straight through.
         assert expand_skill_command("/skill:nope hi", [skill]) == "/skill:nope hi";
         assert expand_skill_command("just chat", [skill]) == "just chat";
         broken: dict[str, any] = dict(skill);
@@ -474,7 +404,6 @@ test "load_skill_by_dir returns stripped bodies and empty on misses" {
         );
         assert load_skill_by_dir("realone", package_root=tmp) == "Real body here.";
         assert load_skill_by_dir("missing", package_root=tmp) == "";
-        # Corrupt bytes fall back to '' instead of raising.
         _write_bytes_as_latin1(
             os.path.join(tmp, "pi", "skills", "corrupt", "SKILL.md"), "\xff\xfe\x00\xff"
         );
@@ -518,7 +447,6 @@ test "skill_read_allowlist yields absolute files and rooted base dirs" {
 }
 
 test "real jackal catalog under pi/skills parses read-only" {
-    # Locate the repo root by walking up from the cwd looking for pi/skills.
     probe = os.getcwd();
     repo = "";
     for _hop in range(8) {
@@ -533,18 +461,14 @@ test "real jackal catalog under pi/skills parses read-only" {
         probe = parent;
     }
     if not repo {
-        # Repo layout unavailable in this environment; nothing to assert.
         return;
     }
     tmp = _make_tmp();
     try {
-        # Read-only smoke: real builtin catalog, empty user/home roots, cwd
-        # pointed away from any project skills dir.
         result = load_jackal_skills(
             cwd=tmp, package_root=repo, agent_dir=os.path.join(tmp, "home")
         );
         items: list[dict[str, any]] = result["skills"];
-        # The repo ships ~26 built-in skills; be robust to small drift.
         assert len(items) >= 20;
         prev = "";
         for item in items {
@@ -557,7 +481,7 @@ test "real jackal catalog under pi/skills parses read-only" {
             assert str(s["filePath"]).startswith(os.path.join(repo, "pi", "skills"));
             assert str(s["source"]) == "builtin";
             if prev {
-                assert prev <= name;  # name-sorted output
+                assert prev <= name;
             }
             prev = name;
         }

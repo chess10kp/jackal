@@ -1,5 +1,3 @@
-"""Unit tests for tui/format.jac (display-only transcript blocks)."""
-
 test "format_turn is compact for conversation roles" {
     out = format_turn("user", "hello\nworld");
     assert out == "◆ You\n  hello\n  world", str(out);

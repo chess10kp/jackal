@@ -1,10 +1,3 @@
-"""Unit 7 acceptance: focus order, layers, modal overlay lifecycle.
-
-Helpers for layer z-order are fixed. Core focus_order / open_modal /
-close_overlay are stubbed until Unit 7 implementation (OSPUI.md §17,
-OSPUI-P0-PLAN Unit 7).
-"""
-
 import from ui.model {
     MainScreen,
     Prompt,
@@ -91,16 +84,11 @@ test "focus_order follows containment then FocusNext override" {
 
     structural = focus_order(session, screen);
     assert [n.key for n in structural] == ["a", "b", "c"];
-
-    # FocusNext from a -> c skips b in the override chain after a.
     a +>:FocusNext:+> c;
     overridden = focus_order(session, screen);
     keys = [n.key for n in overridden];
     assert keys[0] == "a";
     assert "c" in keys;
-    # After visiting a, next via FocusNext is c (b may still appear if
-    # unreachable from the override walk — structural remainder is allowed
-    # only after the override chain ends).
     assert keys.index("c") == keys.index("a") + 1;
 }
 
@@ -154,7 +142,6 @@ test "open_modal_overlay saves focus traps and focuses initial target" {
     assert result.initial_focus_id == node_id(button);
     assert session.saved_focus_id == prior;
     assert get_focus_node(session) is button;
-    # Modal layer must exist and be preferred for input targeting.
     assert overlay in [screen ->:Layer:->];
 }
 
@@ -182,7 +169,6 @@ test "close_overlay restores prior focus and reports damage bounds" {
     assert closed.restored_focus_id == node_id(prompt);
     assert get_focus_node(session) is prompt;
     assert overlay not in [screen ->:Layer:->];
-    # Damage must cover the former overlay region so underlay is repainted.
     assert not closed.damage.is_empty() or (closed.damage.width >= 0 and closed.damage.height >= 0);
 }
 
@@ -200,7 +186,6 @@ test "closing overlay with deleted prior focus clears focus safely" {
     set_current_screen(session, screen);
     set_focus(session, prompt);
     open_modal_overlay(session, screen, overlay, initial_focus=overlay);
-    # Simulate prior focus becoming unavailable before close.
     session.saved_focus_id = "dead-focus-id";
     closed = close_overlay(session, overlay);
     assert closed.restored_focus_id == "";

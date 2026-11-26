@@ -1,5 +1,3 @@
-"""Behavior tests for the OSPUI domain/UI binding registry."""
-
 test "subscribe and unsubscribe round trip" {
     registry = BindingRegistry();
     assert subscribe(registry, "session.events", "target-1", "TranscriptChanged");
@@ -42,8 +40,6 @@ test "unsubscribe_target clears all bindings for one target" {
     removed = unsubscribe_target(registry, "shared");
     assert removed == 2;
     assert binding_count(registry) == 1;
-    # NOTE: `== []` against an empty list literal miscompares natively;
-    # use length checks instead.
     assert len(bindings_for_target(registry, "shared")) == 0;
     assert len(bindings_for_target(registry, "other")) == 1;
 }

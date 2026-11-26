@@ -1,9 +1,3 @@
-"""Unit tests for tui/preview.jac (same-stem annex; imports live in the stem
-— the module itself is import-free). Guards the C3 display contract: first
-TOOL_RESULT_PREVIEW_LINES lines verbatim, per-line char cap, and the exact
-'…  +N lines' footer when the result is longer. Display-only: nothing
-here may assume the full result is unavailable elsewhere."""
-
 test "short result shows verbatim with no footer" {
     out = tool_result_preview("alpha\nbeta\ngamma");
     assert out == "alpha\nbeta\ngamma", str(out);
@@ -21,7 +15,6 @@ test "long result shows six lines plus an exact-count footer" {
 
 test "trailing newline does not invent an extra hidden line" {
     out = tool_result_preview("a\nb\nc\nd\ne\nf\ng\n");
-    # Seven logical lines: six shown, exactly one more.
     assert out.endswith("\n…  +1 lines"), str(out);
 }
 
@@ -44,7 +37,7 @@ test "overlong lines inside a long result are capped, footer still counts lines"
         a + "\n" + b + "\n" + "tail1\ntail2\ntail3\ntail4\ntail5\ntail6\ntail7"
     );
     parts: list[str] = out.split("\n");
-    assert len(parts) == 7, str(out);  # 6 shown + footer
+    assert len(parts) == 7, str(out);
     assert parts[0].endswith("y..."), str(out);
     assert parts[1].endswith("z..."), str(out);
     assert parts[5] == "tail4", str(out);

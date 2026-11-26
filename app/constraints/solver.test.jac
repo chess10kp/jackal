@@ -1,10 +1,3 @@
-"""M1 tests: static required solver.
-
-Covers LAYOUT-ENGINE-PLAN §9 M1: typed handles, content-hash duplicate
-detection, atomic add with exact rollback, provenance hooks, deterministic
-ordering, and seeded property systems.
-"""
-
 import from constraints.algebra {
     Constraint,
     Expression,
@@ -20,9 +13,6 @@ import from constraints.algebra {
     normalize_expression,
     strength_weight,
 }
-# ConstraintHandle, SolveError, SolveResult, SolverSnapshot, Solver, and
-# Row come from constraints.results/constraints.solver implicitly:
-# a <stem>.test.jac must not import its own stem module.
 import from time { perf_counter }
 import sys;
 
@@ -39,7 +29,6 @@ def _sum(parts: list[Expression]) -> Expression {
 }
 
 def _build_chain(s: Solver) -> dict[int, float] {
-    # a=0, b=a+10, c=b+20 — the M0 exit-criteria system.
     a = s.new_variable();
     b = s.new_variable();
     c = s.new_variable();
@@ -54,7 +43,6 @@ def _build_chain(s: Solver) -> dict[int, float] {
 }
 
 def _tableau_state(s: Solver) -> str {
-    # Exact pre/post comparison for rollback tests (plan §5.4).
     parts: list[str] = [];
     parts.append("tick=" + str(s.id_tick));
     parts.append("gen=" + str(s.generation));
@@ -87,8 +75,6 @@ test "chained equalities solve deterministically with handles" {
     s2 = Solver();
     v2 = _build_chain(s2);
     assert v2 == vals;
-
-    # Generation advanced once per successful add; failures leave it.
     assert s.generation == 3;
 }
 
@@ -120,29 +106,18 @@ test "duplicate constraints are rejected by content hash" {
     e = _sum([_vt(x), _vt(y), Expression(constant=-10.0)]);
     r1 = s.add_constraint(eq(e), provenance="first");
     assert r1.ok;
-
-    # Same content, different object => duplicate.
     dup = s.add_constraint(eq(normalize_expression(e)), provenance="second");
     assert not dup.ok;
     assert dup.error == SolveError.DUPLICATE_CONSTRAINT;
     assert dup.handle is None;
     assert dup.witness_provenance == ["first"];
-
-    # Semantically identical after normalization (reordered terms).
     reordered = _sum([_vt(y), Expression(constant=-10.0), _vt(x)]);
     dup2 = s.add_constraint(eq(reordered));
     assert not dup2.ok;
     assert dup2.error == SolveError.DUPLICATE_CONSTRAINT;
-
-    # Same expression with a different strength is a distinct M2
-    # constraint. It is accepted as a soft error objective, not treated as
-    # a required duplicate.
     other_strength = Constraint(expression=e, relation=Relation.EQ, strength=StrengthTier.WEAK);
     r3 = s.add_constraint(other_strength);
     assert r3.ok;
-
-    # The two accepted constraints each advance generation once; duplicate
-    # failures do not.
     assert s.generation == 2;
 }
 
@@ -150,23 +125,18 @@ test "failed add rolls back tableau state exactly" {
     s = Solver();
     a = s.new_variable();
     b = s.new_variable();
-    fresh = s.new_variable();  # never used; id_tick probe
+    fresh = s.new_variable();
 
     assert s.add_constraint(eq(_vt(a))).ok;
     assert s.add_constraint(eq(add_expressions(_vt(b), Expression(constant=-5.0)))).ok;
 
     before = _tableau_state(s);
-
-    # Inconsistent required equality: must fail and leave zero residue.
     bad = s.add_constraint(eq(add_expressions(_vt(a), Expression(constant=-7.0))));
     assert not bad.ok;
     assert bad.error == SolveError.UNSATISFIABLE;
 
     after = _tableau_state(s);
     assert before == after;
-
-    # The rejected constraint's key was not registered; re-adding a
-    # consistent constraint still works and ids continue cleanly.
     c = s.new_variable();
     ok_r = s.add_constraint(eq(add_expressions(_vt(c), Expression(constant=-2.0))));
     assert ok_r.ok;
@@ -178,25 +148,17 @@ test "unsatisfiable system via artificial variable rolls back" {
     w = s.new_variable();
     x = s.new_variable();
     y = s.new_variable();
-
-    # w + x == 4, w - x == 0  =>  w = x = 2.
     assert s.add_constraint(eq(_sum([_vt(w), _vt(x), Expression(constant=-4.0)]))).ok;
     assert s.add_constraint(eq(_sum([_vt(w), _vt(x, -1.0)]))).ok;
 
     before = _tableau_state(s);
-
-    # y - w == 1, y - w == 3 pair is fine individually; force conflict:
-    # y == w + 1 and y == w + 3 cannot both hold given fixed w,x.
     r1 = s.add_constraint(eq(_sum([_vt(y), _vt(w, -1.0), Expression(constant=-1.0)])));
     assert r1.ok;
     r2 = s.add_constraint(eq(_sum([_vt(y), _vt(w, -1.0), Expression(constant=-3.0)])));
     assert not r2.ok;
     assert r2.error == SolveError.UNSATISFIABLE;
-
-    # State identical to just after r1 committed.
     mid = _tableau_state(s);
     assert len(mid) > 0;
-    # Rollback restored everything except r1's own committed state.
     s2 = Solver();
     w2 = s2.new_variable();
     x2 = s2.new_variable();
@@ -211,8 +173,6 @@ test "unsatisfiable system via artificial variable rolls back" {
 test "required inequality leaves variable at default bound" {
     s = Solver();
     x = s.new_variable();
-
-    # x <= 5 with no upward pressure: non-basic x reads zero.
     r = s.add_constraint(
         Constraint(
             expression=normalize_expression(_vt(x)),
@@ -228,7 +188,7 @@ test "non-finite coefficients are rejected at the interface" {
     s = Solver();
     x = s.new_variable();
 
-    huge = 1e308 * 10.0;  # infinity without a math import
+    huge = 1e308 * 10.0;
     bad = s.add_constraint(
         Constraint(
             expression=Expression(terms=[Term(variable=x, coefficient=huge)], constant=0.0),
@@ -255,11 +215,6 @@ test "reset returns solver to empty state" {
     assert s.add_constraint(eq(add_expressions(_vt(b), Expression(constant=-3.0)))).ok;
     assert s.snapshot().values[b.id] == 3.0;
 }
-
-# ----------------------------------------------------------------------
-# Seeded property systems (plan §8.1): constructed-solvable and
-# deliberately-inconsistent families over a tiny deterministic LCG.
-# ----------------------------------------------------------------------
 
 obj LCG {
     has state: int = 12345;
@@ -314,15 +269,10 @@ test "property: constructed solvable systems satisfy all constraints" {
         rng = LCG(state=seed * 7919);
         s = Solver();
         vs: list[Variable] = [];
-        n = 1 + rng.next_int(15);  # 1..15 variables
+        n = 1 + rng.next_int(15);
         for i in range(n) {
             vs.append(s.new_variable());
         }
-
-        # Target values then equations built FROM them => always solvable.
-        # Integer coefficients/targets keep arithmetic exact: the solver's
-        # feasibility epsilon is 1e-8 and decimal fractions would drift
-        # past it after many substitutions (real finding from this test).
         targets: dict[int, float] = {};
         for v in vs {
             targets[v.id] = float(rng.next_int(21) - 10);
@@ -332,7 +282,7 @@ test "property: constructed solvable systems satisfy all constraints" {
         cs: list[Constraint] = [];
         seen_keys: list[str] = [];
         for i in range(count) {
-            k = 1 + rng.next_int(3);  # terms per equation
+            k = 1 + rng.next_int(3);
             terms: list[Expression] = [];
             const: float = 0.0;
             picked: list[Variable] = [];
@@ -354,7 +304,7 @@ test "property: constructed solvable systems satisfy all constraints" {
             rel = Relation.EQ;
             if roll == 1 {
                 rel = Relation.LEQ;
-                const += float(1 + rng.next_int(10));  # positive slack
+                const += float(1 + rng.next_int(10));
             } elif roll == 2 {
                 rel = Relation.GEQ;
                 const -= float(1 + rng.next_int(10));
@@ -364,8 +314,6 @@ test "property: constructed solvable systems satisfy all constraints" {
                 relation=rel,
                 strength=StrengthTier.REQUIRED,
             );
-            # The generator can emit identical equations; duplicates are
-            # legitimately rejected, so skip them before adding.
             key = constraint_key(c);
             if _contains_str(seen_keys, key) {
                 continue;
@@ -398,9 +346,6 @@ def _seeded_system(seed: int) -> dict[int, float] {
     for i in range(n) {
         vs.append(s.new_variable());
     }
-
-    # Chain equalities plus random cross-links between earlier variables
-    # expressed as exact linear combinations of already-fixed variables.
     s.add_constraint(eq(_vt(vs[0])));
     for i in range(1, n) {
         anchor = vs[rng.next_int(i)];
@@ -461,17 +406,12 @@ def _fixture_expr(vs: list[Variable], pairs: list[list[any]], const: float) -> E
     return acc;
 }
 
-# ----------------------------------------------------------------------
-# M2 constraint hierarchy: symbolic lexicographic objective.
-# ----------------------------------------------------------------------
-
 test "LexWeight compares tiers lexicographically" {
     strong = strength_weight(StrengthTier.STRONG);
     medium = strength_weight(StrengthTier.MEDIUM);
     weak = strength_weight(StrengthTier.WEAK);
     assert lex_compare(strong, medium) > 0;
     assert lex_compare(medium, weak) > 0;
-    # Many lower-tier units still cannot cross one higher-tier unit.
     many_weak = LexWeight(tiers=[0.0, 0.0, 1000000.0]);
     assert lex_compare(strong, many_weak) > 0;
     assert lex_compare(many_weak, strong) < 0;
@@ -518,8 +458,6 @@ test "one strong error dominates many weak errors" {
         strength=StrengthTier.STRONG,
     );
     assert s.add_constraint(strong).ok;
-    # Each weak equality has distinct content. Their aggregate scalar cost
-    # would be large, but lexicographic semantics must keep x at 1000.
     for i in range(1, 21) {
         weak = Constraint(
             expression=_sum([_vt(x), Expression(constant=-float(i))]),
@@ -534,7 +472,6 @@ test "one strong error dominates many weak errors" {
 test "soft inequality minimizes only its violating side" {
     s = Solver();
     x = s.new_variable();
-    # Hard x == 3 and soft x <= 1: the soft error is exactly 2.
     assert s.add_constraint(eq(_sum([_vt(x), Expression(constant=-3.0)]))).ok;
     soft = Constraint(
         expression=_sum([_vt(x), Expression(constant=-1.0)]),
@@ -544,10 +481,6 @@ test "soft inequality minimizes only its violating side" {
     assert s.add_constraint(soft).ok;
     assert s.snapshot().values[x.id] == 3.0;
 }
-
-# ----------------------------------------------------------------------
-# M3 incrementality: removal, edit variables, dual optimization.
-# ----------------------------------------------------------------------
 
 def _must_handle(r: SolveResult) -> ConstraintHandle {
     assert r.ok;
@@ -568,14 +501,10 @@ test "removal frees a variable for re-constraining" {
     assert r1.ok and r2.ok;
     snap = s.snapshot();
     assert snap.values[a.id] == 0.0 and snap.values[b.id] == 10.0;
-
-    # Remove a == 0: `a` becomes free, the chain still holds.
     assert s.remove_constraint(_must_handle(r1)).ok;
     assert s.add_constraint(eq(_sum([_vt(a), Expression(constant=-5.0)]))).ok;
     snap = s.snapshot();
     assert snap.values[a.id] == 5.0 and snap.values[b.id] == 15.0;
-
-    # Removing an unknown handle fails cleanly.
     ghost = ConstraintHandle(id=99999);
     res = s.remove_constraint(ghost);
     assert not res.ok;
@@ -601,12 +530,8 @@ test "removing a soft constraint releases its objective weight" {
     );
     assert strong.ok and weak.ok;
     assert s.snapshot().values[x.id] == 10.0;
-
-    # Without the STRONG fact the WEAK preference is achievable.
     assert s.remove_constraint(_must_handle(strong)).ok;
     assert s.snapshot().values[x.id] == 2.0;
-
-    # And without either, x sits at its default bound.
     assert s.remove_constraint(_must_handle(weak)).ok;
     assert s.snapshot().values[x.id] == 0.0;
 }
@@ -633,13 +558,10 @@ test "removal of required inequality drops only its slack row" {
     rows_before = len(s.rows);
     assert s.remove_constraint(_must_handle(r_le)).ok;
     assert len(s.rows) == rows_before - 1;
-    # y >= x survives; x itself is now unconstrained, so pin both and
-    # confirm the remaining system still solves coherently.
     assert s.add_constraint(eq(_sum([_vt(y), Expression(constant=-9.0)]))).ok;
     assert s.add_constraint(eq(_vt(x))).ok;
     snap = s.snapshot();
     assert snap.values[x.id] == 0.0 and snap.values[y.id] == 9.0;
-    # The surviving GEQ is respected by construction (0 <= 9).
     assert snap.values[y.id] >= snap.values[x.id];
 }
 
@@ -656,8 +578,6 @@ test "add/remove cycles return state to baseline" {
 
     handles: list[ConstraintHandle] = [];
     for i in range(1, 11) {
-        # A fresh variable per constraint keeps every REQUIRED fact
-        # satisfiable while still exercising slack-row churn.
         vi = s.new_variable();
         r = s.add_constraint(eq(_sum([_vt(vi), Expression(constant=-float(i))])));
         assert r.ok;
@@ -667,26 +587,17 @@ test "add/remove cycles return state to baseline" {
         r = s.remove_constraint(h);
         assert r.ok;
     }
-
-    # Live state returns exactly to baseline: no residual rows,
-    # constraint registrations, objective terms, or value drift.
     assert len(s.rows) == base_rows;
     assert len(s.cns) == base_cns;
     assert len(s.handle_keys) == 0;
     assert len(s.provenance) == 0;
     assert len(s.objective.cells) == base_objective_cells;
     after = s.snapshot();
-    # Every variable touched by the cycle sits back at its default bound.
     for vid in sorted(after.values.keys()) {
         assert after.values[vid] == 0.0;
     }
     assert after.generation > base_values.generation;
-    # Symbol allocations are deliberately never released on success
-    # (kiwi semantics); they grow monotonically instead of leaking
-    # per-cycle state.
     assert len(s.kinds) >= base_kinds;
-
-    # The recycled solver still solves identically to a fresh one.
     assert s.add_constraint(eq(_vt(a))).ok;
     assert s.add_constraint(eq(_sum([_vt(b), _vt(a, -1.0), Expression(constant=-7.0)]))).ok;
     snap = s.snapshot();
@@ -697,8 +608,6 @@ test "edit variables track suggestions under hard constraints" {
     s = Solver();
     width = s.new_variable();
     child = s.new_variable();
-
-    # Child fills half of a resizable container; both stay non-negative.
     assert s.add_constraint(
         Constraint(expression=_vt(width), relation=Relation.GEQ, strength=StrengthTier.REQUIRED)
     ).ok;
@@ -753,12 +662,8 @@ test "edit variable API rejects misuse with typed errors" {
     res = s.add_edit_variable(x, StrengthTier.WEAK);
     assert not res.ok;
     assert res.error == SolveError.DUPLICATE_EDIT_VARIABLE;
-
-    # A second variable can be edited independently.
     assert s.add_edit_variable(y, StrengthTier.MEDIUM).ok;
     assert s.has_edit_variable(x) and s.has_edit_variable(y);
-
-    # Removal drops exactly one registration.
     assert s.remove_edit_variable(x).ok;
     assert not s.has_edit_variable(x);
     res = s.remove_edit_variable(x);
@@ -770,7 +675,6 @@ test "edit variable API rejects misuse with typed errors" {
 test "suggestion yields to stronger constraints via dual optimize" {
     s = Solver();
     x = s.new_variable();
-    # Hard bound: x <= 5.
     assert s.add_constraint(
         Constraint(
             expression=_sum([_vt(x), Expression(constant=-5.0)]),
@@ -778,23 +682,16 @@ test "suggestion yields to stronger constraints via dual optimize" {
             strength=StrengthTier.REQUIRED,
         ),
     ).ok;
-    # Weak preference x == 3 is satisfiable at the default suggestion.
     assert s.add_edit_variable(x, StrengthTier.WEAK).ok;
     assert s.suggest_value(x, 3.0).ok;
     assert s.snapshot().values[x.id] == 3.0;
-
-    # Suggesting past the hard bound must clamp to it, not violate it.
     assert s.suggest_value(x, 100.0).ok;
     assert s.snapshot().values[x.id] == 5.0;
-    # And back below: feasibility restores along the way.
     assert s.suggest_value(x, 1.0).ok;
     assert s.snapshot().values[x.id] == 1.0;
 }
 
 test "incremental suggestion matches a from-scratch solve" {
-    # The edit mechanism is a soft equality whose constant moves; a
-    # sequence of suggestions must land where a fresh solver given the
-    # final value directly would land (kiwi semantics).
     inc = Solver();
     width_i = inc.new_variable();
     top_i = inc.new_variable();
@@ -832,8 +729,6 @@ test "incremental suggestion matches a from-scratch solve" {
     assert si[width_i.id] == sf[width_f.id];
     assert si[top_i.id] == sf[top_f.id];
     assert si[height_i.id] == sf[height_f.id];
-    # h == w + t under the required equality; verified against upstream
-    # kiwisolver 1.5.0 for this exact scenario.
     assert si[height_i.id] == 62.0;
 }
 
@@ -847,7 +742,6 @@ test "edit removal releases its constraint from the system" {
     handles_before = len(s.handle_keys);
     assert s.remove_edit_variable(x).ok;
     assert len(s.handle_keys) == handles_before - 1;
-    # Free again: defaults hold and re-editing is possible.
     assert s.snapshot().values[x.id] == 0.0;
     assert s.add_edit_variable(x, StrengthTier.MEDIUM).ok;
     assert s.suggest_value(x, 4.0).ok;
@@ -855,15 +749,9 @@ test "edit removal releases its constraint from the system" {
 }
 
 test "rebuild adoption swaps the full mutable state including worklist" {
-    # Regression: add_constraint's UNSAT-rebuild path adopted rows/kinds/
-    # var_symbols/objective/id_tick/cns but NOT infeasible_rows, leaving
-    # a stale worklist whose symbol ids denote different rows in the
-    # adopted tableau (latent suggest_value corruption).
     s = Solver();
     x = s.new_variable();
     y = s.new_variable();
-    # Soft constraints populate the objective; the equality pins x and
-    # keeps the tableau non-trivial for replay.
     assert s.add_constraint(eq(_vt(x, 1.0))).ok;
     assert s.add_constraint(
         Constraint(expression=_vt(y, 1.0), relation=Relation.EQ, strength=StrengthTier.WEAK)
@@ -871,18 +759,12 @@ test "rebuild adoption swaps the full mutable state including worklist" {
 
     bundle = s._replay_all(s.history);
     assert bundle is not None;
-
-    # Plant a stale entry the way a pre-adoption live solver could carry:
-    # an id beyond anything the bundle allocated.
     stale = bundle.id_tick + 999;
     s.infeasible_rows.append(stale);
 
     s._adopt(bundle);
-    # Worklist must come from the bundle, stale entry gone.
     assert s.infeasible_rows == bundle.infeasible_rows;
     assert stale not in s.infeasible_rows;
-    # The rest of the mutable state matches the bundle wholesale, and
-    # rebuild-invariant bookkeeping is preserved.
     assert sorted(s.rows.keys()) == sorted(bundle.rows.keys());
     assert sorted(s.var_symbols.keys()) == sorted(bundle.var_symbols.keys());
     assert s.id_tick == bundle.id_tick;

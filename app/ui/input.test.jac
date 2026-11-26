@@ -1,5 +1,3 @@
-"""Input normalization: escapes, paste, and coalescing."""
-
 test "plain ascii becomes text events" {
     norm = InputNormalizer();
     events = norm.feed("ab");
@@ -90,8 +88,6 @@ test "sgr mouse click decodes; motion is coalesced" {
     assert mouse.x == 10;
     assert mouse.y == 20;
     assert mouse.pressed;
-
-    # Motion bit (32) set — held until flush_coalesced.
     m1 = norm.feed("\x1b[<32;11;21M");
     m2 = norm.feed("\x1b[<32;12;22M");
     assert m1 == [];

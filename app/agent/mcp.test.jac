@@ -1,22 +1,3 @@
-"""Tests for agent/mcp.jac (same-stem annex, merged with the base module
-at test time - no import of the own stem). All transport tests run against
-a fake newline-delimited JSON-RPC MCP server generated into a temp dir at
-test time; the real `jac mcp` is never spawned here.
-
-Fake server modes:
-  normal   - handshake + echo/boom tools (transport basics)
-  silent   - never answers tools/list (timeout path)
-  paged    - tools/list pages 5 tools two at a time via nextCursor
-  requests - sends sampling/roots server->client requests before tools/list;
-             the listed tool name proves whether the client answered them
-  dieafter - exits immediately after the initialized notification (EOF path)
-
-A second fixture (FAKE_HTTP_SERVER_SRC) is a streamable-HTTP MCP server:
-initialize issues Mcp-Session-Id sess-42 and post-initialize requests
-without that header are rejected, tools/list answers as JSON, tools/call
-answers as text/event-stream (both client response paths).
-"""
-
 glob FAKE_SERVER_SRC: str = """
 import shutil;
 import sys, json, time, os
@@ -223,7 +204,6 @@ test "tools/list maps to ToolSpec-shaped specs" {
         assert echo["description"] == "Echo the given text back.";
         props: any = echo["parameters"].get("properties");
         assert isinstance(props, dict) and "text" in props;
-        # prefixed mapping avoids native-tool collisions
         prefixed = mcp_tool_specs(client, prefix="mcp_");
         names = [s["name"] for s in prefixed];
         assert "mcp_echo" in names;
@@ -243,7 +223,6 @@ test "tools/list follows nextCursor pagination to exhaustion" {
         assert res["ok"] is True;
         tools: any = res.get("tools", []);
         names = [str(t.get("name", "")) for t in tools];
-        # 5 tools across 3 pages (2+2+1) — no silent truncation.
         assert len(names) == 5;
         for i in range(5) {
             assert ("t" + str(i)) in names;
@@ -263,11 +242,8 @@ test "server-to-client requests are answered, never buffered" {
         res = mcp_list_tools(client, timeout_s=10.0);
         assert res["ok"] is True;
         tools: any = res.get("tools", []);
-        # The server names its only tool after what it observed: ok_ping
-        # means the client answered sampling/roots with method errors.
         names = [str(t.get("name", "")) for t in tools];
         assert "ok_ping" in names, str(names);
-        # And the requests were never buffered as notifications.
         for note in client.notifications {
             assert str(note.get("method", "")) != "sampling/createMessage";
         }
@@ -287,7 +263,6 @@ test "call_tool round trip through fake server" {
         assert res["ok"] is True;
         assert res.get("is_error") is False;
         assert res.get("result") == "echo:hello";
-        # JSON-RPC-level error for unknown tool fails loud at the seam
         bad = mcp_call_tool(client, "nope", {}, timeout_s=10.0);
         assert bad["ok"] is False;
         assert "unknown tool" in str(bad.get("error", ""));
@@ -321,14 +296,11 @@ test "server death fails in-flight calls fast and marks the client dead" {
     try {
         cmd = _write_mode_server(tmp, "dieafter");
         assert mcp_start(client, cmd, timeout_s=10.0)["ok"] is True;
-        # Give the server a moment to exit after the initialized notification.
         time.sleep(0.3);
         t0 = time.time();
         res = mcp_list_tools(client, timeout_s=10.0);
         elapsed = time.time() - t0;
         assert res["ok"] is False;
-        # EOF fast-fail (closed connection) or honest not-running — never a
-        # full 10s timeout burn.
         assert elapsed < 5.0;
         assert mcp_is_alive(client) is False;
     } finally {
@@ -344,7 +316,6 @@ test "spawn failure and empty-cmd fail loud without raising" {
     assert "failed to spawn" in str(res.get("error", ""));
     empty = mcp_start(client, []);
     assert empty["ok"] is False;
-    # calls before start also fail loud
     fresh = create_mcp_client();
     lt = mcp_list_tools(fresh);
     assert lt["ok"] is False;
@@ -391,7 +362,6 @@ test "prompts list and get round trip" {
         assert len(msgs) == 1;
         text: str = str(msgs[0].get("content", {}).get("text", ""));
         assert text == "Hello, jackal!", str(text);
-        # unknown prompt -> honest error at the seam
         bad = mcp_get_prompt(client, "nope", {}, timeout_s=10.0);
         assert bad["ok"] is False;
     } finally {
@@ -413,18 +383,15 @@ test "resources list and read round trip" {
         assert str(res[0]["uri"]) == "mem://notes/1";
         assert str(res[0]["name"]) == "notes";
         assert str(res[1]["mimeType"]) == "application/octet-stream";
-        # text content joins into "text", raw contents ride along
         got = mcp_read_resource(client, "mem://notes/1", timeout_s=10.0);
         assert got["ok"] is True;
         assert str(got.get("text", "")) == "resource one";
         contents: any = got.get("contents", []);
         assert isinstance(contents, list) and len(contents) == 1;
-        # blob content surfaces as an honest stub, never dropped
         blob = mcp_read_resource(client, "mem://bin/1", timeout_s=10.0);
         assert blob["ok"] is True;
         assert "[blob resource: application/octet-stream, 4 b64 chars]"
             in str(blob.get("text", ""));
-        # unknown uri -> honest JSON-RPC error at the seam
         bad = mcp_read_resource(client, "mem://nope", timeout_s=10.0);
         assert bad["ok"] is False;
         assert "unknown resource" in str(bad.get("error", ""));
@@ -504,8 +471,6 @@ print("READY %d" % srv.server_address[1], flush=True)
 srv.serve_forever()
 """;
 
-"""Spawn the fake HTTP server on an ephemeral port; returns the process and
-its URL (blocks until the server prints READY <port>)."""
 def _start_fake_http_server(tmp: str) -> tuple[any, str] {
     path: str = os.path.join(tmp, "mcp_http_server.py");
     with open(path, "w") as f {
@@ -549,24 +514,18 @@ test "http transport round trip: initialize, session echo, json and sse bodies" 
         res = mcp_start_http(client, url, {"X-Probe": "on"}, timeout_s=10.0);
         assert res["ok"] is True, str(res);
         assert res.get("server_name") == "fake-http-mcp";
-        # session id captured from the initialize response
         assert client.session_id == "sess-42";
-        # tools/list over the JSON body path (session id must be echoed or
-        # the server rejects with 400)
         listed = mcp_list_tools(client, timeout_s=10.0);
         assert listed["ok"] is True, str(listed);
         tools: any = listed.get("tools", []);
         assert len(tools) == 1;
         assert str(tools[0]["name"]) == "echo";
-        # tools/call over the text/event-stream body path
         call = mcp_call_tool(client, "echo", {"text": "hi"}, timeout_s=10.0);
         assert call["ok"] is True, str(call);
         assert str(call.get("result", "")) == "echo:hi";
-        # unknown method -> honest JSON-RPC error
         bad = mcp_call_tool(client, "nope", {}, timeout_s=10.0);
         assert bad["ok"] is False;
         assert "method not found" in str(bad.get("error", ""));
-        # stop sends DELETE; a fresh initialize on the same client works
         assert mcp_stop(client)["ok"] is True;
         again = mcp_start_http(client, url, timeout_s=10.0);
         assert again["ok"] is True, str(again);
@@ -589,16 +548,12 @@ test "http transport refuses bad urls and reports unreachable servers" {
     bad_scheme = mcp_start_http(client, "ftp://example.invalid/mcp");
     assert bad_scheme["ok"] is False;
     assert "http(s) url" in str(bad_scheme.get("error", ""));
-    # port 9 on loopback: nothing listens -> connection refused, fast
     refused = mcp_start_http(client, "http://127.0.0.1:9/mcp", timeout_s=5.0);
     assert refused["ok"] is False;
     err: str = str(refused.get("error", ""));
     assert "initialize failed" in err, str(err);
 }
 
-"""Interpreter for the Python fixture servers. Never `sys.executable`: in a
-native test runner that is the runner itself, so spawning it re-runs the
-suite recursively (a fork bomb)."""
 def _fixture_python -> str {
     found: str | None = shutil.which("python3");
     return found if found is not None else "python3";

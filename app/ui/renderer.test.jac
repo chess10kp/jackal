@@ -1,12 +1,3 @@
-# Behavior tests for retained damage renderer, patch scope, and cursor.
-#
-# Assert both final cells and patch scope so full clears cannot hide shrink,
-# move, overlay-close, or cursor-cleanup bugs (OSPUI.md §21, PLAN Gate 3).
-#
-# Same-stem annex of ui/renderer.jac: base symbols are ambient here — never
-# import from ui.renderer or ui.layout in this file (circular at collection);
-# pull everything else from leaves (ui.layout_types, ui.model).
-
 import from ui.model { MainScreen, Prompt, ApprovalOverlay, UiRegion, Layer, node_id }
 
 import from ui.mutation { append_child, detach }
@@ -29,7 +20,6 @@ node TextRegion(UiRegion) {
     has label: str = "";
 }
 
-# Spec builders over the permanent seam (legacy contract equivalents).
 def _sp(width: AxisSize, height: AxisSize) -> LayoutSpec {
     return LayoutSpec(width=width, height=height);
 }
@@ -135,8 +125,6 @@ test "first paint fills expected cells without full clear" {
 }
 
 test "growth damages union of old and new mid bounds and shifts bot" {
-    # Intrinsic mid sizes to content so growth shifts siblings; grow() fills
-    # leftover and is covered by the vertical shell layout tests.
     shell = _shell_renderer(40, 10);
     renderer = shell.renderer;
     screen = shell.screen;
@@ -303,9 +291,6 @@ test "overlay close damages old rect and restores underlying cells" {
     term.clear_writes();
 
     detach_node(renderer, overlay);
-    # mutation.detach cuts Child edges only; mirror runtime.close_overlay
-    # teardown by cutting the Layer edge so the overlay leaves the
-    # compute scope (a Layer-reached node needs a registered spec).
     for e in [edge screen ->:Layer:-> overlay] {
         del e;
     }
@@ -317,7 +302,6 @@ test "overlay close damages old rect and restores underlying cells" {
     assert not _rows_contain(cells_after, "Approve");
     assert result.used_full_clear == False;
     assert frame_used_full_clear(term.writes) == False;
-    # Old overlay rectangle must appear in damage so underlay is repainted.
     covered = False;
     for d in result.damage {
         if d.rect.intersects(overlay_rect) or d.reason == "detach" {
@@ -349,7 +333,6 @@ test "cursor placed in prompt region and cleared on detach" {
     term.clear_writes();
     detach_node(renderer, prompt);
     detach(prompt);
-    # Empty screen after detach: cursor must be cleared / relocated off-field.
     result2 = render_frame(renderer, screen, term);
     assert renderer.cursor_node_id == "";
     assert result2.cursor_row == -1 or result2.cursor_col == -1;
@@ -423,8 +406,6 @@ test "viewport change between frames adds full-frame resize damage" {
     }
     assert second_has_resize;
     assert second.used_full_clear == False;
-
-    # Same-size frame afterwards carries no resize damage.
     third = render_frame(renderer, screen, term);
     third_has_resize = False;
     for d in third.damage {
@@ -460,14 +441,10 @@ test "resize shrink repaints wrapped rows matching desired snapshot" {
     assert after.height > before.height;
     assert result.used_full_clear == False;
     assert frame_used_full_clear(term.writes) == False;
-    # Every visible cell must match the desired buffer: stale pixels from
-    # the wide layout are a resize bug even when no clear was emitted.
     painted = term.capture_cells();
     desired = desired_cells(renderer, screen);
     assert len(painted) == len(desired);
     for i in range(len(desired)) {
-        # capture_cells rstrips; a stale cell in the trailing span would
-        # survive the strip and break this equality.
         assert painted[i] == desired[i].rstrip();
     }
     term.stop();
@@ -530,7 +507,6 @@ test "overlapping overlays stack by z_index and closing top reveals lower" {
     term.start();
     render_frame(renderer, screen, term);
     cells = term.capture_cells();
-    # Higher z paints over lower wherever the layers overlap.
     assert _rows_contain(cells, "BRAVO");
     assert not _rows_contain(cells, "ALPHA");
 
@@ -592,9 +568,6 @@ test "disjoint edits yield separate small patch rects" {
     mark_semantic_dirty(renderer, top);
     mark_semantic_dirty(renderer, bot);
     result = render_frame(renderer, screen, term);
-
-    # Far-apart single-row edits must not coalesce into one screen-spanning
-    # patch: disjoint damage stays disjoint.
     assert len(result.patch_rects) == 2;
     total_area = 0;
     for r in result.patch_rects {
@@ -605,7 +578,6 @@ test "disjoint edits yield separate small patch rects" {
     cells = term.capture_cells();
     assert cells[0].startswith("HEAD");
     assert cells[_rect_of(renderer.layout, bot).y].startswith("FOOT");
-    # Undamaged middle keeps its content.
     assert "mid" in cells[1];
     term.stop();
 }
@@ -618,7 +590,6 @@ test "compute_damage unions prev and current rects after growth" {
     set_node_contract(renderer, mid, _intrinsic_spec());
     term = VirtualTerminal(columns=30, rows=10);
     term.start();
-    # First frame establishes the prev-rect damage baseline.
     render_frame(renderer, screen, term);
     set_node_content(renderer, mid, ["a", "b", "c", "d"]);
     mark_layout_dirty(renderer, mid);
