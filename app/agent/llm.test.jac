@@ -747,7 +747,7 @@ test "every provider route declares usable metadata" {
         assert isinstance(base_url, str) and base_url != "";
         key_env = route.get("key_env", "");
         assert isinstance(key_env, str);
-        if pid != "mock" {
+        if pid != "mock" and route.get("authType") != "oauth" {
             assert key_env != "";
         }
         assert isinstance(route.get("models", []), list);

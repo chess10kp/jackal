@@ -28,3 +28,10 @@ def refresh_model_catalog -> dict[str, int];
 def _refresh_one(provider: str);
 
 def _schedule_catalog_refresh(provider: str);
+
+def invalidate_openai_catalog;
+
+def fetch_account_models -> list[str];
+
+glob _OPENAI_LABELS: dict[str, str] = {};
+def account_model_label(model: str) -> str;

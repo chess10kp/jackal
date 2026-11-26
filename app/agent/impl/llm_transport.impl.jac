@@ -223,6 +223,9 @@ impl MockTransport.stream(
 }
 
 impl provider_for(model: str) -> str {
+    if model.startswith("openai/") {
+        return "openai";
+    }
     if model.startswith("openrouter/") {
         return "openrouter";
     }
@@ -251,6 +254,9 @@ impl routed_model_id(provider: str, name: str) -> str {
 impl credential_error(model: str) -> str {
     try {
         provider = provider_for(model);
+        if provider == "openai" {
+            return "" if configured_account() else "Use /login openai to continue with ChatGPT";
+        }
         if provider == "ext" {
             return "";
         }
@@ -295,6 +301,14 @@ impl make_transport(model: str = "", thinking: str = "", hook_bridge: any = None
     base_url = os.environ.get(base_url_env, str(route["base_url"]))
         if base_url_env
         else str(route["base_url"]);
+    if provider == "openai" {
+        return ChatGPTTransport(
+            model=stripped,
+            thinking=thinking,
+            hook_bridge=hook_bridge,
+            account_key=account_revision(),
+        );
+    }
     if provider == "mock" {
         return MockTransport(base_url=base_url, model=stripped, thinking=thinking);
     }
@@ -351,4 +365,12 @@ impl make_ext_transport(
     t.ext_cfg = cfg;
     t.hook_bridge = bridge;
     return t;
+}
+
+impl ChatGPTTransport.stream(
+    messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+) -> Iterator[dict[str, any]] {
+    yield from responses_stream(
+        self.model, self.thinking, messages, tool_defs, self, self.account_key
+    );
 }

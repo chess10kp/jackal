@@ -190,6 +190,7 @@ impl _tick_cmd(app: LiveShell) {
 }
 
 impl _tick_app(app: LiveShell) {
+    _tick_login(app);
     _tick_cmd(app);
     _tick_ui_modal(app);
     if app.phase == "streaming" {

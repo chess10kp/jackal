@@ -18,3 +18,5 @@ def _open_tasks_picker(app: LiveShell) -> str;
 def _open_checkpoints_picker(app: LiveShell) -> str;
 def _create_checkpoint_now(app: LiveShell, name: str) -> str;
 def _restore_checkpoint(app: LiveShell, name: str) -> str;
+
+def _tick_login(app: LiveShell);

@@ -39,6 +39,14 @@ obj MockTransport(Transport) {
 }
 
 glob PROVIDER_ROUTES: dict[str, dict[str, any]] = {
+    "openai": {
+        "description": "Continue with ChatGPT",
+        "base_url": "https://api.openai.com/v1",
+        "base_url_env": "",
+        "key_env": "",
+        "authType": "oauth",
+        "models": [],
+    },
     "openrouter": {
         "description": "OpenRouter multi-provider gateway",
         "base_url": "https://openrouter.ai/api/v1",
@@ -92,3 +100,10 @@ obj ProviderTransport(Transport) {
 def make_ext_transport(
     bridge: PluginBridge | None, model_id: str, thinking: str = ""
 ) -> ProviderTransport | None;
+
+obj ChatGPTTransport(Transport) {
+    has account_key: str = "";
+    override def stream(
+        messages: list[dict[str, any]], tool_defs: list[dict[str, any]]
+    ) -> Iterator[dict[str, any]];
+}

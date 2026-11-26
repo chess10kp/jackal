@@ -91,6 +91,13 @@ impl _run_slash(app: LiveShell, line: str) -> str {
             opened = _open_picker(app, "LOGOUT", have, have);
             return "" if opened else "logout picker unavailable (another choice is open)";
         }
+        if prov == "openai" {
+            if app.phase != "ready" {
+                return "Finish or abort the current turn before signing out";
+            }
+            start_logout();
+            return "Signing out of ChatGPT...";
+        }
         return logout_provider(prov);
     }
     if line == "/abort" {

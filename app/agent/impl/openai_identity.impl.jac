@@ -82,6 +82,9 @@ impl validate_identity(
         raise ValueError("unsupported ID token header");
     }
     keys: any = jwks.get("keys", []);
+    if not isinstance(keys, list) {
+        raise ValueError("invalid JWKS keys");
+    }
     matches: list[dict[str, any]] = [];
     for key in keys {
         if isinstance(key, dict) and key.get("kid") == header["kid"] {
@@ -111,9 +114,15 @@ impl validate_identity(
     if claims.get("iss") != "https://auth.openai.com" {
         raise ValueError("ID token issuer rejected");
     }
-    for name in ["exp", "iat"] {
+    for name in ["exp", "iat", "nbf"] {
+        if name == "nbf" and name not in claims {
+            continue;
+        }
         value: any = claims.get(name);
-        if isinstance(value, bool) or not isinstance(value, (int, float)) {
+        if isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+        {
             raise ValueError("ID token timestamp missing");
         }
     }

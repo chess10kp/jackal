@@ -282,6 +282,9 @@ impl _model_completion_candidates(prefix: str) -> list[list[str]] {
         if isinstance(route, dict) {
             desc = str(route.get("description", "") or "");
         }
+        if prov == "openai" {
+            desc = account_model_label(mid);
+        }
         out.append(["/model " + mid, desc]);
     }
     return out;

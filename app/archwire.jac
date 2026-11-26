@@ -1699,3 +1699,54 @@ graph import ui {
     width ++> transcript { wrap_text }
     width ++> vt_screen { grapheme_width }
 }
+
+graph import agent {
+    openai_accounts ++> openai_login {
+        ISSUER,
+        RESOURCE,
+        host_identity,
+        selected_account,
+        request_json,
+        token_record,
+        save_account,
+    }
+    openai_identity ++> openai_accounts { validate_identity }
+}
+
+graph import {
+    agent.openai_accounts ++> agent.llm_transport { configured_account, account_revision }
+    agent.openai_responses ++> agent.llm_transport { responses_stream }
+}
+
+graph import {
+    agent.openai_login ++> tui.picker_actions { start_login, cancel_login, poll_login }
+    agent.openai_accounts ++> tui.picker_actions { configured_account }
+    agent.model_catalog ++> tui.picker_actions { invalidate_openai_catalog, warm_model_catalog }
+    tui.picker_actions ++> tui.input { _tick_login }
+}
+
+graph import {
+    agent.openai_accounts ++> agent.auth_env { logout_account, configured_account }
+}
+
+graph import {
+    agent.openai_accounts ++> agent.model_catalog { configured_account, request_json, access_token }
+}
+
+graph import agent {
+    openai_accounts ++> openai_responses { access_token }
+}
+
+graph import {
+    agent.openai_accounts ++> tui.picker_actions { read_accounts, select_account }
+}
+
+graph import {
+    agent.openai_accounts ++> agent.model_catalog { account_revision }
+    agent.model_catalog ++> tui.overlay { account_model_label }
+}
+
+graph import {
+    agent.openai_accounts ++> agent.openai_login { logout_account }
+    agent.openai_login ++> tui.commands { start_logout }
+}

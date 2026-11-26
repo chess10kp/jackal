@@ -229,3 +229,32 @@ test "tui picker is owned by the window stack and closes cleanly" {
         sb.cleanup();
     }
 }
+
+test "ChatGPT login picker exposes saved registrations and cancels without a model call" {
+    sb = make_sandbox();
+    tui: TuiSession | None = None;
+    try {
+        with open(os.path.join(sb.agent_dir, "openai-accounts.json"), "w") as target {
+            target.write(
+                '{"accounts":{"oaiapp_saved:subject":{"client_id":"oaiapp_saved","subject":"subject","email":"person@example.invalid"}},"active":"oaiapp_saved:subject"}',
+            );
+        }
+        tui = spawn_tui(sb);
+        tui.type_text("/login");
+        tui.press("enter");
+        tui.wait_for("Continue with ChatGPT", 20.0);
+        tui.press("esc");
+        tui.wait_for("login cancelled", 20.0);
+        tui.type_text("/login openai");
+        tui.press("enter");
+        tui.wait_for("person@example.invalid", 20.0);
+        tui.wait_for("another ChatGPT", 20.0);
+        tui.press("esc");
+        assert sb.calls() == [], "account selection does not invoke a model";
+    } finally {
+        if tui is not None {
+            tui.close();
+        }
+        sb.cleanup();
+    }
+}

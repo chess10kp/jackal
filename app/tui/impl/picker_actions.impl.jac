@@ -16,9 +16,11 @@ impl _login_provider_entries -> dict[str, any] {
         );
         item = {
             "id": provider_id,
-            "displayName": provider_id,
+            "displayName": "Continue with ChatGPT" if provider_id == "openai" else provider_id,
             "authType": auth_type,
-            "configured": bool(status.get("configured", False)),
+            "configured": configured_account()
+                if provider_id == "openai"
+                else bool(status.get("configured", False)),
             "modelCount": len(meta.get("models", []) or []),
         };
         rows.append(format_provider_label(item));
@@ -50,6 +52,7 @@ impl _login_error(app: LiveShell, message: str) {
 }
 
 impl _cancel_login(app: LiveShell) {
+    cancel_login();
     app.auth_flow = transition_auth_flow(app.auth_flow, "cancel");
     if _picker_state(app) is not None {
         _close_picker(app);
@@ -59,6 +62,66 @@ impl _cancel_login(app: LiveShell) {
 }
 
 impl _start_login_provider(app: LiveShell, provider_id: str) {
+    if provider_id.startswith("openai-account:") {
+        cancel_login();
+        ready = select_account(provider_id[len("openai-account:"):]);
+        invalidate_openai_catalog();
+        if _picker_state(app) is not None {
+            _close_picker(app);
+        }
+        if ready {
+            warm_model_catalog();
+            _push_turn(app, "tool", "ChatGPT account selected. Use /model to choose its models.");
+        } else {
+            start_login();
+        }
+        app.dirty = True;
+        return;
+    }
+    if provider_id == "openai-new" or provider_id == "openai-reauthorize" {
+        if _picker_state(app) is not None {
+            _close_picker(app);
+        }
+        start_login(new_account=provider_id == "openai-new");
+        _push_turn(app, "tool", "Opening ChatGPT sign-in. Use /login cancel to cancel.");
+        app.dirty = True;
+        return;
+    }
+    if provider_id == "openai" {
+        data: dict[str, any] = {};
+        try {
+            data = read_accounts();
+        } except Exception {
+            _login_error(app, "Cannot read the protected ChatGPT account store");
+            return;
+        }
+        accounts: dict[str, any] = data["accounts"];
+        if accounts {
+            rows: list[str] = [];
+            ids: list[str] = [];
+            for key in accounts {
+                record: dict[str, any] = accounts[key];
+                label = str(record.get("email", "") or record.get("subject", "ChatGPT account"));
+                rows.append(
+                    label
+                        + " ("
+                        + str(record.get("client_id", ""))[-8:]
+                        + ")"
+                        + (" [active]" if key == data.get("active") else ""),
+                );
+                ids.append("openai-account:" + key);
+            }
+            rows.append("Continue with another ChatGPT account");
+            ids.append("openai-new");
+            rows.append("Authorize selected account again");
+            ids.append("openai-reauthorize");
+            if _picker_state(app) is not None {
+                _close_picker(app);
+            }
+            _open_picker(app, "LOGIN", rows, ids);
+            return;
+        }
+    }
     entries = _login_provider_entries();
     stored: dict[str, any] = entries.get("stored", {});
     found: dict[str, any] | None = None;
@@ -80,12 +143,19 @@ impl _start_login_provider(app: LiveShell, provider_id: str) {
         app.auth_flow, "set_logging_in", {"providerId": provider_id, "status": "starting"}
     );
     if auth_type == "oauth" {
-        result = oauth_start_login(provider_id);
-        detail = str(result.get("detail", "") or "") if isinstance(result, dict) else "";
-        _login_error(
-            app,
-            "OAuth login is unavailable in the native runtime" + (": " + detail if detail else ""),
+        if provider_id != "openai" {
+            _login_error(app, "Account sign-in is not implemented for " + provider_id);
+            return;
+        }
+        start_login();
+        app.auth_flow = transition_auth_flow(
+            app.auth_flow, "set_browser_auth", {"providerId": provider_id}
         );
+        if _picker_state(app) is not None {
+            _close_picker(app);
+        }
+        _push_turn(app, "tool", "Opening ChatGPT sign-in. Use /login cancel to cancel.");
+        app.dirty = True;
         return;
     }
     if not key_env {
@@ -136,6 +206,21 @@ impl _complete_api_key_login(app: LiveShell, provider_id: str, key: str) {
 }
 
 impl _open_login_picker(app: LiveShell, provider_arg: str = "") -> str {
+    if provider_arg == "cancel" {
+        _cancel_login(app);
+        return "";
+    }
+    if provider_arg == "openai new" {
+        start_login(new_account=True);
+        app.auth_flow = transition_auth_flow(
+            app.auth_flow, "set_browser_auth", {"providerId": "openai"}
+        );
+        _push_turn(
+            app, "tool", "Opening ChatGPT sign-in for another account. Use /login cancel to cancel."
+        );
+        app.dirty = True;
+        return "";
+    }
     entries = _login_provider_entries();
     rows: list[str] = list(entries.get("rows", []));
     ids: list[str] = list(entries.get("ids", []));
@@ -347,4 +432,34 @@ impl _restore_checkpoint(app: LiveShell, name: str) -> str {
     }
     app.dirty = True;
     return "checkpoint '" + name + "' restored (" + str(len(msgs)) + " msgs" + note + ")";
+}
+
+impl _tick_login(app: LiveShell) {
+    while True {
+        event = poll_login();
+        if not event {
+            return;
+        }
+        kind = str(event.get("kind", ""));
+        if kind == "browser" {
+            _push_turn(app, "tool", "Continue with ChatGPT: " + str(event["url"]));
+        } elif kind == "success" {
+            app.auth_flow = transition_auth_flow(
+                app.auth_flow, "set_logged_in", {"providerId": "openai"}
+            );
+            invalidate_openai_catalog();
+            warm_model_catalog();
+            _push_turn(
+                app,
+                "tool",
+                "Signed in with ChatGPT. Use /model to choose an account model; /login openai new adds another account.",
+            );
+        } elif kind == "logout" {
+            invalidate_openai_catalog();
+            _push_turn(app, "tool", str(event["message"]));
+        } elif kind == "error" {
+            _login_error(app, str(event["message"]));
+        }
+        app.dirty = True;
+    }
 }

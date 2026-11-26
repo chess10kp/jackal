@@ -1,85 +1,39 @@
-# OpenAI account sign-in scope
+# OpenAI account sign-in
 
-Requested: ChatGPT account sign-in, not API-key entry.
+Jackal supports ChatGPT account sign-in through OpenAI's documented open-source registration flow. It creates its own client registration and uses the Responses API with the account's granted ChatGPT plan permission.
 
-## Current behavior
+## Use it
 
-`tui/picker_actions.jac` constructs `/login` from `PROVIDER_ROUTES`.
-OAuth selection always reports unavailable. `agent/auth_network.jac` has
-unimplemented authorization and refresh seams. `agent/llm_transport.jac`
-implements Chat Completions, not Responses.
+1. Start the TUI with `./run.sh` and enter `/login openai`, or select **Continue with ChatGPT** from `/login`.
+2. Complete authorization in the browser. If the browser does not open, use the URL shown in the terminal. Sign-in expires after five minutes; `/login cancel` cancels it.
+3. Use `/model` to choose an `openai/<slug>` model from your account's catalog. Display names appear beside the model commands.
+4. `/login openai` also opens the saved-account picker. Choose an existing registration, add another account, or authorize the selected account again. `/login openai new` starts a new registration directly.
+5. `/logout openai` removes the active session's local tokens and attempts remote revocation. A message distinguishes confirmed revocation from a local-only sign-out. The registration remains available for reauthorization.
 
-## Implementation boundary
+The browser must reach Jackal's loopback callback at `127.0.0.1`. When running Jackal over SSH, forward the callback port shown in its authorization URL before completing authorization, or run the binary on the browser's machine. A callback URL must not be pasted into the chat prompt.
 
-Use OpenAI's documented open-source Sign in with ChatGPT flow, with Jackal's
-own dynamic client registration. Do not reuse Codex's client ID or credentials.
+API-key login remains available under `openai_compat` and the other existing providers. Account tokens are never exported as API-key environment variables.
 
-1. Persist a stable, opaque host ID. Start a loopback callback listener before
-   opening the browser. Generate fresh state, nonce, and PKCE per attempt.
-2. Validate callback state and issued client ID; exchange the code. Validate
-   the ID-token signature using JWKS, issuer, audience, expiry, and nonce.
-   Require the returned plan-usage permission before enabling inference.
-3. Save credentials atomically with owner-only permissions, retaining the
-   issued client ID and verified identity. Keep pending sign-ins separate
-   from the active account. Refresh rotating credentials as one transaction.
-4. Add a distinct account-auth provider route and Responses transport. Convert
-   conversation history, function calls, and tool results; normalize streamed
-   text, calls, completion, and errors for the existing agent loop.
-5. Run authorization off the TUI thread. Support cancellation and timeout;
-   show the authorization URL for users whose browser is on another machine.
-6. Test malformed callbacks, rejected consent, invalid signatures and claims,
-   missing permissions, expired/revoked tokens, refresh rotation, storage
-   failures, text streaming, and multi-turn tool use. Build both native entries
-   on box-7a0637; account consent is a separate user-operated live check.
+## Storage and implementation
 
-## Native dependency investigation / human handoff (updated November 26)
+Credentials live in `openai-accounts.json` under `JACKAL_AGENT_DIR`, or `~/.jackal` when that variable is unset. The launcher defaults `JACKAL_AGENT_DIR` to the repo's `pi/` directory. The file is written atomically with mode `0600`; newly created parent directories use `0700`. Do not share or commit this file.
 
-Neojac 0.5.3 is installed locally and was copied to the VM at
-`/data/home/.local/bin/neojac-0.5.3` without replacing its old compiler.
-Its native C-library interface supports statically linked OpenSSL crypto.
-`app/agent/openai_identity.jac` now implements RS256 verification using
-OpenSSL EVP, RSA JWKS conversion, and issuer/audience/expiry/nonce/subject
-checks. It compiled in isolation on the VM. Synthetic signed-token fixtures
-and security tests are beside it; the private fixture key was discarded.
-The three native security tests now pass on replacement dev box
-`jackal-extra-1` with neojac 0.5.3 (14.7 seconds). They cover a valid
-signature, tampering, invalid issuer/audience/nonce/timestamps, unsupported
-algorithm, unknown signing key, malformed tokens, and account substitution.
-The previous box became unavailable during test transfer.
+A stable host UUID survives restarts. Each attempt uses fresh state, nonce and PKCE, and starts its loopback listener before opening the browser. Callback state and issued client ID are checked before token exchange. ID tokens undergo native OpenSSL RS256 verification plus issuer, audience, validity, nonce and subject checks. ChatGPT plan permission is required separately.
 
-The full application build with 0.5.3 also reports E2231 (requires
-`archwire.jac`), E3058 (redundant lint selection), and E3059 (old lint ignore
-configuration). Owner: Jackal toolchain migration. Minimal recommended fix:
-migrate the project manifest and import wiring to the new compiler format,
-preserving the existing native placement policy, then build both entries.
-This is separate from implementing OAuth. The replacement dev box is now
-reachable using `instabox ssh jackal-extra-1`; neojac is installed there at
-`/data/workspace/neojac` (also linked from `~/.local/bin/neojac`).
+Registrations are keyed by issued client ID and verified subject, so identical emails do not merge accounts. A pending attempt leaves the active account unchanged until validation succeeds. Refreshes hold a cross-process file lock while exchanging and atomically replacing the rotating token pair. A transport retains its selected account for the whole turn, even if the user selects another account.
 
-Account login is still unimplemented and disabled. The native verifier is
-preparatory code, not a verified authentication feature or deliverable binary.
+The account route uses `https://api.openai.com/v1/models` and `/responses`, with `store: false` and streaming enabled. Conversation history includes prior function calls and their outputs. Buffered function calls reach the agent only after an explicit successful terminal event; truncated or failed streams remain errors even after partial text.
 
-### Earlier investigation
+Source modules are `app/agent/openai_accounts.jac`, `openai_login.jac`, `openai_identity.jac`, and `openai_responses.jac`, with bodies in their `impl/` annexes. UI integration uses the existing login picker and frame tick. The project requires neojac 0.5.3's architecture wiring and implementation-annex format.
 
-On box-7a0637, neojac 0.3.2 rejects `import jwt` with W1100 (module not found).
-This proves no JWT module is available through that import; it does not prove
-that lower-level cryptography or another native library cannot implement OIDC.
-At that point no native ID-token verification implementation had been established.
+## Verification
 
-Owner: Jackal integration, with neojac runtime/library support if needed.
-The new OpenSSL implementation above replaces the earlier proposed next step
-of establishing a supported native signature-verification boundary.
-Do not replace signature verification with base64 decoding. The repository's
-AGENTS.md rule 4 requires stopping and documenting framework gaps for the human.
-Implementation is not complete; no login option has been enabled.
+Development and native builds run on `jackal-extra-1`, in `/data/workspace/jackal-openai`, isolated from the other VM session. Automated tests cover signed-token rejection, callback HTTP handling, account isolation and private storage, refresh-record rotation, missing plan permission, Responses history conversion, and unsuccessful terminal streams. A PTY test covers the account picker and cancellation.
 
-The VM checkout also contains extensive pre-existing edits, including auth and
-transport files. Preserve those edits when continuing; do not overwrite it with
-the local checkout.
+Real account consent, a live refresh grant, remote revocation and subscription-backed inference require a user-operated account check; automated fixtures do not establish that live authorization succeeded. Test results and binary paths are recorded in the delivery message.
 
-## Primary references
+## Protocol references
 
-- https://developers.openai.com/siwc/token-sharing-open-source
-- https://developers.openai.com/siwc/token-sharing-open-source/sign-in
-- https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference
-- https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions
+- [Registration and sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+- [Models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)
+- [Profiles and sessions](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)

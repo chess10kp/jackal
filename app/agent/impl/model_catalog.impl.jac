@@ -65,7 +65,11 @@ impl _merge_catalog_result(
     provider: str, fetched: list[str], fallback: list[str], now_ms: int
 ) -> list[str] {
     if fetched {
-        _CATALOG_CACHE[provider] = {"models": list(fetched), "fetched_ms": now_ms};
+        _CATALOG_CACHE[provider] = {
+            "models": list(fetched),
+            "fetched_ms": now_ms,
+            "account": account_revision() if provider == "openai" else "",
+        };
         return list(fetched);
     }
     stale: any = _CATALOG_CACHE.get(provider);
@@ -107,6 +111,9 @@ impl _fetch_route_models(route: dict[str, any]) -> list[str] {
     if _is_local_route(route) {
         return [];
     }
+    if route.get("authType") == "oauth" {
+        return fetch_account_models();
+    }
     try {
         base = str(route.get("base_url", ""));
         url = base.rstrip("/") + "/models";
@@ -141,6 +148,12 @@ impl catalog_models(provider: str) -> list[str] {
         return _static_models(route);
     }
     cached: any = _CATALOG_CACHE.get(provider);
+    if provider == "openai"
+        and isinstance(cached, dict)
+        and cached.get("account") != account_revision()
+    {
+        cached = None;
+    }
     models: any = cached.get("models") if isinstance(cached, dict) else None;
     if (isinstance(models, list) and models) {
         if not _entry_is_fresh(cached, _now_ms(), _ttl_ms()) {
@@ -176,11 +189,14 @@ impl refresh_model_catalog -> dict[str, int] {
 
 impl _refresh_one(provider: str) {
     try {
+        revision = account_revision() if provider == "openai" else "";
         raw_route: any = PROVIDER_ROUTES.get(provider);
         route: dict[str, any] = raw_route if isinstance(raw_route, dict) else {};
         if not _is_local_route(route) {
             fetched: list[str] = _fetch_route_models(route);
-            _merge_catalog_result(provider, fetched, _static_models(route), _now_ms());
+            if provider != "openai" or revision == account_revision() {
+                _merge_catalog_result(provider, fetched, _static_models(route), _now_ms());
+            }
         }
     } except Exception {} finally {
         _CATALOG_REFRESHING.pop(provider, None);
@@ -193,4 +209,36 @@ impl _schedule_catalog_refresh(provider: str) {
     }
     _CATALOG_REFRESHING[provider] = True;
     flow _refresh_one(provider);
+}
+
+impl invalidate_openai_catalog {
+    _CATALOG_CACHE.pop("openai", None);
+}
+
+impl fetch_account_models -> list[str] {
+    out: list[str] = [];
+    try {
+        if not configured_account() {
+            return out;
+        }
+        payload = request_json("https://api.openai.com/v1/models", bearer=access_token());
+        rows: any = payload.get("models", []);
+        if not isinstance(rows, list) {
+            return out;
+        }
+        for row in rows {
+            if isinstance(row, dict) and row.get("visibility") == "list" {
+                slug: any = row.get("slug");
+                if isinstance(slug, str) and slug and slug not in out {
+                    _OPENAI_LABELS["openai/" + slug] = str(row.get("display_name", slug));
+                    out.append(slug);
+                }
+            }
+        }
+    } except Exception {}
+    return out;
+}
+
+impl account_model_label(model: str) -> str {
+    return _OPENAI_LABELS.get(model, "Continue with ChatGPT");
 }

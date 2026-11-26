@@ -2,6 +2,7 @@ import base64;
 import json;
 import time;
 import re;
+import math;
 
 import from crypto {
     def BIO_new_mem_buf(buf: bytes, length: i32) -> ptr;

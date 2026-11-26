@@ -3,6 +3,9 @@
 
 # Pi isolated agent dir (pi/): secrets and session logs
 pi/auth.json
+openai-accounts.json
+openai-accounts.json.lock
+.openai-*
 pi/sessions/
 pi/mcp-cache.json
 pi/mcp-npx-cache.json

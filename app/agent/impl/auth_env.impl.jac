@@ -29,6 +29,9 @@ impl note_hydrated(key_env: str) {
 }
 
 impl logout_provider(provider_id: str) -> str {
+    if provider_id == "openai" {
+        return logout_account();
+    }
     if provider_id not in PROVIDER_ROUTES {
         return "unknown provider: " + provider_id;
     }
@@ -55,7 +58,7 @@ impl stored_providers -> list[str] {
     data = load_auth_file(resolve_auth_path());
     out: list[str] = [];
     for prov in PROVIDER_ROUTES {
-        if has_credential(data, str(prov)) {
+        if configured_account() if str(prov) == "openai" else has_credential(data, str(prov)) {
             out.append(str(prov));
         }
     }
