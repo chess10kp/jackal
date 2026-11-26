@@ -32,16 +32,38 @@ own dynamic client registration. Do not reuse Codex's client ID or credentials.
    failures, text streaming, and multi-turn tool use. Build both native entries
    on box-7a0637; account consent is a separate user-operated live check.
 
-## Native dependency investigation / human handoff
+## Native dependency investigation / human handoff (updated November 26)
+
+Neojac 0.5.3 is installed locally and was copied to the VM at
+`/data/home/.local/bin/neojac-0.5.3` without replacing its old compiler.
+Its native C-library interface supports statically linked OpenSSL crypto.
+`app/agent/openai_identity.jac` now implements RS256 verification using
+OpenSSL EVP, RSA JWKS conversion, and issuer/audience/expiry/nonce/subject
+checks. It compiled in isolation on the VM. Synthetic signed-token fixtures
+and security tests are beside it; the private fixture key was discarded.
+Those tests have **not run**: Instabox began returning
+`no sandbox with ID or name "box-7a0637"` during test transfer.
+
+The full application build with 0.5.3 also reports E2231 (requires
+`archwire.jac`), E3058 (redundant lint selection), and E3059 (old lint ignore
+configuration). Owner: Jackal toolchain migration. Minimal recommended fix:
+migrate the project manifest and import wiring to the new compiler format,
+preserving the existing native placement policy, then build both entries.
+This is separate from implementing OAuth and requires a working dev box.
+
+Account login is still unimplemented and disabled. The native verifier is
+preparatory code, not a verified authentication feature or deliverable binary.
+
+### Earlier investigation
 
 On box-7a0637, neojac 0.3.2 rejects `import jwt` with W1100 (module not found).
 This proves no JWT module is available through that import; it does not prove
 that lower-level cryptography or another native library cannot implement OIDC.
-No native ID-token verification implementation has yet been established.
+At that point no native ID-token verification implementation had been established.
 
 Owner: Jackal integration, with neojac runtime/library support if needed.
-Minimal recommended next step: establish a supported native JWKS/JWT signature
-verification API, or explicitly choose a reviewed crypto helper boundary.
+The new OpenSSL implementation above replaces the earlier proposed next step
+of establishing a supported native signature-verification boundary.
 Do not replace signature verification with base64 decoding. The repository's
 AGENTS.md rule 4 requires stopping and documenting framework gaps for the human.
 Implementation is not complete; no login option has been enabled.
