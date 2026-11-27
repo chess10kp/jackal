@@ -40,10 +40,13 @@ test "submit streams the reply into the transcript" {
     try {
         h.type_text("hi jackal");
         h.press("enter");
+        h.wait_for("streamed");
+        assert "▍" not in h.screen(), str(h.dump());
         h.wait_for("streamed reply from mock");
         h.wait_idle();
         txt = h.screen();
         assert "◆ You" not in txt and "◇ Jackal" not in txt, str(h.dump());
+        assert "Jackal ·" not in txt and "mode" not in txt.splitlines()[0], str(h.dump());
         assert "hi jackal" in txt, str(h.dump());
         calls = h.calls();
         assert len(calls) == 1 and calls[0]["last"]["content"] == "hi jackal", str(h.dump());
