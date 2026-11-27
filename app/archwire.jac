@@ -150,7 +150,24 @@ graph import {
     core.edit ++> agent.tools { apply_edit }
     core.edit ++> tui.overlay { compute_unified_diff }
     tui.format ++> ui.demo_live_shell_messages { format_turn }
-    ui.editor ++> tui.input { editor_backspace, editor_history_prev, editor_history_next }
+    ui.editor ++> tui.input {
+        editor_backspace,
+        editor_delete_forward,
+        editor_move_left,
+        editor_move_right,
+        editor_move_home,
+        editor_move_end,
+        editor_move_word_left,
+        editor_move_word_right,
+        editor_kill_to_end,
+        editor_kill_to_start,
+        editor_kill_word_left,
+        editor_kill_word_right,
+        editor_yank,
+        editor_transpose,
+        editor_history_prev,
+        editor_history_next,
+    }
     ui.emulated_terminal ++> e2e.harness { EmulatedTerminal }
     ui.emulated_terminal ++> tui.harness { EmulatedTerminal }
     ui.input ++> tui.input { HostEvent, TextEvent, KeyEvent, PasteEvent, coalesce_events }
@@ -175,7 +192,7 @@ graph import {
     ui.runtime ++> tui.state { UiSession }
     ui.screen ++> agent.protocol { ShellScreen }
     ui.screen ++> tui.core { configure_main_shell_layout }
-    ui.screen ++> tui.input { shell_insert_text, shell_submit, shell_cancel }
+    ui.screen ++> tui.input { shell_insert_text, shell_submit }
     ui.screen ++> tui.runtime { shell_resize }
     ui.screen ++> tui.shell { build_main_shell, install_shell_contracts }
     ui.screen ++> tui.state { ShellScreen }
@@ -205,6 +222,8 @@ graph import agent {
         load_auth_file,
         save_auth_file,
         resolve_auth_path,
+        load_auth_merged,
+        pi_agent_dir,
         stored_api_key,
         credential_remove,
         has_credential,
@@ -219,6 +238,9 @@ graph import agent {
         _path_dirname,
         _file_chmod,
         resolve_auth_path,
+        pi_agent_dir,
+        pi_agent_auth_path,
+        load_auth_merged,
         load_auth_file,
         save_auth_file,
         validate_credential,

@@ -31,6 +31,7 @@ node Prompt(UiRegion) {
         caret: int = 0,
         sel_anchor: int = -1,
         sel_end: int = -1,
+        kill_buffer: str = "",
         history: list[str] = [],
         history_index: int = -1;
 }

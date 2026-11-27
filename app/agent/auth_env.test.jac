@@ -43,3 +43,26 @@ test "hydrate exports stored keys and logout clears only those" {
         shutil.rmtree(tmp_dir, ignore_errors=True);
     }
 }
+
+test "hydrate maps Pi openai id to OPENAI_API_KEY" {
+    key_env = "OPENAI_API_KEY";
+    saved_dir = os.environ.get("JACKAL_AGENT_DIR");
+    saved_key = os.environ.pop(key_env, None);
+    tmp_dir = _with_agent_dir({"openai": {"type": "api_key", "key": "sk-openai-from-pi"}});
+    os.environ["JACKAL_AGENT_DIR"] = tmp_dir;
+    try {
+        assert "openai_compat" in hydrate_auth_environment();
+        assert os.environ.get(key_env) == "sk-openai-from-pi";
+    } finally {
+        os.environ.pop(key_env, None);
+        if saved_key is not None {
+            os.environ[key_env] = saved_key;
+        }
+        if saved_dir is None {
+            os.environ.pop("JACKAL_AGENT_DIR", None);
+        } else {
+            os.environ["JACKAL_AGENT_DIR"] = saved_dir;
+        }
+        shutil.rmtree(tmp_dir, ignore_errors=True);
+    }
+}

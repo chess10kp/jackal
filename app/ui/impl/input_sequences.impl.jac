@@ -182,8 +182,20 @@ impl decode_sequence(seq: str) -> HostEvent {
     if seq == "\x0b" {
         return KeyEvent(key="ctrl+k");
     }
+    if seq == "\x10" {
+        return KeyEvent(key="ctrl+p");
+    }
+    if seq == "\x0e" {
+        return KeyEvent(key="ctrl+n");
+    }
     if seq == "\x17" {
         return KeyEvent(key="ctrl+w");
+    }
+    if seq == "\x19" {
+        return KeyEvent(key="ctrl+y");
+    }
+    if seq == "\x14" {
+        return KeyEvent(key="ctrl+t");
     }
     if seq == ESC + "\x0a" {
         return KeyEvent(key="alt+ctrl+j");

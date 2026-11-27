@@ -131,6 +131,132 @@ impl editor_move_end(prompt: Prompt) {
     prompt.caret = i;
 }
 
+impl editor_move_word_left(prompt: Prompt) {
+    editor_clear_selection(prompt);
+    i = _clamp(prompt.caret, 0, len(prompt.draft));
+    while i > 0 and prompt.draft[i - 1] == " " {
+        i -= 1;
+    }
+    while i > 0 and prompt.draft[i - 1] != " " and prompt.draft[i - 1] != "\n" {
+        i -= 1;
+    }
+    prompt.caret = i;
+}
+
+impl editor_move_word_right(prompt: Prompt) {
+    editor_clear_selection(prompt);
+    i = _clamp(prompt.caret, 0, len(prompt.draft));
+    while i < len(prompt.draft) and prompt.draft[i] != " " and prompt.draft[i] != "\n" {
+        i += 1;
+    }
+    while i < len(prompt.draft) and prompt.draft[i] == " " {
+        i += 1;
+    }
+    prompt.caret = i;
+}
+
+impl editor_kill_to_end(prompt: Prompt) {
+    if editor_has_selection(prompt) {
+        a = min(prompt.sel_anchor, prompt.sel_end);
+        b = max(prompt.sel_anchor, prompt.sel_end);
+        prompt.kill_buffer = prompt.draft[a:b];
+        _delete_selection(prompt);
+        return;
+    }
+    end = prompt.caret;
+    while end < len(prompt.draft) and prompt.draft[end] != "\n" {
+        end += 1;
+    }
+    if end > prompt.caret {
+        prompt.kill_buffer = prompt.draft[prompt.caret:end];
+        prompt.draft = prompt.draft[:prompt.caret] + prompt.draft[end:];
+    }
+}
+
+impl editor_kill_to_start(prompt: Prompt) {
+    if editor_has_selection(prompt) {
+        a = min(prompt.sel_anchor, prompt.sel_end);
+        b = max(prompt.sel_anchor, prompt.sel_end);
+        prompt.kill_buffer = prompt.draft[a:b];
+        _delete_selection(prompt);
+        return;
+    }
+    start = prompt.caret;
+    while start > 0 and prompt.draft[start - 1] != "\n" {
+        start -= 1;
+    }
+    if start < prompt.caret {
+        prompt.kill_buffer = prompt.draft[start:prompt.caret];
+        prompt.draft = prompt.draft[:start] + prompt.draft[prompt.caret:];
+        prompt.caret = start;
+    }
+}
+
+impl editor_kill_word_left(prompt: Prompt) {
+    if editor_has_selection(prompt) {
+        editor_kill_to_start(prompt);
+        return;
+    }
+    end = prompt.caret;
+    start = end;
+    while start > 0 and prompt.draft[start - 1] == " " {
+        start -= 1;
+    }
+    while start > 0 and prompt.draft[start - 1] != " " and prompt.draft[start - 1] != "\n" {
+        start -= 1;
+    }
+    if start < end {
+        prompt.kill_buffer = prompt.draft[start:end];
+        prompt.draft = prompt.draft[:start] + prompt.draft[end:];
+        prompt.caret = start;
+    }
+}
+
+impl editor_kill_word_right(prompt: Prompt) {
+    if editor_has_selection(prompt) {
+        editor_kill_to_end(prompt);
+        return;
+    }
+    start = prompt.caret;
+    end = start;
+    while end < len(prompt.draft) and prompt.draft[end] == " " {
+        end += 1;
+    }
+    while end < len(prompt.draft) and prompt.draft[end] != " " and prompt.draft[end] != "\n" {
+        end += 1;
+    }
+    if end > start {
+        prompt.kill_buffer = prompt.draft[start:end];
+        prompt.draft = prompt.draft[:start] + prompt.draft[end:];
+    }
+}
+
+impl editor_yank(prompt: Prompt) {
+    editor_insert(prompt, prompt.kill_buffer);
+}
+
+impl editor_transpose(prompt: Prompt) {
+    n = len(prompt.draft);
+    if n < 2 {
+        return;
+    }
+    i = _clamp(prompt.caret, 0, n);
+    if i == 0 {
+        return;
+    }
+    if i == n {
+        i -= 1;
+    }
+    left = i - 1;
+    right = i;
+    prompt.draft = prompt.draft[:left]
+        + prompt.draft[right]
+        + prompt.draft[left]
+        + prompt.draft[right + 1:];
+    prompt.caret = min(n, right + 1);
+    editor_clear_selection(prompt);
+}
+
 impl editor_move_up(prompt: Prompt) {
     editor_clear_selection(prompt);
     line_start = prompt.caret;

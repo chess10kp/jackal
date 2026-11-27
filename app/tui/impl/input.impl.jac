@@ -294,6 +294,66 @@ impl _handle_key(app: LiveShell, key: str) {
         _scroll_transcript(app, max(1, app.proj.viewport_height) - 1);
         return;
     }
+    if key == "left" or key == "ctrl+b" {
+        editor_move_left(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "right" or key == "ctrl+f" {
+        editor_move_right(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "ctrl+a" {
+        editor_move_home(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "ctrl+e" {
+        editor_move_end(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "alt+b" {
+        editor_move_word_left(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "alt+f" {
+        editor_move_word_right(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "ctrl+k" {
+        editor_kill_to_end(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "ctrl+w" {
+        editor_kill_word_left(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "alt+d" {
+        editor_kill_word_right(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "alt+backspace" or key == "alt+\x7f" {
+        editor_kill_word_left(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "ctrl+y" {
+        editor_yank(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
+    if key == "ctrl+t" {
+        editor_transpose(app.shell.prompt);
+        app.dirty = True;
+        return;
+    }
     if key == "home" {
         set_follow_tail(app.proj, False);
         app.proj.view.scroll_offset = 0;
@@ -320,7 +380,19 @@ impl _handle_key(app: LiveShell, key: str) {
         }
         return;
     }
+    if key == "ctrl+p" {
+        if app.phase != "streaming" {
+            _history_up(app);
+        }
+        return;
+    }
     if key == "down" {
+        if app.phase != "streaming" {
+            _history_down(app);
+        }
+        return;
+    }
+    if key == "ctrl+n" {
         if app.phase != "streaming" {
             _history_down(app);
         }
@@ -362,13 +434,16 @@ impl _handle_key(app: LiveShell, key: str) {
         return;
     }
     if key == "ctrl+u" {
-        shell_cancel(app.session, app.shell);
+        editor_kill_to_start(app.shell.prompt);
         app.shell.prompt.history_index = -1;
         app.dirty = True;
         return;
     }
     if key == "ctrl+d" {
-        if not app.shell.prompt.draft {
+        if app.shell.prompt.draft {
+            editor_delete_forward(app.shell.prompt);
+            app.dirty = True;
+        } else {
             app.running = False;
         }
         return;

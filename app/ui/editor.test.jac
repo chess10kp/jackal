@@ -56,6 +56,34 @@ test "caret display col respects wide glyph width" {
     assert editor_caret_display_col(p) == display_width(p.draft);
 }
 
+test "readline word movement and kill yank" {
+    p = Prompt(key="p");
+    editor_insert(p, "one two");
+    editor_move_word_left(p);
+    assert p.caret == 4;
+    editor_move_word_right(p);
+    assert p.caret == 7;
+    editor_kill_word_left(p);
+    assert p.draft == "one ";
+    assert p.kill_buffer == "two";
+    editor_yank(p);
+    assert p.draft == "one two";
+    assert p.caret == 7;
+}
+
+test "readline kill to line boundaries and transpose" {
+    p = Prompt(key="p");
+    editor_insert(p, "abcd");
+    p.caret = 2;
+    editor_kill_to_end(p);
+    assert p.draft == "ab";
+    assert p.kill_buffer == "cd";
+    editor_yank(p);
+    assert p.draft == "abcd";
+    editor_transpose(p);
+    assert p.draft == "abdc";
+}
+
 test "AblePrompt abilities handle insert submit cancel" {
     handle = create_session();
     session = handle.session;

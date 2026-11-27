@@ -15,6 +15,7 @@ Jac-native terminal coding agent.
 5. **Forward product work:** `app/`, its tests, and docs.
 6. **Jac compiler bugs:** file an upstream issue at jaseci-labs/jac without waiting for the user, make the fix in the `vendor/jac` checkout so work can continue, and put the implementation details in that issue.
 7. **Dev host (instabox):** Use the **jackal-extra-1** (account: `nitin@jaseci.org`) box for compiling and hands-on work on this repo (neojac builds, `jac build`, heavy tests) unless the user directs otherwise — not a compute-constrained local machine.
+8. **User delivery:** Focus on the user's requests and do the work in the VM. For code changes, build a fresh binary by default and return the complete binary when the project supports it. Target the VM's native platform unless the user specifies another target. Leave the binary in the project's normal build output path and report that exact path. Run the full test suite before delivery when practical; if it cannot be run, state the specific blocker and what verification was completed. Keep status updates brief and factual.
 
 ---
 

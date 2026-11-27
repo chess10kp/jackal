@@ -24,6 +24,11 @@ def _path_dirname(p: str) -> str;
 
 def _file_chmod(p: str, mode: int);
 def resolve_auth_path(agent_dir: str = "") -> str;
+
+def pi_agent_dir -> str;
+
+def pi_agent_auth_path -> str;
+def load_auth_merged(primary_path: str) -> dict[str, any];
 def load_auth_file(path: str) -> dict[str, any];
 
 def save_auth_file(path: str, data: dict[str, any]) -> bool;

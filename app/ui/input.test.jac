@@ -207,6 +207,20 @@ test "alt ctrl j and k decode from control bytes" {
     assert k_down.key == "alt+ctrl+j";
 }
 
+test "readline control and meta keys decode" {
+    norm = InputNormalizer();
+    assert (norm.feed("\x01")[0] as KeyEvent).key == "ctrl+a";
+    assert (norm.feed("\x05")[0] as KeyEvent).key == "ctrl+e";
+    assert (norm.feed("\x02")[0] as KeyEvent).key == "ctrl+b";
+    assert (norm.feed("\x06")[0] as KeyEvent).key == "ctrl+f";
+    assert (norm.feed("\x19")[0] as KeyEvent).key == "ctrl+y";
+    assert (norm.feed("\x14")[0] as KeyEvent).key == "ctrl+t";
+    assert (norm.feed("\x10")[0] as KeyEvent).key == "ctrl+p";
+    assert (norm.feed("\x0e")[0] as KeyEvent).key == "ctrl+n";
+    assert (norm.feed("\x1bb")[0] as KeyEvent).key == "alt+b";
+    assert (norm.feed("\x1bf")[0] as KeyEvent).key == "alt+f";
+}
+
 test "modified home end and tilde keys decode" {
     norm = InputNormalizer();
     k1 = norm.feed("\x1b[1;5H")[0] as KeyEvent;

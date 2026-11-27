@@ -31,6 +31,20 @@ def editor_move_home(prompt: Prompt);
 
 def editor_move_end(prompt: Prompt);
 
+def editor_move_word_left(prompt: Prompt);
+
+def editor_move_word_right(prompt: Prompt);
+def editor_kill_to_end(prompt: Prompt);
+def editor_kill_to_start(prompt: Prompt);
+
+def editor_kill_word_left(prompt: Prompt);
+
+def editor_kill_word_right(prompt: Prompt);
+
+def editor_yank(prompt: Prompt);
+
+def editor_transpose(prompt: Prompt);
+
 def editor_move_up(prompt: Prompt);
 
 def editor_move_down(prompt: Prompt);

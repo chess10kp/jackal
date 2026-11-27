@@ -88,7 +88,7 @@ impl _prompt_lines(app: LiveShell) -> list[str] {
     } elif app.shell.approval is not None {
         hint = "modal — a accept · r reject";
     } else {
-        hint = "enter send · ↑↓ history · ctrl+u clear";
+        hint = "enter send · ↑↓ history · ctrl+a/e line · ctrl+u/k kill";
     }
     hint = truncate_text(hint, max(0, w - 4), ellipsis="…");
     hint_w = display_width(hint);

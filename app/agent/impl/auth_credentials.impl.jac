@@ -25,6 +25,27 @@ impl resolve_auth_path(agent_dir: str = "") -> str {
     return os.path.join(base, AUTH_FILE_NAME);
 }
 
+impl pi_agent_dir -> str {
+    return os.path.join(_path_expanduser("~"), ".pi", "agent");
+}
+
+impl pi_agent_auth_path -> str {
+    return os.path.join(pi_agent_dir(), AUTH_FILE_NAME);
+}
+
+impl load_auth_merged(primary_path: str) -> dict[str, any] {
+    merged: dict[str, any] = {};
+    pi_path = pi_agent_auth_path();
+    if pi_path != primary_path and os.path.isfile(pi_path) {
+        merged = load_auth_file(pi_path);
+    }
+    primary = load_auth_file(primary_path);
+    for key in primary {
+        merged[str(key)] = primary[key];
+    }
+    return merged;
+}
+
 impl load_auth_file(path: str) -> dict[str, any] {
     if not os.path.isfile(path) {
         return {};
