@@ -176,6 +176,12 @@ impl decode_sequence(seq: str) -> HostEvent {
     if seq == "\x05" {
         return KeyEvent(key="ctrl+e");
     }
+    if seq == "\x02" {
+        return KeyEvent(key="ctrl+b");
+    }
+    if seq == "\x06" {
+        return KeyEvent(key="ctrl+f");
+    }
     if seq == "\x15" {
         return KeyEvent(key="ctrl+u");
     }
