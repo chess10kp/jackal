@@ -66,6 +66,7 @@ test "approval modal: y runs the tool" {
         h.type_text("make a.txt");
         h.press("enter");
         h.wait_for("approve");
+        assert "▍" not in h.screen(), str(h.dump());
         assert not h.exists("a.txt");
         h.press("y");
         h.wait_for("wrote a.txt");
@@ -80,7 +81,7 @@ test "approval modal: n denies and the model is told" {
     h = open_tui(
         script=[
             {
-                "text": "",
+                "text": "I can write b.txt.",
                 "tool_calls": [{"name": "write_file", "args": {"path": "b.txt", "content": "B"}}],
             },
             {"text": "ok, skipped"},
@@ -90,6 +91,8 @@ test "approval modal: n denies and the model is told" {
         h.type_text("make b.txt");
         h.press("enter");
         h.wait_for("approve");
+        assert "I can write b.txt." in h.screen(), str(h.dump());
+        assert "▍" not in h.screen(), str(h.dump());
         h.press("n");
         h.wait_for("ok, skipped");
         h.wait_idle();

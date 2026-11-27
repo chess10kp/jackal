@@ -33,7 +33,7 @@ impl _begin_assistant_reply(app: LiveShell, user_text: str) {
     );
     app.stream_shown = 0;
     app.stream_tick = 0;
-    app.stream_msg_id = _push_turn(app, "assistant", "▍");
+    app.stream_msg_id = _push_turn(app, "assistant", "");
     app.status_hint = "streaming";
 }
 
@@ -55,11 +55,7 @@ impl _tick_stream(app: LiveShell) {
         return;
     }
     app.stream_shown = min(len(app.stream_full), app.stream_shown + step);
-    body = app.stream_full[:app.stream_shown];
-    if app.stream_shown < len(app.stream_full) {
-        body = body + "█";
-    }
-    _rewrite_turn(app, app.stream_msg_id, "assistant", body);
+    _rewrite_turn(app, app.stream_msg_id, "assistant", app.stream_full[:app.stream_shown]);
     frac = float(app.stream_shown) / float(max(1, len(app.stream_full)));
     app.progress_value = 0.08 + 0.55 * frac;
     app.progress spawn SetProgress(value=app.progress_value);

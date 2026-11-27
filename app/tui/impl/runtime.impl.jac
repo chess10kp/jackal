@@ -27,7 +27,7 @@ impl _begin_assistant_reply(app: LiveShell, user_text: str, model_text: str = ""
     app.stream_tick = 0;
     q = queue.Queue();
     app.evq = q;
-    app.stream_msg_id = _push_turn(app, "assistant", "▍");
+    app.stream_msg_id = _push_turn(app, "assistant", "");
     def collector(kind: str, data: dict[str, any]) {
         try {
             q.put((str(kind), dict(data)));
@@ -180,7 +180,7 @@ impl _tick_stream(app: LiveShell) {
         }
     }
     if chunks_pending {
-        _rewrite_turn(app, app.stream_msg_id, "assistant", app.stream_full + "▍");
+        _rewrite_turn(app, app.stream_msg_id, "assistant", app.stream_full);
     }
     if drained {
         app.dirty = True;
