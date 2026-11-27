@@ -24,11 +24,21 @@ Jac-native terminal coding agent.
 Canonical workspace for Jackal compile and dev work:
 
 ```bash
-npx instabox@latest ssh jackal-extra-1
+~/.config/instabox/accounts/jackal/instabox ssh jackal-extra-1
 cd ~/repos/jackal
 ```
 
 Default account: **`nitin@jaseci.org`**. Use **`jackal-extra-1`** for development by default; the older `box-7a0637` is no longer the default. If the checkout is missing on the new box, prepare `~/repos/jackal` there before starting development.
+
+**Account selection on this machine:** use `~/.config/instabox/accounts/jackal/instabox` for all Jackal VM commands. This private wrapper loads the dedicated `nitin@jaseci.org` API key from `~/.config/instabox/accounts/jackal/api-key`, independently of the CLI's saved login or other account wrappers. Do not log out or replace the global login to switch accounts. The older `~/.config/instabox/agents/neojac-codex/instabox` wrapper selects `nmadhu@umich.edu` and cannot access this VM.
+
+```bash
+~/.config/instabox/accounts/jackal/instabox whoami
+~/.config/instabox/accounts/jackal/instabox get jackal-extra-1
+~/.config/instabox/accounts/jackal/instabox exec jackal-extra-1 --cwd /data/home/repos/jackal -- <command>
+```
+
+The key and wrapper stay outside Git (directory/wrapper mode `700`, key mode `600`). Never print or commit the key. If the wrapper is missing on another machine, provision an account-specific key there; these paths describe local setup, not files supplied by the repository.
 
 Repo path on the box: **`~/repos/jackal`**. Run `./run.sh`, `neojac build` / `neojac test`, and `cd app && ../jac build` there by default.
 
