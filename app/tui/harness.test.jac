@@ -1,9 +1,14 @@
-test "first frame: header hidden, prompt, terminal modes" {
+test "first frame: no startup banner, prompt, terminal modes" {
     h = open_tui();
     try {
         h.wait_for("❯");
         assert h.term.find("● ready") is None, str(h.dump());
-        assert h.term.find("❯") is not None, str(h.dump());
+        assert h.term.find("· System") is None, str(h.dump());
+        assert h.term.find("Jackal ·") is None, str(h.dump());
+        assert h.term.find("/help for commands") is None, str(h.dump());
+        lines = h.term.viewport();
+        assert lines[-2] == "─" * 100, str(h.dump());
+        assert lines[-1].strip() == "❯", str(h.dump());
         assert h.term.alternate_screen and h.term.bracketed_paste, str(h.dump());
         assert h.term.title.startswith("Jackal"), str(h.term.title);
         for line in h.term.viewport() {
@@ -113,7 +118,7 @@ test "yolo mode runs tools without a modal" {
         mode="yolo",
     );
     try {
-        h.wait_for("YOLO");
+        assert h.app.mode == "yolo", str(h.dump());
         h.type_text("edit it");
         h.press("enter");
         h.wait_for("edited");
@@ -124,17 +129,18 @@ test "yolo mode runs tools without a modal" {
     }
 }
 
-test "slash commands render output and shift+tab cycles the mode badge" {
+test "slash commands render output and shift+tab changes mode" {
     h = open_tui();
     try {
         h.type_text("/help");
         h.press("enter");
         h.wait_for("/compact");
         h.press("shift+tab");
-        h.wait_for("AUTO");
+        h.step();
+        assert h.app.mode == "auto-accept", str(h.dump());
         h.type_text("/mode plan");
         h.press("enter");
-        h.wait_for("PLAN");
+        h.wait_for("[plan] ❯");
         assert h.calls() == [];
     } finally {
         h.close();

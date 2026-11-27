@@ -14,7 +14,7 @@ impl _apply_resize(app: LiveShell, columns: int, rows: int) {
     app.renderer = create_renderer(columns, rows);
     _install_layout(app);
     app.proj.viewport_width = max(12, columns - 2);
-    app.proj.viewport_height = max(4, rows - 6);
+    app.proj.viewport_height = max(4, rows - 5);
     app.dirty = True;
 }
 

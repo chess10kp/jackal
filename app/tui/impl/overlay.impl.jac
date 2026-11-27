@@ -359,19 +359,7 @@ impl _slash_popup_rows(app: LiveShell, matches: list[list[str]]) -> list[str] {
 
 impl _transcript_lines(app: LiveShell) -> list[str] {
     win = materialize_visible(app.proj);
-    if win.lines {
-        return win.lines;
-    }
-    w = max(10, app.columns - 2);
-    return [
-        "",
-        truncate_text("  Jackal — native agent harness", w, ellipsis="…"),
-        "",
-        truncate_text("  Type a message below, or try /help for commands.", w, ellipsis="…"),
-        "",
-        truncate_text("  Example:  explain how the transcript layout works", w, ellipsis="…"),
-        "",
-    ];
+    return win.lines;
 }
 
 impl _paint(app: LiveShell) {
@@ -391,7 +379,7 @@ impl _paint(app: LiveShell) {
     set_node_contract(
         app.renderer,
         app.shell.prompt,
-        LayoutSpec(width=fill_axis(), height=fixed_axis(3 + len(popup_rows))),
+        LayoutSpec(width=fill_axis(), height=fixed_axis(len(prompt_lines) + len(popup_rows))),
     );
     overlay: list[str] | None = None;
     if app.phase == "approval" {
@@ -426,8 +414,8 @@ impl _paint(app: LiveShell) {
     mark_layout_dirty(app.renderer, app.shell.screen);
     prefix_w = display_width(_prompt_prefix(app.mode));
     draft_w = display_width(app.shell.prompt.draft);
-    cursor_col = 1 + prefix_w + draft_w;
-    max_col = app.columns - 2;
+    cursor_col = prefix_w + draft_w;
+    max_col = app.columns - 1;
     if cursor_col > max_col {
         cursor_col = max_col;
     }

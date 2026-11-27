@@ -48,7 +48,6 @@ graph import {
     agent.llm ++> tui.shell { warm_model_catalog }
     agent.modes ++> main { requires_approval, is_read_only_mode, read_only_mode_block_reason }
     agent.modes ++> tui.commands { DEV_MODES }
-    agent.modes ++> tui.core { is_read_only_mode }
     include agent.modes ++> tui.input { cycle_mode, is_read_only_mode }
     agent.modes ++> tui.runtime {
         requires_approval,
@@ -211,7 +210,7 @@ graph import {
     ui.transcript ++> tui.picker_actions { apply_transcript_revision }
     ui.transcript ++> tui.shell { bind_transcript, set_follow_tail }
     ui.transcript ++> tui.state { TranscriptProjection, TranscriptMessage }
-    ui.width ++> tui.core { display_width, truncate_text }
+    ui.width ++> tui.core { truncate_text }
     ui.width ++> tui.overlay { display_width, truncate_text }
     ui.width ++> tui.window { display_width, truncate_text }
 }
@@ -984,7 +983,7 @@ graph import tui {
     context ++> picker_actions { _skills_picker_entries }
     core ++> commands { _push_turn }
     core ++> input { _push_turn, _scroll_transcript }
-    include core ++> overlay { _rule, _pad_to, _prompt_prefix, _prompt_lines }
+    core ++> overlay { _prompt_prefix, _prompt_lines }
     core ++> picker_actions { _push_turn, _meter }
     core ++> runtime { _push_turn, _rewrite_turn, _finish_turn, _install_layout }
     core ++> shell { _push_turn, _install_layout }

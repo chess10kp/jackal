@@ -1,6 +1,5 @@
 def _rule(width: int, ch: str = "─") -> str;
 
-def _pad_to(text: str, width: int) -> str;
 def _meter(value: float, width: int) -> str;
 
 def _next_id(app: LiveShell) -> str;

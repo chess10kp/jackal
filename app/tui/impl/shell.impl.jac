@@ -15,7 +15,7 @@ impl create_live_shell(term: Terminal | None = None) -> LiveShell {
     shell = build_main_shell(session);
     install_shell_contracts(session, shell, "live.transcript");
     proj = bind_transcript(
-        shell.transcript, "live.transcript", width=max(12, cols - 2), height=max(4, rows - 6)
+        shell.transcript, "live.transcript", width=max(12, cols - 2), height=max(4, rows - 5)
     );
     set_follow_tail(proj, True);
     renderer = create_renderer(cols, rows);
@@ -31,18 +31,6 @@ impl create_live_shell(term: Terminal | None = None) -> LiveShell {
         mode=get_mode(),
     );
     _install_layout(app);
-    _push_turn(
-        app,
-        "system",
-        "Jackal · "
-            + get_model()
-            + " · "
-            + app.mode
-            + " mode\n"
-            + "cwd "
-            + os.getcwd()
-            + " · /help for commands · shift+tab cycles mode · ctrl+c cancels a turn",
-    );
     return app;
 }
 
